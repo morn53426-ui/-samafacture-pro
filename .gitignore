@@ -1,0 +1,19 @@
+# Secrets — ne jamais committer
+.env
+server/.env
+
+# Dépendances
+node_modules/
+server/node_modules/
+mobile/node_modules/
+
+# Sauvegardes / fichiers générés
+server/backups/
+server/pdf-jobs/
+*.log
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

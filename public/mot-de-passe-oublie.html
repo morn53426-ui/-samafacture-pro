@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Mot de passe oublié — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div id="auth-side-root"></div>
+    <div class="auth-form-side">
+      <div class="auth-form-card">
+        <h2>Mot de passe oublié</h2>
+        <p style="color:var(--ink-soft); margin-bottom:26px;">Indiquez votre email, nous vous enverrons un lien de réinitialisation.</p>
+        <div id="error-box"></div>
+        <div id="success-box"></div>
+        <form id="forgot-form">
+          <div class="field">
+            <label>Adresse email</label>
+            <input type="email" id="email" required placeholder="vous@entreprise.com" />
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; padding:12px;">Envoyer le lien de réinitialisation</button>
+        </form>
+        <p style="margin-top:20px; font-size:0.88rem; color:var(--ink-soft);">
+          <a href="login.html" style="color:var(--emerald); font-weight:600;"><i class="ic" data-icon="arrow-left"></i> Retour à la connexion</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/auth-slider.js"></script>
+<script>
+  if (Api.token()) location.href = 'dashboard.html';
+  initAuthSlider();
+
+  document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorBox = document.getElementById('error-box');
+    const successBox = document.getElementById('success-box');
+    errorBox.innerHTML = '';
+    successBox.innerHTML = '';
+    const email = document.getElementById('email').value.trim();
+    const form = e.target;
+    const restore = setButtonLoading(form.querySelector('button[type=submit]'), 'Envoi en cours…');
+    try {
+      const { message } = await Api.post('/auth/mot-de-passe-oublie', { email });
+      successBox.innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:0.85rem;">${message}</div>`;
+      form.reset();
+    } catch (err) {
+      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+    } finally {
+      restore();
+    }
+  });
+</script>
+</body>
+</html>

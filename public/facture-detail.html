@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Facture — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+<style>
+  body { background: #EDEAE2; }
+  .wrap { max-width: 800px; margin: 30px auto; }
+  .toolbar { display:flex; justify-content:flex-end; gap:10px; margin-bottom:16px; }
+  .invoice-doc, .invoice-doc * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @media print {
+    body { background: #fff; }
+    .toolbar { display: none; }
+    .wrap { margin: 0; max-width: none; }
+    .invoice-doc { border: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <button class="btn btn-outline" onclick="window.close()">Fermer</button>
+      <button class="btn btn-outline" onclick="telechargerPdf(this)"><i class="ic" data-icon="download"></i> Télécharger le PDF</button>
+      <button class="btn btn-primary" onclick="window.print()"><i class="ic" data-icon="printer"></i> Imprimer / Exporter en PDF</button>
+    </div>
+    <div class="invoice-doc" id="doc"></div>
+  </div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/facture-templates.js"></script>
+<script>
+  requireAuthPage();
+  const id = new URLSearchParams(location.search).get('id');
+  let user, templates;
+
+  async function telechargerPdf(btn) {
+    const restore = setButtonLoading(btn, 'Génération du PDF…');
+    try {
+      const res = await fetch(`${API_BASE}/factures/${id}/pdf`, {
+        headers: { Authorization: `Bearer ${Api.token()}` }
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Erreur ${res.status} lors de la génération du PDF.`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (res.headers.get('content-disposition') || '').match(/filename="(.+)"/)?.[1] || `document-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      restore();
+    }
+  }
+
+  async function load() {
+    // 🐛 Correctif : l'utilisateur était lu depuis Api.currentUser() (localStorage `sf_user`),
+    // rempli uniquement lors d'un login/register normal dans un vrai navigateur. Or cette même
+    // page est aussi ouverte par Puppeteer en headless pour générer le PDF (server/utils/pdf.js) :
+    // ce flux-là n'injecte qu'un token temporaire (`sf_token`) dans localStorage, jamais `sf_user`.
+    // Résultat avant ce correctif : `Api.currentUser()` valait `null` dans ce contexte, et
+    // `user.devise`/`user.facture_template` levait une exception synchrone dès le chargement du
+    // script — la page ne rendait jamais rien, `window.__docReady` n'était jamais posé, et
+    // Puppeteer finissait par expirer après 15s (échec systématique de la génération PDF, quel
+    // que soit le modèle choisi). On récupère maintenant l'utilisateur via GET /auth/me, qui ne
+    // dépend que du token (présent dans les deux contextes) — et on obtient au passage des
+    // données toujours à jour (logo/modèle/personnalisation tout juste enregistrés).
+    const [{ user: freshUser }, { facture, lignes, qr_code }] = await Promise.all([
+      Api.get('/auth/me'),
+      Api.get(`/factures/${id}`)
+    ]);
+    user = freshUser;
+    templates = createFactureTemplates({
+      escapeHtml, formatDate, statutBadge,
+      formatMontant: (n) => formatMontant(n, user.devise)
+    });
+
+    const isDevis = facture.type === 'devis';
+    const template = user.facture_template || 'classique';
+
+    document.getElementById('doc').innerHTML = templates.renderInvoiceHtml({
+      user, facture, lignes, isDevis, qrCode: qr_code, template,
+      // Personnalisation (couleurs/logo/police) enregistrée par l'utilisateur — voir
+      // public/parametres.html et server/routes/auth.js. Absente => rendu par défaut du modèle,
+      // inchangé. C'est cette même page qui est capturée par Puppeteer pour générer le PDF
+      // (server/utils/pdf.js), donc rien d'autre à modifier pour que la personnalisation
+      // s'applique aussi au PDF téléchargé.
+      personnalisation: user.facture_personnalisation || null
+    });
+    document.getElementById('doc').className = `invoice-doc tpl-${template}`;
+
+    // Signal utilisé par la génération de PDF côté serveur (Puppeteer attend cette variable
+    // avant de capturer la page — voir server/routes/factures.js, route /:id/pdf).
+    window.__docReady = true;
+  }
+
+  load().catch(err => showFatalError(err.message));
+</script>
+</body>
+</html>

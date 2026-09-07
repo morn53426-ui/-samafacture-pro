@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Rapports — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+<script src="js/chart-loader.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div><h1>Rapports</h1><p>Analysez vos ventes et votre comptabilité</p></div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px;">
+      <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
+        <div class="field" style="margin:0;"><label>Du</label><input type="date" id="from" /></div>
+        <div class="field" style="margin:0;"><label>Au</label><input type="date" id="to" /></div>
+        <div class="field" style="margin:0;">
+          <label>Regrouper par</label>
+          <select id="group_by">
+            <option value="day">Jour</option>
+            <option value="week">Semaine</option>
+            <option value="month" selected>Mois</option>
+            <option value="year">Année</option>
+            <option value="client">Client</option>
+            <option value="produit">Produit</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="loadVentes().catch(err => alert(err.message))">Appliquer</button>
+        <button class="btn btn-outline" onclick="exportCsv()"><i class="ic" data-icon="download"></i> Export CSV</button>
+        <button class="btn btn-outline" onclick="exportExcel()"><i class="ic" data-icon="download"></i> Export Excel <span class="plan-badge" style="margin:0 0 0 6px;"><i class="ic" data-icon="star"></i> Pro</span></button>
+      </div>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom:18px;">
+      <div class="card stat-card">
+        <div class="stat-icon icon-emerald"><i class="ic" data-icon="banknote"></i></div>
+        <div class="stat-label">Recettes</div>
+        <div class="stat-value mono" id="rec-recettes">0</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-icon icon-clay"><i class="ic" data-icon="wallet"></i></div>
+        <div class="stat-label">Dépenses</div>
+        <div class="stat-value mono" id="rec-depenses">0</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-icon icon-navy"><i class="ic" data-icon="trending-up"></i></div>
+        <div class="stat-label">Bénéfice net</div>
+        <div class="stat-value mono" id="rec-benefice">0</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-icon icon-gold"><i class="ic" data-icon="receipt"></i></div>
+        <div class="stat-label">TVA collectée</div>
+        <div class="stat-value mono" id="rec-tva">0</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:18px;">
+      <h3 id="chart-title">Ventes par mois</h3>
+      <canvas id="chart-ventes" height="110"></canvas>
+    </div>
+
+    <div class="card" style="padding:0;">
+      <table>
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('rapports');
+
+  let chart;
+  let currentRows = [];
+  let currentGroupBy = 'month';
+
+  async function loadComptabilite() {
+    const from = document.getElementById('from').value;
+    const to = document.getElementById('to').value;
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    const stats = await Api.get('/rapports/comptabilite?' + qs.toString());
+    document.getElementById('rec-recettes').textContent = formatMontant(stats.recettes);
+    document.getElementById('rec-depenses').textContent = formatMontant(stats.depenses);
+    document.getElementById('rec-benefice').textContent = formatMontant(stats.benefice);
+    document.getElementById('rec-tva').textContent = formatMontant(stats.tva_collectee);
+  }
+
+  async function loadVentes() {
+    const from = document.getElementById('from').value;
+    const to = document.getElementById('to').value;
+    const group_by = document.getElementById('group_by').value;
+    currentGroupBy = group_by;
+    const qs = new URLSearchParams({ group_by });
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+
+    const { rows } = await Api.get('/rapports/ventes?' + qs.toString());
+    currentRows = rows;
+
+    const labels = { day: 'jour', week: 'semaine', month: 'mois', year: 'année', client: 'client', produit: 'produit' };
+    document.getElementById('chart-title').textContent = `Ventes par ${labels[group_by]}`;
+
+    await window.chartReady;
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById('chart-ventes'), {
+      type: 'bar',
+      data: {
+        labels: rows.length ? rows.map(r => r.label) : ['—'],
+        datasets: [{ label: 'Total', data: rows.length ? rows.map(r => r.total) : [0], backgroundColor: '#0FA980', borderRadius: 6, maxBarThickness: 44 }]
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#EDEAE2' } }, x: { grid: { display: false } } } }
+    });
+
+    const isProduit = group_by === 'produit';
+    document.getElementById('table-head').innerHTML = isProduit
+      ? `<tr><th>Produit</th><th>Quantité vendue</th><th>Total</th></tr>`
+      : `<tr><th>${labels[group_by].charAt(0).toUpperCase() + labels[group_by].slice(1)}</th><th>Factures</th><th>Total</th></tr>`;
+
+    document.getElementById('table-body').innerHTML = rows.length ? rows.map(r => isProduit
+      ? `<tr><td>${escapeHtml(r.label)}</td><td class="mono">${r.quantite}</td><td class="mono">${formatMontant(r.total)}</td></tr>`
+      : `<tr><td>${escapeHtml(r.label)}</td><td class="mono">${r.nb_factures}</td><td class="mono">${formatMontant(r.total)}</td></tr>`
+    ).join('') : `<tr><td colspan="3"><div class="empty-state"><div class="ic">${Icon('bar-chart')}</div>Aucune donnée pour cette période</div></td></tr>`;
+
+    loadComptabilite().catch(err => alert(err.message));
+  }
+
+  function exportCsv() {
+    if (!currentRows.length) { alert('Aucune donnée à exporter.'); return; }
+    const isProduit = currentGroupBy === 'produit';
+    const header = isProduit ? ['Produit', 'Quantite', 'Total'] : ['Periode', 'Factures', 'Total'];
+    const lines = [header.join(';')];
+    currentRows.forEach(r => {
+      lines.push(isProduit ? [r.label, r.quantite, r.total].join(';') : [r.label, r.nb_factures, r.total].join(';'));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `rapport-ventes-${currentGroupBy}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportExcel() {
+    const from = document.getElementById('from').value;
+    const to = document.getElementById('to').value;
+    const qs = new URLSearchParams({ group_by: currentGroupBy });
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+
+    try {
+      const res = await fetch('/api/rapports/export-excel?' + qs.toString(), {
+        headers: { 'Authorization': `Bearer ${Api.token()}` }
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Impossible de générer le fichier Excel.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'rapport-samafacture.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  loadVentes().catch(err => showFatalError(err.message));
+</script>
+</body>
+</html>

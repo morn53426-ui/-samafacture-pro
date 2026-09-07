@@ -1,0 +1,35 @@
+# SamaFacture Pro — robots.txt
+# ⚠️ Remplacez "votredomaine.com" ci-dessous par votre vrai nom de domaine une fois en ligne
+# (voir le README : pensez aussi à configurer APP_URL dans .env).
+
+User-agent: *
+Allow: /
+
+# Pages applicatives (nécessitent une connexion, aucun contenu utile à indexer)
+Disallow: /dashboard.html
+Disallow: /clients.html
+Disallow: /factures.html
+Disallow: /devis.html
+Disallow: /nouvelle-facture.html
+Disallow: /factures-recurrentes.html
+Disallow: /facture-detail.html
+Disallow: /produits.html
+Disallow: /depenses.html
+Disallow: /rapports.html
+Disallow: /finances.html
+Disallow: /assistant-ia.html
+Disallow: /facture-ia.html
+Disallow: /abonnement.html
+Disallow: /parametres.html
+Disallow: /mot-de-passe-oublie.html
+Disallow: /reinitialiser-mot-de-passe.html
+Disallow: /abonnement-retour.html
+
+# Documents clients consultés via lien privé (données personnelles, jamais à indexer)
+Disallow: /consulter.html
+Disallow: /verifier.html
+
+# API
+Disallow: /api/
+
+Sitemap: https://votredomaine.com/sitemap.xml

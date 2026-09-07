@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Centre d'aide — SamaFacture Pro</title>
+<meta name="description" content="Questions fréquentes sur SamaFacture Pro : créer une facture, encaisser un paiement, exporter en PDF, gérer vos dépenses et bien plus." />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="canonical" href="https://votredomaine.com/aide.html" />
+<meta name="robots" content="index, follow" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+
+<!-- Données structurées FAQPage (SEO + GEO) : reprend le contenu du tableau `faq` plus bas
+     dans cette page. Statique pour rester lisible par les robots qui n'exécutent pas le JS —
+     à maintenir en même temps que le tableau `faq` si vous ajoutez/modifiez des questions. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Comment créer ma première facture ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Allez dans « Nouvelle facture » dans le menu, sélectionnez un client (ou créez-en un via « Clients »), ajoutez une ou plusieurs lignes d'articles, puis cliquez sur « Créer le document ». Le total (sous-total, TVA, remise, livraison) se calcule automatiquement." }
+    },
+    {
+      "@type": "Question",
+      "name": "Comment transformer un devis en facture ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Depuis la page « Devis », cliquez sur le bouton « → Facture » à côté du devis concerné. Un nouveau numéro de facture lui sera attribué automatiquement." }
+    },
+    {
+      "@type": "Question",
+      "name": "Comment enregistrer un paiement reçu ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Sur la page « Factures », cliquez sur « Encaisser » à côté de la facture concernée, indiquez le montant et le mode de paiement (Wave, Orange Money, PayDunya, espèces...). Le statut de la facture passe automatiquement à « Payée » une fois le montant total réglé." }
+    },
+    {
+      "@type": "Question",
+      "name": "Comment exporter une facture en PDF ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Ouvrez la facture puis cliquez sur « Imprimer ». Dans la fenêtre d'impression de votre navigateur, choisissez « Enregistrer en PDF » comme imprimante de destination." }
+    },
+    {
+      "@type": "Question",
+      "name": "Puis-je changer la devise affichée sur mes factures ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Oui, dans « Paramètres », vous pouvez choisir entre FCFA, EUR et USD. Ce réglage s'applique à l'ensemble de vos documents." }
+    },
+    {
+      "@type": "Question",
+      "name": "Comment ajouter mon logo et mes coordonnées d'entreprise ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Rendez-vous dans « Paramètres » pour renseigner le nom, l'adresse, le téléphone et l'email de votre entreprise. Ces informations apparaissent automatiquement sur vos factures et devis." }
+    },
+    {
+      "@type": "Question",
+      "name": "Comment suivre mes dépenses et mon bénéfice ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "La section « Dépenses » permet d'enregistrer vos sorties d'argent. La page « Rapports » affiche ensuite vos recettes, dépenses, bénéfice net et TVA collectée sur la période de votre choix, avec export CSV." }
+    },
+    {
+      "@type": "Question",
+      "name": "Puis-je réinitialiser toutes mes données de test ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Oui, dans « Paramètres » → « Zone dangereuse », le bouton « Réinitialiser le tableau de bord » supprime définitivement clients, produits, factures, devis et dépenses, sans toucher à votre compte ni à vos informations d'entreprise." }
+    },
+    {
+      "@type": "Question",
+      "name": "Mes données sont-elles sécurisées ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Vos données sont stockées dans votre propre base MySQL et l'accès à l'application nécessite une authentification par mot de passe (chiffré) et jeton de session. Consultez la page « Confidentialité » pour plus de détails." }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="lp-header">
+  <div class="brand"><img src="images/icon-192.png" alt="Logo SamaFacture Pro" /> SamaFacture Pro</div>
+  <nav>
+    <a href="index.html">Accueil</a>
+    <a href="login.html">Connexion</a>
+    <a href="register.html" class="btn btn-primary btn-sm">Essai gratuit</a>
+  </nav>
+</header>
+
+<main class="lp-content">
+  <h1>Centre d'aide</h1>
+  <p style="color:var(--ink-soft); margin-bottom:20px;">Réponses aux questions les plus fréquentes</p>
+
+  <div class="card" style="margin-bottom:16px; padding:14px 18px;">
+    <input type="text" id="search" placeholder="Rechercher une question..." style="border:none; outline:none; width:100%;" />
+  </div>
+
+  <div id="faq-list"></div>
+</main>
+
+<footer class="lp-footer">
+  <div class="lp-footer-inner">
+    <div class="brand" style="color:#fff;"><img src="images/icon-192.png" alt="" style="width:28px;height:28px;border-radius:7px;" /> SamaFacture Pro</div>
+    <div class="lp-footer-links">
+      <a href="aide.html">Centre d'aide</a>
+      <a href="support.html">Support technique</a>
+      <a href="confidentialite.html">Confidentialité</a>
+      <a href="conditions.html">Conditions d'utilisation</a>
+    </div>
+  </div>
+  <div class="lp-footer-bottom">© 2026 SamaFacture Pro. Tous droits réservés.</div>
+</footer>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script>
+  const faq = [
+    {
+      q: "Comment créer ma première facture ?",
+      r: "Allez dans « Nouvelle facture » dans le menu, sélectionnez un client (ou créez-en un via « Clients »), ajoutez une ou plusieurs lignes d'articles, puis cliquez sur « Créer le document ». Le total (sous-total, TVA, remise, livraison) se calcule automatiquement."
+    },
+    {
+      q: "Comment transformer un devis en facture ?",
+      r: "Depuis la page « Devis », cliquez sur le bouton « → Facture » à côté du devis concerné. Un nouveau numéro de facture lui sera attribué automatiquement."
+    },
+    {
+      q: "Comment enregistrer un paiement reçu ?",
+      r: "Sur la page « Factures », cliquez sur « Encaisser » à côté de la facture concernée, indiquez le montant et le mode de paiement (Wave, Orange Money, PayDunya, espèces...). Le statut de la facture passe automatiquement à « Payée » une fois le montant total réglé."
+    },
+    {
+      q: "Comment exporter une facture en PDF ?",
+      r: "Ouvrez la facture puis cliquez sur « Imprimer ». Dans la fenêtre d'impression de votre navigateur, choisissez « Enregistrer en PDF » comme imprimante de destination."
+    },
+    {
+      q: "Puis-je changer la devise affichée sur mes factures ?",
+      r: "Oui, dans « Paramètres », vous pouvez choisir entre FCFA, EUR et USD. Ce réglage s'applique à l'ensemble de vos documents."
+    },
+    {
+      q: "Comment ajouter mon logo et mes coordonnées d'entreprise ?",
+      r: "Rendez-vous dans « Paramètres » pour renseigner le nom, l'adresse, le téléphone et l'email de votre entreprise. Ces informations apparaissent automatiquement sur vos factures et devis."
+    },
+    {
+      q: "Comment suivre mes dépenses et mon bénéfice ?",
+      r: "La section « Dépenses » permet d'enregistrer vos sorties d'argent. La page « Rapports » affiche ensuite vos recettes, dépenses, bénéfice net et TVA collectée sur la période de votre choix, avec export CSV."
+    },
+    {
+      q: "Puis-je réinitialiser toutes mes données de test ?",
+      r: "Oui, dans « Paramètres » → « Zone dangereuse », le bouton « Réinitialiser le tableau de bord » supprime définitivement clients, produits, factures, devis et dépenses, sans toucher à votre compte ni à vos informations d'entreprise."
+    },
+    {
+      q: "Mes données sont-elles sécurisées ?",
+      r: "Vos données sont stockées dans votre propre base MySQL et l'accès à l'application nécessite une authentification par mot de passe (chiffré) et jeton de session. Consultez la page « Confidentialité » pour plus de détails."
+    }
+  ];
+
+  function render(list) {
+    document.getElementById('faq-list').innerHTML = list.length ? list.map((item, i) => `
+      <div class="card" style="margin-bottom:12px; cursor:pointer;" onclick="toggle(${i})">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">${item.q}</h3>
+          <span id="chevron-${i}" style="color:var(--ink-soft); display:inline-flex; transition:transform var(--dur-base) var(--ease-standard);">${Icon('chevron-down')}</span>
+        </div>
+        <div id="answer-${i}" style="display:none; margin-top:10px; color:var(--ink-soft);">${item.r}</div>
+      </div>
+    `).join('') : `<div class="empty-state"><div class="ic">${Icon('search')}</div>Aucun résultat pour cette recherche</div>`;
+  }
+
+  function toggle(i) {
+    const el = document.getElementById(`answer-${i}`);
+    const chevron = document.getElementById(`chevron-${i}`);
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : 'block';
+    chevron.style.transform = open ? 'rotate(0deg)' : 'rotate(180deg)';
+  }
+
+  document.getElementById('search').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    render(faq.filter(item => item.q.toLowerCase().includes(q) || item.r.toLowerCase().includes(q)));
+  });
+
+  render(faq);
+</script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Consulter le document — SamaFacture Pro</title>
+<meta name="description" content="Consultez votre facture ou devis en ligne." />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+<style>
+  body { background: #EDEAE2; position: relative; overflow-x: hidden; }
+  body::before {
+    content: '';
+    position: absolute; top: -180px; left: 50%; transform: translateX(-50%);
+    width: 520px; height: 380px;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(14,169,128,0.14), transparent 60%),
+      radial-gradient(circle at 75% 20%, rgba(221,165,63,0.12), transparent 55%);
+    filter: blur(10px);
+    pointer-events: none;
+  }
+  .wrap { max-width: 800px; margin: 30px auto; padding: 0 16px; position: relative; }
+  .toolbar {
+    display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:16px;
+    background: rgba(255,255,255,0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+  }
+  .invoice-doc, .invoice-doc * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Additif uniquement (nouvelle classe) : ne touche pas .invoice-doc, réutilisée telle
+     quelle par les modèles internes de facture-detail.html — cette page publique a son
+     propre habillage, sans modifier ce qui est partagé. */
+  .invoice-doc--public {
+    position: relative;
+    overflow: hidden;
+  }
+  .invoice-doc--public::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--emerald), var(--gold));
+  }
+  @media print {
+    body { background: #fff; }
+    body::before { display: none; }
+    .toolbar { display: none; }
+    .wrap { margin: 0; max-width: none; }
+    .invoice-doc { border: none; }
+    .invoice-doc--public::before { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <img src="images/icon-192.png" alt="SamaFacture Pro" style="width:30px; height:30px; border-radius:8px; box-shadow:var(--shadow-sm);" />
+        <span style="font-family:var(--font-display); font-weight:700; color:var(--navy-950);">SamaFacture Pro</span>
+      </div>
+      <button class="btn btn-primary" onclick="window.print()"><i class="ic" data-icon="printer"></i> Imprimer / Enregistrer en PDF</button>
+    </div>
+    <div class="invoice-doc invoice-doc--public" id="doc">
+      <div id="loading" style="text-align:center; padding:60px 20px; color:var(--ink-soft);">Chargement du document…</div>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+  const code = params.get('code');
+
+  function lignesRowsHtml(lignes) {
+    return lignes.map(l => `
+      <tr>
+        <td>${escapeHtml(l.designation)}</td>
+        <td class="mono">${l.quantite}</td>
+        <td class="mono">${formatMontant(l.prix_unitaire, facture.devise)}</td>
+        <td class="mono">${l.tva}%</td>
+        <td class="mono" style="text-align:right;">${formatMontant(l.total_ligne, facture.devise)}</td>
+      </tr>
+    `).join('');
+  }
+
+  let facture; // référencée par lignesRowsHtml via formatMontant(devise)
+
+  async function load() {
+    if (!id || !code) {
+      document.getElementById('doc').innerHTML = `<div class="empty-state"><div class="ic">${Icon('x')}</div>Ce lien est incomplet ou invalide.</div>`;
+      return;
+    }
+    try {
+      const data = await Api.get(`/public/consulter/${id}/${code}`);
+      facture = data.facture;
+      const lignes = data.lignes;
+      const isDevis = facture.type === 'devis';
+
+      document.getElementById('doc').innerHTML = `
+        <div class="head">
+          <div style="display:flex; align-items:center; gap:14px;">
+            ${facture.entreprise_logo ? `<img src="${escapeHtml(facture.entreprise_logo)}" alt="Logo" style="max-width:56px; max-height:56px; object-fit:contain;" />` : ''}
+            <div>
+              <h2 style="margin-bottom:2px;">${escapeHtml(facture.entreprise_nom || facture.user_nom)}</h2>
+              <div style="color:var(--ink-soft); font-size:0.85rem;">
+                ${escapeHtml(facture.entreprise_adresse)}<br/>
+                ${escapeHtml(facture.entreprise_telephone)} ${facture.entreprise_email ? '· ' + escapeHtml(facture.entreprise_email) : ''}
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <h1 style="margin-bottom:2px;">${isDevis ? 'DEVIS' : 'FACTURE'}</h1>
+            <div class="mono" style="color:var(--ink-soft);">${escapeHtml(facture.numero)}</div>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-bottom:24px;">
+          <div>
+            <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); margin-bottom:6px;">Facturé à</div>
+            <div style="font-weight:700;">${escapeHtml(facture.client_nom)}</div>
+            <div style="color:var(--ink-soft); font-size:0.85rem;">
+              ${escapeHtml(facture.client_adresse)}<br/>
+              ${escapeHtml(facture.client_telephone)} ${facture.client_email ? '· ' + escapeHtml(facture.client_email) : ''}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div><span style="color:var(--ink-soft);">Date d'émission :</span> ${formatDate(facture.date_emission)}</div>
+            <div><span style="color:var(--ink-soft);">Échéance :</span> ${formatDate(facture.date_echeance)}</div>
+            <div style="margin-top:6px;">${statutBadge(facture.statut)}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead><tr><th>Désignation</th><th>Qté</th><th>Prix U.</th><th>TVA</th><th style="text-align:right;">Total</th></tr></thead>
+          <tbody>${lignesRowsHtml(lignes)}</tbody>
+        </table>
+
+        <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+          <div style="width:280px;">
+            <div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Sous-total</span><span class="mono">${formatMontant(facture.sous_total, facture.devise)}</span></div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0;"><span>TVA</span><span class="mono">${formatMontant(facture.total_tva, facture.devise)}</span></div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Remise</span><span class="mono">- ${formatMontant(facture.remise, facture.devise)}</span></div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Livraison</span><span class="mono">${formatMontant(facture.frais_livraison, facture.devise)}</span></div>
+            <div style="display:flex; justify-content:space-between; padding:10px 0; border-top:2px solid var(--navy-950); font-weight:700; font-size:1.1rem;"><span>Total</span><span class="mono">${formatMontant(facture.total, facture.devise)}</span></div>
+            ${!isDevis ? `<div style="display:flex; justify-content:space-between; padding:6px 0; color:var(--emerald);"><span>Payé</span><span class="mono">${formatMontant(facture.montant_paye, facture.devise)}</span></div>` : ''}
+          </div>
+        </div>
+
+        ${facture.commentaires || facture.mode_paiement ? `
+          <div style="margin-top:40px; color:var(--ink-soft); font-size:0.85rem;">
+            ${facture.commentaires ? `<div>${escapeHtml(facture.commentaires)}</div>` : ''}
+            ${facture.mode_paiement ? `<div style="margin-top:6px;">Mode de paiement : ${escapeHtml(facture.mode_paiement)}</div>` : ''}
+          </div>
+        ` : ''}
+      `;
+    } catch (err) {
+      document.getElementById('doc').innerHTML = `<div class="empty-state"><div class="ic">${Icon('x')}</div>${escapeHtml(err.message)}</div>`;
+    }
+  }
+  load();
+</script>
+</body>
+</html>

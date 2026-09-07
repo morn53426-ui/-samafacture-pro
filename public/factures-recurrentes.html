@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Factures récurrentes — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Factures récurrentes <span class="plan-badge" style="vertical-align:middle;"><i class="ic" data-icon="star"></i> Pro</span></h1>
+        <p>Automatisez la facturation de vos abonnements et prestations régulières</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ Nouvelle facture récurrente</button>
+    </div>
+
+    <div id="error-box"></div>
+
+    <div class="card" style="padding:0;">
+      <table class="table-stack">
+        <thead><tr><th>Libellé</th><th>Client</th><th>Fréquence</th><th>Prochaine génération</th><th>Générées</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="recurrentes-body"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div id="modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center; overflow-y:auto; padding:30px 12px;">
+  <div class="card" style="width:640px; max-width:95vw;">
+    <h3 id="modal-title">Nouvelle facture récurrente</h3>
+    <div id="modal-error"></div>
+    <form id="recurrente-form">
+      <input type="hidden" id="recurrente-id" />
+      <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px;">
+        <div class="field"><label>Libellé *</label><input type="text" id="libelle" required placeholder="Abonnement maintenance mensuelle" /></div>
+        <div class="field"><label>Client *</label><select id="client_id" required></select></div>
+        <div class="field">
+          <label>Fréquence</label>
+          <select id="frequence">
+            <option value="hebdomadaire">Hebdomadaire</option>
+            <option value="mensuelle" selected>Mensuelle</option>
+            <option value="annuelle">Annuelle</option>
+          </select>
+        </div>
+        <div class="field"><label>Première génération</label><input type="date" id="prochaine_date" required /></div>
+      </div>
+
+      <h3 style="margin-top:6px;">Articles</h3>
+      <table>
+        <thead><tr><th>Désignation</th><th style="width:100px;">Qté</th><th style="width:120px;">Prix U.</th><th style="width:80px;">TVA%</th><th></th></tr></thead>
+        <tbody id="lignes-body"></tbody>
+      </table>
+      <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addLigne()">+ Ajouter une ligne</button>
+
+      <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px; margin-top:18px;">
+        <div class="field"><label>Remise</label><input type="number" id="remise" min="0" step="1" value="0" /></div>
+        <div class="field"><label>Frais de livraison</label><input type="number" id="frais_livraison" min="0" step="1" value="0" /></div>
+      </div>
+      <div class="field">
+        <label>Mode de paiement</label>
+        <select id="mode_paiement">
+          <option value="">—</option>
+          <option>Espèces</option><option>Wave</option><option>Orange Money</option>
+          <option>PayDunya</option><option>Virement bancaire</option><option>Chèque</option><option>Carte bancaire</option>
+        </select>
+      </div>
+      <div class="field"><label>Commentaires</label><textarea id="commentaires"></textarea></div>
+
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('factures-recurrentes');
+
+  let recurrentes = [];
+  let clients = [];
+  let produits = [];
+  let ligneCount = 0;
+
+  const freqLabels = { hebdomadaire: 'Hebdomadaire', mensuelle: 'Mensuelle', annuelle: 'Annuelle' };
+
+  async function load() {
+    const [{ recurrentes: rows }, { clients: c }, { produits: p }] = await Promise.all([
+      Api.get('/factures-recurrentes'), Api.get('/clients'), Api.get('/produits')
+    ]);
+    recurrentes = rows;
+    clients = c;
+    produits = p;
+    renderTable();
+  }
+
+  function renderTable() {
+    document.getElementById('recurrentes-body').innerHTML = recurrentes.length ? recurrentes.map(r => `
+      <tr>
+        <td data-label="Libellé" style="font-weight:600;">${escapeHtml(r.libelle)}</td>
+        <td data-label="Client">${escapeHtml(r.client_nom)}</td>
+        <td data-label="Fréquence">${freqLabels[r.frequence] || r.frequence}</td>
+        <td data-label="Prochaine génération">${formatDate(r.prochaine_date)}</td>
+        <td data-label="Générées" class="mono">${r.factures_generees}</td>
+        <td data-label="Statut"><span class="badge ${r.actif ? 'badge-payee' : 'badge-annulee'}">${r.actif ? 'Active' : 'En pause'}</span></td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="btn btn-sm btn-outline" onclick="genererMaintenant(${r.id})" title="Générer une facture immédiatement">Générer maintenant</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleActif(${r.id}, ${r.actif ? 0 : 1})">${r.actif ? 'Mettre en pause' : 'Réactiver'}</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteRecurrente(${r.id})">Supprimer</button>
+        </td>
+      </tr>
+    `).join('') : `<tr><td colspan="7"><div class="empty-state"><div class="ic">${Icon('repeat')}</div>Aucune facture récurrente. Créez-en une pour automatiser vos abonnements !</div></td></tr>`;
+  }
+
+  function openModal() {
+    document.getElementById('modal-title').textContent = 'Nouvelle facture récurrente';
+    document.getElementById('recurrente-form').reset();
+    document.getElementById('recurrente-id').value = '';
+    document.getElementById('modal-error').innerHTML = '';
+    document.getElementById('prochaine_date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('client_id').innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.nom)}</option>`).join('');
+    document.getElementById('lignes-body').innerHTML = '';
+    addLigne();
+    document.getElementById('modal').style.display = 'flex';
+  }
+  function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+  function addLigne() {
+    ligneCount++;
+    const id = 'l' + ligneCount;
+    const produitOptions = produits.map(p => `<option value="${p.id}" data-prix="${p.prix_ht}" data-tva="${p.tva}">${escapeHtml(p.nom)}</option>`).join('');
+    const row = document.createElement('tr');
+    row.id = id;
+    row.innerHTML = `
+      <td>
+        <select style="margin-bottom:4px;" onchange="applyProduit('${id}', this)">
+          <option value="">Produit du catalogue (optionnel)</option>
+          ${produitOptions}
+        </select>
+        <input type="text" class="ligne-designation" placeholder="Désignation" required />
+      </td>
+      <td><input type="number" class="ligne-qte" value="1" min="0" step="1" /></td>
+      <td><input type="number" class="ligne-pu" value="0" min="0" step="1" /></td>
+      <td><input type="number" class="ligne-tva" value="0" min="0" max="100" step="1" /></td>
+      <td><button type="button" class="btn btn-sm btn-danger" onclick="document.getElementById('${id}').remove()">${Icon('x')}</button></td>
+    `;
+    document.getElementById('lignes-body').appendChild(row);
+  }
+
+  function applyProduit(rowId, select) {
+    const row = document.getElementById(rowId);
+    const opt = select.options[select.selectedIndex];
+    if (opt.value) {
+      row.querySelector('.ligne-designation').value = opt.textContent;
+      row.querySelector('.ligne-pu').value = opt.dataset.prix;
+      row.querySelector('.ligne-tva').value = opt.dataset.tva;
+    }
+  }
+
+  function getLignes() {
+    return [...document.getElementById('lignes-body').querySelectorAll('tr')].map(row => ({
+      designation: row.querySelector('.ligne-designation').value,
+      quantite: parseFloat(row.querySelector('.ligne-qte').value) || 0,
+      prix_unitaire: parseFloat(row.querySelector('.ligne-pu').value) || 0,
+      tva: parseFloat(row.querySelector('.ligne-tva').value) || 0
+    })).filter(l => l.designation && l.quantite > 0);
+  }
+
+  document.getElementById('recurrente-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const lignes = getLignes();
+    if (!lignes.length) {
+      document.getElementById('modal-error').innerHTML = `<div class="error-box">Ajoutez au moins un article.</div>`;
+      return;
+    }
+    const payload = {
+      libelle: document.getElementById('libelle').value,
+      client_id: document.getElementById('client_id').value,
+      frequence: document.getElementById('frequence').value,
+      prochaine_date: document.getElementById('prochaine_date').value,
+      remise: parseFloat(document.getElementById('remise').value) || 0,
+      frais_livraison: parseFloat(document.getElementById('frais_livraison').value) || 0,
+      mode_paiement: document.getElementById('mode_paiement').value,
+      commentaires: document.getElementById('commentaires').value,
+      lignes
+    };
+    const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Enregistrement…');
+    try {
+      const id = document.getElementById('recurrente-id').value;
+      if (id) await Api.put(`/factures-recurrentes/${id}`, payload);
+      else await Api.post('/factures-recurrentes', payload);
+      closeModal();
+      load().catch(err => alert(err.message));
+    } catch (err) {
+      document.getElementById('modal-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+    } finally {
+      restore();
+    }
+  });
+
+  async function genererMaintenant(id) {
+    if (!confirm('Générer une facture immédiatement à partir de ce modèle ?')) return;
+    try {
+      await Api.post(`/factures-recurrentes/${id}/generer`, {});
+      alert('Facture générée avec succès — consultez la liste des factures.');
+      load().catch(err => alert(err.message));
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  async function toggleActif(id, actif) {
+    try {
+      await Api.put(`/factures-recurrentes/${id}`, { actif });
+      load().catch(err => alert(err.message));
+    } catch (err) {
+      showFatalError(err.message);
+    }
+  }
+
+  async function deleteRecurrente(id) {
+    if (!confirm('Supprimer cette facture récurrente ? Les factures déjà générées ne seront pas supprimées.')) return;
+    try {
+      await Api.del(`/factures-recurrentes/${id}`);
+      load().catch(err => alert(err.message));
+    } catch (err) {
+      showFatalError(err.message);
+    }
+  }
+
+  load().catch(err => showFatalError(err.message));
+</script>
+</body>
+</html>

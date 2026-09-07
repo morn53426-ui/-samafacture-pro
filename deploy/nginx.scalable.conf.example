@@ -1,0 +1,41 @@
+# Reverse proxy pour plusieurs instances SamaFacture Pro.
+# Docker Compose : `docker compose up -d --build` puis
+# `docker compose up -d --scale app=3`.
+# Pour une vraie production, terminez TLS ici (ou devant ce proxy) et utilisez un domaine réel.
+
+events {}
+
+http {
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    upstream samafacture_api {
+        keepalive 32;
+        # Avec Docker Compose, le DNS du service app peut retourner plusieurs réplicas.
+        # ip_hash conserve une même connexion Socket.IO sur la même instance ; Redis assure
+        # la diffusion des événements entre instances.
+        ip_hash;
+        server app:4000 resolve;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+        client_max_body_size 8m;
+
+        location / {
+            proxy_pass http://samafacture_api;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_read_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_buffering on;
+            proxy_buffers 8 16k;
+            proxy_buffer_size 16k;
+        }
+    }
+}

@@ -1,0 +1,982 @@
+const express = require('express');
+const crypto = require('crypto');
+const QRCode = require('qrcode');
+const { pool } = require('../config/db');
+const { requireAuth } = require('../middleware/auth');
+const { positiveNumber, percentage } = require('../utils/validation');
+const { FREE_MONTHLY_INVOICE_LIMIT, isPaidPlan } = require('../utils/plans');
+const { sendMail } = require('../config/mailer');
+const { getPagination, buildPaginationMeta } = require('../utils/pagination');
+const { genererPdfFacture } = require('../utils/pdf');
+const { notifierUtilisateur } = require('../realtime');
+const { enqueuePdfJob, getPdfJob, getPdfPath } = require('../pdf-queue');
+
+const router = express.Router();
+router.use(requireAuth);
+
+async function nextNumero(conn, userId, type) {
+  const prefix = type === 'devis' ? 'DEV' : 'FAC';
+  const year = new Date().getFullYear();
+
+  // Incrément atomique via la table compteurs_numerotation : la ligne (user_id, type, année)
+  // est verrouillée le temps de l'opération (dans la transaction en cours), ce qui élimine
+  // tout risque de doublon même si deux factures sont créées en même temps.
+  await conn.query(
+    `INSERT INTO compteurs_numerotation (user_id, type, annee, dernier_numero)
+     VALUES (?, ?, ?, LAST_INSERT_ID(1))
+     ON DUPLICATE KEY UPDATE dernier_numero = LAST_INSERT_ID(dernier_numero + 1)`,
+    [userId, type, year]
+  );
+  const [[{ n }]] = await conn.query('SELECT LAST_INSERT_ID() as n');
+  const next = String(n).padStart(4, '0');
+  return `${prefix}-${year}-${next}`;
+}
+
+function round2(n) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Insère toutes les lignes d'une facture/devis en UNE seule requête (multi-row INSERT) plutôt
+ * qu'une requête par ligne — voir AMELIORATIONS_SCALABILITE.md. Sur une facture de 20 lignes,
+ * c'est 1 aller-retour MySQL au lieu de 20 : à volume élevé (beaucoup de créations/duplications
+ * de factures en parallèle), ça réduit d'autant le temps de connexion tenue sur le pool et la
+ * latence perçue par l'utilisateur. Ne fait rien si `lignes` est vide (une facture sans lignes
+ * n'a rien à insérer ici — évite un INSERT ... VALUES () invalide).
+ */
+async function insererLignesFacture(conn, factureId, lignes) {
+  if (!lignes.length) return;
+  const placeholders = lignes.map(() => '(?, ?, ?, ?, ?, ?, ?)').join(', ');
+  const params = lignes.flatMap((l) => [
+    factureId, l.produit_id || null, l.designation, l.quantite, l.prix_unitaire, l.tva, l.total_ligne
+  ]);
+  await conn.query(
+    `INSERT INTO facture_lignes (facture_id, produit_id, designation, quantite, prix_unitaire, tva, total_ligne)
+     VALUES ${placeholders}`,
+    params
+  );
+}
+
+function computeTotals(lignes, remise, frais_livraison) {
+  // 1) HT brut de chaque ligne (avant remise globale)
+  const brutLignes = lignes.map((l) => {
+    const qte = positiveNumber(l.quantite, 0);
+    const pu = positiveNumber(l.prix_unitaire, 0);
+    const tvaRate = percentage(l.tva, 0);
+    return { ...l, quantite: qte, prix_unitaire: pu, tva: tvaRate, ligneHT: qte * pu };
+  });
+
+  const sous_total = brutLignes.reduce((s, l) => s + l.ligneHT, 0);
+  const livraisonVal = positiveNumber(frais_livraison, 0);
+  // La remise ne peut pas dépasser le sous-total (évite une base imposable négative)
+  const remiseVal = Math.min(positiveNumber(remise, 0), sous_total);
+
+  // 2) La remise réduit la base imposable AVANT calcul de la TVA, répartie au prorata de chaque ligne.
+  //    C'est cette base nette qui sert à calculer la TVA réellement due — sinon la TVA affichée
+  //    resterait calculée sur un montant que le client ne paie plus.
+  let total_tva = 0;
+  const computedLignes = brutLignes.map((l) => {
+    const ratio = sous_total > 0 ? l.ligneHT / sous_total : 0;
+    const ligneHT_net = l.ligneHT - remiseVal * ratio;
+    const ligneTVA = ligneHT_net * (l.tva / 100);
+    total_tva += ligneTVA;
+    // Le total affiché par ligne reste le montant brut (qté × prix × (1+TVA%)) : la remise globale
+    // et son effet sur la TVA sont reflétés séparément dans le récapitulatif de la facture.
+    const total_ligne = round2(l.ligneHT + l.ligneHT * (l.tva / 100));
+    return { ...l, total_ligne };
+  });
+
+  total_tva = round2(total_tva);
+  const total = round2(sous_total - remiseVal + total_tva + livraisonVal);
+
+  return { computedLignes, sous_total: round2(sous_total), total_tva, total, remise: remiseVal };
+}
+
+/**
+ * Applique plusieurs variations de stock en UNE seule requête (UPDATE ... CASE) plutôt qu'une
+ * requête par produit — même logique que insererLignesFacture ci-dessus (voir
+ * AMELIORATIONS_SCALABILITE.md) : une facture de 20 lignes ne tenait auparavant la connexion
+ * transactionnelle que le temps de 20 allers-retours MySQL séquentiels (décompte à la création,
+ * restitution à l'annulation/suppression, transformation devis→facture). Audit final : ce point
+ * avait été traité pour l'insertion des lignes mais pas pour l'ajustement du stock — corrigé ici
+ * pour les trois appelants (POST /, PUT /:id/statut via ajusterStockFacture, DELETE /:id via
+ * ajusterStockFacture, POST /:id/transformer-en-facture).
+ * Les lignes référençant un même produit sont regroupées (somme des deltas) pour n'écrire
+ * qu'une seule fois par produit, même si un produit apparaît sur plusieurs lignes.
+ * `ajustements` : tableau de { produit_id, delta }. Ne fait rien si vide.
+ */
+async function appliquerAjustementsStock(conn, userId, ajustements) {
+  if (!ajustements.length) return;
+  const parProduit = new Map();
+  for (const { produit_id, delta } of ajustements) {
+    if (!produit_id) continue;
+    parProduit.set(produit_id, (parProduit.get(produit_id) || 0) + delta);
+  }
+  const ids = [...parProduit.keys()];
+  if (!ids.length) return;
+  const whenClauses = ids.map(() => 'WHEN ? THEN stock + ?').join(' ');
+  const caseParams = ids.flatMap((id) => [id, parProduit.get(id)]);
+  await conn.query(
+    `UPDATE produits SET stock = CASE id ${whenClauses} END WHERE id IN (${ids.map(() => '?').join(',')}) AND user_id = ?`,
+    [...caseParams, ...ids, userId]
+  );
+}
+
+/**
+ * Ajuste le stock des produits liés aux lignes d'une facture, dans un sens (+1 restitue,
+ * -1 redécompte). Utilisée pour garder le stock cohérent quand une facture change de statut
+ * (annulation/réactivation) ou est supprimée — symétrique au décompte fait à la création
+ * (voir POST / et /transformer-en-facture). N'affecte jamais les lignes sans produit_id
+ * (saisie libre, jamais liée à l'inventaire).
+ */
+async function ajusterStockFacture(conn, factureId, userId, sens) {
+  const [lignes] = await conn.query(
+    'SELECT produit_id, quantite FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL',
+    [factureId]
+  );
+  await appliquerAjustementsStock(conn, userId, lignes.map((l) => ({ produit_id: l.produit_id, delta: sens * l.quantite })));
+}
+
+/**
+ * @openapi
+ * /factures:
+ *   get:
+ *     summary: Liste les factures ou devis de l'utilisateur connecté (paginé, filtrable)
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema: { type: string, enum: [facture, devis] }
+ *       - in: query
+ *         name: statut
+ *         schema: { type: string, enum: [en_attente, payee, en_retard, annulee] }
+ *       - in: query
+ *         name: client_id
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limite
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200:
+ *         description: Liste paginée.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 factures: { type: array, items: { $ref: '#/components/schemas/Facture' } }
+ */
+router.get('/', async (req, res, next) => {
+  try {
+    const { type, statut, client_id } = req.query;
+    const { page, limite, offset } = getPagination(req.query);
+
+    let whereSql = ' WHERE f.user_id = ?';
+    const params = [req.user.id];
+    if (type) { whereSql += ' AND f.type = ?'; params.push(type); }
+    if (statut) { whereSql += ' AND f.statut = ?'; params.push(statut); }
+    if (client_id) { whereSql += ' AND f.client_id = ?'; params.push(client_id); }
+
+    const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM factures f${whereSql}`, params);
+    const [rows] = await pool.query(
+      `SELECT f.*, c.nom as client_nom, c.email as client_email FROM factures f JOIN clients c ON c.id = f.client_id${whereSql}
+       ORDER BY f.date_emission DESC, f.id DESC LIMIT ? OFFSET ?`,
+      [...params, limite, offset]
+    );
+    res.json({ factures: rows, pagination: buildPaginationMeta(page, limite, total) });
+  } catch (err) { next(err); }
+});
+
+/**
+ * @openapi
+ * /factures/{id}:
+ *   get:
+ *     summary: Détail d'une facture/devis, avec ses lignes, ses paiements et son QR code de vérification
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Détail complet.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 facture: { $ref: '#/components/schemas/Facture' }
+ *                 lignes: { type: array, items: { $ref: '#/components/schemas/LigneFacture' } }
+ *                 paiements: { type: array, items: { type: object } }
+ *                 qr_code: { type: string, nullable: true, description: "Image QR encodée en base64 (data URL)." }
+ *                 verify_url: { type: string }
+ *       404: { description: "Facture introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+router.get('/:id', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone, c.adresse as client_adresse
+       FROM factures f JOIN clients c ON c.id = f.client_id WHERE f.id = ? AND f.user_id = ?`,
+      [req.params.id, req.user.id]
+    );
+    const facture = rows[0];
+    if (!facture) return res.status(404).json({ error: 'Facture introuvable.' });
+
+    // Les factures créées avant l'ajout de cette fonctionnalité n'ont pas encore de code —
+    // on le génère à la volée au premier affichage plutôt que de migrer toute la table.
+    if (!facture.verification_code) {
+      facture.verification_code = crypto.randomBytes(5).toString('hex');
+      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+    }
+
+    const [[lignes], [paiements]] = await Promise.all([
+      pool.query('SELECT * FROM facture_lignes WHERE facture_id = ?', [facture.id]),
+      pool.query('SELECT * FROM paiements WHERE facture_id = ? ORDER BY date_paiement DESC', [facture.id])
+    ]);
+
+    const verifyUrl = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/verifier.html?id=${facture.id}&code=${facture.verification_code}`;
+    let qrCode = null;
+    try {
+      qrCode = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 180, color: { dark: '#0F1B33' } });
+    } catch (qrErr) {
+      console.error('Génération du QR code échouée :', qrErr.message);
+    }
+
+    res.json({ facture, lignes, paiements, qr_code: qrCode, verify_url: verifyUrl });
+  } catch (err) { next(err); }
+});
+
+/**
+ * @openapi
+ * /factures:
+ *   post:
+ *     summary: Crée une facture ou un devis (calcule automatiquement sous-total, TVA et total à partir des lignes)
+ *     description: "Le plan Gratuit est limité à 10 factures par mois (les devis restent illimités sur tous les plans)."
+ *     tags: [Factures]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [client_id, lignes]
+ *             properties:
+ *               client_id: { type: integer }
+ *               type: { type: string, enum: [facture, devis], default: facture }
+ *               date_emission: { type: string, format: date }
+ *               date_echeance: { type: string, format: date, nullable: true }
+ *               remise: { type: number, default: 0 }
+ *               frais_livraison: { type: number, default: 0 }
+ *               mode_paiement: { type: string, nullable: true }
+ *               commentaires: { type: string, nullable: true }
+ *               lignes: { type: array, items: { $ref: '#/components/schemas/LigneFacture' } }
+ *     responses:
+ *       201:
+ *         description: Document créé.
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } }
+ *       403: { description: "Quota du plan Gratuit atteint (code QUOTA_DEPASSE).", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+router.post('/', async (req, res, next) => {
+  let conn;
+  try {
+    const idempotencyKey = req.get('Idempotency-Key')?.trim() || null;
+    if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 100)) {
+      return res.status(400).json({ error: 'Idempotency-Key invalide (8 à 100 caractères).' });
+    }
+    const { client_id, type, date_emission, date_echeance, remise, frais_livraison, mode_paiement, commentaires, lignes } = req.body;
+
+    // Une nouvelle tentative avec la même clé doit retourner le document déjà créé plutôt
+    // que créer une seconde facture. La clé est facultative afin de préserver exactement le
+    // comportement historique des clients qui ne l'envoient pas.
+    if (idempotencyKey) {
+      const [existing] = await pool.query(
+        'SELECT * FROM factures WHERE user_id = ? AND idempotency_key = ?',
+        [req.user.id, idempotencyKey]
+      );
+      if (existing.length) return res.status(200).json({ facture: existing[0], idempotent_replay: true });
+    }
+
+    if (!client_id || !Array.isArray(lignes) || lignes.length === 0) {
+      return res.status(400).json({ error: 'Un client et au moins une ligne de produit sont requis.' });
+    }
+    const [clientRows] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client_id, req.user.id]);
+    if (!clientRows.length) {
+      return res.status(400).json({ error: 'Client invalide.' });
+    }
+
+    // Isolation des données : un produit référencé sur une ligne doit appartenir à
+    // l'utilisateur courant (sinon on ignore le lien, la ligne reste valable en saisie libre).
+    const produitIds = [...new Set(lignes.map(l => l.produit_id).filter(Boolean))];
+    if (produitIds.length) {
+      const [ownedRows] = await pool.query(
+        `SELECT id FROM produits WHERE user_id = ? AND id IN (${produitIds.map(() => '?').join(',')})`,
+        [req.user.id, ...produitIds]
+      );
+      const ownedIds = new Set(ownedRows.map(r => r.id));
+      for (const l of lignes) {
+        if (l.produit_id && !ownedIds.has(l.produit_id)) l.produit_id = null;
+      }
+    }
+
+    const docType = type === 'devis' ? 'devis' : 'facture';
+
+    // Quota du plan gratuit : 10 factures par mois (les devis restent illimités sur tous les
+    // plans). On relit le plan depuis la base plutôt que le jeton JWT, pour qu'un changement
+    // de plan prenne effet immédiatement sans attendre l'expiration de la session.
+    if (docType === 'facture') {
+      const [[userRow]] = await pool.query('SELECT plan FROM users WHERE id = ?', [req.user.id]);
+      if (!isPaidPlan(userRow?.plan)) {
+        const [[{ n: countThisMonth }]] = await pool.query(
+          `SELECT COUNT(*) as n FROM factures
+           WHERE user_id = ? AND type = 'facture' AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')`,
+          [req.user.id]
+        );
+        if (countThisMonth >= FREE_MONTHLY_INVOICE_LIMIT) {
+          notifierUtilisateur(req.user.id, 'alerte_quota', {
+            message: `Vous avez atteint la limite de ${FREE_MONTHLY_INVOICE_LIMIT} factures du plan Gratuit ce mois-ci.`
+          });
+          return res.status(403).json({
+            error: `Le plan Gratuit est limité à ${FREE_MONTHLY_INVOICE_LIMIT} factures par mois. Passez à un plan payant dans Paramètres pour continuer.`,
+            code: 'QUOTA_DEPASSE'
+          });
+        }
+      }
+    }
+
+    const { computedLignes, sous_total, total_tva, total, remise: remiseAppliquee } = computeTotals(lignes, remise, frais_livraison);
+    // Code court utilisé pour la vérification publique de la facture (via QR code) : évite
+    // qu'un tiers puisse deviner l'URL de vérification d'une autre facture en changeant l'id.
+    const verificationCode = crypto.randomBytes(5).toString('hex');
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const numero = await nextNumero(conn, req.user.id, docType);
+    const [result] = await conn.query(
+      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.id, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
+        date_echeance || null, remiseAppliquee, Number(frais_livraison) || 0, mode_paiement || null,
+        commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
+      ]
+    );
+    const factureId = result.insertId;
+
+    await insererLignesFacture(conn, factureId, computedLignes);
+
+    // Décompte automatique du stock : uniquement pour une vraie facture (une vente
+    // effective), jamais pour un devis (simple proposition, pas encore de vente). Ne
+    // bloque jamais la création si le stock devient négatif — beaucoup de commerçants
+    // vendent volontairement en rupture temporaire (réassort à venir) ; c'est une
+    // indication, pas une contrainte dure. Restauré symétriquement si la facture est
+    // supprimée ou annulée (voir DELETE /:id et PUT /:id/statut plus bas).
+    if (docType === 'facture') {
+      await appliquerAjustementsStock(conn, req.user.id, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
+    }
+
+    await conn.commit();
+    const [factureRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [factureId]);
+    res.status(201).json({ facture: factureRows[0] });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    if (err?.code === 'ER_DUP_ENTRY' && req.get('Idempotency-Key')) {
+      try {
+        const [existing] = await pool.query(
+          'SELECT * FROM factures WHERE user_id = ? AND idempotency_key = ?',
+          [req.user.id, req.get('Idempotency-Key').trim()]
+        );
+        if (existing.length) return res.status(200).json({ facture: existing[0], idempotent_replay: true });
+      } catch (replayErr) { return next(replayErr); }
+    }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+/**
+ * @openapi
+ * /factures/{id}/statut:
+ *   put:
+ *     summary: Change manuellement le statut d'une facture (ex. annuler, remettre en attente)
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [statut]
+ *             properties: { statut: { type: string, enum: [en_attente, payee, en_retard, annulee] } }
+ *     responses:
+ *       200: { description: "Statut mis à jour.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
+ *       404: { description: "Facture introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+router.put('/:id/statut', async (req, res, next) => {
+  const conn = await pool.getConnection();
+  try {
+    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const existing = existingRows[0];
+    if (!existing) { conn.release(); return res.status(404).json({ error: 'Facture introuvable.' }); }
+
+    const { statut } = req.body;
+    const valides = ['en_attente', 'payee', 'en_retard', 'annulee'];
+    if (!valides.includes(statut)) { conn.release(); return res.status(400).json({ error: 'Statut invalide.' }); }
+
+    await conn.beginTransaction();
+    await conn.query('UPDATE factures SET statut = ? WHERE id = ?', [statut, existing.id]);
+
+    // Symétrie avec le décompte automatique du stock (voir POST / et /transformer-en-facture
+    // ci-dessus) : annuler une facture doit restituer le stock déjà décompté, et ré-annuler
+    // l'annulation (repasser à un autre statut) doit le redécompter — sinon le stock affiché
+    // dérive silencieusement de la réalité à chaque annulation/réactivation.
+    if (existing.type === 'facture' && existing.statut !== 'annulee' && statut === 'annulee') {
+      await ajusterStockFacture(conn, existing.id, req.user.id, +1); // restitue (+ stock)
+    } else if (existing.type === 'facture' && existing.statut === 'annulee' && statut !== 'annulee') {
+      await ajusterStockFacture(conn, existing.id, req.user.id, -1); // redécompte (- stock)
+    }
+
+    await conn.commit();
+    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ?', [existing.id]);
+    res.json({ facture: rows[0] });
+  } catch (err) {
+    await conn.rollback();
+    next(err);
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * @openapi
+ * /factures/{id}/transformer-en-facture:
+ *   post:
+ *     summary: Convertit un devis accepté en facture (nouvelle numérotation FAC-, le devis d'origine reste consultable)
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       201: { description: "Facture créée à partir du devis.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
+ *       404: { description: "Devis introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+router.post('/:id/transformer-en-facture', async (req, res, next) => {
+  const conn = await pool.getConnection();
+  try {
+    const [devisRows] = await pool.query(`SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis'`, [req.params.id, req.user.id]);
+    const devis = devisRows[0];
+    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
+
+    await conn.beginTransaction();
+    const numero = await nextNumero(conn, req.user.id, 'facture');
+    await conn.query(`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente' WHERE id = ?`, [numero, devis.id]);
+
+    // Décompte du stock au moment où le devis devient une vraie vente (même règle qu'à la
+    // création directe d'une facture, voir POST / ci-dessus) — jamais fait tant que ce
+    // n'était qu'un devis.
+    const [lignesDevis] = await conn.query('SELECT produit_id, quantite FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL', [devis.id]);
+    await appliquerAjustementsStock(conn, req.user.id, lignesDevis.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
+
+    await conn.commit();
+
+    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ?', [devis.id]);
+    res.json({ facture: rows[0] });
+  } catch (err) {
+    await conn.rollback();
+    next(err);
+  } finally {
+    conn.release();
+  }
+});
+
+// Duplique une facture ou un devis existant (même client, mêmes lignes) avec un nouveau
+// numéro, une nouvelle date d'émission et un statut remis à zéro.
+/**
+ * @openapi
+ * /factures/{id}/dupliquer:
+ *   post:
+ *     summary: Duplique une facture/devis existant en nouveau brouillon (nouveau numéro, statut réinitialisé)
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       201: { description: "Copie créée.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
+ *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+router.post('/:id/dupliquer', async (req, res, next) => {
+  const conn = await pool.getConnection();
+  try {
+    const [sourceRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const source = sourceRows[0];
+    if (!source) return res.status(404).json({ error: 'Document introuvable.' });
+
+    const [lignesSource] = await pool.query('SELECT * FROM facture_lignes WHERE facture_id = ?', [source.id]);
+
+    await conn.beginTransaction();
+    const numero = await nextNumero(conn, req.user.id, source.type);
+    const [result] = await conn.query(
+      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
+       VALUES (?, ?, ?, ?, CURDATE(), NULL, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.id, source.client_id, numero, source.type,
+        source.remise, source.frais_livraison, source.mode_paiement, source.commentaires,
+        source.sous_total, source.total_tva, source.total
+      ]
+    );
+    const nouvelId = result.insertId;
+
+    await insererLignesFacture(conn, nouvelId, lignesSource);
+
+    await conn.commit();
+    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ?', [nouvelId]);
+    res.status(201).json({ facture: rows[0] });
+  } catch (err) {
+    await conn.rollback();
+    next(err);
+  } finally {
+    conn.release();
+  }
+});
+
+// Génère et renvoie un vrai fichier PDF de la facture/du devis (téléchargement direct,
+// sans passer par la boîte de dialogue d'impression du navigateur).
+/**
+ * @openapi
+ * /factures/{id}/pdf:
+ *   get:
+ *     summary: "Télécharge la facture/le devis en PDF (rendu identique à l'écran : logo, QR code, signature, modèle choisi)"
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Fichier PDF.
+ *         content:
+ *           application/pdf:
+ *             schema: { type: string, format: binary }
+ *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       502: { description: "Génération du PDF échouée (réessayer).", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+router.post('/:id/pdf/async', async (req, res, next) => {
+  try {
+    if (!process.env.REDIS_URL) return res.status(503).json({ error: "La génération PDF asynchrone n'est pas configurée." });
+    const [rows] = await pool.query('SELECT id FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Document introuvable.' });
+    const jobId = await enqueuePdfJob({ factureId: req.params.id, user: req.user });
+    res.status(202).json({ job_id: jobId, status: 'queued' });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/pdf/jobs/:jobId', async (req, res, next) => {
+  try {
+    const job = await getPdfJob(req.params.jobId, req.user.id);
+    if (!job) return res.status(404).json({ error: 'Job PDF introuvable.' });
+    if (String(job.factureId) !== String(req.params.id)) return res.status(404).json({ error: 'Job PDF introuvable.' });
+    if (job.status === 'completed') {
+      return res.json({ status: job.status, download_url: `/api/factures/${req.params.id}/pdf/jobs/${req.params.jobId}/download` });
+    }
+    res.json({ status: job.status, error: job.error || null });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/pdf/jobs/:jobId/download', async (req, res, next) => {
+  try {
+    const job = await getPdfJob(req.params.jobId, req.user.id);
+    if (!job || String(job.factureId) !== String(req.params.id) || job.status !== 'completed') {
+      return res.status(404).json({ error: 'PDF non disponible.' });
+    }
+    const file = await getPdfPath(req.params.jobId);
+    const [rows] = await pool.query('SELECT numero, type FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Document introuvable.' });
+    const prefixe = rows[0].type === 'devis' ? 'devis' : 'facture';
+    res.download(file, `${prefixe}-${rows[0].numero}.pdf`, err => { if (err && !res.headersSent) next(err); });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/pdf', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query('SELECT id, numero, type FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const facture = rows[0];
+    if (!facture) return res.status(404).json({ error: 'Document introuvable.' });
+
+    const pdfBuffer = await genererPdfFacture(facture.id, req.user);
+    const prefixe = facture.type === 'devis' ? 'devis' : 'facture';
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${prefixe}-${facture.numero}.pdf"`,
+      'Content-Length': pdfBuffer.length
+    });
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('Génération PDF échouée :', err.message);
+    res.status(502).json({ error: "Impossible de générer le PDF pour le moment. Réessayez dans un instant." });
+  }
+});
+
+// Envoie la facture/le devis par email au client, avec un lien de consultation en ligne
+// (lecture seule, sans compte requis) réutilisant le code de vérification du QR code.
+/**
+ * @openapi
+ * /factures/{id}/envoyer:
+ *   post:
+ *     summary: Envoie la facture/le devis par email au client (lien de consultation en ligne + PDF en pièce jointe)
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties: { email: { type: string, description: "Remplace l'email du client par défaut." } }
+ *     responses:
+ *       200: { description: "Email envoyé.", content: { application/json: { schema: { type: object, properties: { success: { type: boolean }, sent_to: { type: string } } } } } }
+ *       400: { description: "Aucune adresse email disponible.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+/**
+ * Envoie une facture/devis par email au client, avec PDF en pièce jointe si la génération
+ * réussit (sinon l'email part quand même, sans bloquer sur un souci de rendu PDF). Extraite
+ * en fonction réutilisable pour que la route manuelle ci-dessous ET l'envoi automatique des
+ * factures récurrentes (voir config/scheduler.js) partagent exactement la même logique —
+ * un seul endroit de vérité, pas de comportement divergent entre les deux déclencheurs.
+ * @param {string|undefined} destinataireForce email explicite (sinon celui du client)
+ */
+async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireForce) {
+  const [rows] = await pool.query(
+    `SELECT f.*, c.nom as client_nom, c.email as client_email,
+            u.entreprise_nom, u.nom as user_nom, u.email as user_email, u.role as user_role
+     FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
+     WHERE f.id = ? AND f.user_id = ?`,
+    [factureId, userId]
+  );
+  const facture = rows[0];
+  if (!facture) throw new Error('Document introuvable.');
+
+  const destinataire = destinataireForce || facture.client_email;
+  if (!destinataire) throw new Error("Aucune adresse email pour ce client.");
+
+  if (!facture.verification_code) {
+    facture.verification_code = crypto.randomBytes(5).toString('hex');
+    await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+  }
+
+  const consultUrl = `${baseUrl}/consulter.html?id=${facture.id}&code=${facture.verification_code}`;
+  const emetteur = facture.entreprise_nom || facture.user_nom;
+  const isDevis = facture.type === 'devis';
+  const label = isDevis ? 'devis' : 'facture';
+
+  let attachments;
+  try {
+    // genererPdfFacture signe un token temporaire avec id/email/role/nom (voir
+    // utils/pdf.js) : on reconstruit ici le même objet "utilisateur" que req.user
+    // fournirait normalement, à partir des colonnes déjà jointes ci-dessus — pour que
+    // l'envoi automatique (sans req, déclenché par le planificateur) se comporte
+    // exactement comme l'envoi manuel depuis la route.
+    const pdfBuffer = await genererPdfFacture(facture.id, { id: userId, email: facture.user_email, role: facture.user_role, nom: facture.user_nom });
+    attachments = [{ filename: `${label}-${facture.numero}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }];
+  } catch (pdfErr) {
+    console.error('PDF joint à l\'email échoué (email envoyé sans pièce jointe) :', pdfErr.message);
+  }
+
+  await sendMail({
+    to: destinataire,
+    subject: `${emetteur} vous a envoyé un ${label} — ${facture.numero}`,
+    text: `Bonjour ${facture.client_nom},\n\n${emetteur} vous a envoyé un ${label} d'un montant de ${facture.total} FCFA.\n\nConsultez-le en ligne : ${consultUrl}\n\nMerci de votre confiance.`,
+    html: `<p>Bonjour ${facture.client_nom},</p><p><strong>${emetteur}</strong> vous a envoyé un ${label} (${facture.numero}) d'un montant de <strong>${facture.total} FCFA</strong>.</p><p><a href="${consultUrl}" style="display:inline-block;padding:10px 18px;background:#0FA980;color:#fff;border-radius:8px;text-decoration:none;">Consulter le ${label}</a></p><p>Ou copiez ce lien : ${consultUrl}</p>`,
+    attachments
+  });
+
+  return { success: true, sent_to: destinataire };
+}
+
+router.post('/:id/envoyer', async (req, res, next) => {
+  try {
+    const baseUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+    const resultat = await envoyerFactureParEmail(req.params.id, req.user.id, baseUrl, req.body && req.body.email);
+    res.json(resultat);
+  } catch (err) {
+    if (err.message === 'Document introuvable.') return res.status(404).json({ error: err.message });
+    if (err.message === "Aucune adresse email pour ce client.") {
+      return res.status(400).json({ error: "Aucune adresse email pour ce client. Ajoutez-en une dans sa fiche, ou précisez-en une." });
+    }
+    next(err);
+  }
+});
+
+// Envoie une relance pour une facture en attente ou en retard, même mécanisme avec un ton
+// plus pressant — réduit les impayés.
+/**
+ * @openapi
+ * /factures/{id}/relancer:
+ *   post:
+ *     summary: Envoie une relance par email pour une facture en attente/en retard (PDF joint)
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties: { email: { type: string, description: "Remplace l'email du client par défaut." } }
+ *     responses:
+ *       200: { description: "Relance envoyée.", content: { application/json: { schema: { type: object, properties: { success: { type: boolean }, sent_to: { type: string } } } } } }
+ *       400: { description: "Facture déjà payée, ou aucune adresse email disponible.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       404: { description: "Facture introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+router.post('/:id/relancer', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT f.*, c.nom as client_nom, c.email as client_email, u.entreprise_nom, u.nom as user_nom
+       FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
+       WHERE f.id = ? AND f.user_id = ? AND f.type = 'facture'`,
+      [req.params.id, req.user.id]
+    );
+    const facture = rows[0];
+    if (!facture) return res.status(404).json({ error: 'Facture introuvable.' });
+    if (facture.statut === 'payee') return res.status(400).json({ error: 'Cette facture est déjà payée.' });
+
+    const destinataire = (req.body && req.body.email) || facture.client_email;
+    if (!destinataire) return res.status(400).json({ error: "Aucune adresse email pour ce client." });
+
+    if (!facture.verification_code) {
+      facture.verification_code = crypto.randomBytes(5).toString('hex');
+      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+    }
+
+    const baseUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+    const consultUrl = `${baseUrl}/consulter.html?id=${facture.id}&code=${facture.verification_code}`;
+    const emetteur = facture.entreprise_nom || facture.user_nom;
+    const resteAPayer = Number(facture.total) - Number(facture.montant_paye);
+
+    let attachments;
+    try {
+      const pdfBuffer = await genererPdfFacture(facture.id, req.user);
+      attachments = [{ filename: `facture-${facture.numero}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }];
+    } catch (pdfErr) {
+      console.error('PDF joint à la relance échoué (email envoyé sans pièce jointe) :', pdfErr.message);
+    }
+
+    await sendMail({
+      to: destinataire,
+      subject: `Rappel : facture ${facture.numero} en attente de paiement`,
+      text: `Bonjour ${facture.client_nom},\n\nNous vous rappelons que la facture ${facture.numero} d'un montant de ${resteAPayer} FCFA est toujours en attente de règlement.\n\nConsultez-la ici : ${consultUrl}\n\nMerci de régulariser dans les meilleurs délais.`,
+      html: `<p>Bonjour ${facture.client_nom},</p><p>Nous vous rappelons que la facture <strong>${facture.numero}</strong> d'un montant restant dû de <strong>${resteAPayer} FCFA</strong> est toujours en attente de règlement.</p><p><a href="${consultUrl}" style="display:inline-block;padding:10px 18px;background:#E8A33D;color:#0F1B33;border-radius:8px;text-decoration:none;font-weight:600;">Consulter la facture</a></p><p>Merci de régulariser dans les meilleurs délais.</p>`,
+      attachments
+    });
+
+    res.json({ success: true, sent_to: destinataire });
+  } catch (err) { next(err); }
+});
+
+/**
+ * @openapi
+ * /factures/{id}:
+ *   delete:
+ *     summary: Supprime une facture/devis (et ses lignes/paiements associés)
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200: { description: "Supprimé." }
+ *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+router.delete('/:id', async (req, res, next) => {
+  const conn = await pool.getConnection();
+  try {
+    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const existing = existingRows[0];
+    if (!existing) { conn.release(); return res.status(404).json({ error: 'Facture introuvable.' }); }
+
+    await conn.beginTransaction();
+    // Restitue le stock déjà décompté avant de supprimer, sauf si la facture était déjà
+    // annulée (son stock avait alors déjà été restitué par PUT /:id/statut — le restituer
+    // une seconde fois créerait un stock fantôme supérieur à la réalité).
+    if (existing.type === 'facture' && existing.statut !== 'annulee') {
+      await ajusterStockFacture(conn, existing.id, req.user.id, +1);
+    }
+    await conn.query('DELETE FROM factures WHERE id = ?', [existing.id]);
+    await conn.commit();
+    res.json({ success: true });
+  } catch (err) {
+    await conn.rollback();
+    next(err);
+  } finally {
+    conn.release();
+  }
+});
+
+// --- Paiements liés à une facture ---
+/**
+ * @openapi
+ * /factures/{id}/paiements:
+ *   post:
+ *     summary: Enregistre un paiement (partiel ou total) sur une facture — la marque "payée" automatiquement si le montant total est atteint
+ *     tags: [Factures]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [montant, methode]
+ *             properties:
+ *               montant: { type: number, example: 15000 }
+ *               methode: { type: string, example: 'Wave' }
+ *               reference: { type: string, nullable: true }
+ *     responses:
+ *       201: { description: "Paiement enregistré.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
+ *       400: { description: "Montant ou méthode invalide.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       404: { description: "Facture introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ */
+router.post('/:id/paiements', async (req, res, next) => {
+  let conn;
+  try {
+    const idempotencyKey = req.get('Idempotency-Key')?.trim() || null;
+    if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 100)) {
+      return res.status(400).json({ error: 'Idempotency-Key invalide (8 à 100 caractères).' });
+    }
+    const { montant, methode, reference } = req.body;
+    const montantNum = Number(montant);
+    if (!Number.isFinite(montantNum) || montantNum <= 0 || !methode) {
+      return res.status(400).json({ error: 'Montant (positif) et méthode de paiement requis.' });
+    }
+
+    if (idempotencyKey) {
+      const [existingPayment] = await pool.query(
+        'SELECT p.*, f.* FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.user_id = ? AND p.idempotency_key = ?',
+        [req.user.id, idempotencyKey]
+      );
+      if (existingPayment.length) {
+        const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.user.id]);
+        return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
+      }
+    }
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    // SELECT ... FOR UPDATE : verrouille la ligne facture le temps de la transaction, pour
+    // que deux paiements enregistrés au même instant (ex. webhook + saisie manuelle, ou
+    // double-clic) ne se basent jamais sur le même montant_paye de départ — même bug de
+    // fond que la numérotation concurrente des factures (voir nextNumero), appliqué ici au
+    // solde d'une facture pour ne jamais perdre un paiement en cas d'écritures simultanées.
+    const [factureRows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, req.user.id]);
+    const facture = factureRows[0];
+    if (!facture) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture introuvable.' });
+    }
+
+    // Le premier contrôle d'idempotence est optimiste et se fait avant la transaction.
+    // Sous concurrence, deux requêtes peuvent toutefois franchir ce contrôle avant que
+    // l'une des deux ait inséré le paiement. La facture est maintenant verrouillée par
+    // SELECT ... FOR UPDATE : on refait donc le contrôle DANS la transaction. La seconde
+    // requête attend le commit de la première, voit alors son paiement et le rejoue proprement
+    // au lieu de tomber sur une erreur de contrainte unique / 500.
+    if (idempotencyKey) {
+      const [paymentRows] = await conn.query(
+        'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
+        [req.user.id, idempotencyKey]
+      );
+      if (paymentRows.length) {
+        await conn.rollback();
+        const [existingFacture] = await pool.query(
+          'SELECT * FROM factures WHERE id = ? AND user_id = ?',
+          [paymentRows[0].facture_id, req.user.id]
+        );
+        return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
+      }
+    }
+
+    // Empêche un paiement de dépasser le solde restant dû (ex. saisie manuelle erronée,
+    // ou double soumission d'un même règlement) — le solde est lu sous le verrou FOR UPDATE
+    // ci-dessus, donc cohérent même si un autre paiement vient d'être enregistré à l'instant.
+    const resteAPayerAvant = round2(Number(facture.total) - Number(facture.montant_paye));
+    if (round2(montantNum) > resteAPayerAvant) {
+      await conn.rollback();
+      return res.status(400).json({
+        error: `Le montant dépasse le solde restant dû (${resteAPayerAvant} FCFA).`
+      });
+    }
+
+    await conn.query(
+      `INSERT INTO paiements (user_id, facture_id, montant, methode, reference, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)`,
+      [req.user.id, facture.id, montantNum, methode, reference || null, idempotencyKey]
+    );
+
+    const nouveauMontantPaye = Number(facture.montant_paye) + montantNum;
+    const nouveauStatut = nouveauMontantPaye >= Number(facture.total) ? 'payee' : facture.statut;
+    await conn.query('UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ?', [nouveauMontantPaye, nouveauStatut, facture.id]);
+    await conn.commit();
+
+    const [updatedRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [facture.id]);
+    res.status(201).json({ facture: updatedRows[0] });
+
+    if (nouveauStatut === 'payee' && facture.statut !== 'payee') {
+      notifierUtilisateur(req.user.id, 'facture_payee', { facture: updatedRows[0] });
+    }
+  } catch (err) {
+    if (conn) await conn.rollback();
+    if (err?.code === 'ER_DUP_ENTRY' && req.get('Idempotency-Key')) {
+      try {
+        const key = req.get('Idempotency-Key').trim();
+        const [existingPayment] = await pool.query(
+          'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ?',
+          [req.user.id, key]
+        );
+        if (existingPayment.length) {
+          const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.user.id]);
+          return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
+        }
+      } catch (replayErr) { return next(replayErr); }
+    }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// computeTotals est réutilisée par factures-recurrentes.js pour que la génération
+// automatique applique exactement la même règle de calcul (remise prorata avant TVA,
+// arrondis) qu'une facture créée manuellement — un seul endroit de vérité pour ce calcul.
+module.exports = router;
+module.exports.computeTotals = computeTotals;
+module.exports.ajusterStockFacture = ajusterStockFacture;
+module.exports.insererLignesFacture = insererLignesFacture;
+// envoyerFactureParEmail est réutilisée par config/scheduler.js pour l'envoi automatique
+// des factures générées depuis un modèle récurrent (voir étape 2 ci-dessous).
+module.exports.envoyerFactureParEmail = envoyerFactureParEmail;

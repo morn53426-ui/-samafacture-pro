@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Créer un compte — SamaFacture Pro</title>
+<meta name="description" content="Créez votre compte SamaFacture Pro gratuitement et commencez à facturer vos clients en quelques minutes, sans carte bancaire." />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="canonical" href="https://votredomaine.com/register.html" />
+<meta name="robots" content="index, follow" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div id="auth-side-root"></div>
+    <div class="auth-form-side">
+      <div class="auth-form-card">
+        <div class="auth-form-badge">
+          <div class="mark"><img src="images/icon-192.png" alt="" /></div>
+          <span>SamaFacture Pro</span>
+        </div>
+        <h2>Créer votre compte</h2>
+        <p style="color:var(--ink-soft); margin-bottom:26px;">Commencez gratuitement dès aujourd'hui.</p>
+        <div id="error-box"></div>
+
+        <div id="google-btn" style="display:none; margin-bottom:18px;">
+          <div class="gsi-slot"></div>
+          <div class="auth-divider"><span>ou</span></div>
+        </div>
+
+        <form id="register-form">
+          <div class="field">
+            <label>Nom complet</label>
+            <input type="text" id="nom" required placeholder="Aminata Diop" />
+          </div>
+          <div class="field">
+            <label>Nom de l'entreprise</label>
+            <input type="text" id="entreprise_nom" placeholder="Boutique Aminata" />
+          </div>
+          <div class="field">
+            <label>Adresse email</label>
+            <input type="email" id="email" required placeholder="vous@entreprise.com" />
+          </div>
+          <div class="field">
+            <label>Mot de passe</label>
+            <input type="password" id="password" required placeholder="6 caractères minimum" />
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; padding:12px;">Créer mon compte</button>
+        </form>
+        <p style="margin-top:20px; font-size:0.88rem; color:var(--ink-soft);">
+          Déjà inscrit ? <a href="login.html" style="color:var(--emerald); font-weight:600;">Se connecter</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/auth-slider.js"></script>
+<script src="js/google-auth.js"></script>
+<script>
+  if (Api.token()) location.href = 'dashboard.html';
+  initAuthSlider();
+  initGoogleButton('google-btn');
+
+  document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorBox = document.getElementById('error-box');
+    errorBox.innerHTML = '';
+    const nom = document.getElementById('nom').value.trim();
+    const entreprise_nom = document.getElementById('entreprise_nom').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Création du compte…');
+    try {
+      const { token, user } = await Api.post('/auth/register', { nom, email, password, entreprise_nom });
+      Api.setSession(token, user);
+      location.href = 'dashboard.html';
+    } catch (err) {
+      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+      restore();
+    }
+  });
+</script>
+</body>
+</html>

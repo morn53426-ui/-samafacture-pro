@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Facture par IA — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+<style>
+  /* --- Styles spécifiques à la génération de facture par IA (frontend uniquement) --- */
+  .fia-intro {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .fia-intro .badge-ia {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: var(--emerald-light);
+    color: var(--emerald);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .fia-prompt-card textarea {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    font-family: inherit;
+    font-size: 0.92rem;
+    background: transparent;
+    color: var(--ink);
+  }
+  .fia-prompt-card textarea:focus { outline: none; border-color: var(--emerald); }
+
+  .fia-examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 16px;
+  }
+  .fia-chip {
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-align: left;
+  }
+  .fia-chip:hover { background: var(--emerald-light); border-color: var(--emerald); color: var(--emerald); }
+
+  .fia-actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .fia-hint { font-size: 0.78rem; color: var(--ink-soft); }
+
+  .fia-loading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 22px;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+  }
+  .fia-spinner {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 3px solid var(--line);
+    border-top-color: var(--emerald);
+    animation: fia-spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes fia-spin { to { transform: rotate(360deg); } }
+
+  .fia-result-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--emerald-light);
+    color: var(--emerald);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+
+  .fia-field-ai {
+    position: relative;
+  }
+  .fia-ai-tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--emerald);
+    background: var(--emerald-light);
+    padding: 1px 7px;
+    border-radius: 999px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .fia-empty-preview {
+    text-align: center;
+    color: var(--ink-soft);
+    padding: 40px 20px;
+  }
+  .fia-empty-preview .ic { font-size: 2.2rem; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <div class="fia-intro"><span class="badge-ia"><i class="ic" data-icon="wand"></i> Génération par IA</span></div>
+        <h1>Facture par IA</h1>
+        <p>Décrivez votre facture en langage naturel, l'IA prépare un brouillon que vous pouvez modifier</p>
+      </div>
+    </div>
+
+    <!-- Zone de saisie du prompt -->
+    <div class="card fia-prompt-card">
+      <h3>Décrivez la facture</h3>
+      <textarea id="fia-prompt" placeholder="Ex : Facture pour Amadou Diallo, 3 ordinateurs portables à 250 000 FCFA et 1 imprimante à 85 000 FCFA, livraison le 20 août, paiement par Wave."></textarea>
+
+      <div class="fia-examples" id="fia-examples"></div>
+
+      <div class="fia-actions-row">
+        <span class="fia-hint">Aucune donnée n'est envoyée à un serveur — génération simulée pour l'aperçu de l'interface.</span>
+        <button type="button" class="btn btn-primary" id="fia-generate-btn" onclick="generateFacture()"><i class="ic" data-icon="sparkles"></i> Générer la facture</button>
+      </div>
+    </div>
+
+    <!-- Résultat -->
+    <div id="fia-result-zone" style="margin-top:20px;"></div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('facture-ia');
+
+  // ---------------------------------------------------------------------
+  // Frontend uniquement : aucune requête n'est envoyée à un backend ou à un
+  // modèle d'IA. La "génération" ci-dessous est simulée côté client pour
+  // prévisualiser l'expérience finale (extraction très simplifiée du texte).
+  // ---------------------------------------------------------------------
+
+  const EXAMPLES = [
+    'Facture pour Amadou Diallo : 3 ordinateurs portables à 250 000 FCFA, livraison le 20 août, paiement Wave',
+    'Devis pour Fatou Ndiaye : 10 sacs de ciment à 6 500 FCFA et 2 heures de main d\'œuvre à 15 000 FCFA',
+    'Facture Boutique Diop : 5 t-shirts à 4 000 FCFA, TVA 18%, paiement Orange Money'
+  ];
+
+  let ligneCount = 0;
+  let lastGenerated = null;
+
+  function renderExamples() {
+    document.getElementById('fia-examples').innerHTML = EXAMPLES.map((ex, i) => `
+      <button type="button" class="fia-chip" onclick="useExample(${i})">${Icon('message-circle')} ${escapeHtml(ex.slice(0, 46))}…</button>
+    `).join('');
+  }
+  function useExample(i) {
+    document.getElementById('fia-prompt').value = EXAMPLES[i];
+  }
+
+  // Extraction très simplifiée à partir du texte saisi : cherche un nom de
+  // client après "pour", et des lignes du type "N produit à P FCFA".
+  function parsePrompt(text) {
+    const clientMatch = text.match(/pour\s+([A-ZÀ-Ý][\wÀ-ÿ' -]{2,40}?)(?:\s*[:,]|$)/i);
+    const client = clientMatch ? clientMatch[1].trim() : 'Client à préciser';
+
+    const type = /devis/i.test(text) ? 'devis' : 'facture';
+
+    const modePaiement =
+      /wave/i.test(text) ? 'Wave' :
+      /orange\s*money/i.test(text) ? 'Orange Money' :
+      /paydunya/i.test(text) ? 'PayDunya' :
+      /virement/i.test(text) ? 'Virement bancaire' :
+      /esp[eè]ces/i.test(text) ? 'Espèces' : '';
+
+    const tvaGlobalMatch = text.match(/tva\s*(\d{1,2})\s*%/i);
+    const tvaGlobal = tvaGlobalMatch ? parseFloat(tvaGlobalMatch[1]) : 0;
+
+    // Repère des motifs "12 produit(s) à 3 000 FCFA" / "12 x produit 3000 FCFA"
+    const ligneRegex = /(\d+)\s*(?:x\s*)?([a-zà-ÿ' -]{3,40}?)\s*(?:à|a)\s*([\d\s]{2,10})\s*(?:fcfa)?/gi;
+    const lignes = [];
+    let m;
+    while ((m = ligneRegex.exec(text)) !== null) {
+      const qte = parseInt(m[1], 10) || 1;
+      const designation = m[2].trim().replace(/^(de|d')\s+/i, '');
+      const prix = parseInt(m[3].replace(/\s/g, ''), 10) || 0;
+      if (designation.length > 1) {
+        lignes.push({ designation: capitalize(designation), quantite: qte, prix_unitaire: prix, tva: tvaGlobal });
+      }
+    }
+    if (lignes.length === 0) {
+      lignes.push({ designation: 'Article à préciser', quantite: 1, prix_unitaire: 0, tva: tvaGlobal });
+    }
+
+    const dateMatch = text.match(/(\d{1,2})\s*(janv\w*|f[ée]vr\w*|mars|avr\w*|mai|juin|juil\w*|ao[uû]t|sept\w*|oct\w*|nov\w*|d[ée]c\w*)/i);
+
+    return { client, type, modePaiement, lignes, dateNote: dateMatch ? dateMatch[0] : null };
+  }
+
+  function capitalize(s) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  function generateFacture() {
+    const text = document.getElementById('fia-prompt').value.trim();
+    const zone = document.getElementById('fia-result-zone');
+    if (!text) {
+      zone.innerHTML = `<div class="error-box">Décrivez d'abord la facture à générer.</div>`;
+      return;
+    }
+
+    const btn = document.getElementById('fia-generate-btn');
+    const restore = setButtonLoading(btn, 'Génération…');
+    zone.innerHTML = `
+      <div class="card fia-loading">
+        <div class="fia-spinner"></div>
+        <div>L'IA analyse votre description et prépare un brouillon…</div>
+      </div>`;
+
+    // Simulation locale (pas d'appel réseau).
+    setTimeout(() => {
+      restore();
+      lastGenerated = parsePrompt(text);
+      renderResult(lastGenerated);
+    }, 1100);
+  }
+
+  function renderResult(data) {
+    ligneCount = 0;
+    const zone = document.getElementById('fia-result-zone');
+    zone.innerHTML = `
+      <div class="fia-result-banner">${Icon('check-circle')} Brouillon généré — vérifiez et ajustez les informations avant de créer le document.</div>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>Informations générales <span class="fia-ai-tag">Suggéré par l'IA</span></h3>
+          <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px;">
+            <div class="field fia-field-ai">
+              <label>Client</label>
+              <input type="text" id="fia-client" value="${escapeHtml(data.client)}" />
+            </div>
+            <div class="field">
+              <label>Type de document</label>
+              <select id="fia-type">
+                <option value="facture" ${data.type === 'facture' ? 'selected' : ''}>Facture</option>
+                <option value="devis" ${data.type === 'devis' ? 'selected' : ''}>Devis</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Mode de paiement</label>
+              <select id="fia-mode-paiement">
+                <option value="" ${!data.modePaiement ? 'selected' : ''}>—</option>
+                <option ${data.modePaiement === 'Espèces' ? 'selected' : ''}>Espèces</option>
+                <option ${data.modePaiement === 'Wave' ? 'selected' : ''}>Wave</option>
+                <option ${data.modePaiement === 'Orange Money' ? 'selected' : ''}>Orange Money</option>
+                <option ${data.modePaiement === 'PayDunya' ? 'selected' : ''}>PayDunya</option>
+                <option ${data.modePaiement === 'Virement bancaire' ? 'selected' : ''}>Virement bancaire</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Date d'émission</label>
+              <input type="date" id="fia-date-emission" value="${new Date().toISOString().slice(0, 10)}" />
+            </div>
+          </div>
+          ${data.dateNote ? `<p class="fia-hint">${Icon('calendar')} Indice détecté dans le texte : « ${escapeHtml(data.dateNote)} » — pensez à vérifier l'échéance.</p>` : ''}
+
+          <h3 style="margin-top:14px;">Articles <span class="fia-ai-tag">Suggéré par l'IA</span></h3>
+          <table>
+            <thead><tr><th>Désignation</th><th style="width:100px;">Qté</th><th style="width:130px;">Prix U.</th><th style="width:80px;">TVA%</th><th style="width:120px;">Total</th><th></th></tr></thead>
+            <tbody id="fia-lignes-body"></tbody>
+          </table>
+          <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addFiaLigne()">+ Ajouter une ligne</button>
+
+          <div class="field" style="margin-top:16px;"><label>Commentaires</label><textarea id="fia-commentaires" placeholder="Merci pour votre confiance."></textarea></div>
+        </div>
+
+        <div class="card" style="align-self:start;">
+          <h3>Récapitulatif</h3>
+          <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
+            <span>Sous-total HT</span><span class="mono" id="fia-rec-sous-total">0 FCFA</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
+            <span>TVA</span><span class="mono" id="fia-rec-tva">0 FCFA</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding:14px 0; font-weight:700; font-size:1.15rem;">
+            <span>Total</span><span class="mono" id="fia-rec-total" style="color:var(--emerald);">0 FCFA</span>
+          </div>
+          <button type="button" class="btn btn-primary" style="width:100%; padding:12px;" onclick="confirmerFacture()">Créer le document</button>
+          <button type="button" class="btn btn-outline" style="width:100%; padding:12px; margin-top:8px;" onclick="generateFacture()">${Icon('repeat')} Régénérer</button>
+          <p class="fia-hint" style="margin-top:10px;">Tous les champs proposés par l'IA restent modifiables avant la création.</p>
+        </div>
+      </div>
+    `;
+
+    data.lignes.forEach(l => addFiaLigne(l));
+  }
+
+  function addFiaLigne(prefill) {
+    ligneCount++;
+    const id = 'fl' + ligneCount;
+    const row = document.createElement('tr');
+    row.id = id;
+    row.innerHTML = `
+      <td><input type="text" class="fia-ligne-designation" value="${escapeHtml(prefill?.designation || '')}" placeholder="Désignation" /></td>
+      <td><input type="number" class="fia-ligne-qte ligne-input-sm" value="${prefill?.quantite ?? 1}" min="0" step="1" oninput="fiaRecalc()" /></td>
+      <td><input type="number" class="fia-ligne-pu ligne-input-sm" value="${prefill?.prix_unitaire ?? 0}" min="0" step="1" oninput="fiaRecalc()" /></td>
+      <td><input type="number" class="fia-ligne-tva ligne-input-sm" value="${prefill?.tva ?? 0}" min="0" max="100" step="1" oninput="fiaRecalc()" /></td>
+      <td class="mono fia-ligne-total">0</td>
+      <td><button type="button" class="btn btn-sm btn-danger" onclick="removeFiaLigne('${id}')">${Icon('x')}</button></td>
+    `;
+    document.getElementById('fia-lignes-body').appendChild(row);
+    fiaRecalc();
+  }
+
+  function removeFiaLigne(rowId) {
+    document.getElementById(rowId)?.remove();
+    fiaRecalc();
+  }
+
+  function round2(n) {
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  }
+
+  function getFiaLignes() {
+    return [...document.getElementById('fia-lignes-body').querySelectorAll('tr')].map(row => {
+      const qte = parseFloat(row.querySelector('.fia-ligne-qte').value) || 0;
+      const pu = parseFloat(row.querySelector('.fia-ligne-pu').value) || 0;
+      const tva = parseFloat(row.querySelector('.fia-ligne-tva').value) || 0;
+      const designation = row.querySelector('.fia-ligne-designation').value;
+      const total = round2(qte * pu * (1 + tva / 100));
+      row.querySelector('.fia-ligne-total').textContent = formatMontant(total);
+      return { designation, quantite: qte, prix_unitaire: pu, tva, total_ligne: total };
+    });
+  }
+
+  function fiaRecalc() {
+    const lignes = getFiaLignes();
+    const sousTotal = round2(lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0));
+    const totalTva = round2(lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire * (l.tva / 100), 0));
+    const total = round2(sousTotal + totalTva);
+
+    document.getElementById('fia-rec-sous-total').textContent = formatMontant(sousTotal);
+    document.getElementById('fia-rec-tva').textContent = formatMontant(totalTva);
+    document.getElementById('fia-rec-total').textContent = formatMontant(total);
+  }
+
+  function confirmerFacture() {
+    // Frontend uniquement : aucune création réelle n'est envoyée au serveur ici.
+    const zone = document.getElementById('fia-result-zone');
+    zone.insertAdjacentHTML('afterbegin', `
+      <div class="fia-result-banner" style="background: var(--gold-light, #FDF2DC); color:#B87415;">
+        ${Icon('help-circle')} Aperçu d'interface : le bouton « Créer le document » enverra ces informations à la création réelle de facture une fois le backend IA connecté.
+      </div>
+    `);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  renderExamples();
+</script>
+</body>
+</html>

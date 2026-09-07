@@ -1,0 +1,1234 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* Palette premium — identité conservée (navy/émeraude/or), valeurs affinées pour un
+     rendu plus profond et un meilleur contraste. */
+  --navy-950: #0B1526;
+  --navy-900: #14213D;
+  --navy-800: #1C2B4A;
+  --navy-700: #28395E;
+  --emerald: #0EA980;
+  --emerald-light: #E3F6EF;
+  --gold: #DDA53F;
+  --gold-light: #FBF0DC;
+  --clay: #E1484F;
+  --clay-light: #FBEAEB;
+  --cream: #F6F4EE;
+  --paper: #FFFFFF;
+  --ink: #171B26;
+  --ink-soft: #5B6172;
+  --line: #E6E2D9;
+
+  /* Tokens "structurels" fixes : toujours sombres, dans les deux thèmes (barre latérale,
+     pied de page, en-têtes de tableau...). Contrairement à --navy-950/900 ci-dessus, ceux-ci
+     ne s'inversent jamais en mode sombre — c'est ce qui permet aux titres (qui utilisent
+     --navy-950 comme couleur de texte) de rester lisibles sans casser la barre latérale. */
+  --structural-dark-1: #0B1526;
+  --structural-dark-2: #14213D;
+
+  --font-display: 'Sora', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  /* Échelle d'élévation — à utiliser plutôt que d'inventer une nouvelle ombre au cas par
+     cas (ce qui a produit jusqu'ici une dizaine de valeurs légèrement différentes). */
+  --shadow-xs: 0 1px 2px rgba(15, 27, 51, 0.05);
+  --shadow-sm: 0 2px 8px rgba(15, 27, 51, 0.06);
+  --shadow-md: 0 8px 24px rgba(15, 27, 51, 0.08);
+  --shadow-lg: 0 14px 36px rgba(15, 27, 51, 0.12);
+  --shadow-xl: 0 24px 60px rgba(15, 27, 51, 0.18);
+  --shadow-card: var(--shadow-xs), var(--shadow-md); /* alias historique, gardé pour compatibilité */
+  --sidebar-w: 260px;
+
+  /* Échelle de transition — durées et courbe réutilisées par tous les composants animés
+     (cartes, boutons, champs, menus, toasts, modales, info-bulles...). Remplace les valeurs
+     "0.15s ease" / "cubic-bezier(0.16, 1, 0.3, 1)" ressaisies séparément à une dizaine
+     d'endroits, sans changer aucune des durées ou courbes existantes. */
+  --dur-fast: 0.15s;
+  --dur-base: 0.18s;
+  --dur-med: 0.2s;
+  --dur-slow: 0.25s;
+  --ease-standard: ease;
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Échelle d'espacement — base 4px. À privilégier pour toute nouvelle règle plutôt que
+     d'introduire une valeur arbitraire (le fichier en accumulait une quarantaine avant
+     cette tâche, de 3px à 84px, sans logique de progression commune). Les valeurs déjà
+     très spécifiques (paddings de boutons, badges...) ont été volontairement laissées
+     telles quelles : elles ont été ajustées finement au pixel près lors des tâches
+     précédentes, les reprendre mécaniquement risquerait de casser cet équilibre visuel
+     sans bénéfice réel. Cette échelle sert surtout aux nouveaux espacements structurels. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Échelle typographique — cohérente et modulaire, à utiliser pour toute nouvelle règle
+     plutôt que d'introduire une nouvelle taille arbitraire. */
+  --text-2xs: 0.7rem;
+  --text-xs: 0.78rem;
+  --text-sm: 0.85rem;
+  --text-base: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.7rem;
+  --text-3xl: 2.1rem;
+  --text-4xl: 2.6rem;
+
+  color-scheme: light;
+}
+
+/* ---------- Mode sombre ---------- */
+/* S'active automatiquement selon la préférence système. data-theme sur <html> permet une
+   bascule manuelle future (ex: un interrupteur dans les paramètres) sans rien changer ici. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --is-dark: 1; }
+}
+:root[data-theme="dark"] { --is-dark: 1; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --cream: #0F1420;
+    --paper: #171D2C;
+    --ink: #EDEFF5;
+    --ink-soft: #9AA3B8;
+    --line: #2A3245;
+    --emerald-light: #12352C;
+    --gold-light: #3A2E15;
+    --clay-light: #3A1B1E;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.32);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.38);
+    --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.45);
+    --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.55);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 28px rgba(0, 0, 0, 0.4);
+  }
+  /* Les titres et quelques textes à fort contraste utilisent --navy-950/900 comme couleur
+     de texte sur fond clair ; en mode sombre ils doivent passer à --ink (devenu clair)
+     plutôt que de s'inverser eux-mêmes, pour ne pas casser la barre latérale (voir plus haut). */
+  :root:not([data-theme="light"]) h1,
+  :root:not([data-theme="light"]) h2,
+  :root:not([data-theme="light"]) h3,
+  :root:not([data-theme="light"]) h4,
+  :root:not([data-theme="light"]) .stat-card .stat-value,
+  :root:not([data-theme="light"]) .lp-header .brand,
+  :root:not([data-theme="light"]) .btn-outline {
+    color: var(--ink);
+  }
+  :root:not([data-theme="light"]) .btn-outline {
+    border-color: var(--line);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --cream: #0F1420;
+  --paper: #171D2C;
+  --ink: #EDEFF5;
+  --ink-soft: #9AA3B8;
+  --line: #2A3245;
+  --emerald-light: #12352C;
+  --gold-light: #3A2E15;
+  --clay-light: #3A1B1E;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.32);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.45);
+  --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+:root[data-theme="dark"] h1, :root[data-theme="dark"] h2,
+:root[data-theme="dark"] h3, :root[data-theme="dark"] h4,
+:root[data-theme="dark"] .stat-card .stat-value,
+:root[data-theme="dark"] .lp-header .brand,
+:root[data-theme="dark"] .btn-outline { color: var(--ink); }
+:root[data-theme="dark"] .btn-outline { border-color: var(--line); }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.58;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  margin: 0 0 0.4em 0;
+  color: var(--navy-950);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance; /* évite les titres coupés bizarrement sur une ou deux lignes */
+}
+h1 { font-size: var(--text-2xl); font-weight: 700; }
+h2 { font-size: var(--text-xl); font-weight: 700; }
+h3 { font-size: var(--text-lg); font-weight: 600; letter-spacing: -0.005em; }
+h4 { font-size: var(--text-md); font-weight: 600; letter-spacing: normal; }
+p { margin: 0 0 0.8em 0; }
+a { color: inherit; text-decoration: none; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+button, input, select, textarea { font-family: var(--font-body); font-size: 0.95rem; }
+
+/* ---------- Layout general ---------- */
+.app-shell { display: flex; min-height: 100vh; }
+
+.main-content {
+  flex: 1;
+  margin-left: var(--sidebar-w);
+  padding: 28px 34px 60px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 26px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ==================== Composant Avatar ==================== */
+.avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--structural-dark-2); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+
+/* ---------- Sidebar (fixe en haut avec menu déroulant sur mobile) ---------- */
+.sidebar {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-w);
+  background: linear-gradient(180deg, var(--structural-dark-1) 0%, var(--structural-dark-2) 100%);
+  color: #C9D2E8;
+  display: flex;
+  flex-direction: column;
+  z-index: 110;
+}
+
+.mobile-toggle {
+  display: none;
+  width: 44px; height: 44px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  font-size: 1.05rem;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+.mobile-toggle:hover { background: rgba(255,255,255,0.16); }
+.mobile-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(15,27,51,0.55);
+  z-index: 105;
+}
+.sidebar-overlay.show { display: block; }
+
+@media (max-width: 900px) {
+  .main-content { margin-left: 0; padding: 84px 18px 50px; }
+  .mobile-toggle { display: flex; }
+
+  /* Le logo + menu s'affichent verticalement, fixés en haut de l'écran (au lieu du tiroir latéral) */
+  .sidebar {
+    left: 0; right: 0; top: 0; bottom: auto;
+    width: 100%;
+    height: auto;
+    max-height: 100vh;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.25);
+  }
+  .sidebar-nav, .sidebar-foot { display: none; }
+  .sidebar.open { box-shadow: 0 4px 28px rgba(0,0,0,0.4); border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .sidebar.open .sidebar-nav, .sidebar.open .sidebar-foot { display: block; }
+  .sidebar.open .sidebar-nav { max-height: calc(100vh - 76px); overflow-y: auto; }
+
+  /* Fenêtres modales (nouveau client, nouveau produit, paiement...) : le bandeau de
+     navigation devient ici une barre fixée en haut de l'écran avec z-index:110 (voir
+     .sidebar ci-dessus). Sans ceci, une modale centrée verticalement dont le sommet
+     s'approche du haut de l'écran se retrouve partiellement cachée derrière ce bandeau
+     (titre coupé) car son propre z-index:60 est inférieur — repérée via sa signature
+     d'overlay commune, sans toucher au balisage HTML. */
+  div[style*="z-index:60"] { z-index: 120 !important; }
+
+  .page-header { flex-direction: column; align-items: flex-start; }
+  .page-header > div:last-child, .page-header > button, .page-header > a { width: 100%; }
+  h1 { font-size: 1.35rem; }
+
+  /* Cibles tactiles plus grandes : boutons, éléments de menu, champs de formulaire
+     (recommandation d'accessibilité tactile ~44px de hauteur minimum). */
+  .btn:not(.btn-sm) { min-height: 44px; padding: 11px 18px; }
+  .btn-sm { min-height: 38px; }
+  .nav-item { padding: 12px 12px; min-height: 44px; }
+  input[type=text], input[type=email], input[type=password], input[type=number],
+  input[type=date], input[type=tel], input[type=search], input[type=url], select, textarea {
+    padding: 12px 13px;
+  }
+  input[type=checkbox], input[type=radio] { width: 20px; height: 20px; }
+}
+
+@media (max-width: 560px) {
+  /* padding-top volontairement ≥ à la hauteur réelle du bandeau fixe (.sidebar-brand,
+     ~77-80px selon le rendu des polices) + marge de sécurité, sinon le haut du titre de
+     page (h1, premier élément de .main-content) se retrouve caché dessous — c'est
+     exactement ce qui se produisait ici avec 72px, trop juste. Ne pas redescendre sous
+     84px (valeur déjà utilisée par le bloc @media 900px ci-dessus) sans revérifier la
+     hauteur réelle du bandeau sur un vrai appareil. */
+  .main-content { padding: 88px 12px 46px; }
+  .grid-4 { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card { padding: 16px; }
+  .stat-card .stat-value { font-size: 1.3rem; }
+
+  /* Tableaux : un peu moins de respiration par cellule pour afficher plus de contenu
+     avant que le défilement horizontal (déjà géré par .card { overflow-x:auto }) ne prenne le relais. */
+  .card table { min-width: 480px; }
+  thead th, tbody td { padding: 10px 12px; }
+  .card { -webkit-overflow-scrolling: touch; }
+
+  /* Empile les boutons d'un groupe d'actions plutôt que de les laisser se compresser côte à côte */
+  .page-header > div:last-child { display: flex; flex-direction: column; gap: 8px; }
+  .page-header > div:last-child .btn { width: 100%; }
+}
+
+@media (max-width: 400px) {
+  /* Très petits téléphones : une seule colonne pour les statistiques et les grilles à 4 colonnes */
+  .grid-4 { grid-template-columns: 1fr; }
+  h1 { font-size: 1.2rem; }
+  .card { padding: 14px; }
+}
+
+/* Tableau "Factures récurrentes" (7 colonnes) : sur mobile, bascule en cartes empilées
+   plutôt que de forcer un défilement horizontal. Mêmes informations et actions,
+   simplement réorganisées verticalement. Scopé à .table-stack (ajouté uniquement sur
+   cette table) pour ne pas affecter les autres tableaux de l'app — revus en Phase 9 et
+   déjà adaptés au défilement horizontal, qui reste approprié pour eux (moins de colonnes,
+   ou usage plus proche d'un tableur consulté par des utilisateurs habitués). */
+@media (max-width: 640px) {
+  .table-stack { min-width: 0 !important; }
+  .table-stack thead { display: none; }
+  .table-stack, .table-stack tbody, .table-stack tr, .table-stack td { display: block; width: 100%; }
+  .table-stack tr {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    margin-bottom: 12px;
+    padding: 14px;
+  }
+  .table-stack tbody tr:last-child { margin-bottom: 0; }
+  .table-stack td {
+    padding: 6px 0;
+    border: none;
+    text-align: left !important;
+    white-space: normal !important;
+  }
+  .table-stack td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--ink-soft);
+    margin-bottom: 2px;
+  }
+  /* Cellule d'actions : pas d'étiquette, boutons empilés en pleine largeur */
+  .table-stack td:last-child {
+    display: flex; flex-direction: column; gap: 8px;
+    padding-top: 10px; margin-top: 4px;
+    border-top: 1px dashed var(--line);
+  }
+  .table-stack td:last-child .btn { width: 100%; }
+  /* Ligne "aucune donnée" (colspan) : reste centrée, pas transformée en carte */
+  .table-stack td[colspan] { border: none; padding: 0; }
+}
+
+/* Fenêtres modales (ex: ajout/modification client, produit, dépense…) : évite qu'une
+   modale plus haute que l'écran ne devienne inaccessible sur mobile, sans toucher au
+   balisage HTML — repérées via leur signature d'overlay commune (z-index:60). */
+@media (max-width: 560px) {
+  div[style*="z-index:60"] {
+    padding: 16px 12px !important;
+  }
+  div[style*="z-index:60"] > .card {
+    width: 100% !important;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+.sidebar-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sidebar-brand .mark {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800; color: var(--structural-dark-1);
+  overflow: hidden; flex-shrink: 0;
+}
+.sidebar-brand .mark img { width: 100%; height: 100%; object-fit: cover; }
+.sidebar-brand .name { font-family: var(--font-display); font-weight: 700; color: #fff; font-size: 1.02rem; }
+.sidebar-brand .sub { font-size: 0.7rem; color: #8B96B4; letter-spacing: 0.04em; text-transform: uppercase; }
+
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 14px 12px; }
+.nav-group-label {
+  font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #5D6A8F; margin: 18px 10px 6px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  color: #B7C0DA; font-size: 0.89rem; font-weight: 500;
+  cursor: pointer; transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+  margin-bottom: 2px;
+}
+.nav-item .ic { width: 18px; text-align: center; font-size: 1rem; }
+.nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.nav-item:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.nav-item.active { background: var(--emerald); color: #fff; box-shadow: 0 2px 10px rgba(14,169,128,0.35); }
+.nav-item.active .ic { color: #fff; }
+.nav-item.active:hover { background: #0C9670; }
+
+.sidebar-foot {
+  padding: 16px 20px 20px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 0.78rem; color: #6B76A0;
+}
+.plan-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(221, 165, 63, 0.15); color: var(--gold);
+  padding: 4px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.install-app-btn {
+  display: none; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 9px 12px; margin-bottom: 12px;
+  border-radius: var(--radius-sm); border: 1px solid rgba(15,169,128,0.4);
+  background: rgba(15,169,128,0.12); color: #6FE3BE;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer;
+}
+.install-app-btn:hover { background: rgba(15,169,128,0.2); }
+
+/* ==================== Composant Carte ==================== */
+.grid { display: grid; gap: var(--space-5); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-2 { grid-template-columns: 2fr 1fr; }
+@media (max-width: 1100px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-5) var(--space-6);
+  overflow-x: auto;
+  transition: box-shadow var(--dur-base) var(--ease-standard), transform var(--dur-base) var(--ease-standard), border-color var(--dur-base) var(--ease-standard), opacity var(--dur-base) var(--ease-standard);
+}
+
+/* Chargement — silhouette animée à afficher pendant qu'une carte attend ses données,
+   plutôt qu'un texte "Chargement..." ou un contenu vide. */
+.card-skeleton { position: relative; overflow: hidden; color: transparent; pointer-events: none; }
+.card-skeleton * { visibility: hidden; }
+.card-skeleton::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+  background-size: 200% 100%;
+  animation: card-shimmer 1.4s ease-in-out infinite;
+}
+:root:not([data-theme="light"]) .card-skeleton::after,
+:root[data-theme="dark"] .card-skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  background-size: 200% 100%;
+}
+@keyframes card-shimmer {
+  0% { background-position: 150% 0; }
+  100% { background-position: -50% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-skeleton::after { animation-duration: 2.2s; }
+}
+
+.stat-card { display: flex; flex-direction: column; gap: 10px; }
+.stat-card .stat-top { display: flex; align-items: center; justify-content: space-between; }
+.stat-card .stat-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; font-size: 1.05rem;
+}
+.stat-card .stat-label { font-size: 0.8rem; color: var(--ink-soft); font-weight: 500; }
+.stat-card .stat-value { font-family: var(--font-mono); font-weight: 700; font-size: 1.6rem; color: var(--navy-950); }
+.stat-card .stat-delta { font-size: 0.78rem; }
+
+.icon-emerald { background: var(--emerald-light); color: var(--emerald); }
+.icon-gold { background: var(--gold-light); color: #B87415; }
+.icon-clay { background: var(--clay-light); color: var(--clay); }
+.icon-navy { background: #E8ECF7; color: var(--navy-800); }
+
+/* ==================== Composant Tableau ==================== */
+table { width: 100%; border-collapse: collapse; }
+.card table { min-width: 560px; }
+thead th {
+  text-align: left; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ink-soft); font-weight: 600; padding: 10px 14px; border-bottom: 1px solid var(--line);
+}
+tbody td { padding: 13px 14px; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
+tbody tr:last-child td { border-bottom: none; }
+/* Utilisait auparavant une couleur fixe (#FBFAF7), invisible/incorrecte en mode sombre —
+   remplacée par un ton dérivé du thème. */
+tbody tr:hover { background: color-mix(in srgb, var(--ink) 3%, var(--paper)); }
+
+/* Lignes zébrées pour une lecture plus facile des tableaux longs (auparavant appliqué
+   uniquement aux factures imprimées ; désormais cohérent sur toute l'application, et
+   compatible avec le mode sombre — l'ancienne valeur #FAF9F5 était fixe). */
+.card table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--ink) 2%, var(--paper)); }
+.card table tbody tr:nth-child(even):hover { background: color-mix(in srgb, var(--ink) 4%, var(--paper)); }
+
+/* Ligne cliquable (ex: ouvrir une fiche au clic sur toute la ligne) — variante à ajouter
+   au besoin, n'affecte pas les tableaux existants par défaut. */
+.row-clickable { cursor: pointer; }
+.row-clickable:focus-visible { outline: 2px solid var(--emerald); outline-offset: -2px; }
+
+/* Lignes de chargement (silhouette animée), à afficher pendant la récupération des
+   données plutôt qu'un tableau vide ou un texte "Chargement..." */
+.row-skeleton td { padding: 14px; }
+.row-skeleton .skeleton-bar {
+  height: 12px; border-radius: 4px;
+  background: linear-gradient(90deg, var(--line), color-mix(in srgb, var(--line) 40%, var(--paper)), var(--line));
+  background-size: 200% 100%;
+  animation: card-shimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-skeleton .skeleton-bar { animation-duration: 2.2s; }
+}
+
+
+/* ==================== Composant Badge ==================== */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 600;
+  white-space: nowrap;
+}
+/* Petit point de couleur avant le texte, pour une lecture plus rapide au survol d'une
+   liste (motif courant dans les SaaS modernes : Stripe, Linear...). */
+.badge::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.badge-payee { background: var(--emerald-light); color: var(--emerald); }
+.badge-attente { background: var(--gold-light); color: #B87415; }
+.badge-retard { background: var(--clay-light); color: var(--clay); }
+/* Utilisait auparavant des couleurs fixes (#EFEFEF/#7A7A7A) qui ne s'adaptaient pas au
+   mode sombre — remplacées par les tokens du thème. */
+.badge-annulee { background: var(--line); color: var(--ink-soft); }
+
+/* ==================== Composant Champ de formulaire ==================== */
+label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--navy-900); margin-bottom: 6px; }
+.field { margin-bottom: var(--space-4); }
+
+input[type=text], input[type=email], input[type=password], input[type=number],
+input[type=date], input[type=tel], input[type=search], input[type=url], select, textarea {
+  width: 100%; padding: 10px 13px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--paper); color: var(--ink); outline: none;
+  font-family: var(--font-body); font-size: var(--text-base, 0.9375rem);
+  transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard), background-color var(--dur-fast) var(--ease-standard);
+}
+
+/* Survol : légère mise en évidence avant même le focus */
+input[type=text]:hover, input[type=email]:hover, input[type=password]:hover, input[type=number]:hover,
+input[type=date]:hover, input[type=tel]:hover, input[type=search]:hover, input[type=url]:hover,
+select:hover, textarea:hover {
+  border-color: var(--ink-soft);
+}
+
+/* Focus : anneau accessible (bien plus visible qu'un simple changement de couleur de bordure) */
+input[type=text]:focus, input[type=email]:focus, input[type=password]:focus, input[type=number]:focus,
+input[type=date]:focus, input[type=tel]:focus, input[type=search]:focus, input[type=url]:focus,
+select:focus, textarea:focus {
+  border-color: var(--emerald);
+  box-shadow: 0 0 0 3px var(--emerald-light);
+}
+
+/* Désactivé */
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--cream); color: var(--ink-soft);
+  cursor: not-allowed; opacity: 0.7;
+}
+
+input::placeholder, textarea::placeholder { color: var(--ink-soft); opacity: 0.7; }
+
+textarea { resize: vertical; min-height: 80px; }
+
+/* Liste déroulante avec chevron personnalisé (plus cohérent avec le design que la flèche
+   par défaut du système d'exploitation) */
+select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235B6172' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+/* Cases à cocher et boutons radio — reprend les couleurs de la marque sans reconstruire
+   un composant personnalisé complet (bon support navigateur pour accent-color). */
+input[type=checkbox], input[type=radio] {
+  accent-color: var(--emerald);
+  width: 16px; height: 16px;
+  cursor: pointer;
+}
+input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed; opacity: 0.6; }
+
+
+/* Champs compacts des lignes de facture (quantité, prix unitaire, TVA) :
+   moins de padding pour laisser la place à des valeurs à plusieurs chiffres. */
+.ligne-input-sm {
+  padding: 8px 6px !important;
+  text-align: right;
+  min-width: 0;
+}
+
+/* ==================== Composant Button ==================== */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 18px; border-radius: var(--radius-sm); border: 1px solid transparent;
+  font-family: var(--font-body); font-weight: 600; font-size: 0.88rem; line-height: 1;
+  cursor: pointer; user-select: none; white-space: nowrap;
+  transition: opacity var(--dur-fast) var(--ease-standard), transform 0.1s ease, background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+}
+.btn:active { transform: translateY(1px); }
+
+/* Focus clavier accessible : visible uniquement à la navigation clavier (pas au clic
+   souris, grâce à :focus-visible), sur fond clair comme sombre. */
+.btn:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+}
+
+/* État désactivé — commun à toutes les variantes */
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  pointer-events: none;
+}
+
+/* État de chargement : conserve la taille du bouton, réduit le texte, ajoute un
+   spinner animé. Utilisé par setButtonLoading() dans api.js. */
+.btn-loading {
+  color: transparent !important;
+  pointer-events: none;
+  position: relative;
+}
+.btn-loading::after {
+  content: '';
+  position: absolute; left: 50%; top: 50%;
+  width: 16px; height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid var(--ink-soft);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin 0.6s linear infinite;
+}
+.btn-primary.btn-loading::after { border-color: #fff; border-right-color: transparent; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .btn-loading::after { animation-duration: 1.4s; }
+}
+
+/* ---------- Variantes ---------- */
+.btn-primary { background: var(--emerald); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #0C9670; }
+
+.btn-outline { background: transparent; border-color: var(--line); color: var(--navy-900); }
+.btn-outline:hover:not(:disabled) { background: var(--cream); border-color: var(--ink-soft); }
+
+.btn-danger { background: var(--clay-light); color: var(--clay); }
+.btn-danger:hover:not(:disabled) { background: var(--clay); color: #fff; }
+
+.btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+
+
+/* ==================== Composant Notification (toast) ==================== */
+.toast-container {
+  position: fixed; bottom: var(--space-6); right: var(--space-6);
+  z-index: 300;
+  display: flex; flex-direction: column; gap: var(--space-2);
+  max-width: min(360px, calc(100vw - 2 * var(--space-4)));
+  pointer-events: none; /* laisse passer les clics entre deux notifications */
+}
+.toast {
+  pointer-events: auto;
+  background: var(--emerald); color: #fff;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-body); font-size: 0.88rem; font-weight: 600; line-height: 1.4;
+  --fade-in-y: 10px;
+  --fade-in-scale: 0.95;
+  animation: fade-in-up var(--dur-slow) var(--ease-spring);
+}
+.toast-error { background: var(--clay); }
+.toast-info { background: var(--structural-dark-1); }
+
+.toast.toast-leaving { animation: toast-out var(--dur-med) var(--ease-standard) forwards; }
+
+/* Fondu + translation + léger zoom d'entrée — partagé par toast, modale, info-bulles
+   vides et bannière de connexion, qui utilisaient jusqu'ici 4 @keyframes quasi identiques
+   (mêmes propriétés animées, seules la distance et l'échelle de départ différaient).
+   Chaque composant fixe --fade-in-y / --fade-in-scale juste avant d'appeler cette
+   animation ; sans redéfinition, --fade-in-scale vaut 1 (pas de zoom). */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(var(--fade-in-y, 10px)) scale(var(--fade-in-scale, 1)); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(6px) scale(0.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+  .toast.toast-leaving { animation: none; opacity: 0; transition: opacity 0.2s; }
+}
+
+@media (max-width: 480px) {
+  .toast-container { left: var(--space-4); right: var(--space-4); bottom: var(--space-4); max-width: none; }
+}
+
+/* Utilise un attribut data-tooltip="texte" plutôt que l'attribut title="" du navigateur :
+   les deux en même temps afficheraient une bulle stylée ET l'infobulle native du système,
+   ce qu'il n'existe aucun moyen fiable d'éviter en CSS pur si on garde title. Adopter ce
+   composant dans une page (remplacer title="..." par data-tooltip="...") est un
+   changement de composant métier, hors périmètre de cette tâche. */
+[data-tooltip] { position: relative; }
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--structural-dark-1);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.3;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  max-width: 240px;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard), visibility 0.15s;
+  z-index: 80;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Un peu de délai avant apparition, pour ne pas déclencher la bulle au simple passage
+   du curseur — évite un effet clignotant quand la souris traverse plusieurs éléments. */
+[data-tooltip]:hover::after { transition-delay: 0.35s; }
+[data-tooltip]:focus-visible::after { transition-delay: 0s; } /* immédiat au clavier */
+
+/* Positions alternatives, quand la bulle par défaut (au-dessus) déborderait de l'écran */
+[data-tooltip-pos="bottom"]::after {
+  bottom: auto; top: calc(100% + 8px);
+  transform: translateX(-50%) translateY(-4px);
+}
+[data-tooltip-pos="bottom"]:hover::after,
+[data-tooltip-pos="bottom"]:focus-visible::after { transform: translateX(-50%) translateY(0); }
+
+[data-tooltip-pos="left"]::after {
+  bottom: auto; top: 50%; left: auto; right: calc(100% + 8px);
+  transform: translateY(-50%) translateX(4px);
+}
+[data-tooltip-pos="left"]:hover::after,
+[data-tooltip-pos="left"]:focus-visible::after { transform: translateY(-50%) translateX(0); }
+
+[data-tooltip-pos="right"]::after {
+  bottom: auto; top: 50%; left: calc(100% + 8px);
+  transform: translateY(-50%) translateX(-4px);
+}
+[data-tooltip-pos="right"]:hover::after,
+[data-tooltip-pos="right"]:focus-visible::after { transform: translateY(-50%) translateX(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tooltip]::after { transition-duration: 0.01ms !important; transition-delay: 0s !important; }
+}
+
+/* Les info-bulles n'ont pas d'équivalent tactile fiable (pas de survol sur mobile) — on
+   les masque sur petit écran plutôt que de laisser un texte inaccessible au doigt. */
+@media (hover: none) {
+  [data-tooltip]::after { display: none; }
+}
+
+/* Les modales de l'application partagent toutes la même structure (un conteneur dont
+   l'id se termine par "modal", contenant une .card) — ce qui permet de les cibler ici par
+   sélecteur, sans avoir à modifier chaque page individuellement. */
+
+[id$="modal"] {
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+/* La boîte de dialogue elle-même : légère apparition (fondu + zoom) à l'ouverture. Comme
+   l'élément est en display:none avant ouverture, l'animation se relance à chaque fois
+   qu'il redevient visible — aucun JavaScript n'est nécessaire pour la déclencher. */
+[id$="modal"] > .card {
+  --fade-in-y: 10px;
+  --fade-in-scale: 0.97;
+  animation: fade-in-up 0.22s var(--ease-spring);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  [id$="modal"] > .card { animation: none; }
+}
+
+/* Petit écran : les modales s'ouvrent souvent avec un formulaire long (ex: fiche client) —
+   on réduit la marge et on laisse défiler verticalement plutôt que de déborder de l'écran. */
+@media (max-width: 480px) {
+  [id$="modal"] > .card { max-height: 94vh; width: 94vw !important; }
+}
+
+.auth-wrap {
+  min-height: 100vh; display: flex; align-items: stretch;
+}
+
+/* Conteneur du slider : les diapositives et l'overlay sont en position absolue à
+   l'intérieur, le contenu (logo, bannière) passe au-dessus via .auth-content. */
+.auth-side {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--structural-dark-1); /* couleur de secours pendant le chargement des images */
+}
+
+.auth-slide {
+  position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  z-index: 0;
+  transition: opacity 1.3s ease;
+  transform: scale(1);
+}
+.auth-slide.active {
+  opacity: 1;
+  z-index: 1;
+  animation: authKenBurns 6.5s ease-in-out forwards;
+}
+@keyframes authKenBurns {
+  from { transform: scale(1); }
+  to { transform: scale(1.09); }
+}
+
+/* Overlay sombre pour garantir la lisibilité du texte quelle que soit l'image */
+.auth-slide-overlay {
+  position: absolute; inset: 0;
+  z-index: 2;
+  background: linear-gradient(165deg, rgba(0,0,0,0.60) 0%, rgba(10,16,30,0.45) 45%, rgba(0,0,0,0.55) 100%);
+}
+
+.auth-content {
+  position: relative;
+  z-index: 3;
+  height: 100%;
+  padding: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #fff;
+}
+
+/* Flèches de navigation */
+.auth-slider-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 42px; height: 42px; border-radius: 50%;
+  background: rgba(255,255,255,0.14);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff; font-size: 1.3rem; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 4;
+  transition: background var(--dur-med) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
+}
+.auth-slider-arrow:hover { background: rgba(255,255,255,0.28); }
+.auth-slider-arrow:active { transform: translateY(-50%) scale(0.92); }
+.auth-slider-arrow.prev { left: 18px; }
+.auth-slider-arrow.next { right: 18px; }
+
+/* Points de navigation */
+.auth-slider-dots { display: flex; gap: 8px; margin-top: 14px; }
+.auth-slider-dots .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+  cursor: pointer; transition: all var(--dur-slow) var(--ease-standard);
+}
+.auth-slider-dots .dot.active { background: #fff; width: 22px; border-radius: 4px; }
+
+/* Bannière défilante (ticker) en verre dépoli, remplace l'ancien texte statique */
+.auth-marquee-group { --fade-in-y: 12px; animation: fade-in-up 0.9s var(--ease-standard) both; animation-delay: var(--dur-slow); }
+.auth-marquee {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.10);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.18);
+  padding: 14px 0;
+  box-shadow: 0 0 26px rgba(15,169,128,0.22);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.auth-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: authMarqueeScroll 24s linear infinite;
+}
+.auth-marquee:hover .auth-marquee-track { animation-play-state: paused; }
+.auth-marquee-item {
+  flex-shrink: 0;
+  padding: 0 26px;
+  font-size: 0.9rem; font-weight: 500;
+  white-space: nowrap;
+  border-right: 1px solid rgba(255,255,255,0.2);
+  text-shadow: 0 0 14px rgba(15,169,128,0.55);
+}
+@keyframes authMarqueeScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.auth-form-side {
+  width: 460px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  padding: 40px;
+  position: relative;
+  overflow: hidden;
+  background: var(--cream);
+}
+/* Lueur discrète en haut du panneau (écho des couleurs de marque déjà utilisées dans le
+   slider), plutôt qu'un fond plat — un seul geste décoratif, tout le reste reste sobre. */
+.auth-form-side::before {
+  content: '';
+  position: absolute; top: -180px; left: 50%; transform: translateX(-50%);
+  width: 520px; height: 380px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(14,169,128,0.16), transparent 60%),
+    radial-gradient(circle at 75% 20%, rgba(221,165,63,0.14), transparent 55%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.auth-form-card {
+  width: 100%; max-width: 360px;
+  position: relative;
+  background: var(--paper);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xl);
+  padding: 38px 34px 32px;
+  --fade-in-y: 14px;
+  animation: fade-in-up var(--dur-slow) var(--ease-spring);
+}
+/* Le seul accent de couleur du panneau : un fil émeraude → or en tête de carte, qui
+   reprend exactement les deux teintes déjà à l'œuvre dans le slider (lueur du bandeau
+   défilant, points de navigation) — le lien visuel entre les deux moitiés de l'écran. */
+.auth-form-card::before {
+  content: '';
+  position: absolute; top: 0; left: 26px; right: 26px; height: 3px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(90deg, var(--emerald), var(--gold));
+}
+.auth-form-card .auth-form-badge {
+  display: flex; align-items: center; gap: 9px;
+  margin-bottom: 20px;
+}
+.auth-form-card .auth-form-badge .mark {
+  width: 30px; height: 30px; border-radius: 8px; overflow: hidden; flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+.auth-form-card .auth-form-badge .mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.auth-form-card .auth-form-badge span {
+  font-family: var(--font-display); font-weight: 700; font-size: 0.86rem;
+  letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-soft);
+}
+.auth-form-card h2 {
+  font-size: var(--text-2xl);
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.auth-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0; color: var(--ink-soft); font-size: 0.8rem;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--line);
+}
+.auth-badge { display: flex; align-items: center; gap: 10px; }
+@media (max-width: 900px) { .auth-side { display: none; } .auth-form-side { width: 100%; } }
+@media (max-width: 480px) { .auth-form-card { padding: 30px 22px 26px; box-shadow: var(--shadow-md); } }
+@media (prefers-reduced-motion: reduce) {
+  .auth-slide.active { animation: none; }
+  .auth-marquee-track { animation-duration: 60s; }
+  .auth-form-card { animation: none; }
+  .auth-marquee-group { animation: none; opacity: 1; }
+}
+
+/* ---------- Invoice preview / stamp signature element ---------- */
+.stamp {
+  width: 74px; height: 74px; border-radius: 50%;
+  border: 2px solid var(--emerald);
+  display: flex; align-items: center; justify-content: center;
+  transform: rotate(-8deg);
+  color: var(--emerald); font-family: var(--font-display); font-weight: 800;
+  font-size: 0.62rem; text-align: center; line-height: 1.15; letter-spacing: 0.03em;
+  text-transform: uppercase;
+  position: relative;
+}
+.stamp::before {
+  content: ''; position: absolute; inset: 5px; border-radius: 50%;
+  border: 1px dashed currentColor; opacity: 0.45;
+}
+.stamp.stamp-clay { border-color: var(--clay); color: var(--clay); }
+
+.invoice-doc {
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 40px;
+  box-shadow: var(--shadow-md);
+}
+.invoice-doc .head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
+.invoice-doc table { border-radius: 8px; overflow: hidden; }
+.invoice-doc table thead th { background: var(--structural-dark-1); color: #fff; font-weight: 600; letter-spacing: 0.02em; padding: 12px 14px; }
+.invoice-doc table tbody td { padding: 12px 14px; }
+.invoice-doc table tbody tr:nth-child(even) { background: #FAF9F5; }
+.invoice-doc table tbody tr { page-break-inside: avoid; }
+@media print {
+  .invoice-doc .head { page-break-after: avoid; }
+  .invoice-doc table thead { display: table-header-group; }
+}
+@media (max-width: 640px) {
+  /* Aperçu de facture/devis sur mobile : moins de marge intérieure, en-tête empilé,
+     et défilement horizontal interne plutôt qu'un débordement de toute la page
+     (le tableau et le bloc de totaux gardent leur largeur d'origine, plus lisible). */
+  .invoice-doc {
+    padding: 22px 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .invoice-doc .head { flex-direction: column; gap: 16px; }
+  .invoice-doc table { min-width: 480px; }
+}
+
+/* ==================== Composant État vide ==================== */
+.empty-state {
+  text-align: center; padding: var(--space-12) var(--space-5);
+  color: var(--ink-soft); font-size: 0.92rem; line-height: 1.6;
+  max-width: 360px; margin: 0 auto;
+  --fade-in-y: 4px;
+  animation: fade-in-up var(--dur-slow) var(--ease-standard) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .empty-state { animation: none; }
+}
+.empty-state .ic {
+  width: 56px; height: 56px; margin: 0 auto var(--space-4);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink-soft) 8%, transparent);
+  font-size: 1.7rem; line-height: 1;
+}
+
+
+.helper { font-size: 0.78rem; color: var(--ink-soft); margin-top: -8px; margin-bottom: 14px; }
+.error-box { background: var(--clay-light); color: var(--clay); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.85rem; margin-bottom: 14px; }
+
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
+.page-header p { color: var(--ink-soft); margin: 4px 0 0; }
+
+/* ---------- Pages publiques (accueil, aide, support, confidentialité, conditions) ---------- */
+/* Animations page d'accueil : apparition progressive au chargement (hero) et au scroll (reste de la page).
+   Légères (transform/opacity uniquement, pas de librairie), désactivées si prefers-reduced-motion. */
+.lp-hero > div:first-child,
+.lp-hero-img {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: lp-fade-up 0.7s ease-out forwards;
+}
+.lp-hero > div:first-child { animation-delay: 0.05s; }
+.lp-hero-img { animation-delay: 0.2s; }
+
+.lp-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.lp-reveal.is-visible { opacity: 1; transform: translateY(0); }
+.lp-feature-grid .lp-reveal:nth-child(2) { transition-delay: 0.08s; }
+.lp-feature-grid .lp-reveal:nth-child(3) { transition-delay: 0.16s; }
+.lp-feature-grid .lp-reveal:nth-child(4) { transition-delay: 0.24s; }
+
+@keyframes lp-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.lp-hero-img { transition: transform 0.35s ease; }
+.lp-hero-img:hover { transform: translateY(-4px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero > div:first-child,
+  .lp-hero-img {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .lp-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .lp-hero-img:hover { transform: none; }
+}
+
+.lp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 6vw; max-width: 1280px; margin: 0 auto;
+}
+.lp-header .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; color: var(--navy-950); }
+.lp-header .brand img { width: 34px; height: 34px; border-radius: 8px; }
+.lp-header nav { display: flex; align-items: center; gap: 18px; font-size: 0.9rem; }
+.lp-header nav a { color: var(--ink-soft); font-weight: 500; }
+.lp-hero {
+  max-width: 1280px; margin: 0 auto; padding: 30px 6vw 70px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: center;
+}
+.lp-hero h1 { font-size: 2.6rem; line-height: 1.15; margin-bottom: 18px; }
+.lp-hero h1 .accent { color: var(--emerald); }
+.lp-hero p.lead { font-size: 1.1rem; color: var(--ink-soft); max-width: 480px; margin-bottom: 28px; }
+.lp-hero .cta-row { display: flex; gap: 14px; flex-wrap: wrap; }
+.lp-hero-img { border-radius: 20px; overflow: hidden; box-shadow: var(--shadow-xl); }
+.lp-hero-img img { width: 100%; display: block; }
+.lp-features {
+  background: var(--paper); padding: 70px 6vw; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.lp-features-inner { max-width: 1280px; margin: 0 auto; }
+.lp-features h2 { text-align: center; font-size: 1.9rem; margin-bottom: 44px; }
+.lp-feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+.lp-feature-card { text-align: left; }
+.lp-feature-card .ic { width: 44px; height: 44px; border-radius: 10px; background: var(--emerald-light); color: var(--emerald); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin-bottom: 14px; }
+.lp-feature-card h3 { font-size: 1rem; margin-bottom: 6px; }
+.lp-feature-card p { font-size: 0.88rem; color: var(--ink-soft); margin: 0; }
+.lp-payments { text-align: center; padding: 50px 6vw; color: var(--ink-soft); font-size: 0.9rem; }
+.lp-footer { background: var(--structural-dark-1); color: #9AA6C4; padding: 44px 6vw 30px; }
+.lp-footer-inner { max-width: 1280px; margin: 0 auto; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.lp-footer a { color: #C9D2E8; }
+.lp-footer-links { display: flex; gap: 20px; flex-wrap: wrap; font-size: 0.85rem; }
+.lp-footer-bottom { max-width: 1280px; margin: 24px auto 0; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.78rem; }
+
+/* Pages de contenu public simples (Aide, Support, Confidentialité, Conditions) */
+.lp-content { max-width: 900px; margin: 0 auto; padding: 20px 6vw 70px; }
+
+@media (max-width: 860px) {
+  .lp-hero { grid-template-columns: 1fr; }
+  .lp-hero h1 { font-size: 2rem; }
+  .lp-feature-grid { grid-template-columns: 1fr 1fr; }
+  .lp-header nav { display: none; }
+}
+
+@media (max-width: 480px) {
+  .lp-hero h1 { font-size: 1.6rem; }
+  .lp-hero p.lead { font-size: 1rem; }
+  .lp-feature-grid { grid-template-columns: 1fr; }
+  .lp-hero .cta-row .btn { width: 100%; }
+  .lp-footer-inner { gap: 20px; }
+}
+
+/* ==================== Bascule Clair / Sombre / Système (public/js/theme.js) ==================== */
+/* N'introduit aucune nouvelle variable de couleur : réutilise --paper/--ink/--ink-soft/--line déjà
+   basculées par le bloc "Mode sombre" en tête de ce fichier. */
+.theme-toggle-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 44px; padding: 9px 12px; margin-bottom: 12px;
+  border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06); color: #C9D2E8;
+  font-size: 0.82rem; font-weight: 600; font-family: var(--font-body);
+  cursor: pointer; transition: background var(--dur-fast) var(--ease-standard);
+}
+.theme-toggle-btn:hover { background: rgba(255,255,255,0.12); }
+.theme-toggle-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.theme-toggle-icone { font-size: 1rem; line-height: 1; }
+
+/* Bouton flottant : uniquement sur les pages sans sidebar (accueil, connexion, pages légales...).
+   Celles-ci suivent le thème clair/sombre normal (--paper/--ink), contrairement à la sidebar qui
+   reste toujours sombre par conception (voir --structural-dark-*) — d'où un style différent ici. */
+.theme-toggle-flottant {
+  position: fixed; left: 18px; bottom: 18px; z-index: 90;
+}
+.theme-toggle-flottant .theme-toggle-btn {
+  width: auto; margin-bottom: 0;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  box-shadow: var(--shadow-md);
+}
+.theme-toggle-flottant .theme-toggle-btn:hover { background: var(--cream); }
+.theme-toggle-flottant .theme-toggle-btn:focus-visible { outline: 2px solid var(--emerald); outline-offset: 2px; }
+@media (max-width: 560px) {
+  /* Sur mobile, la barre de navigation prend toute la largeur en haut de l'écran (voir
+     .sidebar en @media max-width:900px) : le bouton flottant reste en bas, à l'écart. */
+  .theme-toggle-flottant { left: 14px; bottom: 14px; }
+  .theme-toggle-flottant .theme-toggle-texte { display: none; } /* icône seule, gain de place */
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle-btn { transition: none; }
+}
+
+/* ==================== Système d'icônes SVG (public/js/icons.js) ==================== */
+/* Taille/couleur héritées du contexte (1em/currentColor) : les classes existantes qui enveloppent
+   déjà chaque icône (.ic, .stat-icon, .lp-feature-card .ic...) continuent de piloter la taille
+   réelle via leur propre font-size, exactement comme elles le faisaient pour l'emoji remplacé —
+   aucune de ces règles n'a eu besoin d'être modifiée. */
+.icon {
+  width: 1em; height: 1em; display: inline-block; vertical-align: -0.125em; flex-shrink: 0;
+}

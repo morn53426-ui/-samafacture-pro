@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Vérification de document — SamaFacture Pro</title>
+<meta name="description" content="Vérifiez l'authenticité d'une facture ou d'un devis émis avec SamaFacture Pro." />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body style="background:var(--cream); position:relative; overflow-x:hidden;">
+
+<div style="position:absolute; top:-180px; left:50%; transform:translateX(-50%); width:520px; height:380px; background:radial-gradient(circle at 30% 30%, rgba(14,169,128,0.16), transparent 60%), radial-gradient(circle at 75% 20%, rgba(221,165,63,0.14), transparent 55%); filter:blur(10px); pointer-events:none;"></div>
+
+<div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; position:relative;">
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:28px;">
+    <img src="images/icon-192.png" alt="SamaFacture Pro" style="width:36px; height:36px; border-radius:9px; box-shadow:var(--shadow-sm);" />
+    <div style="font-family:var(--font-display); font-weight:700; font-size:1.1rem; color:var(--navy-950);">SamaFacture Pro</div>
+  </div>
+
+  <div style="max-width:420px; width:100%; position:relative; overflow:hidden; border-radius:var(--radius); box-shadow:var(--shadow-xl); background:var(--paper);">
+    <div style="height:3px; background:linear-gradient(90deg, var(--emerald), var(--gold));"></div>
+    <div class="card" style="width:100%; text-align:center; border:none; box-shadow:none; border-radius:0;" id="result-card">
+      <div id="loading">Vérification en cours…</div>
+    </div>
+  </div>
+
+  <p style="margin-top:22px; font-size:0.82rem; color:var(--ink-soft);">
+    <a href="index.html" style="color:var(--emerald); font-weight:600;">SamaFacture Pro</a> — logiciel de facturation pour commerçants et PME d'Afrique
+  </p>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+  const code = params.get('code');
+  const card = document.getElementById('result-card');
+
+  function stampHtml(ok) {
+    // Réutilise le même motif de tampon que sur les factures elles-mêmes (voir
+    // facture-templates.js) — un vrai document utilise un tampon pour signifier
+    // son authenticité, c'est ce même geste qui vérifie ici le document.
+    return `<div class="stamp ${ok ? '' : 'stamp-clay'}" style="width:84px; height:84px; margin:0 auto 16px; font-size:0.66rem;">
+      ${ok ? `SamaFacture<br/>${Icon('check')} Vérifié<br/>Authentique` : `Document<br/>${Icon('x')} Non<br/>vérifié`}
+    </div>`;
+  }
+
+  async function verifier() {
+    if (!id || !code) {
+      card.innerHTML = `${stampHtml(false)}<h3>Lien invalide</h3><p style="color:var(--ink-soft);">Ce lien de vérification est incomplet.</p>`;
+      return;
+    }
+    try {
+      const data = await Api.get(`/public/verifier/${id}/${code}`);
+      const statutLabel = { payee: 'Payée', en_attente: 'En attente de paiement', en_retard: 'En retard', annulee: 'Annulée' }[data.statut] || data.statut;
+      const isDevis = data.type === 'devis';
+      card.innerHTML = `
+        ${stampHtml(true)}
+        <h3>Document authentique</h3>
+        <p style="color:var(--ink-soft); margin-bottom:18px;">Ce ${isDevis ? 'devis' : 'facture'} a bien été émis par SamaFacture Pro.</p>
+        <div style="text-align:left; border-top:1px solid var(--line); padding-top:14px;">
+          <div style="display:flex; justify-content:space-between; padding:6px 0;"><span style="color:var(--ink-soft);">Émetteur</span><strong>${escapeHtml(data.entreprise)}</strong></div>
+          <div style="display:flex; justify-content:space-between; padding:6px 0;"><span style="color:var(--ink-soft);">N° ${isDevis ? 'devis' : 'facture'}</span><span class="mono">${escapeHtml(data.numero)}</span></div>
+          <div style="display:flex; justify-content:space-between; padding:6px 0;"><span style="color:var(--ink-soft);">Date d'émission</span>${formatDate(data.date_emission)}</div>
+          <div style="display:flex; justify-content:space-between; padding:6px 0;"><span style="color:var(--ink-soft);">Montant total</span><strong class="mono">${formatMontant(data.total)}</strong></div>
+          <div style="display:flex; justify-content:space-between; padding:6px 0;"><span style="color:var(--ink-soft);">Statut</span>${statutBadge(data.statut)}</div>
+        </div>
+      `;
+    } catch (err) {
+      card.innerHTML = `${stampHtml(false)}<h3>Document introuvable</h3><p style="color:var(--ink-soft);">${err.message}</p>`;
+    }
+  }
+  verifier();
+</script>
+</body>
+</html>

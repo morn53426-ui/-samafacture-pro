@@ -1,0 +1,11 @@
+{
+  "appId": "com.samafacturepro.app",
+  "appName": "SamaFacture Pro",
+  "webDir": "../public",
+  "bundledWebRuntime": false,
+
+  "server": {
+    "url": "https://votredomaine.com",
+    "cleartext": false
+  }
+}

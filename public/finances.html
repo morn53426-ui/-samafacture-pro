@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Tableau de bord financier — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+<script src="js/chart-loader.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div><h1>Tableau de bord financier</h1><p>Trésorerie, bénéfices, prévisions et objectifs</p></div>
+    </div>
+
+    <div class="grid grid-4" id="stats-grid" style="margin-bottom:22px;">
+      <div class="card stat-card card-skeleton">
+        <div class="stat-icon icon-navy"><i class="ic" data-icon="landmark"></i></div>
+        <div class="stat-label">Trésorerie</div>
+        <div class="stat-value mono" id="stat-tresorerie">···</div>
+      </div>
+      <div class="card stat-card card-skeleton">
+        <div class="stat-icon icon-emerald"><i class="ic" data-icon="trending-up"></i></div>
+        <div class="stat-label">Bénéfice net</div>
+        <div class="stat-value mono" id="stat-benefice">···</div>
+      </div>
+      <div class="card stat-card card-skeleton">
+        <div class="stat-icon icon-gold"><i class="ic" data-icon="sparkles"></i></div>
+        <div class="stat-label">Prévision mois prochain</div>
+        <div class="stat-value mono" id="stat-prevision">···</div>
+      </div>
+      <div class="card stat-card card-skeleton">
+        <div class="stat-icon icon-clay"><i class="ic" data-icon="target"></i></div>
+        <div class="stat-label">Objectif du mois</div>
+        <div class="stat-value mono" id="stat-objectif">···</div>
+      </div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h3 style="margin-top:0;">Évolution &amp; prévision (6 derniers mois + 1 mois estimé)</h3>
+        <canvas id="chart-finances" height="130"></canvas>
+        <p style="margin:10px 0 0; font-size:0.78rem; color:var(--muted, #7A8296);">
+          La prévision est une estimation simple basée sur la moyenne des 3 derniers mois de chiffre d'affaires. Ce n'est pas un engagement comptable.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">Objectif mensuel</h3>
+        <p style="font-size:0.85rem; color:var(--muted, #7A8296); margin-top:0;">
+          Fixez un objectif de chiffre d'affaires pour le mois en cours. <i data-icon="alert-triangle" style="color:var(--gold); vertical-align:-0.15em;"></i> Fonctionnalité en aperçu : l'objectif est enregistré uniquement sur cet appareil (aucune synchronisation serveur pour le moment).
+        </p>
+        <div class="field">
+          <label>Objectif (<span id="objectif-devise">FCFA</span>)</label>
+          <input type="number" id="objectif-input" min="0" step="1000" placeholder="Ex : 2 000 000" />
+        </div>
+        <button class="btn btn-primary" onclick="saveObjectif()">Enregistrer l'objectif</button>
+
+        <div style="margin-top:22px;">
+          <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:6px;">
+            <span>Progression</span>
+            <span id="objectif-progress-label" class="mono">0 %</span>
+          </div>
+          <div style="background:#EDEAE2; border-radius:8px; height:10px; overflow:hidden;">
+            <div id="objectif-progress-bar" style="background:#0FA980; height:100%; width:0%; transition:width .3s;"></div>
+          </div>
+          <p style="font-size:0.78rem; color:var(--muted, #7A8296); margin-top:8px;" id="objectif-detail"></p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('finances');
+
+  const OBJECTIF_STORAGE_KEY = 'samafacture_objectif_mensuel';
+
+  async function loadFinances() {
+    // Réutilise les deux endpoints existants : /dashboard (trésorerie, évolution des ventes)
+    // et /rapports/comptabilite (bénéfice net calculé sur le mois en cours).
+    const now = new Date();
+    const debutMois = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+    const [dash, compta] = await Promise.all([
+      Api.get('/dashboard'),
+      Api.get('/rapports/comptabilite?from=' + debutMois)
+    ]);
+
+    document.getElementById('stat-tresorerie').textContent = formatMontant(dash.tresorerie);
+    document.getElementById('stat-benefice').textContent = formatMontant(compta.benefice);
+
+    document.querySelectorAll('#stats-grid .card-skeleton').forEach(c => c.classList.remove('card-skeleton'));
+
+    renderPrevision(dash.evolution_mensuelle || []);
+    renderObjectif(compta.recettes || 0);
+  }
+
+  function renderPrevision(evolution) {
+    const totals = evolution.map(m => Number(m.total) || 0);
+    const dernierMois = totals.slice(-3);
+    const moyenne = dernierMois.length ? dernierMois.reduce((a, b) => a + b, 0) / dernierMois.length : 0;
+
+    document.getElementById('stat-prevision').textContent = formatMontant(moyenne);
+
+    const labels = evolution.map(m => m.mois);
+    const values = totals.slice();
+    // Ajoute un point de prévision à la suite des données réelles
+    const previsionLabel = 'Estimation';
+    labels.push(previsionLabel);
+    values.push(moyenne);
+
+    renderChart(labels, values, previsionLabel);
+  }
+
+  let chart;
+  async function renderChart(labels, values, previsionLabel) {
+    await window.chartReady;
+    const ctx = document.getElementById('chart-finances');
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels.length ? labels : ['—'],
+        datasets: [{
+          label: 'Chiffre d\'affaires',
+          data: values.length ? values : [0],
+          backgroundColor: labels.map(l => l === previsionLabel ? '#F2B84B' : '#0FA980'),
+          borderRadius: 6,
+          maxBarThickness: 44
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, grid: { color: '#EDEAE2' } }, x: { grid: { display: false } } }
+      }
+    });
+  }
+
+  function renderObjectif(recettesMoisEnCours) {
+    const devise = (Api.currentUser() && Api.currentUser().devise) || 'FCFA';
+    document.getElementById('objectif-devise').textContent = devise;
+
+    lastRecettes = recettesMoisEnCours;
+    const saved = Number(localStorage.getItem(OBJECTIF_STORAGE_KEY) || 0);
+    document.getElementById('objectif-input').value = saved || '';
+    updateObjectifDisplay(saved, recettesMoisEnCours);
+  }
+
+  function updateObjectifDisplay(objectif, recettesMoisEnCours) {
+    document.getElementById('stat-objectif').textContent = objectif ? formatMontant(objectif) : '—';
+    const pct = objectif > 0 ? Math.min(100, Math.round((recettesMoisEnCours / objectif) * 100)) : 0;
+    document.getElementById('objectif-progress-label').textContent = pct + ' %';
+    document.getElementById('objectif-progress-bar').style.width = pct + '%';
+    document.getElementById('objectif-detail').textContent = objectif
+      ? `${formatMontant(recettesMoisEnCours)} encaissés sur ${formatMontant(objectif)} visés ce mois-ci.`
+      : `Aucun objectif défini pour l'instant.`;
+  }
+
+  let lastRecettes = 0;
+  function saveObjectif() {
+    const val = Number(document.getElementById('objectif-input').value || 0);
+    if (val < 0) { alert('L\'objectif ne peut pas être négatif.'); return; }
+    localStorage.setItem(OBJECTIF_STORAGE_KEY, String(val));
+    updateObjectifDisplay(val, lastRecettes);
+  }
+
+  loadFinances().catch(err => showFatalError(err.message));
+</script>
+</body>
+</html>

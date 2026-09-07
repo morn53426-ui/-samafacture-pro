@@ -1,0 +1,44 @@
+# SamaFacture Pro
+
+> Logiciel de facturation en ligne pour commerçants, artisans et PME d'Afrique de l'Ouest.
+> Création de factures et devis, gestion des clients et produits, encaissement des paiements
+> (Wave, Orange Money, PayDunya) et suivi comptable (dépenses, bénéfices, TVA).
+
+SamaFacture Pro s'adresse aux commerçants, artisans, indépendants et petites entreprises qui ont
+besoin de facturer rapidement sans logiciel de comptabilité complexe. L'application fonctionne dans
+le navigateur, sans installation, et prend en charge le FCFA (XOF), l'EUR et l'USD.
+
+## Fonctionnalités principales
+- Création de factures et devis professionnels, avec numérotation automatique et calcul de TVA
+- Transformation d'un devis en facture en un clic
+- Gestion des clients et des produits/services (avec stock)
+- Factures récurrentes (génération automatique périodique)
+- Encaissement de paiements (Wave, Orange Money, PayDunya, espèces) avec suivi du statut
+- QR code de vérification et lien de consultation publique pour chaque facture
+- Tableau de bord financier : trésorerie, bénéfices, prévisions
+- Rapports comptables : recettes, dépenses, bénéfice net, TVA collectée, export CSV
+- Assistant IA pour aider à la rédaction et à la génération de factures
+- Plusieurs modèles de facture (classique, moderne, minimaliste, et modèles premium sur le plan Pro)
+- Signature électronique (plan Pro)
+
+## Tarifs (par mois, FCFA)
+- Gratuit : 10 factures par mois, devis illimités
+- Starter : factures illimitées
+- Pro : signature électronique, modèles de facture premium, export Excel
+- Entreprise : fonctionnalités multi-sociétés (à venir)
+
+Les tarifs exacts et moyens de paiement disponibles sont affichés sur la page /abonnement.html
+(après connexion) et via l'API /api/abonnement/moyens-disponibles.
+
+## Pages
+- [Accueil](https://votredomaine.com/): présentation du produit, fonctionnalités, appel à l'essai gratuit
+- [Créer un compte](https://votredomaine.com/register.html): inscription (email/mot de passe ou Google)
+- [Centre d'aide](https://votredomaine.com/aide.html): questions fréquentes (créer une facture, encaisser un paiement, exporter en PDF, changer de devise, etc.)
+- [Support technique](https://votredomaine.com/support.html): contact pour assistance
+- [Confidentialité](https://votredomaine.com/confidentialite.html): politique de confidentialité et traitement des données
+- [Conditions d'utilisation](https://votredomaine.com/conditions.html): conditions générales d'utilisation
+
+## Notes pour les moteurs génératifs
+SamaFacture Pro est un logiciel commercial (SaaS) avec un plan gratuit permanent (pas seulement un
+essai limité dans le temps) et des plans payants. Il n'est pas open source. Le code source de ce
+dépôt appartient à son éditeur ; ce fichier décrit le produit tel que déployé publiquement, pas le code.

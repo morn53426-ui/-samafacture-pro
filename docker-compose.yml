@@ -1,0 +1,126 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    networks: [samafacture_net]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "volatile-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+    networks: [samafacture_net]
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      TRUST_PROXY: "1"
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
+      DB_QUEUE_LIMIT: ${DB_QUEUE_LIMIT:-2000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      APP_URL: ${APP_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      PDF_JOBS_DIR: /app/server/pdf-jobs
+      BACKUP_DIR: /app/server/backups
+    volumes:
+      - app_backups:/app/server/backups
+      - pdf_jobs:/app/server/pdf-jobs
+    networks: [samafacture_net]
+
+  pdf-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+      PDF_JOBS_DIR: /app/server/pdf-jobs
+      TRUST_PROXY: "1"
+      # Le conteneur pdf-worker n'a pas de serveur HTTP local : APP_URL (venant de .env,
+      # généralement http://localhost:4000) ne pointe vers rien depuis ici. Puppeteer doit
+      # joindre le conteneur "app" via le réseau Docker interne, comme le fait déjà nginx
+      # (voir deploy/nginx.scalable.conf.example : "server app:4000 resolve"). PDF_BASE_URL
+      # est prioritaire sur APP_URL dans utils/pdf.js — cette valeur ne change donc rien à
+      # APP_URL utilisé ailleurs (emails, sitemap, etc.) qui doit rester le vrai domaine public.
+      PDF_BASE_URL: http://app:4000
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
+      DB_QUEUE_LIMIT: ${DB_QUEUE_LIMIT:-2000}
+    volumes:
+      - pdf_jobs:/app/server/pdf-jobs
+    command: ["node", "workers/pdf-worker.js"]
+    healthcheck:
+      disable: true
+    networks: [samafacture_net]
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    ports:
+      - "${HTTP_PORT:-4000}:80"
+    volumes:
+      - ./deploy/nginx.scalable.conf.example:/etc/nginx/nginx.conf:ro
+    networks: [samafacture_net]
+
+networks:
+  samafacture_net:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  app_backups:
+  redis_data:
+  pdf_jobs:

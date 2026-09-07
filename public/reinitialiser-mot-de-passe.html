@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Réinitialiser le mot de passe — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div id="auth-side-root"></div>
+    <div class="auth-form-side">
+      <div class="auth-form-card">
+        <h2>Nouveau mot de passe</h2>
+        <p style="color:var(--ink-soft); margin-bottom:26px;">Choisissez un nouveau mot de passe pour votre compte.</p>
+        <div id="error-box"></div>
+        <div id="no-token-box" style="display:none;">
+          <div class="error-box">Ce lien est invalide. Redemandez un lien depuis la page « Mot de passe oublié ».</div>
+          <a href="mot-de-passe-oublie.html" class="btn btn-outline" style="width:100%; margin-top:10px; display:flex; justify-content:center;">Redemander un lien</a>
+        </div>
+        <form id="reset-form">
+          <div class="field">
+            <label>Nouveau mot de passe</label>
+            <input type="password" id="password" required placeholder="6 caractères minimum" />
+          </div>
+          <div class="field">
+            <label>Confirmer le mot de passe</label>
+            <input type="password" id="password2" required placeholder="Ressaisissez le mot de passe" />
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; padding:12px;">Réinitialiser le mot de passe</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/auth-slider.js"></script>
+<script>
+  initAuthSlider();
+
+  const token = new URLSearchParams(location.search).get('token');
+  if (!token) {
+    document.getElementById('reset-form').style.display = 'none';
+    document.getElementById('no-token-box').style.display = 'block';
+  }
+
+  document.getElementById('reset-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorBox = document.getElementById('error-box');
+    errorBox.innerHTML = '';
+    const password = document.getElementById('password').value;
+    const password2 = document.getElementById('password2').value;
+
+    if (password !== password2) {
+      errorBox.innerHTML = `<div class="error-box">Les mots de passe ne correspondent pas.</div>`;
+      return;
+    }
+
+    const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Réinitialisation…');
+    try {
+      await Api.post('/auth/reinitialiser-mot-de-passe', { token, password });
+      Api.clearSession();
+      location.href = 'login.html?reinitialise=1';
+    } catch (err) {
+      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+      restore();
+    }
+  });
+</script>
+</body>
+</html>

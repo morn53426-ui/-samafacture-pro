@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Clients — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Clients</h1>
+        <p>Gérez votre portefeuille clients</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ Nouveau client</button>
+    </div>
+
+    <div class="card" style="margin-bottom:18px; padding:14px 18px;">
+      <input type="text" id="search" placeholder="Rechercher un client (nom, téléphone, email)..." style="border:none; outline:none; width:100%;" />
+    </div>
+
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>Client</th><th>Contact</th><th>Montant dû</th><th>Total facturé</th><th></th></tr></thead>
+        <tbody id="clients-body">
+          <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="pagination"></div>
+  </main>
+</div>
+
+<!-- Modal client -->
+<div id="modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card" style="width:440px; max-width:92vw;">
+    <h3 id="modal-title">Nouveau client</h3>
+    <div id="modal-error"></div>
+    <form id="client-form">
+      <input type="hidden" id="client-id" />
+      <div class="field"><label>Nom du client *</label><input type="text" id="nom" required /></div>
+      <div class="field"><label>Téléphone</label><input type="tel" id="telephone" placeholder="+221 77 000 00 00" /></div>
+      <div class="field"><label>WhatsApp</label><input type="tel" id="whatsapp" /></div>
+      <div class="field"><label>Email</label><input type="email" id="email" /></div>
+      <div class="field"><label>Adresse</label><input type="text" id="adresse" /></div>
+      <div class="field"><label>Notes</label><textarea id="notes"></textarea></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('clients');
+
+  let clients = [];
+  let currentPage = 1;
+  let currentQuery = '';
+
+  async function load(q, page) {
+    if (q !== undefined) currentQuery = q;
+    if (page !== undefined) currentPage = page;
+    const qs = new URLSearchParams({ page: currentPage });
+    if (currentQuery) qs.set('q', currentQuery);
+    const { clients: rows, pagination } = await Api.get('/clients?' + qs.toString());
+    clients = rows;
+    renderTable();
+    renderPagination('pagination', pagination, (p) => load(undefined, p));
+  }
+
+  function renderTable() {
+    document.getElementById('clients-body').innerHTML = clients.length ? clients.map(c => `
+      <tr class="row-clickable" tabindex="0" role="button" aria-label="Modifier ${escapeHtml(c.nom)}"
+          onclick="editClient(${c.id})" onkeydown="if(event.key==='Enter') editClient(${c.id})">
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="avatar" style="width:32px;height:32px;font-size:0.72rem;">${initials(c.nom)}</div>
+            <div style="font-weight:600;">${escapeHtml(c.nom)}</div>
+          </div>
+        </td>
+        <td>${escapeHtml(c.telephone || c.email) || '—'}</td>
+        <td class="mono" style="color:${c.total_du > 0 ? 'var(--clay)' : 'var(--ink-soft)'};">${formatMontant(c.total_du)}</td>
+        <td class="mono">${formatMontant(c.total_facture)}</td>
+        <td style="text-align:right;" onclick="event.stopPropagation();">
+          <button class="btn btn-sm btn-outline" onclick='editClient(${c.id})'>Modifier</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteClient(${c.id})">Supprimer</button>
+        </td>
+      </tr>
+    `).join('') : `<tr><td colspan="5"><div class="empty-state"><div class="ic">${Icon('users')}</div>Aucun client. Ajoutez votre premier client !</div></td></tr>`;
+  }
+
+  document.getElementById('search').addEventListener('input', (e) => load(e.target.value, 1));
+
+  function openModal() {
+    document.getElementById('modal-title').textContent = 'Nouveau client';
+    document.getElementById('client-form').reset();
+    document.getElementById('client-id').value = '';
+    document.getElementById('modal-error').innerHTML = '';
+    document.getElementById('modal').style.display = 'flex';
+  }
+  function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+  function editClient(id) {
+    const c = clients.find(c => c.id === id);
+    document.getElementById('modal-title').textContent = 'Modifier le client';
+    document.getElementById('client-id').value = c.id;
+    document.getElementById('nom').value = c.nom || '';
+    document.getElementById('telephone').value = c.telephone || '';
+    document.getElementById('whatsapp').value = c.whatsapp || '';
+    document.getElementById('email').value = c.email || '';
+    document.getElementById('adresse').value = c.adresse || '';
+    document.getElementById('notes').value = c.notes || '';
+    document.getElementById('modal-error').innerHTML = '';
+    document.getElementById('modal').style.display = 'flex';
+  }
+
+  async function deleteClient(id) {
+    if (!confirm('Supprimer ce client ? Toutes ses factures et devis associés seront également supprimés définitivement.')) return;
+    try {
+      await Api.del(`/clients/${id}`);
+      load().catch(err => alert(err.message));
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  document.getElementById('client-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('client-id').value;
+    const payload = {
+      nom: document.getElementById('nom').value,
+      telephone: document.getElementById('telephone').value,
+      whatsapp: document.getElementById('whatsapp').value,
+      email: document.getElementById('email').value,
+      adresse: document.getElementById('adresse').value,
+      notes: document.getElementById('notes').value
+    };
+    const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Enregistrement…');
+    try {
+      if (id) await Api.put(`/clients/${id}`, payload);
+      else await Api.post('/clients', payload);
+      closeModal();
+      load().catch(err => alert(err.message));
+    } catch (err) {
+      document.getElementById('modal-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+    } finally {
+      restore();
+    }
+  });
+
+  load().catch(err => showFatalError(err.message));
+</script>
+</body>
+</html>

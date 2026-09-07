@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Devis — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Devis</h1>
+        <p>Transformez vos devis acceptés en factures en un clic</p>
+      </div>
+      <a href="nouvelle-facture.html" class="btn btn-primary">+ Nouveau devis</a>
+    </div>
+
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>N°</th><th>Client</th><th>Émission</th><th>Total</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="devis-body"></tbody>
+      </table>
+    </div>
+    <div id="pagination"></div>
+  </main>
+</div>
+
+<div id="send-modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card" style="width:400px; max-width:92vw;">
+    <h3>Envoyer par email</h3>
+    <div id="send-error"></div>
+    <form id="send-form">
+      <input type="hidden" id="send-facture-id" />
+      <div class="field"><label>Adresse email du client *</label><input type="email" id="send-email" required /></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" onclick="closeSendModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Envoyer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('devis');
+
+  let currentPage = 1;
+  async function load(page) {
+    if (page !== undefined) currentPage = page;
+    const { factures, pagination } = await Api.get(`/factures?type=devis&page=${currentPage}`);
+    document.getElementById('devis-body').innerHTML = factures.length ? factures.map(f => `
+      <tr>
+        <td class="mono">${escapeHtml(f.numero)}</td>
+        <td>${escapeHtml(f.client_nom)}</td>
+        <td>${formatDate(f.date_emission)}</td>
+        <td class="mono">${formatMontant(f.total)}</td>
+        <td>${statutBadge(f.statut)}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="btn btn-sm btn-outline" onclick="printFacture(${f.id})">Imprimer</button>
+          <button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))})'>Envoyer</button>
+          <button class="btn btn-sm btn-outline" onclick="dupliquerDevis(${f.id})">Dupliquer</button>
+          <button class="btn btn-sm btn-primary" onclick="transformer(${f.id})">${Icon('arrow-right')} Facture</button>
+        </td>
+      </tr>
+    `).join('') : `<tr><td colspan="6"><div class="empty-state"><div class="ic">${Icon('file-stack')}</div>Aucun devis pour l'instant</div></td></tr>`;
+    renderPagination('pagination', pagination, (p) => load(p));
+  }
+
+  async function transformer(id) {
+    if (!confirm('Transformer ce devis en facture ?')) return;
+    await Api.post(`/factures/${id}/transformer-en-facture`, {});
+    location.href = 'factures.html';
+  }
+
+  function printFacture(id) {
+    window.open(`facture-detail.html?id=${id}`, '_blank');
+  }
+
+  function openSendModal(id, clientEmail) {
+    document.getElementById('send-facture-id').value = id;
+    document.getElementById('send-email').value = clientEmail || '';
+    document.getElementById('send-error').innerHTML = '';
+    document.getElementById('send-modal').style.display = 'flex';
+  }
+  function closeSendModal() { document.getElementById('send-modal').style.display = 'none'; }
+
+  document.getElementById('send-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('send-facture-id').value;
+    const email = document.getElementById('send-email').value;
+    const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Envoi en cours…');
+    try {
+      const { sent_to } = await Api.post(`/factures/${id}/envoyer`, { email });
+      closeSendModal();
+      showSuccessNotice(`Email envoyé à ${sent_to} ✓`);
+    } catch (err) {
+      document.getElementById('send-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+    } finally {
+      restore();
+    }
+  });
+
+  async function dupliquerDevis(id) {
+    try {
+      const { facture } = await Api.post(`/factures/${id}/dupliquer`, {});
+      load().catch(err => alert(err.message));
+      showSuccessNotice(`Devis dupliqué : ${facture.numero} ✓`);
+    } catch (err) {
+      showFatalError(err.message);
+    }
+  }
+
+  load().catch(err => showFatalError(err.message));
+</script>
+</body>
+</html>

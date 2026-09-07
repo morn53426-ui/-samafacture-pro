@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Abonnement — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div><h1>Abonnement</h1><p>Comparez les offres et gérez votre plan</p></div>
+    </div>
+
+    <div class="card" style="max-width:820px;">
+      <h3 style="margin-top:0;">Mon abonnement</h3>
+      <p style="color:var(--ink-soft);">
+        Le plan <strong>Pro</strong> débloque la signature électronique, 3 modèles de facture premium (Élégant,
+        Corporate, Créatif) et l'export Excel. Le plan <strong>Gratuit</strong> est limité à 10 factures par mois
+        (devis illimités).
+      </p>
+      <div id="plan-msg"></div>
+      <div id="plan-cards"></div>
+      <div id="plan-fallback" style="display:none;">
+        <div class="field">
+          <label>Plan actuel</label>
+          <select id="plan-select">
+            <option value="gratuit">Gratuit — 10 factures/mois</option>
+            <option value="starter">Starter — factures illimitées</option>
+            <option value="pro">Pro — toutes les fonctionnalités</option>
+            <option value="entreprise">Entreprise — multi-sociétés (bientôt)</option>
+          </select>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="changePlan(this)">Changer de plan</button>
+        <p class="helper" style="margin-top:10px;">
+          Aucune passerelle de paiement (Wave/PayDunya) n'est configurée sur ce serveur : ce sélecteur permet de
+          tester les fonctionnalités des différents plans gratuitement, en local.
+        </p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('abonnement');
+
+  async function loadPlans() {
+    const user = Api.currentUser();
+    let moyens;
+    try {
+      moyens = await Api.get('/abonnement/moyens-disponibles');
+    } catch (err) {
+      document.getElementById('plan-cards').innerHTML = `<div class="error-box">${err.message}</div>`;
+      return;
+    }
+
+    const plans = [
+      { id: 'gratuit', nom: 'Gratuit', prix: 0, desc: '10 factures/mois, devis illimités' },
+      { id: 'starter', nom: 'Starter', prix: moyens.tarifs.starter, desc: 'Factures illimitées' },
+      { id: 'pro', nom: 'Pro', prix: moyens.tarifs.pro, desc: 'Signature électronique, modèles premium, export Excel' },
+      { id: 'entreprise', nom: 'Entreprise', prix: moyens.tarifs.entreprise, desc: 'Multi-sociétés (bientôt)' }
+    ];
+
+    const aucunMoyenConfigure = !moyens.wave && !moyens.paydunya;
+
+    document.getElementById('plan-cards').innerHTML = `
+      <div class="grid" style="grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 14px 0;">
+        ${plans.map(p => `
+          <div class="card" style="padding:16px; ${user.plan === p.id ? 'border-color:var(--emerald); box-shadow:0 0 0 2px var(--emerald-light);' : ''}">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>${p.nom}</strong>
+              ${user.plan === p.id ? '<span class="badge badge-payee">Plan actuel</span>' : ''}
+            </div>
+            <div class="mono" style="font-size:1.3rem; font-weight:700; margin:6px 0;">${p.prix > 0 ? formatMontant(p.prix, 'FCFA') + '<span style=\'font-size:0.7rem;font-weight:400;color:var(--ink-soft);\'>/mois</span>' : 'Gratuit'}</div>
+            <div class="helper" style="margin:0 0 10px;">${p.desc}</div>
+            ${p.id !== 'gratuit' && user.plan !== p.id ? `
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <button class="btn btn-sm btn-primary" ${moyens.wave ? '' : 'disabled title="Wave non configuré"'} onclick="payerAbonnement('${p.id}', 'wave', this)">${Icon('smartphone')} Payer avec Wave</button>
+                <button class="btn btn-sm btn-outline" ${moyens.paydunya ? '' : 'disabled title="Non configuré"'} onclick="payerAbonnement('${p.id}', 'paydunya', this)">${Icon('credit-card')} Orange Money / Carte bancaire</button>
+              </div>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    // Si aucune passerelle n'est configurée sur ce serveur, on laisse le sélecteur manuel
+    // disponible pour pouvoir tester les fonctionnalités sans paiement réel.
+    document.getElementById('plan-fallback').style.display = aucunMoyenConfigure ? 'block' : 'none';
+  }
+
+  async function payerAbonnement(plan, fournisseur, btn) {
+    const restore = setButtonLoading(btn, 'Redirection…');
+    try {
+      const { checkout_url } = await Api.post('/abonnement/payer', { plan, fournisseur });
+      location.href = checkout_url;
+    } catch (err) {
+      document.getElementById('plan-msg').innerHTML = `<div class="error-box">${err.message}</div>`;
+      restore();
+    }
+  }
+
+  async function changePlan(btn) {
+    const plan = document.getElementById('plan-select').value;
+    const restore = setButtonLoading(btn, 'Mise à jour…');
+    try {
+      const { user } = await Api.put('/auth/plan', { plan });
+      localStorage.setItem('sf_user', JSON.stringify(user));
+      document.getElementById('plan-msg').innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:0.85rem;">Plan mis à jour ✓ Rechargez la page pour voir les options débloquées dans le menu.</div>`;
+    } catch (err) {
+      document.getElementById('plan-msg').innerHTML = `<div class="error-box">${err.message}</div>`;
+    } finally {
+      restore();
+    }
+  }
+
+  loadPlans();
+</script>
+</body>
+</html>

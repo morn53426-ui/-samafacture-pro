@@ -1,0 +1,49 @@
+# Exemple de configuration nginx pour servir SamaFacture Pro derrière un reverse proxy
+# avec TLS — remplacez "votredomaine.com" et les chemins de certificat, puis copiez ce
+# fichier dans /etc/nginx/sites-available/ sur votre serveur (activez-le ensuite avec
+# `ln -s` vers sites-enabled/, comme n'importe quel site nginx classique).
+#
+# Rappel important : server/app.js n'active `app.set('trust proxy', 1)` (nécessaire pour
+# que le rate-limiting et les logs voient la vraie IP du visiteur, pas celle de nginx) que
+# si la variable d'environnement TRUST_PROXY est définie dans server/.env. Pensez à la
+# définir (TRUST_PROXY=true) lorsque l'application tourne derrière ce proxy.
+
+# Redirige tout le trafic HTTP vers HTTPS.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name votredomaine.com www.votredomaine.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name votredomaine.com www.votredomaine.com;
+
+    # Certificats TLS (ex. générés par Certbot / Let's Encrypt : certbot --nginx)
+    ssl_certificate     /etc/letsencrypt/live/votredomaine.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/votredomaine.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Génération de PDF (Puppeteer) et upload de logo en base64 peuvent être volumineux ;
+    # aligné sur la limite déjà définie côté Express (express.json({ limit: '7mb' })).
+    client_max_body_size 8m;
+
+    location / {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+
+        # En-têtes standards pour que l'app voie la vraie IP/protocole du visiteur
+        # (utilisés par TRUST_PROXY côté Express, voir app.js).
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Nécessaire pour les WebSockets (notifications temps réel — voir server/realtime.js).
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 60s;
+    }
+}

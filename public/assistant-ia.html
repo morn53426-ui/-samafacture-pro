@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Assistant IA — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+<style>
+  /* --- Styles spécifiques à l'Assistant IA (connecté à /api/assistant, voir server/routes/assistant.js) --- */
+  .ia-shell {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    height: calc(100vh - 160px);
+    min-height: 520px;
+  }
+  @media (max-width: 900px) {
+    .ia-shell { grid-template-columns: 1fr; height: auto; }
+    .ia-history { display: none; }
+    .ia-history.show { display: flex; }
+  }
+
+  /* Colonne historique */
+  .ia-history {
+    display: flex;
+    flex-direction: column;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .ia-history-head {
+    padding: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .ia-history-head h3 { margin: 0 0 10px; font-size: 0.95rem; }
+  .ia-new-btn {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--emerald);
+    background: var(--emerald-light);
+    color: var(--emerald);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .ia-new-btn:hover { filter: brightness(0.97); }
+  .ia-history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .ia-history-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    margin-bottom: 4px;
+    color: var(--ink);
+  }
+  .ia-history-item:hover { background: var(--line); }
+  .ia-history-item.active { background: var(--emerald-light); }
+  .ia-history-item .h-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ia-history-item .h-meta {
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+  .ia-history-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+  }
+
+  /* Colonne chat */
+  .ia-chat {
+    display: flex;
+    flex-direction: column;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .ia-chat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .ia-chat-head .who { display: flex; align-items: center; gap: 10px; }
+  .ia-avatar-bot {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--navy-900), var(--emerald));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem; flex-shrink: 0;
+  }
+  .ia-chat-head .name { font-weight: 700; font-size: 0.95rem; }
+  .ia-chat-head .status { font-size: 0.78rem; color: var(--emerald); display: flex; align-items: center; gap: 5px; }
+  .ia-chat-head .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--emerald); display: inline-block; }
+  .ia-history-toggle { display: none; }
+  @media (max-width: 900px) {
+    .ia-history-toggle { display: inline-flex; }
+  }
+
+  .ia-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .ia-msg { display: flex; gap: 10px; max-width: 78%; }
+  .ia-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+  .ia-msg .ia-avatar-sm {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+    background: var(--line); color: var(--ink);
+  }
+  .ia-msg.assistant .ia-avatar-sm {
+    background: linear-gradient(135deg, var(--navy-900), var(--emerald));
+    color: #fff;
+  }
+  .ia-bubble {
+    padding: 11px 14px;
+    border-radius: 14px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  .ia-msg.assistant .ia-bubble {
+    background: var(--emerald-light);
+    color: var(--ink);
+    border-bottom-left-radius: 4px;
+  }
+  .ia-msg.user .ia-bubble {
+    background: var(--navy-900);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .ia-msg-time {
+    font-size: 0.68rem;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+  .ia-msg.user .ia-msg-time { text-align: right; }
+
+  .ia-typing { display: flex; gap: 4px; padding: 4px 2px; }
+  .ia-typing span {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--ink-soft);
+    animation: ia-bounce 1.1s infinite ease-in-out;
+  }
+  .ia-typing span:nth-child(2) { animation-delay: 0.15s; }
+  .ia-typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes ia-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  .ia-empty-state {
+    margin: auto;
+    text-align: center;
+    color: var(--ink-soft);
+    max-width: 380px;
+  }
+  .ia-empty-state .ic { font-size: 2.4rem; margin-bottom: 10px; }
+  .ia-empty-state h3 { color: var(--ink); margin: 0 0 6px; }
+
+  .ia-suggestions {
+    padding: 0 18px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ia-chip {
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    font-size: 0.8rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .ia-chip:hover { background: var(--emerald-light); border-color: var(--emerald); color: var(--emerald); }
+
+  .ia-input-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 14px 18px;
+    border-top: 1px solid var(--line);
+  }
+  .ia-input-bar textarea {
+    flex: 1;
+    resize: none;
+    max-height: 120px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    background: transparent;
+    color: var(--ink);
+  }
+  .ia-input-bar textarea:focus { outline: none; border-color: var(--emerald); }
+  .ia-send-btn {
+    width: 42px; height: 42px; border-radius: 50%;
+    border: none; background: var(--emerald); color: #fff;
+    font-size: 1.05rem; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ia-send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ia-disclaimer {
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    padding: 0 18px 12px;
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Assistant IA</h1>
+        <p>Posez une question sur vos ventes, vos factures ou demandez une relance</p>
+      </div>
+      <button type="button" class="btn btn-outline ia-history-toggle" onclick="toggleHistoryPanel()"><i class="ic" data-icon="clock"></i> Historique</button>
+    </div>
+
+    <div class="ia-shell">
+      <!-- Historique des conversations -->
+      <aside class="ia-history" id="ia-history-panel">
+        <div class="ia-history-head">
+          <h3>Historique</h3>
+          <button type="button" class="ia-new-btn" onclick="startNewConversation()">+ Nouvelle conversation</button>
+        </div>
+        <div class="ia-history-list" id="ia-history-list"></div>
+      </aside>
+
+      <!-- Fenêtre de chat -->
+      <section class="ia-chat">
+        <div class="ia-chat-head">
+          <div class="who">
+            <div class="ia-avatar-bot"><i class="ic" data-icon="sparkles"></i></div>
+            <div>
+              <div class="name">Assistant SamaFacture</div>
+              <div class="status"><span class="dot"></span> En ligne</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ia-messages" id="ia-messages"></div>
+
+        <div class="ia-suggestions" id="ia-suggestions"></div>
+
+        <div class="ia-input-bar">
+          <textarea id="ia-input" rows="1" placeholder="Écrivez votre message… (Entrée pour envoyer, Maj+Entrée pour un saut de ligne)"></textarea>
+          <button type="button" class="ia-send-btn" id="ia-send-btn" onclick="sendMessage()" aria-label="Envoyer"><i class="ic" data-icon="arrow-right"></i></button>
+        </div>
+        <div class="ia-disclaimer">Réponses générées par IA (Claude, Anthropic) à partir de vos données de facturation. Vérifiez les informations importantes avant de vous y fier.</div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('assistant-ia');
+
+  // ---------------------------------------------------------------------
+  // Connecté à l'API /api/assistant (Claude, Anthropic) — voir server/routes/assistant.js.
+  // L'historique et les réponses viennent réellement du serveur.
+  // ---------------------------------------------------------------------
+
+  const SUGGESTIONS = [
+    { icon: 'receipt', text: 'Crée une facture pour un client' },
+    { icon: 'bar-chart', text: 'Résume mes ventes du mois' },
+    { icon: 'clock', text: 'Quels clients sont en retard de paiement ?' },
+    { icon: 'mail', text: 'Rédige une relance de facture impayée' },
+    { icon: 'package', text: 'Ajoute un nouveau produit au catalogue' }
+  ];
+
+  let conversations = [];
+  let activeConversationId = null;
+
+  function formatHeure(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function loadConversations() {
+    try {
+      const { conversations: list } = await Api.get('/assistant/conversations');
+      conversations = list.map(c => ({ id: c.id, title: c.titre, updated: formatDate(c.updated_at), messages: null }));
+    } catch (err) {
+      conversations = [];
+    }
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('ia-history-list');
+    if (!conversations.length) {
+      list.innerHTML = `<div class="ia-history-empty">Aucune conversation pour l'instant.</div>`;
+      return;
+    }
+    list.innerHTML = conversations.map(c => `
+      <button type="button" class="ia-history-item ${c.id === activeConversationId ? 'active' : ''}" onclick="loadConversation(${c.id})">
+        <div class="h-title">${escapeHtml(c.title)}</div>
+        <div class="h-meta">${escapeHtml(c.updated)}</div>
+      </button>
+    `).join('');
+  }
+
+  function renderSuggestions() {
+    const box = document.getElementById('ia-suggestions');
+    box.innerHTML = SUGGESTIONS.map(s => `<button type="button" class="ia-chip" onclick="useSuggestion(this)">${escapeHtml(s)}</button>`).join('');
+  }
+
+  function useSuggestion(btn) {
+    const text = btn.textContent.replace(/^\S+\s/, ''); // retire l'emoji devant
+    const input = document.getElementById('ia-input');
+    input.value = text;
+    input.focus();
+    autoGrow(input);
+  }
+
+  function renderMessages() {
+    const box = document.getElementById('ia-messages');
+    const conv = conversations.find(c => c.id === activeConversationId);
+    if (!conv || !conv.messages || conv.messages.length === 0) {
+      box.innerHTML = `
+        <div class="ia-empty-state">
+          <div class="ic">${Icon('sparkles')}</div>
+          <h3>Comment puis-je vous aider ?</h3>
+          <p>Choisissez une suggestion ci-dessous ou décrivez ce dont vous avez besoin.</p>
+        </div>`;
+      return;
+    }
+    box.innerHTML = conv.messages.map(m => `
+      <div class="ia-msg ${m.role}">
+        <div class="ia-avatar-sm">${m.role === 'assistant' ? Icon('sparkles') : (initials(Api.currentUser()?.nom) || Icon('users'))}</div>
+        <div>
+          <div class="ia-bubble">${escapeHtml(m.text)}</div>
+          <div class="ia-msg-time">${escapeHtml(m.time)}</div>
+        </div>
+      </div>
+    `).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function startNewConversation() {
+    activeConversationId = null;
+    renderHistory();
+    renderMessages();
+    document.getElementById('ia-input').focus();
+    if (window.innerWidth <= 900) toggleHistoryPanel(false);
+  }
+
+  async function loadConversation(id) {
+    activeConversationId = id;
+    renderHistory();
+    const conv = conversations.find(c => c.id === id);
+    if (conv && !conv.messages) {
+      try {
+        const { messages } = await Api.get(`/assistant/conversations/${id}`);
+        conv.messages = messages.map(m => ({ role: m.role, text: m.contenu, time: formatHeure(m.created_at) }));
+      } catch (err) {
+        conv.messages = [];
+      }
+    }
+    renderMessages();
+    if (window.innerWidth <= 900) toggleHistoryPanel(false);
+  }
+
+  function toggleHistoryPanel(force) {
+    document.getElementById('ia-history-panel').classList.toggle('show', force);
+  }
+
+  function nowLabel() {
+    return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function showTyping() {
+    const box = document.getElementById('ia-messages');
+    const el = document.createElement('div');
+    el.className = 'ia-msg assistant';
+    el.id = 'ia-typing-row';
+    el.innerHTML = `
+      <div class="ia-avatar-sm">${Icon('sparkles')}</div>
+      <div class="ia-bubble"><div class="ia-typing"><span></span><span></span><span></span></div></div>
+    `;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function hideTyping() {
+    document.getElementById('ia-typing-row')?.remove();
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('ia-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    // Conversation locale temporaire tant que le serveur n'a pas encore renvoyé
+    // d'identifiant réel (première question d'une nouvelle conversation).
+    let conv;
+    if (!activeConversationId) {
+      conv = { id: 'temp', title: text.slice(0, 40) || 'Nouvelle conversation', updated: "À l'instant", messages: [] };
+      conversations.unshift(conv);
+      activeConversationId = 'temp';
+    } else {
+      conv = conversations.find(c => c.id === activeConversationId);
+    }
+    conv.messages = conv.messages || [];
+    conv.messages.push({ role: 'user', text, time: nowLabel() });
+    conv.updated = "À l'instant";
+
+    input.value = '';
+    autoGrow(input);
+    renderHistory();
+    renderMessages();
+
+    document.getElementById('ia-send-btn').disabled = true;
+    showTyping();
+
+    try {
+      const payload = { message: text };
+      if (typeof activeConversationId === 'number') payload.conversation_id = activeConversationId;
+      const data = await Api.post('/assistant/message', payload);
+
+      hideTyping();
+
+      // Remplace l'ID temporaire par le vrai ID renvoyé par le serveur, une fois connu.
+      if (activeConversationId === 'temp') {
+        conv.id = data.conversation_id;
+        activeConversationId = data.conversation_id;
+      }
+      conv.messages.push({ role: 'assistant', text: data.reponse, time: nowLabel() });
+      renderMessages();
+      renderHistory();
+    } catch (err) {
+      hideTyping();
+      conv.messages.push({ role: 'assistant', text: `⚠️ ${err.message}`, time: nowLabel() });
+      renderMessages();
+    } finally {
+      document.getElementById('ia-send-btn').disabled = false;
+    }
+  }
+
+  document.getElementById('ia-input').addEventListener('input', function () { autoGrow(this); });
+  document.getElementById('ia-input').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  renderSuggestions();
+  renderMessages();
+  loadConversations();
+</script>
+</body>
+</html>

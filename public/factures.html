@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Factures — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Factures</h1>
+        <p>Suivez le statut de toutes vos factures</p>
+      </div>
+      <a href="nouvelle-facture.html" class="btn btn-primary">+ Nouvelle facture</a>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-bottom:16px;">
+      <button class="btn btn-sm btn-outline" data-filter="" onclick="filterStatut('')">Toutes</button>
+      <button class="btn btn-sm btn-outline" data-filter="en_attente" onclick="filterStatut('en_attente')">En attente</button>
+      <button class="btn btn-sm btn-outline" data-filter="payee" onclick="filterStatut('payee')">Payées</button>
+      <button class="btn btn-sm btn-outline" data-filter="en_retard" onclick="filterStatut('en_retard')">En retard</button>
+    </div>
+
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>N°</th><th>Client</th><th>Émission</th><th>Échéance</th><th>Total</th><th>Statut</th><th></th></tr></thead>
+        <tbody id="factures-body">
+          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="pagination"></div>
+  </main>
+</div>
+
+<div id="pay-modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card" style="width:380px; max-width:92vw;">
+    <h3>Enregistrer un paiement</h3>
+    <div id="pay-error"></div>
+    <form id="pay-form">
+      <input type="hidden" id="pay-facture-id" />
+      <div class="field"><label>Montant *</label><input type="number" id="pay-montant" required /></div>
+      <div class="field">
+        <label>Méthode *</label>
+        <select id="pay-methode" required>
+          <option>Espèces</option><option>Wave</option><option>Orange Money</option>
+          <option>PayDunya</option><option>Virement bancaire</option><option>Chèque</option><option>Carte bancaire</option>
+        </select>
+      </div>
+      <div class="field"><label>Référence</label><input type="text" id="pay-reference" /></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" onclick="closePayModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="send-modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card" style="width:400px; max-width:92vw;">
+    <h3 id="send-modal-title">Envoyer par email</h3>
+    <div id="send-error"></div>
+    <form id="send-form">
+      <input type="hidden" id="send-facture-id" />
+      <input type="hidden" id="send-action" />
+      <div class="field"><label>Adresse email du client *</label><input type="email" id="send-email" required /></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" onclick="closeSendModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Envoyer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('factures');
+
+  let currentStatut = '';
+  let currentPage = 1;
+
+  async function load(page) {
+    if (page !== undefined) currentPage = page;
+    const qs = new URLSearchParams({ type: 'facture', page: currentPage });
+    if (currentStatut) qs.set('statut', currentStatut);
+    const { factures, pagination } = await Api.get('/factures?' + qs.toString());
+    document.getElementById('factures-body').innerHTML = factures.length ? factures.map(f => `
+      <tr class="row-clickable" tabindex="0" role="button" aria-label="Voir la facture ${escapeHtml(f.numero)}"
+          onclick="printFacture(${f.id})" onkeydown="if(event.key==='Enter') printFacture(${f.id})">
+        <td class="mono">${escapeHtml(f.numero)}</td>
+        <td>${escapeHtml(f.client_nom)}</td>
+        <td>${formatDate(f.date_emission)}</td>
+        <td>${formatDate(f.date_echeance)}</td>
+        <td class="mono">${formatMontant(f.total)}</td>
+        <td>${statutBadge(f.statut)}</td>
+        <td style="text-align:right; white-space:nowrap;" onclick="event.stopPropagation();">
+          ${f.statut !== 'payee' ? `<button class="btn btn-sm btn-outline" onclick="openPayModal(${f.id})">Encaisser</button>` : ''}
+          <button class="btn btn-sm btn-outline" onclick="printFacture(${f.id})">Imprimer</button>
+          <button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))}, "envoyer")'>Envoyer</button>
+          ${f.statut === 'en_attente' || f.statut === 'en_retard' ? `<button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))}, "relancer")'>Relancer</button>` : ''}
+          <button class="btn btn-sm btn-outline" onclick="dupliquerFacture(${f.id})">Dupliquer</button>
+        </td>
+      </tr>
+    `).join('') : `<tr><td colspan="7"><div class="empty-state"><div class="ic">${Icon('file-text')}</div>Aucune facture pour l'instant</div></td></tr>`;
+    renderPagination('pagination', pagination, (p) => load(p));
+  }
+
+  function filterStatut(s) {
+    currentStatut = s;
+    document.querySelectorAll('[data-filter]').forEach(b => b.classList.toggle('btn-primary', b.dataset.filter === s));
+    load(1);
+  }
+
+  function openPayModal(id) {
+    document.getElementById('pay-facture-id').value = id;
+    document.getElementById('pay-form').reset();
+    document.getElementById('pay-error').innerHTML = '';
+    document.getElementById('pay-modal').style.display = 'flex';
+  }
+  function closePayModal() { document.getElementById('pay-modal').style.display = 'none'; }
+
+  document.getElementById('pay-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('pay-facture-id').value;
+    const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Enregistrement…');
+    try {
+      await Api.post(`/factures/${id}/paiements`, {
+        montant: parseFloat(document.getElementById('pay-montant').value),
+        methode: document.getElementById('pay-methode').value,
+        reference: document.getElementById('pay-reference').value
+      });
+      closePayModal();
+      load().catch(err => alert(err.message));
+    } catch (err) {
+      document.getElementById('pay-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+    } finally {
+      restore();
+    }
+  });
+
+  function printFacture(id) {
+    window.open(`facture-detail.html?id=${id}`, '_blank');
+  }
+
+  function openSendModal(id, clientEmail, action) {
+    document.getElementById('send-modal-title').textContent = action === 'relancer' ? 'Envoyer une relance' : 'Envoyer par email';
+    document.getElementById('send-facture-id').value = id;
+    document.getElementById('send-action').value = action;
+    document.getElementById('send-email').value = clientEmail || '';
+    document.getElementById('send-error').innerHTML = '';
+    document.getElementById('send-modal').style.display = 'flex';
+  }
+  function closeSendModal() { document.getElementById('send-modal').style.display = 'none'; }
+
+  document.getElementById('send-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('send-facture-id').value;
+    const action = document.getElementById('send-action').value;
+    const email = document.getElementById('send-email').value;
+    const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Envoi en cours…');
+    try {
+      const { sent_to } = await Api.post(`/factures/${id}/${action}`, { email });
+      closeSendModal();
+      showSuccessNotice(`Email envoyé à ${sent_to} ✓`);
+    } catch (err) {
+      document.getElementById('send-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+    } finally {
+      restore();
+    }
+  });
+
+  async function dupliquerFacture(id) {
+    try {
+      const { facture } = await Api.post(`/factures/${id}/dupliquer`, {});
+      load().catch(err => alert(err.message));
+      showSuccessNotice(`Facture dupliquée : ${facture.numero} ✓`);
+    } catch (err) {
+      showFatalError(err.message);
+    }
+  }
+
+  load().catch(err => showFatalError(err.message));
+</script>
+</body>
+</html>

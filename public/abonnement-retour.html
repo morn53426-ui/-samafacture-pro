@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Confirmation de paiement — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body style="background:var(--cream);">
+
+<div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px;">
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:24px;">
+    <img src="images/icon-192.png" alt="SamaFacture Pro" style="width:36px; height:36px; border-radius:9px;" />
+    <div style="font-family:var(--font-display); font-weight:700; font-size:1.1rem; color:var(--navy-950);">SamaFacture Pro</div>
+  </div>
+
+  <div class="card" style="max-width:420px; width:100%; text-align:center;" id="result-card">
+    <div id="loading">Vérification du paiement…</div>
+  </div>
+
+  <p style="margin-top:18px;">
+    <a href="parametres.html" style="color:var(--emerald); font-weight:600; display:inline-flex; align-items:center; gap:4px;"><i class="ic" data-icon="arrow-right" style="transform:scaleX(-1);"></i> Retour aux paramètres</a>
+  </p>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+  requireAuthPage();
+  const card = document.getElementById('result-card');
+  const ref = new URLSearchParams(location.search).get('ref');
+
+  function renderStatut(statut, plan) {
+    if (statut === 'payee') {
+      card.innerHTML = `
+        <div class="stat-icon icon-emerald" style="width:52px;height:52px;font-size:1.6rem;margin:0 auto 14px;">${Icon('check')}</div>
+        <h3>Paiement confirmé</h3>
+        <p style="color:var(--ink-soft);">Votre abonnement <strong>${escapeHtml(plan)}</strong> est maintenant actif. Rechargez vos pages pour voir les nouvelles options.</p>
+        <a href="parametres.html" class="btn btn-primary" style="margin-top:10px; display:inline-flex;">Voir mes paramètres</a>
+      `;
+    } else if (statut === 'echouee' || statut === 'expiree') {
+      card.innerHTML = `
+        <div class="stat-icon icon-clay" style="width:52px;height:52px;font-size:1.6rem;margin:0 auto 14px;">${Icon('x')}</div>
+        <h3>Paiement non abouti</h3>
+        <p style="color:var(--ink-soft);">Le paiement n'a pas pu être confirmé. Vous pouvez réessayer depuis les paramètres.</p>
+      `;
+    } else {
+      card.innerHTML = `
+        <div class="stat-icon icon-gold" style="width:52px;height:52px;font-size:1.6rem;margin:0 auto 14px;">${Icon('clock')}</div>
+        <h3>Paiement en cours de traitement</h3>
+        <p style="color:var(--ink-soft);">Cela peut prendre quelques instants. Cette page se met à jour automatiquement.</p>
+      `;
+    }
+  }
+
+  async function verifier() {
+    if (!ref) {
+      card.innerHTML = `<div class="empty-state"><div class="ic">${Icon('x')}</div>Référence de paiement manquante.</div>`;
+      return;
+    }
+    try {
+      const { statut, plan } = await Api.get(`/abonnement/statut/${ref}`);
+      renderStatut(statut, plan);
+      if (statut === 'en_attente') setTimeout(verifier, 4000); // repasse vérifier périodiquement
+    } catch (err) {
+      card.innerHTML = `<div class="empty-state"><div class="ic">${Icon('x')}</div>${escapeHtml(err.message)}</div>`;
+    }
+  }
+  verifier();
+</script>
+</body>
+</html>

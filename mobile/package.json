@@ -1,0 +1,19 @@
+{
+  "name": "samafacture-pro-mobile",
+  "version": "1.0.0",
+  "description": "Enveloppe native iOS/Android (Capacitor) pour SamaFacture Pro — charge le site web existant, ne réécrit rien.",
+  "private": true,
+  "scripts": {
+    "sync": "npx cap sync",
+    "open:ios": "npx cap open ios",
+    "open:android": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.1.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.0",
+    "@capacitor/ios": "^6.1.0",
+    "@capacitor/android": "^6.1.0"
+  }
+}

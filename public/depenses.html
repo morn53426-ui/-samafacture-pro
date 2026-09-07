@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Dépenses — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1>Dépenses</h1>
+        <p>Suivez les sorties d'argent de votre activité</p>
+      </div>
+      <button class="btn btn-primary" onclick="openModal()">+ Nouvelle dépense</button>
+    </div>
+
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>Libellé</th><th>Catégorie</th><th>Date</th><th>Montant</th><th></th></tr></thead>
+        <tbody id="depenses-body"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div id="modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card" style="width:420px; max-width:92vw;">
+    <h3 id="modal-title">Nouvelle dépense</h3>
+    <div id="modal-error"></div>
+    <form id="depense-form">
+      <input type="hidden" id="depense-id" />
+      <div class="field"><label>Libellé *</label><input type="text" id="libelle" required placeholder="Achat de fournitures" /></div>
+      <div style="display:flex; gap:12px;">
+        <div class="field" style="flex:1;"><label>Montant *</label><input type="number" id="montant" min="0" step="1" required /></div>
+        <div class="field" style="flex:1;"><label>Date *</label><input type="date" id="date_depense" required /></div>
+      </div>
+      <div class="field"><label>Catégorie</label><input type="text" id="categorie" placeholder="Loyer, Transport, Stock..." /></div>
+      <div class="field"><label>Notes</label><textarea id="notes"></textarea></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('depenses');
+
+  let depenses = [];
+  async function load() {
+    const { depenses: rows } = await Api.get('/depenses');
+    depenses = rows;
+    document.getElementById('depenses-body').innerHTML = depenses.length ? depenses.map(d => `
+      <tr>
+        <td style="font-weight:600;">${escapeHtml(d.libelle)}</td>
+        <td>${escapeHtml(d.categorie) || '—'}</td>
+        <td>${formatDate(d.date_depense)}</td>
+        <td class="mono" style="color:var(--clay);">${formatMontant(d.montant)}</td>
+        <td style="text-align:right;">
+          <button class="btn btn-sm btn-outline" onclick='editDepense(${d.id})'>Modifier</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteDepense(${d.id})">Supprimer</button>
+        </td>
+      </tr>
+    `).join('') : `<tr><td colspan="5"><div class="empty-state"><div class="ic">${Icon('wallet')}</div>Aucune dépense enregistrée</div></td></tr>`;
+  }
+
+  function openModal() {
+    document.getElementById('modal-title').textContent = 'Nouvelle dépense';
+    document.getElementById('depense-form').reset();
+    document.getElementById('depense-id').value = '';
+    document.getElementById('date_depense').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('modal-error').innerHTML = '';
+    document.getElementById('modal').style.display = 'flex';
+  }
+  function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+  function editDepense(id) {
+    const d = depenses.find(d => d.id === id);
+    document.getElementById('modal-title').textContent = 'Modifier la dépense';
+    document.getElementById('depense-id').value = d.id;
+    document.getElementById('libelle').value = d.libelle;
+    document.getElementById('montant').value = d.montant;
+    document.getElementById('date_depense').value = d.date_depense;
+    document.getElementById('categorie').value = d.categorie || '';
+    document.getElementById('notes').value = d.notes || '';
+    document.getElementById('modal').style.display = 'flex';
+  }
+
+  async function deleteDepense(id) {
+    if (!confirm('Supprimer cette dépense ?')) return;
+    try {
+      await Api.del(`/depenses/${id}`);
+      load().catch(err => alert(err.message));
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  document.getElementById('depense-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('depense-id').value;
+    const payload = {
+      libelle: document.getElementById('libelle').value,
+      montant: parseFloat(document.getElementById('montant').value) || 0,
+      date_depense: document.getElementById('date_depense').value,
+      categorie: document.getElementById('categorie').value,
+      notes: document.getElementById('notes').value
+    };
+    const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Enregistrement…');
+    try {
+      if (id) await Api.put(`/depenses/${id}`, payload);
+      else await Api.post('/depenses', payload);
+      closeModal();
+      load().catch(err => alert(err.message));
+    } catch (err) {
+      document.getElementById('modal-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+    } finally {
+      restore();
+    }
+  });
+
+  load().catch(err => showFatalError(err.message));
+</script>
+</body>
+</html>

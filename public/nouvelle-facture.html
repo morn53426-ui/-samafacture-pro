@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Nouvelle facture — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content">
+    <div class="page-header">
+      <div>
+        <h1 id="page-title">Nouvelle facture</h1>
+        <p>Le total se calcule automatiquement</p>
+      </div>
+      <div>
+        <label style="display:inline-block; margin-right:10px;">
+          <input type="radio" name="doc_type" value="facture" checked /> Facture
+        </label>
+        <label style="display:inline-block;">
+          <input type="radio" name="doc_type" value="devis" /> Devis
+        </label>
+      </div>
+    </div>
+
+    <div id="error-box"></div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Informations générales</h3>
+        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px;">
+          <div class="field">
+            <label>Client *</label>
+            <select id="client_id" required></select>
+          </div>
+          <div class="field">
+            <label>Mode de paiement</label>
+            <select id="mode_paiement">
+              <option value="">—</option>
+              <option>Espèces</option>
+              <option>Wave</option>
+              <option>Orange Money</option>
+              <option>PayDunya</option>
+              <option>Virement bancaire</option>
+              <option>Chèque</option>
+              <option>Carte bancaire</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Date d'émission</label>
+            <input type="date" id="date_emission" />
+          </div>
+          <div class="field">
+            <label>Date d'échéance</label>
+            <input type="date" id="date_echeance" />
+          </div>
+        </div>
+
+        <h3 style="margin-top:10px;">Articles</h3>
+        <table>
+          <thead><tr><th>Désignation</th><th style="width:110px;">Qté</th><th style="width:140px;">Prix U.</th><th style="width:90px;">TVA%</th><th style="width:130px;">Total</th><th></th></tr></thead>
+          <tbody id="lignes-body"></tbody>
+        </table>
+        <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addLigne()">+ Ajouter une ligne</button>
+
+        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px; margin-top:20px;">
+          <div class="field"><label>Remise (montant)</label><input type="number" id="remise" value="0" /></div>
+          <div class="field"><label>Frais de livraison</label><input type="number" id="frais_livraison" value="0" /></div>
+        </div>
+        <div class="field"><label>Commentaires</label><textarea id="commentaires" placeholder="Merci pour votre confiance."></textarea></div>
+      </div>
+
+      <div class="card" style="align-self:start;">
+        <h3>Récapitulatif</h3>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
+          <span>Sous-total HT</span><span class="mono" id="rec-sous-total">0 FCFA</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
+          <span>TVA</span><span class="mono" id="rec-tva">0 FCFA</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
+          <span>Remise</span><span class="mono" id="rec-remise">- 0 FCFA</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
+          <span>Livraison</span><span class="mono" id="rec-livraison">0 FCFA</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:14px 0; font-weight:700; font-size:1.15rem;">
+          <span>Total</span><span class="mono" id="rec-total" style="color:var(--emerald);">0 FCFA</span>
+        </div>
+        <button id="submit-facture-btn" class="btn btn-primary" style="width:100%; padding:12px;" onclick="submitFacture()">Créer le document</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+  requireAuthPage();
+  renderSidebar('nouvelle-facture');
+
+  let clients = [];
+  let produits = [];
+  let ligneCount = 0;
+
+  document.getElementById('date_emission').value = new Date().toISOString().slice(0, 10);
+
+  async function init() {
+    const [{ clients: c }, { produits: p }] = await Promise.all([Api.get('/clients'), Api.get('/produits')]);
+    clients = c; produits = p;
+    document.getElementById('client_id').innerHTML = '<option value="">Sélectionner un client</option>' +
+      clients.map(cl => `<option value="${cl.id}">${escapeHtml(cl.nom)}</option>`).join('');
+    addLigne();
+
+    document.querySelectorAll('input[name=doc_type]').forEach(r => r.addEventListener('change', () => {
+      const type = document.querySelector('input[name=doc_type]:checked').value;
+      document.getElementById('page-title').textContent = type === 'devis' ? 'Nouveau devis' : 'Nouvelle facture';
+    }));
+  }
+
+  function addLigne() {
+    ligneCount++;
+    const id = 'l' + ligneCount;
+    const produitOptions = produits.map(p => `<option value="${p.id}" data-prix="${p.prix_ht}" data-tva="${p.tva}">${escapeHtml(p.nom)}</option>`).join('');
+    const row = document.createElement('tr');
+    row.id = id;
+    row.innerHTML = `
+      <td>
+        <select class="ligne-produit" style="margin-bottom:4px;" onchange="applyProduit('${id}', this)">
+          <option value="">Produit du catalogue (optionnel)</option>
+          ${produitOptions}
+        </select>
+        <input type="text" class="ligne-designation" placeholder="Désignation" />
+      </td>
+      <td><input type="number" class="ligne-qte ligne-input-sm" value="1" min="0" step="1" oninput="recalc()" /></td>
+      <td><input type="number" class="ligne-pu ligne-input-sm" value="0" min="0" step="1" oninput="recalc()" /></td>
+      <td><input type="number" class="ligne-tva ligne-input-sm" value="0" min="0" max="100" step="1" oninput="recalc()" /></td>
+      <td class="mono ligne-total">0</td>
+      <td><button type="button" class="btn btn-sm btn-danger" onclick="removeLigne('${id}')">${Icon('x')}</button></td>
+    `;
+    document.getElementById('lignes-body').appendChild(row);
+  }
+
+  function applyProduit(rowId, select) {
+    const row = document.getElementById(rowId);
+    const opt = select.options[select.selectedIndex];
+    if (opt.value) {
+      row.querySelector('.ligne-designation').value = opt.textContent;
+      row.querySelector('.ligne-pu').value = opt.dataset.prix;
+      row.querySelector('.ligne-tva').value = opt.dataset.tva;
+    }
+    recalc();
+  }
+
+  function removeLigne(rowId) {
+    document.getElementById(rowId).remove();
+    recalc();
+  }
+
+  function round2(n) {
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  }
+
+  function getLignes() {
+    return [...document.getElementById('lignes-body').querySelectorAll('tr')].map(row => {
+      const qte = parseFloat(row.querySelector('.ligne-qte').value) || 0;
+      const pu = parseFloat(row.querySelector('.ligne-pu').value) || 0;
+      const tva = parseFloat(row.querySelector('.ligne-tva').value) || 0;
+      const designation = row.querySelector('.ligne-designation').value;
+      const total = round2(qte * pu * (1 + tva / 100));
+      row.querySelector('.ligne-total').textContent = formatMontant(total);
+      return { designation, quantite: qte, prix_unitaire: pu, tva, total_ligne: total };
+    });
+  }
+
+  function recalc() {
+    const lignes = getLignes();
+    const sousTotal = round2(lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0));
+    const remise = Math.min(Math.max(parseFloat(document.getElementById('remise').value) || 0, 0), sousTotal);
+    const livraison = parseFloat(document.getElementById('frais_livraison').value) || 0;
+
+    // La remise réduit la base imposable avant calcul de la TVA (répartie au prorata de chaque ligne),
+    // pour rester cohérent avec le calcul effectué côté serveur lors de l'enregistrement.
+    const totalTva = round2(lignes.reduce((s, l) => {
+      const ligneHT = l.quantite * l.prix_unitaire;
+      const ratio = sousTotal > 0 ? ligneHT / sousTotal : 0;
+      const ligneHTNet = ligneHT - remise * ratio;
+      return s + ligneHTNet * (l.tva / 100);
+    }, 0));
+
+    const total = round2(sousTotal - remise + totalTva + livraison);
+
+    document.getElementById('rec-sous-total').textContent = formatMontant(sousTotal);
+    document.getElementById('rec-tva').textContent = formatMontant(totalTva);
+    document.getElementById('rec-remise').textContent = '- ' + formatMontant(remise);
+    document.getElementById('rec-livraison').textContent = formatMontant(livraison);
+    document.getElementById('rec-total').textContent = formatMontant(total);
+  }
+
+  document.getElementById('remise').addEventListener('input', recalc);
+  document.getElementById('frais_livraison').addEventListener('input', recalc);
+
+  async function submitFacture() {
+    const errorBox = document.getElementById('error-box');
+    errorBox.innerHTML = '';
+    const lignes = getLignes().filter(l => l.designation && l.quantite > 0);
+    const client_id = document.getElementById('client_id').value;
+
+    if (!client_id) { errorBox.innerHTML = `<div class="error-box">Veuillez sélectionner un client.</div>`; return; }
+    if (lignes.length === 0) { errorBox.innerHTML = `<div class="error-box">Ajoutez au moins un article.</div>`; return; }
+
+    const payload = {
+      client_id,
+      type: document.querySelector('input[name=doc_type]:checked').value,
+      date_emission: document.getElementById('date_emission').value,
+      date_echeance: document.getElementById('date_echeance').value,
+      remise: parseFloat(document.getElementById('remise').value) || 0,
+      frais_livraison: parseFloat(document.getElementById('frais_livraison').value) || 0,
+      mode_paiement: document.getElementById('mode_paiement').value,
+      commentaires: document.getElementById('commentaires').value,
+      lignes
+    };
+
+    const btn = document.getElementById('submit-facture-btn');
+    const restore = setButtonLoading(btn, 'Création en cours…');
+    try {
+      const { facture } = await Api.post('/factures', payload);
+      location.href = `factures.html?highlight=${facture.id}`;
+    } catch (err) {
+      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+      restore();
+    }
+  }
+
+  init().catch(err => showFatalError(err.message));
+</script>
+</body>
+</html>
