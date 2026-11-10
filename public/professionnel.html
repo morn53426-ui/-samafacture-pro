@@ -286,6 +286,7 @@ function applyModulePermissions() {
   setHidden('credit-form', !can('invoices.write'));
   setHidden('deposit-form', !can('payments.write'));
   setHidden('pro-clients', !can('clients.read') && !can('clients.write'));
+  if (!can('clients.write')) document.querySelectorAll('#statement-form button[type="button"]').forEach(button => { button.hidden = true; });
   setHidden('pro-payments', !can('payments.read') && !can('payments.write'));
   setHidden('link-form', !can('payments.write'));
   setHidden('pro-team', !can('team.read') && !can('team.manage'));
