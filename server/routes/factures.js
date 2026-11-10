@@ -232,7 +232,7 @@ router.get('/:id', async (req, res, next) => {
     // on le génère à la volée au premier affichage plutôt que de migrer toute la table.
     if (!facture.verification_code) {
       facture.verification_code = crypto.randomBytes(5).toString('hex');
-      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ? AND user_id = ?', [facture.verification_code, facture.id, req.tenantId]);
     }
 
     const [[lignes], [paiements]] = await Promise.all([
@@ -440,7 +440,7 @@ router.put('/:id/statut', async (req, res, next) => {
     if (!valides.includes(statut)) { conn.release(); return res.status(400).json({ error: 'Statut invalide.' }); }
 
     await conn.beginTransaction();
-    await conn.query('UPDATE factures SET statut = ? WHERE id = ?', [statut, existing.id]);
+    await conn.query('UPDATE factures SET statut = ? WHERE id = ? AND user_id = ?', [statut, existing.id, req.tenantId]);
 
     // Symétrie avec le décompte automatique du stock (voir POST / et /transformer-en-facture
     // ci-dessus) : annuler une facture doit restituer le stock déjà décompté, et ré-annuler
@@ -453,7 +453,7 @@ router.put('/:id/statut', async (req, res, next) => {
     }
 
     await conn.commit();
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ?', [existing.id]);
+    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     res.json({ facture: rows[0] });
   } catch (err) {
     await conn.rollback();
@@ -487,7 +487,7 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
 
     await conn.beginTransaction();
     const numero = await nextNumero(conn, req.tenantId, 'facture');
-    await conn.query(`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente' WHERE id = ?`, [numero, devis.id]);
+    await conn.query(`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente' WHERE id = ? AND user_id = ?`, [numero, devis.id, req.tenantId]);
 
     // Décompte du stock au moment où le devis devient une vraie vente (même règle qu'à la
     // création directe d'une facture, voir POST / ci-dessus) — jamais fait tant que ce
@@ -497,7 +497,7 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
 
     await conn.commit();
 
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ?', [devis.id]);
+    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [devis.id, req.tenantId]);
     res.json({ facture: rows[0] });
   } catch (err) {
     await conn.rollback();
@@ -549,7 +549,7 @@ router.post('/:id/dupliquer', async (req, res, next) => {
     await insererLignesFacture(conn, nouvelId, lignesSource);
 
     await conn.commit();
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ?', [nouvelId]);
+    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [nouvelId, req.tenantId]);
     res.status(201).json({ facture: rows[0] });
   } catch (err) {
     await conn.rollback();
@@ -685,7 +685,7 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
 
   if (!facture.verification_code) {
     facture.verification_code = crypto.randomBytes(5).toString('hex');
-    await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+    await pool.query('UPDATE factures SET verification_code = ? WHERE id = ? AND user_id = ?', [facture.verification_code, facture.id, userId]);
   }
 
   const consultUrl = `${baseUrl}/consulter.html?id=${facture.id}&code=${facture.verification_code}`;
@@ -829,7 +829,7 @@ router.delete('/:id', async (req, res, next) => {
     if (existing.type === 'facture' && existing.statut !== 'annulee') {
       await ajusterStockFacture(conn, existing.id, req.tenantId, +1);
     }
-    await conn.query('DELETE FROM factures WHERE id = ?', [existing.id]);
+    await conn.query('DELETE FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
