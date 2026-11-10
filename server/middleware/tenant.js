@@ -3,8 +3,8 @@ const { pool } = require('../config/db');
 const ROLE_PERMISSIONS = {
   proprietaire: ['*'],
   administrateur: ['*'],
-  manager: ['dashboard.read', 'clients.read', 'clients.write', 'products.read', 'products.write', 'invoices.read', 'invoices.write', 'payments.read', 'payments.write', 'expenses.read', 'expenses.write', 'reports.read', 'documents.read', 'documents.write', 'sales.read', 'sales.write', 'cash.read', 'cash.write', 'team.read'],
-  comptable: ['dashboard.read', 'clients.read', 'products.read', 'invoices.read', 'payments.read', 'payments.write', 'expenses.read', 'expenses.write', 'reports.read', 'documents.read', 'documents.write'],
+  manager: ['dashboard.read', 'clients.read', 'clients.write', 'products.read', 'products.write', 'invoices.read', 'invoices.write', 'payments.read', 'payments.write', 'expenses.read', 'expenses.write', 'reports.read', 'documents.read', 'documents.write', 'sales.read', 'sales.write', 'cash.read', 'cash.write', 'team.read', 'audit.read'],
+  comptable: ['dashboard.read', 'clients.read', 'products.read', 'invoices.read', 'payments.read', 'payments.write', 'expenses.read', 'expenses.write', 'reports.read', 'documents.read', 'documents.write', 'audit.read'],
   commercial: ['dashboard.read', 'clients.read', 'clients.write', 'products.read', 'invoices.read', 'invoices.write', 'sales.read', 'sales.write', 'documents.read'],
   caissier: ['dashboard.read', 'clients.read', 'invoices.read', 'payments.read', 'payments.write', 'cash.read', 'cash.write'],
   employe: ['dashboard.read', 'clients.read', 'products.read', 'invoices.read', 'sales.read'],
@@ -59,6 +59,7 @@ function permissionForRequest(req) {
   const base = req.baseUrl || '';
   const path = req.path || '/';
   const method = req.method;
+
   if (base.endsWith('/dashboard')) return 'dashboard.read';
   if (base.endsWith('/clients')) return method === 'GET' ? 'clients.read' : 'clients.write';
   if (base.endsWith('/produits')) return method === 'GET' ? 'products.read' : 'products.write';
@@ -70,17 +71,21 @@ function permissionForRequest(req) {
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
   }
   if (base.endsWith('/pro')) {
-    if (path.startsWith('/team/invitations/accept')) return 'dashboard.read';
-    if (path.startsWith('/team/companies')) return 'dashboard.read';
+    if (path.startsWith('/team/invitations/accept') || path.startsWith('/team/companies')) return 'dashboard.read';
     if (path.startsWith('/team')) return method === 'GET' ? 'team.read' : 'team.manage';
-    if (path.startsWith('/payments') || path.startsWith('/payment-links')) return method === 'GET' ? 'payments.read' : 'payments.write';
+    if (path.startsWith('/payments') || path.startsWith('/payment-links') || path.startsWith('/refunds') || path.startsWith('/deposits')) {
+      return method === 'GET' ? 'payments.read' : 'payments.write';
+    }
     if (path.startsWith('/cash') || path.startsWith('/establishments')) return method === 'GET' ? 'cash.read' : 'cash.write';
     if (path.startsWith('/documents')) return method === 'GET' ? 'documents.read' : 'documents.write';
     if (path.startsWith('/reports')) return 'reports.read';
     if (path.startsWith('/integrations')) return method === 'GET' ? 'integrations.read' : 'integrations.manage';
     if (path.startsWith('/automations')) return method === 'GET' ? 'automations.read' : 'automations.manage';
+    if (path.startsWith('/audit')) return 'audit.read';
     if (path.startsWith('/clients')) return method === 'GET' ? 'clients.read' : 'clients.write';
-    return method === 'GET' ? 'sales.read' : 'sales.write';
+    if (path.startsWith('/credit-notes')) return method === 'GET' ? 'sales.read' : 'invoices.write';
+    if (path.startsWith('/orders') || path.startsWith('/delivery-notes')) return method === 'GET' ? 'sales.read' : 'sales.write';
+    return 'admin.only';
   }
   return null;
 }
