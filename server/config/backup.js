@@ -14,35 +14,6 @@ function isBackupEnabled() {
   return process.env.BACKUP_ENABLED !== 'false'; // activée par défaut
 }
 
-/**
- * Tente de "réclamer" la sauvegarde du jour : un seul appelant (même en mode cluster,
- * avec plusieurs processus) reçoit `true`, grâce au verrouillage de ligne MySQL
- * (SELECT ... FOR UPDATE dans une transaction). Les autres reçoivent `false` et ne
- * refont pas le travail.
- */
-async function reclamerSauvegardeDuJour() {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    await conn.query(`INSERT IGNORE INTO backup_meta (id, derniere_sauvegarde) VALUES (1, '1970-01-01')`);
-    const [[row]] = await conn.query('SELECT derniere_sauvegarde FROM backup_meta WHERE id = 1 FOR UPDATE');
-
-    const aujourdHui = new Date().toISOString().slice(0, 10);
-    if (row.derniere_sauvegarde === aujourdHui) {
-      await conn.commit();
-      return false; // déjà fait aujourd'hui (par ce processus ou un autre worker)
-    }
-    await conn.query('UPDATE backup_meta SET derniere_sauvegarde = ? WHERE id = 1', [aujourdHui]);
-    await conn.commit();
-    return true;
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
-}
-
 /** Lance mysqldump et attend à la fois sa sortie et son code de terminaison. */
 async function runMysqldump(outputPath, spawnCommand = spawn) {
   const bin = process.env.MYSQLDUMP_PATH || 'mysqldump';
@@ -99,6 +70,7 @@ async function runMysqldump(outputPath, spawnCommand = spawn) {
   } catch (err) {
     if (typeof dump.kill === 'function' && !dump.killed) dump.kill();
     await Promise.allSettled([processClosed, outputFinished]);
+    await fs.promises.unlink(outputPath).catch(() => {});
     throw err;
   }
 }
@@ -165,6 +137,9 @@ async function executerSauvegardeQuotidienne() {
     if (Number(lockRow?.acquired) !== 1) return false;
     lockAcquired = true;
 
+    await conn.query(
+      "INSERT IGNORE INTO backup_meta (id, derniere_sauvegarde) VALUES (1, '1970-01-01')"
+    );
     const [[row]] = await conn.query(
       'SELECT derniere_sauvegarde FROM backup_meta WHERE id = 1'
     );
