@@ -53,6 +53,28 @@ describe('Authentification', () => {
     assert.ok(res.body.token);
   });
 
+  test('le sélecteur manuel de plan ne peut pas attribuer un plan payant en production', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200, login.text);
+
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const response = await request(app)
+        .put('/api/auth/plan')
+        .set('Authorization', `Bearer ${login.body.token}`)
+        .send({ plan: 'entreprise' });
+
+      assert.equal(response.status, 403, response.text);
+      assert.equal(response.body.code, 'PLAN_MANUAL_DISABLED');
+      const [[user]] = await pool.query('SELECT plan FROM users WHERE id = ?', [userId]);
+      assert.equal(user.plan, 'gratuit');
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
   test('la connexion avec un mauvais mot de passe échoue', async () => {
     const res = await request(app).post('/api/auth/login').send({ email, password: 'mauvais-mot-de-passe' });
     assert.equal(res.status, 401);
