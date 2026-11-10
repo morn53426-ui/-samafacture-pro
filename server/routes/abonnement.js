@@ -47,7 +47,8 @@ router.get('/moyens-disponibles', requireAuth, (req, res) => {
   res.json({
     wave: waveConfigured(),
     paydunya: paydunyaConfigured(),
-    tarifs: TARIFS
+    tarifs: TARIFS,
+    manual_plan_selection: process.env.NODE_ENV !== 'production'
   });
 });
 
