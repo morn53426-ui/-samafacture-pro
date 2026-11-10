@@ -1,12 +1,13 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 const { notifierUtilisateur } = require('../realtime');
 const { ajusterStockFacture } = require('./factures');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, requirePermission);
 
 /**
  * @openapi
@@ -44,7 +45,7 @@ router.get('/', async (req, res, next) => {
 
     const [[{ total }]] = await pool.query(
       `SELECT COUNT(*) as total FROM clients WHERE user_id = ?${q ? ' AND (nom LIKE ? OR email LIKE ? OR telephone LIKE ?)' : ''}`,
-      [req.user.id, ...searchParams]
+      [req.tenantId, ...searchParams]
     );
 
     const baseSql = `
@@ -57,7 +58,7 @@ router.get('/', async (req, res, next) => {
     `;
     const [rows] = await pool.query(
       `${baseSql} GROUP BY c.id ORDER BY c.nom LIMIT ? OFFSET ?`,
-      [req.user.id, ...searchParams, limite, offset]
+      [req.tenantId, ...searchParams, limite, offset]
     );
 
     const withTotals = rows.map(c => ({ ...c, total_du: c.total_facture - c.total_paye }));
@@ -86,7 +87,7 @@ router.get('/', async (req, res, next) => {
  */
 router.get('/:id', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [rows] = await pool.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const client = rows[0];
     if (!client) return res.status(404).json({ error: 'Client introuvable.' });
     const [factures] = await pool.query('SELECT * FROM factures WHERE client_id = ? ORDER BY date_emission DESC', [client.id]);
@@ -129,12 +130,12 @@ router.post('/', async (req, res, next) => {
 
     const [result] = await pool.query(
       `INSERT INTO clients (user_id, nom, email, telephone, whatsapp, adresse, notes, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, nom, email || null, telephone || null, whatsapp || null, adresse || null, notes || null, photo || null]
+      [req.tenantId, nom, email || null, telephone || null, whatsapp || null, adresse || null, notes || null, photo || null]
     );
 
     const [rows] = await pool.query('SELECT * FROM clients WHERE id = ?', [result.insertId]);
     res.status(201).json({ client: rows[0] });
-    notifierUtilisateur(req.user.id, 'nouveau_client', { client: rows[0] });
+    notifierUtilisateur(req.tenantId, 'nouveau_client', { client: rows[0] });
   } catch (err) { next(err); }
 });
 
@@ -159,7 +160,7 @@ router.post('/', async (req, res, next) => {
  */
 router.put('/:id', async (req, res, next) => {
   try {
-    const [existingRows] = await pool.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const existing = existingRows[0];
     if (!existing) return res.status(404).json({ error: 'Client introuvable.' });
 
@@ -202,7 +203,7 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [existingRows] = await pool.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     if (!existingRows.length) return res.status(404).json({ error: 'Client introuvable.' });
 
     await conn.beginTransaction();
@@ -217,7 +218,7 @@ router.delete('/:id', async (req, res, next) => {
       [existingRows[0].id]
     );
     for (const f of facturesClient) {
-      await ajusterStockFacture(conn, f.id, req.user.id, +1);
+      await ajusterStockFacture(conn, f.id, req.tenantId, +1);
     }
     await conn.query('DELETE FROM factures WHERE client_id = ?', [existingRows[0].id]);
     await conn.query('DELETE FROM clients WHERE id = ?', [existingRows[0].id]);
