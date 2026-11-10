@@ -512,6 +512,20 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
   try {
     await conn.beginTransaction();
 
+    // Même ordre de verrouillage que les autres parcours : compte, puis devis.
+    // Vérifier le devis avant de réserver une unité permet de conserver un 404 pour un ID
+    // inexistant, même lorsque le quota gratuit est déjà atteint.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    const [devisRows] = await conn.query(
+      `SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis' FOR UPDATE`,
+      [req.params.id, req.tenantId]
+    );
+    const devis = devisRows[0];
+    if (!devis) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Devis introuvable.' });
+    }
+
     const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
     if (!quota.allowed) {
       await conn.rollback();
@@ -522,18 +536,6 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
         error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant pour continuer.`,
         code: 'QUOTA_DEPASSE'
       });
-    }
-
-    // Le compte est verrouillé avant le devis. La clause type='devis' empêche une
-    // double conversion concurrente de redécompter le stock ou de réattribuer un numéro.
-    const [devisRows] = await conn.query(
-      `SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis' FOR UPDATE`,
-      [req.params.id, req.tenantId]
-    );
-    const devis = devisRows[0];
-    if (!devis) {
-      await conn.rollback();
-      return res.status(404).json({ error: 'Devis introuvable.' });
     }
 
     const numero = await nextNumero(conn, req.tenantId, 'facture');
