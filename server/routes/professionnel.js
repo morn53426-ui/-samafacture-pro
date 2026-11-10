@@ -267,7 +267,10 @@ router.get('/clients/:id/statement', async (req, res, next) => {
     const client = await clientOwned(uid, clientId);
     if (!client) return res.status(404).json({ error: 'Client introuvable.' });
     const [factures] = await pool.query('SELECT id, numero, date_emission, date_echeance, total, montant_paye, statut, type FROM factures WHERE user_id = ? AND client_id = ? ORDER BY date_emission DESC, id DESC', [uid, clientId]);
-    const [paiements] = await pool.query('SELECT p.id, p.facture_id, p.montant, p.methode, p.reference, p.date_paiement, f.numero FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.user_id = ? AND f.user_id = ? AND f.client_id = ? AND f.type = 'facture' ORDER BY p.date_paiement DESC', [uid, uid, clientId]);
+    const [paiements] = await pool.query(
+      \`SELECT p.id, p.facture_id, p.montant, p.methode, p.reference, p.date_paiement, f.numero FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.user_id = ? AND f.user_id = ? AND f.client_id = ? AND f.type = 'facture' ORDER BY p.date_paiement DESC\`,
+      [uid, uid, clientId]
+    );
     const [remboursements] = await pool.query(
       "SELECT r.id, r.paiement_id, r.montant, r.motif, r.reference_prestataire, r.traite_le, f.numero FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id JOIN factures f ON f.id = p.facture_id WHERE r.user_id = ? AND f.user_id = ? AND r.statut = 'rembourse' AND f.client_id = ? AND f.type = 'facture' ORDER BY r.traite_le DESC",
       [uid, uid, clientId]
