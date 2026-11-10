@@ -115,12 +115,15 @@ async function genererPdfFacture(factureId, user) {
     // bouton "Imprimer / Exporter en PDF" existant, pas de style dupliqué ici.
     await page.emulateMediaType('print');
 
-    const pdfBuffer = await page.pdf({
+    const pdfData = await page.pdf({
       format: 'A4',
       printBackground: true,
       margin: { top: '14mm', bottom: '14mm', left: '10mm', right: '10mm' }
     });
-    return pdfBuffer;
+    // Puppeteer récent renvoie un Uint8Array. Express traite un Uint8Array simple
+    // comme un objet JSON (clés 0, 1, 2...) au lieu d'un contenu binaire ; Buffer.from
+    // garantit un vrai PDF pour les téléchargements HTTP et les pièces jointes email.
+    return Buffer.from(pdfData);
   } finally {
     if (page) await page.close().catch(() => {});
     releaseSlot();
