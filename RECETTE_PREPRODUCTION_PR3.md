@@ -66,7 +66,19 @@ Le nom de projet Compose `samafacture-preprod` doit rester identique pour toutes
 
 ## 3. Préparer et restaurer la copie de base
 
-1. Produire un dump cohérent de la base source avec `mysqldump --single-transaction`, en incluant routines, événements et triggers. L'export doit être réalisé depuis le contexte de production, mais le fichier doit être écrit dans un emplacement temporaire protégé (droits 600, répertoire non public).
+1. Produire un dump cohérent de la base source avec `mysqldump --single-transaction`, en incluant routines, événements et triggers. Depuis le répertoire du déploiement de production, exécuter la commande ci-dessous. Remplacer le chemin de sortie par un emplacement temporaire protégé (droits 600, répertoire non public) :
+
+```bash
+set -euo pipefail
+umask 077
+docker compose --env-file server/.env exec -T mysql sh -c \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump --single-transaction --routines --events --triggers --hex-blob -uroot "$MYSQL_DATABASE"' \
+  | gzip > /secure/samafacture-preprod-brut.sql.gz
+gzip -t /secure/samafacture-preprod-brut.sql.gz
+sha256sum /secure/samafacture-preprod-brut.sql.gz
+```
+
+Cette commande doit être exécutée côté production uniquement pour lire/exporter la base. Elle n'effectue aucune restauration et n'écrit pas dans MySQL.
 2. Vérifier le fichier avec `gzip -t` et calculer son empreinte avec `sha256sum`. Transférer le dump vers le staging par un canal SSH/SFTP chiffré.
 3. Avant de démarrer l'application de staging, restaurer le dump dans la base `samafacture_preprod` du projet Docker de staging. Utiliser le compte root MySQL du conteneur de staging, jamais les identifiants de production.
 4. Anonymiser les données personnelles présentes dans toutes les tables métier : utilisateurs, clients, fournisseurs, contacts, employés, adresses, téléphones, emails, identifiants fiscaux et bancaires, commentaires et pièces jointes. Remplacer également les emails par des adresses réservées au test sous `example.invalid`. Réinitialiser les mots de passe des comptes de test et supprimer les jetons de récupération, identifiants OAuth, secrets webhook et références marchandes réelles.
@@ -165,7 +177,27 @@ Exécuter une sauvegarde depuis le conteneur de staging :
 docker compose -p samafacture-preprod --env-file server/.env exec -T app npm run backup
 ```
 
-Vérifier qu'une archive complète `.sql.gz` est produite et que `gzip -t` réussit. Copier cette archive vers l'hôte, créer une base temporaire distincte (par exemple `samafacture_restore_test`) dans le MySQL de staging, puis importer l'archive dans cette base. Vérifier que les tables, le nombre d'utilisateurs, factures et paiements correspondent à la base source de la sauvegarde.
+Vérifier qu'une archive complète `.sql.gz` est produite et que `gzip -t` réussit. Copier l'archive vers l'hôte avec `docker compose -p samafacture-preprod --env-file server/.env cp app:/app/server/backups/NOM_ARCHIVE.sql.gz /secure/NOM_ARCHIVE.sql.gz` (remplacer `NOM_ARCHIVE.sql.gz` par le nom réel).
+
+Créer une base temporaire distincte dans le MySQL de staging, puis restaurer dedans :
+
+```bash
+docker compose -p samafacture-preprod --env-file server/.env exec -T mysql sh -c \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -e "CREATE DATABASE IF NOT EXISTS samafacture_restore_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"'
+
+gunzip -c /secure/NOM_ARCHIVE.sql.gz | \
+  docker compose -p samafacture-preprod --env-file server/.env exec -T mysql sh -c \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot samafacture_restore_test'
+```
+
+Vérifier que les tables, le nombre d'utilisateurs, factures et paiements correspondent à la base source de la sauvegarde. Comparer au minimum les compteurs suivants dans la base restaurée :
+
+```sql
+SELECT COUNT(*) AS utilisateurs FROM samafacture_restore_test.users;
+SELECT COUNT(*) AS factures FROM samafacture_restore_test.factures;
+SELECT COUNT(*) AS paiements FROM samafacture_restore_test.paiements;
+SELECT version FROM samafacture_restore_test._samafacture_schema_meta WHERE id = 1;
+```
 
 La restauration doit être faite dans cette base temporaire, jamais dans `samafacture_preprod` en activité ni dans la base de production. Noter la durée, la taille de l'archive et le résultat des contrôles. L'exercice local ne valide pas encore une sauvegarde hors VPS : cette copie externalisée et chiffrée reste un point de production distinct.
 
