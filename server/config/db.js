@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -168,9 +168,19 @@ async function runMigrations(conn) {
     { table: 'users', column: 'reset_token_expires', definition: 'DATETIME' },
     { table: 'users', column: 'signature_default', definition: 'MEDIUMTEXT' },
     { table: 'users', column: 'facture_personnalisation', definition: 'TEXT' },
+    { table: 'users', column: 'entreprise_rccm', definition: 'VARCHAR(80)' },
+    { table: 'users', column: 'entreprise_site_web', definition: 'VARCHAR(190)' },
+    { table: 'users', column: 'entreprise_banque', definition: 'VARCHAR(120)' },
+    { table: 'users', column: 'entreprise_rib', definition: 'VARCHAR(100)' },
+    { table: 'users', column: 'entreprise_conditions_reglement', definition: 'TEXT' },
+    { table: 'users', column: 'entreprise_mentions_legales', definition: 'TEXT' },
     { table: 'produits', column: 'prix_achat', definition: 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER prix_ht' },
     { table: 'factures', column: 'verification_code', definition: 'VARCHAR(10)' },
     { table: 'factures', column: 'idempotency_key', definition: 'VARCHAR(100)' },
+    { table: 'factures', column: 'objet', definition: 'VARCHAR(190)' },
+    { table: 'factures', column: 'reference_externe', definition: 'VARCHAR(100)' },
+    { table: 'factures', column: 'date_validite', definition: 'DATE NULL' },
+    { table: 'factures', column: 'conditions_reglement', definition: 'TEXT' },
     { table: 'paiements', column: 'idempotency_key', definition: 'VARCHAR(100)' },
     { table: 'factures_recurrentes', column: 'envoi_auto_email', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
     { table: 'abonnement_paiements', column: 'internal_reference', definition: "VARCHAR(64) NOT NULL DEFAULT ''" }
