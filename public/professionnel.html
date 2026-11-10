@@ -53,6 +53,15 @@
         </form>
         <div class="pro-list" id="orders-list"><div class="empty-state">Chargement…</div></div>
         <div class="pro-subsection"><h3>Bons de livraison</h3><div id="delivery-list" class="pro-list"></div></div>
+        <div class="pro-subsection"><h3>Factures d’acompte</h3>
+          <form id="deposit-form" class="pro-form">
+            <div class="field"><label for="deposit-invoice">Facture finale *</label><select id="deposit-invoice" required><option value="">Choisir une facture</option></select></div>
+            <div class="field"><label for="deposit-amount">Montant de l’acompte *</label><input id="deposit-amount" type="number" min="0.01" step="0.01" required /></div>
+            <button class="btn btn-outline" type="submit">Créer une demande d’acompte</button>
+          </form>
+          <div id="deposits-list" class="pro-list"></div>
+          <small class="pro-note">L’acompte est encaissé séparément puis ajouté à l’historique des paiements de la facture finale. La facture d’origine reste conservée.</small>
+        </div>
         <div class="pro-subsection"><h3>Avoirs</h3>
           <form id="credit-form" class="pro-form">
             <div class="field"><label for="credit-invoice">Facture d'origine *</label><select id="credit-invoice" required><option value="">Choisir une facture</option></select></div>
@@ -264,14 +273,14 @@ function statusPill(text) { return '<span class="pro-status">' + escapeHtml(text
 async function loadWorkspace() {
   try {
     const results = await Promise.all([
-      Api.get('/pro/orders'), Api.get('/pro/delivery-notes'), Api.get('/pro/credit-notes'),
+      Api.get('/pro/orders'), Api.get('/pro/delivery-notes'), Api.get('/pro/credit-notes'), Api.get('/pro/deposits'),
       Api.get('/pro/team'), Api.get('/pro/establishments'), Api.get('/pro/cash/registers'),
       Api.get('/pro/payments'), Api.get('/pro/payment-links'), Api.get('/pro/documents'),
       Api.get('/pro/automations'), Api.get('/pro/integrations/api-keys'), Api.get('/pro/integrations/webhooks'),
       Api.get('/pro/audit'), Api.get('/pro/team/companies'), Api.get('/clients?page=1&limite=100'),
       Api.get('/factures?type=facture&page=1&limite=100')
     ]);
-    const [orders, delivery, credits, team, branches, registers, payments, links, docs, automations, keys, webhooks, audit, companies, clients, invoices] = results;
+    const [orders, delivery, credits, deposits, team, branches, registers, payments, links, docs, automations, keys, webhooks, audit, companies, clients, invoices] = results;
     customRolesCache = team.roles || [];
     el('invite-custom-role').innerHTML = '<option value="">Choisir un rôle enregistré</option>' + customRolesCache.map(r => '<option value="' + r.id + '">' + escapeHtml(r.nom) + '</option>').join('');
     clientsCache = clients.clients || [];
@@ -293,6 +302,7 @@ async function loadWorkspace() {
     });
     const invoiceOptions = '<option value="">Choisir une facture</option>' + invoicesCache.map(f => '<option value="' + f.id + '">' + escapeHtml(f.numero) + ' — ' + escapeHtml(f.client_nom || '') + ' — ' + formatMontant(f.total) + '</option>').join('');
     el('credit-invoice').innerHTML = invoiceOptions;
+    el('deposit-invoice').innerHTML = invoiceOptions;
     el('link-invoice').innerHTML = invoiceOptions;
     el('document-invoice').innerHTML = '<option value="">Aucune</option>' + invoicesCache.map(f => '<option value="' + f.id + '">' + escapeHtml(f.numero) + '</option>').join('');
 
@@ -300,6 +310,7 @@ async function loadWorkspace() {
     setList('delivery-list', (delivery.bons_livraison || []).map(d => '<div class="pro-list-row"><div><strong>' + escapeHtml(d.numero) + '</strong><small>' + escapeHtml(d.destinataire || d.client_nom || '') + ' · ' + formatDate(d.date_livraison) + '</small></div>' + statusPill(d.statut) + '</div>').join(''));
     setList('credits-list', (credits.avoirs || []).map(a => '<div class="pro-list-row"><div><strong>' + escapeHtml(a.numero) + '</strong><small>Facture ' + escapeHtml(a.facture_numero) + ' · ' + formatMontant(a.montant) + '</small></div><div>' + statusPill(a.statut) + (a.statut === 'brouillon' ? '<button class="btn btn-sm btn-outline" onclick="updateCredit(' + a.id + ',\'valide\')">Valider</button>' : '') + '</div></div>').join(''));
 
+    setList('deposits-list', (deposits.acomptes || []).map(d => '<div class="pro-list-row"><div><strong>' + escapeHtml(d.numero) + '</strong><small>Facture ' + escapeHtml(d.facture_numero) + ' · ' + formatMontant(d.montant) + ' · ' + formatDate(d.date_emission) + '</small></div><div>' + statusPill(d.statut) + (d.statut === 'a_encaisser' ? '<button class="btn btn-sm btn-outline" onclick="receiveDeposit(' + d.id + ')">Marquer encaissé</button>' : '') + '</div></div>').join(''));
     setList('team-list', [
       ...(team.membres || []).map(m => '<div class="pro-list-row"><div><strong>' + escapeHtml(m.nom) + '</strong><small>' + escapeHtml(m.email) + ' · ' + escapeHtml(m.role) + '</small></div>' + statusPill(m.active ? 'Actif' : 'Désactivé') + '<button class="btn btn-sm btn-outline" onclick="removeMember(' + m.id + ')">Désactiver</button></div>'),
       ...(team.invitations || []).map(i => '<div class="pro-list-row"><div><strong>' + escapeHtml(i.email) + '</strong><small>Invitation · ' + escapeHtml(i.role) + ' · expire ' + formatDate(i.expire_at) + '</small></div>' + statusPill(i.statut) + '</div>')
@@ -331,7 +342,7 @@ async function copyPaymentLink() {\n  if (!currentPaymentLink) return;\n  try { 
   try { await Api.post('/pro/orders/' + id + '/delivery-note', {}); showToast('Bon de livraison créé.', 'success'); await loadWorkspace(); }
   catch (e) { alert(e.message); }
 }
-async function updateCredit(id, status) {
+async function receiveDeposit(id) {\n  const methode = prompt('Méthode de règlement (espèces, virement, Wave, etc.) :');\n  if (!methode) return;\n  const reference = prompt('Référence du règlement (facultatif) :') || '';\n  try { await Api.post('/pro/deposits/' + id + '/receive', { methode, reference }); await loadWorkspace(); showToast('Acompte encaissé et ajouté au solde de la facture.', 'success'); }\n  catch (e) { alert(e.message); }\n}\nasync function updateCredit(id, status) {
   try { await Api.put('/pro/credit-notes/' + id + '/status', { statut: status }); await loadWorkspace(); }
   catch (e) { alert(e.message); }
 }
@@ -417,7 +428,14 @@ el('order-form').addEventListener('submit', async e => {
   const payload = { client_id: Number(el('order-client').value), lignes: [{ designation: el('order-designation').value, quantite: Number(el('order-qty').value), prix_unitaire: Number(el('order-price').value) }] };
   try { await Api.post('/pro/orders', payload); e.target.reset(); await loadWorkspace(); showToast('Commande créée.', 'success'); } catch (err) { alert(err.message); }
 });
-el('credit-form').addEventListener('submit', async e => {
+el('deposit-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  try {
+    await Api.post('/pro/deposits', { facture_id: Number(el('deposit-invoice').value), montant: Number(el('deposit-amount').value) });
+    e.target.reset(); await loadWorkspace(); showToast('Demande d’acompte créée.', 'success');
+  } catch (err) { alert(err.message); }
+});
+\nel('credit-form').addEventListener('submit', async e => {
   e.preventDefault();
   try { await Api.post('/pro/credit-notes', { facture_id: Number(el('credit-invoice').value), montant: Number(el('credit-amount').value), motif: el('credit-reason').value }); e.target.reset(); await loadWorkspace(); showToast('Avoir créé en brouillon.', 'success'); } catch (err) { alert(err.message); }
 });
