@@ -207,6 +207,7 @@ router.delete('/:id', async (req, res, next) => {
  *         schema: { type: integer }
  *     responses:
  *       201: { description: "Facture générée.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
+ *       403: { description: "Quota mensuel de factures gratuites atteint (code QUOTA_DEPASSE)." }
  *       404: { description: "Introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/:id/generer', async (req, res, next) => {
