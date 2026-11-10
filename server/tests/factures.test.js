@@ -69,6 +69,29 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(facture.total, 11120); // 10000 - 1000 + 1620 + 500
   });
 
+  test('quantités, prix et TVA sont normalisés aux deux décimales MySQL avant calcul', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        lignes: [{ designation: 'Ligne arrondie', quantite: 1.3333, prix_unitaire: 10.005, tva: 18.555 }]
+      });
+    assert.equal(res.status, 201, res.text);
+
+    const detail = await request(app)
+      .get(`/api/factures/${res.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(detail.status, 200);
+    const line = detail.body.lignes[0];
+    assert.equal(Number(line.quantite), 1.33);
+    assert.equal(Number(line.prix_unitaire), 10.01);
+    assert.equal(Number(line.tva), 18.56);
+    assert.equal(Number(detail.body.facture.sous_total), 13.31);
+    assert.equal(Number(detail.body.facture.total), Number(line.total_ligne));
+  });
+
   test('des frais de livraison négatifs ne sont ni calculés ni enregistrés', async () => {
     const res = await request(app)
       .post('/api/factures')
