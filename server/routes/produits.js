@@ -1,11 +1,12 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage, positiveInt } = require('../utils/validation');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, requirePermission);
 
 /**
  * @openapi
@@ -38,11 +39,11 @@ router.get('/', async (req, res, next) => {
 
     const [[{ total }]] = await pool.query(
       `SELECT COUNT(*) as total FROM produits WHERE user_id = ?${q ? ' AND nom LIKE ?' : ''}`,
-      [req.user.id, ...searchParams]
+      [req.tenantId, ...searchParams]
     );
     const [rows] = await pool.query(
       `SELECT * FROM produits WHERE user_id = ?${q ? ' AND nom LIKE ?' : ''} ORDER BY nom LIMIT ? OFFSET ?`,
-      [req.user.id, ...searchParams, limite, offset]
+      [req.tenantId, ...searchParams, limite, offset]
     );
 
     res.json({ produits: rows, pagination: buildPaginationMeta(page, limite, total) });
@@ -83,7 +84,7 @@ router.post('/', async (req, res, next) => {
     const [result] = await pool.query(
       `INSERT INTO produits (user_id, nom, reference, prix_ht, tva, stock, categorie, description, image)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, nom, reference || null, positiveNumber(prix_ht), percentage(tva), positiveInt(stock), categorie || null, description || null, image || null]
+      [req.tenantId, nom, reference || null, positiveNumber(prix_ht), percentage(tva), positiveInt(stock), categorie || null, description || null, image || null]
     );
 
     const [rows] = await pool.query('SELECT * FROM produits WHERE id = ?', [result.insertId]);
@@ -110,7 +111,7 @@ router.post('/', async (req, res, next) => {
  */
 router.put('/:id', async (req, res, next) => {
   try {
-    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const existing = existingRows[0];
     if (!existing) return res.status(404).json({ error: 'Produit introuvable.' });
 
@@ -156,7 +157,7 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     if (!existingRows.length) return res.status(404).json({ error: 'Produit introuvable.' });
 
     await conn.beginTransaction();
