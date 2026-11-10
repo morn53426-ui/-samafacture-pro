@@ -102,7 +102,7 @@ const resetLimiter = rateLimit({
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, nom: user.nom },
+    { id: user.id, email: user.email, role: user.role, nom: user.nom, token_version: Number(user.token_version) || 0 },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -335,15 +335,23 @@ router.post('/google', async (req, res, next) => {
  * @openapi
  * /auth/logout:
  *   post:
- *     summary: Efface le cookie de session HttpOnly (voir SECURITY_REPORT.md)
- *     description: "N'invalide pas le jeton lui-même (JWT sans état, révocation non implémentée) — se contente de retirer le cookie posé lors de la connexion. Le frontend continue par ailleurs de vider son propre stockage local (voir Api.clearSession() dans public/js/api.js), ce qui suffisait déjà avant l'introduction du cookie ; cette route complète ce nettoyage côté cookie."
+ *     summary: Révoque les sessions actives puis efface le cookie HttpOnly.
+ *     description: Incrémente la version de session du compte : tous les JWT émis avant cette déconnexion deviennent invalides, sur navigateur et mobile.
  *     tags: [Auth]
  *     responses:
  *       204: { description: "Cookie effacé." }
  */
-router.post('/logout', (req, res) => {
-  res.clearCookie('sf_token', { httpOnly: true, sameSite: 'lax', path: '/' });
-  res.status(204).end();
+router.post('/logout', requireAuth, async (req, res, next) => {
+  try {
+    // Révoque les sessions actives de ce compte, y compris les jetons Bearer conservés
+    // dans un ancien navigateur ou appareil. Le changement est pris en compte à la
+    // prochaine requête authentifiée.
+    await pool.query('UPDATE users SET token_version = token_version + 1 WHERE id = ?', [req.user.id]);
+    res.clearCookie('sf_token', { httpOnly: true, sameSite: 'lax', path: '/' });
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Mot de passe oublié ---
@@ -431,7 +439,16 @@ router.post('/reinitialiser-mot-de-passe', async (req, res, next) => {
     if (!user) return res.status(400).json({ error: 'Ce lien de réinitialisation est invalide ou a expiré.' });
 
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE users SET password_hash = ?, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ?', [hash, user.id]);
+    // Mise à jour conditionnelle atomique : un lien de réinitialisation ne peut être utilisé
+    // qu'une seule fois, même si deux requêtes arrivent simultanément. Tous les JWT précédents
+    // sont aussi révoqués par l'incrément de token_version.
+    const [result] = await pool.query(
+      'UPDATE users SET password_hash = ?, token_version = token_version + 1, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ? AND reset_token_hash = ? AND reset_token_expires > NOW()',
+      [hash, user.id, tokenHash]
+    );
+    if (!result.affectedRows) {
+      return res.status(400).json({ error: 'Ce lien de réinitialisation est invalide ou a expiré.' });
+    }
 
     res.json({ message: 'Votre mot de passe a été réinitialisé. Vous pouvez maintenant vous connecter.' });
   } catch (err) { next(err); }
@@ -706,7 +723,7 @@ function sanitizeUser(user) {
   // tels quels sur /auth/me et toutes les routes qui passent par cette fonction (voir
   // AUDIT_PRODUCTION.md §2.2) : même si seul le propriétaire du compte pouvait les lire, envoyer
   // le hash d'un jeton de réinitialisation actif au JavaScript client n'a aucune raison d'être.
-  const { password_hash, reset_token_hash, reset_token_expires, ...rest } = user;
+  const { password_hash, reset_token_hash, reset_token_expires, token_version, ...rest } = user;
   // La colonne est stockée en JSON texte (voir migration facture_personnalisation) ; on la renvoie
   // au client déjà parsée pour lui éviter un JSON.parse. Une valeur corrompue ne doit jamais faire
   // planter la réponse : on retombe alors sur "pas de personnalisation" (comportement par défaut).
