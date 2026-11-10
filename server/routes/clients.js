@@ -54,7 +54,7 @@ router.get('/', async (req, res, next) => {
         COALESCE(SUM(CASE WHEN f.type = 'facture' THEN f.total END), 0) as total_facture,
         COALESCE(SUM(CASE WHEN f.type = 'facture' THEN f.montant_paye END), 0) as total_paye
       FROM clients c
-      LEFT JOIN factures f ON f.client_id = c.id
+      LEFT JOIN factures f ON f.client_id = c.id AND f.user_id = c.user_id
       WHERE c.user_id = ?${q ? ' AND (c.nom LIKE ? OR c.email LIKE ? OR c.telephone LIKE ?)' : ''}
     `;
     const [rows] = await pool.query(
@@ -91,7 +91,7 @@ router.get('/:id', async (req, res, next) => {
     const [rows] = await pool.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const client = rows[0];
     if (!client) return res.status(404).json({ error: 'Client introuvable.' });
-    const [factures] = await pool.query('SELECT * FROM factures WHERE client_id = ? ORDER BY date_emission DESC', [client.id]);
+    const [factures] = await pool.query('SELECT * FROM factures WHERE client_id = ? AND user_id = ? ORDER BY date_emission DESC', [client.id, req.tenantId]);
     res.json({ client, factures });
   } catch (err) { next(err); }
 });
@@ -216,13 +216,13 @@ router.delete('/:id', async (req, res, next) => {
     // sinon supprimer un client par ce chemin laissait le stock de ses produits durablement
     // sous-évalué, sans que rien ne le signale.
     const [facturesClient] = await conn.query(
-      `SELECT id FROM factures WHERE client_id = ? AND type = 'facture' AND statut != 'annulee'`,
-      [existingRows[0].id]
+      `SELECT id FROM factures WHERE client_id = ? AND user_id = ? AND type = 'facture' AND statut != 'annulee'`,
+      [existingRows[0].id, req.tenantId]
     );
     for (const f of facturesClient) {
       await ajusterStockFacture(conn, f.id, req.tenantId, +1);
     }
-    await conn.query('DELETE FROM factures WHERE client_id = ?', [existingRows[0].id]);
+    await conn.query('DELETE FROM factures WHERE client_id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
     await conn.query('DELETE FROM clients WHERE id = ?', [existingRows[0].id]);
     await conn.commit();
 
