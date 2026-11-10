@@ -276,3 +276,21 @@ CREATE TABLE IF NOT EXISTS pro_team_members (
   CONSTRAINT fk_pro_team_members_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_team_members_member FOREIGN KEY (member_user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS pro_acomptes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  facture_id INT UNSIGNED NOT NULL,
+  numero VARCHAR(50) NOT NULL,
+  date_emission DATE NOT NULL,
+  montant DECIMAL(14,2) NOT NULL,
+  statut VARCHAR(20) NOT NULL DEFAULT 'a_encaisser',
+  methode VARCHAR(50) NULL,
+  reference_paiement VARCHAR(190) NULL,
+  encaisse_le DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_pro_acomptes_numero (user_id, numero),
+  KEY idx_pro_acomptes_facture (user_id, facture_id, statut),
+  CONSTRAINT fk_pro_acomptes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pro_acomptes_facture FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
