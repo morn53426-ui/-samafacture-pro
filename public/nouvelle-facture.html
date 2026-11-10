@@ -18,26 +18,22 @@
 <div class="app-shell">
   <div id="sidebar-root"></div>
   <main class="main-content">
-    <div class="page-header">
+    <div class="page-header invoice-builder-header">
       <div>
         <h1 id="page-title">Nouvelle facture</h1>
         <p>Le total se calcule automatiquement</p>
       </div>
-      <div>
-        <label style="display:inline-block; margin-right:10px;">
-          <input type="radio" name="doc_type" value="facture" checked /> Facture
-        </label>
-        <label style="display:inline-block;">
-          <input type="radio" name="doc_type" value="devis" /> Devis
-        </label>
+      <div class="invoice-type-switch" role="group" aria-label="Type de document">
+        <label><input type="radio" name="doc_type" value="facture" checked /> <span class="ic"><i class="ic" data-icon="file-plus"></i></span> Facture</label>
+        <label><input type="radio" name="doc_type" value="devis" /> <span class="ic"><i class="ic" data-icon="file-stack"></i></span> Devis</label>
       </div>
     </div>
 
     <div id="error-box"></div>
 
-    <div class="grid grid-2">
-      <div class="card">
-        <h3>Informations générales</h3>
+    <div class="grid grid-2 invoice-builder-grid">
+      <div class="card invoice-editor-card">
+        <div class="invoice-section-heading"><span class="ic"><i class="ic" data-icon="building"></i></span><div><h3>Informations générales</h3><p>Les informations principales de votre document.</p></div></div>
         <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px;">
           <div class="field">
             <label>Client *</label>
@@ -66,8 +62,8 @@
           </div>
         </div>
 
-        <h3 style="margin-top:10px;">Articles</h3>
-        <table>
+        <div class="invoice-section-heading invoice-lines-heading"><span class="ic"><i class="ic" data-icon="file-stack"></i></span><div><h3>Articles</h3><p>Ajoutez les prestations ou produits facturés.</p></div></div>
+        <table class="invoice-lines-table">
           <thead><tr><th>Désignation</th><th style="width:110px;">Qté</th><th style="width:140px;">Prix U.</th><th style="width:90px;">TVA%</th><th style="width:130px;">Total</th><th></th></tr></thead>
           <tbody id="lignes-body"></tbody>
         </table>
@@ -80,8 +76,8 @@
         <div class="field"><label>Commentaires</label><textarea id="commentaires" placeholder="Merci pour votre confiance."></textarea></div>
       </div>
 
-      <div class="card" style="align-self:start;">
-        <h3>Récapitulatif</h3>
+      <div class="card invoice-summary-card" style="align-self:start;">
+        <div class="invoice-section-heading"><span class="ic"><i class="ic" data-icon="receipt"></i></span><div><h3>Récapitulatif</h3><p>Vérifiez les montants avant de créer le document.</p></div></div>
         <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
           <span>Sous-total HT</span><span class="mono" id="rec-sous-total">0 FCFA</span>
         </div>
@@ -97,7 +93,7 @@
         <div style="display:flex; justify-content:space-between; padding:14px 0; font-weight:700; font-size:1.15rem;">
           <span>Total</span><span class="mono" id="rec-total" style="color:var(--emerald);">0 FCFA</span>
         </div>
-        <button id="submit-facture-btn" class="btn btn-primary" style="width:100%; padding:12px;" onclick="submitFacture()">Créer le document</button>
+        <button id="submit-facture-btn" class="btn btn-primary invoice-submit-button" style="width:100%; padding:12px;" onclick="submitFacture()"><i class="ic" data-icon="file-check"></i> Créer le document</button>
       </div>
     </div>
   </main>
