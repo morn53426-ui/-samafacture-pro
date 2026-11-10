@@ -92,7 +92,7 @@ router.post('/', async (req, res, next) => {
       [req.tenantId, libelle, positiveNumber(montant, 0), categorie || null, date_depense || new Date().toISOString().slice(0, 10), notes || null]
     );
 
-    const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ?', [result.insertId]);
+    const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ depense: rows[0] });
   } catch (err) { next(err); }
 });
@@ -127,16 +127,16 @@ router.put('/:id', async (req, res, next) => {
       return res.status(400).json({ error: 'Le libellé est obligatoire.' });
     }
     await pool.query(
-      `UPDATE depenses SET libelle=?, montant=?, categorie=?, date_depense=?, notes=? WHERE id = ?`,
+      `UPDATE depenses SET libelle=?, montant=?, categorie=?, date_depense=?, notes=? WHERE id = ? AND user_id = ?`,
       [
         libelle ?? existing.libelle,
         montant !== undefined ? positiveNumber(montant, existing.montant) : existing.montant,
         categorie ?? existing.categorie,
-        date_depense ?? existing.date_depense, notes ?? existing.notes, existing.id
+        date_depense ?? existing.date_depense, notes ?? existing.notes, existing.id, req.tenantId
       ]
     );
 
-    const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ?', [existing.id]);
+    const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     res.json({ depense: rows[0] });
   } catch (err) { next(err); }
 });
@@ -160,7 +160,7 @@ router.delete('/:id', async (req, res, next) => {
   try {
     const [existingRows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     if (!existingRows.length) return res.status(404).json({ error: 'Dépense introuvable.' });
-    await pool.query('DELETE FROM depenses WHERE id = ?', [existingRows[0].id]);
+    await pool.query('DELETE FROM depenses WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
     res.json({ success: true });
   } catch (err) { next(err); }
 });
