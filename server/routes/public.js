@@ -147,11 +147,16 @@ router.get('/consulter/:id/:code', verifyLimiter, async (req, res, next) => {
      if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(404).json({ error: 'Lien de paiement introuvable ou expiré.' });
      const hash = crypto.createHash('sha256').update(token).digest('hex');
      const [rows] = await pool.query(
-       'SELECT l.montant, l.devise, l.statut, l.expire_at, f.numero, f.total, f.montant_paye, u.entreprise_nom, u.nom AS user_nom, u.entreprise_telephone, u.entreprise_email, u.entreprise_adresse FROM pro_payment_links l JOIN factures f ON f.id = l.facture_id JOIN users u ON u.id = l.user_id WHERE l.token_hash = ? AND l.statut = ? AND (l.expire_at IS NULL OR l.expire_at > NOW()) LIMIT 1',
+       'SELECT l.id, l.montant, l.devise, l.statut, l.expire_at, f.numero, f.total, f.montant_paye, u.entreprise_nom, u.nom AS user_nom, u.entreprise_telephone, u.entreprise_email, u.entreprise_adresse FROM pro_payment_links l JOIN factures f ON f.id = l.facture_id JOIN users u ON u.id = l.user_id WHERE l.token_hash = ? AND l.statut = ? AND (l.expire_at IS NULL OR l.expire_at > NOW()) LIMIT 1',
        [hash, 'actif']
      );
      if (!rows.length) return res.status(404).json({ error: 'Lien de paiement introuvable ou expiré.' });
      const item = rows[0];
+     const remaining = Math.max(0, Number(item.total) - Number(item.montant_paye));
+     if (remaining + 0.001 < Number(item.montant)) {
+       await pool.query("UPDATE pro_payment_links SET statut = 'expire' WHERE id = ? AND statut = 'actif'", [item.id]);
+       return res.status(409).json({ error: 'Le solde de cette facture a changé. Demandez un nouveau lien de paiement à l’entreprise.' });
+     }
      res.json({
        entreprise: item.entreprise_nom || item.user_nom,
        telephone: item.entreprise_telephone,
@@ -162,7 +167,7 @@ router.get('/consulter/:id/:code', verifyLimiter, async (req, res, next) => {
        devise: item.devise,
        statut: item.statut,
        expiration: item.expire_at,
-       solde_facture: Math.max(0, Number(item.total) - Number(item.montant_paye)),
+       solde_facture: remaining,
        type: 'demande_de_paiement'
      });
    } catch (err) { next(err); }
