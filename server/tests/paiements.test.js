@@ -204,7 +204,7 @@ describe("Paiements d'abonnement", () => {
 });
 
 describe("Paiements de facture : idempotence HTTP", () => {
-  let userId, token, clientId, factureId, devisId, factureAnnuleeId;
+  let userId, token, clientId, factureId, devisId, factureAnnuleeId, factureAvecPaiementId;
 
   before(async () => {
     await setupTestDatabase();
@@ -249,9 +249,42 @@ describe("Paiements de facture : idempotence HTTP", () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ statut: 'annulee' });
     assert.equal(cancellation.status, 200, cancellation.text);
+
+    const paidDocument = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Facture avec acompte', quantite: 1, prix_unitaire: 2000, tva: 0 }] });
+    assert.equal(paidDocument.status, 201, paidDocument.text);
+    factureAvecPaiementId = paidDocument.body.facture.id;
   });
 
   after(async () => { await nettoyerUtilisateur(userId); });
+
+  test('une facture avec un paiement partiel ne peut pas être supprimée ni perdre son historique', async () => {
+    const payment = await request(app)
+      .post(`/api/factures/${factureAvecPaiementId}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 500, methode: 'espèces' });
+    assert.equal(payment.status, 201, payment.text);
+
+    const deletion = await request(app)
+      .delete(`/api/factures/${factureAvecPaiementId}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(deletion.status, 409, deletion.text);
+
+    const [[invoice]] = await pool.query(
+      'SELECT montant_paye, statut FROM factures WHERE id = ? AND user_id = ?',
+      [factureAvecPaiementId, userId]
+    );
+    assert.equal(Number(invoice.montant_paye), 500);
+    assert.equal(invoice.statut, 'en_attente');
+
+    const [[paymentCount]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM paiements WHERE facture_id = ? AND user_id = ?',
+      [factureAvecPaiementId, userId]
+    );
+    assert.equal(Number(paymentCount.total), 1);
+  });
 
   test('un devis et une facture annulée refusent tout nouveau paiement', async () => {
     const quotePayment = await request(app)
