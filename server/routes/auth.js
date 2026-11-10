@@ -341,13 +341,17 @@ router.post('/google', async (req, res, next) => {
  *     responses:
  *       204: { description: "Cookie effacé." }
  */
-router.post('/logout', requireAuth, async (req, res, next) => {
+router.post('/logout', (req, res, next) => {
+  // Efface le cookie même si le jeton Bearer présenté est expiré/invalide : le navigateur
+  // ne doit pas conserver une session cookie inutilisable après une tentative de déconnexion.
+  res.clearCookie('sf_token', { httpOnly: true, sameSite: 'lax', path: '/' });
+  next();
+}, requireAuth, async (req, res, next) => {
   try {
     // Révoque les sessions actives de ce compte, y compris les jetons Bearer conservés
     // dans un ancien navigateur ou appareil. Le changement est pris en compte à la
     // prochaine requête authentifiée.
     await pool.query('UPDATE users SET token_version = token_version + 1 WHERE id = ?', [req.user.id]);
-    res.clearCookie('sf_token', { httpOnly: true, sameSite: 'lax', path: '/' });
     res.status(204).end();
   } catch (err) {
     next(err);
