@@ -22,9 +22,7 @@ async function reserveMonthlyInvoiceQuota(conn, userId) {
     throw error;
   }
 
-  if (isPaidPlan(users[0].plan)) {
-    return { allowed: true, unlimited: true };
-  }
+  const paidPlan = isPaidPlan(users[0].plan);
 
   const [[periodRow]] = await conn.query(
     "SELECT DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01') AS period_start"
@@ -52,7 +50,10 @@ async function reserveMonthlyInvoiceQuota(conn, userId) {
     [userId, periodStart]
   );
   const used = Number(usage?.nombre_factures || 0);
-  if (used >= FREE_MONTHLY_INVOICE_LIMIT) {
+  // Le registre suit toutes les factures de la période, y compris celles créées sous un
+  // plan payant. Sans cela, un compte pourrait créer des factures sous Pro puis revenir à
+  // Gratuit et récupérer artificiellement un quota neuf pour le même mois.
+  if (!paidPlan && used >= FREE_MONTHLY_INVOICE_LIMIT) {
     return {
       allowed: false,
       unlimited: false,
@@ -69,7 +70,7 @@ async function reserveMonthlyInvoiceQuota(conn, userId) {
 
   return {
     allowed: true,
-    unlimited: false,
+    unlimited: paidPlan,
     used: used + 1,
     limit: FREE_MONTHLY_INVOICE_LIMIT,
     period_start: periodStart
