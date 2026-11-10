@@ -71,6 +71,8 @@ const Api = {
     };
     const token = this.token();
     if (token) headers['Authorization'] = `Bearer ${token}`;
+    const companyOwner = localStorage.getItem('sf_company_owner');
+    if (companyOwner) headers['X-SF-Company-Owner'] = companyOwner;
 
     let res;
     try {
