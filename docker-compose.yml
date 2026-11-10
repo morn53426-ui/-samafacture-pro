@@ -42,7 +42,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - .env
+      - ./server/.env
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
@@ -76,7 +76,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - .env
+      - ./server/.env
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
@@ -108,7 +108,7 @@ services:
     restart: unless-stopped
     depends_on:
       app:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${HTTP_PORT:-4000}:80"
     volumes:
