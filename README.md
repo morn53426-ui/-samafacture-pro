@@ -280,7 +280,7 @@ La facture "imprimable" (`facture-detail.html`) peut être exportée en vrai fic
 - **Téléchargement direct** — bouton "⬇️ Télécharger le PDF" sur la page de détail (`GET /api/factures/:id/pdf`).
 - **Pièce jointe email** — les emails envoyés via "Envoyer" et "Relancer" y joignent automatiquement le PDF (en plus du lien de consultation en ligne déjà présent). Si la génération du PDF échoue pour une raison quelconque, l'email part quand même sans pièce jointe plutôt que d'échouer entièrement.
 
-**Fonctionnement technique** : un navigateur headless (Puppeteer) charge la vraie page `facture-detail.html` (avec un jeton temporaire de 2 minutes injecté directement, sans passer par une route publique) puis l'imprime en PDF — exactement le même rendu que ce que l'utilisateur voit à l'écran (logo, QR code, signature, les 6 modèles), sans dupliquer ce rendu dans une deuxième librairie PDF.
+**Fonctionnement technique** : un navigateur headless (Puppeteer) charge la vraie page `facture-detail.html` (avec un jeton temporaire de 2 minutes injecté directement, sans passer par une route publique) puis l'imprime en PDF — exactement le même rendu que ce que l'utilisateur voit à l'écran (logo, QR code, signature et les 15 modèles), sans dupliquer ce rendu dans une deuxième librairie PDF.
 
 **Ce que ça implique en pratique** :
 - Puppeteer installe son propre Chromium (~300 Mo) au premier `npm install` — normal, ce n'est pas une erreur.
@@ -358,12 +358,12 @@ SMTP_PASSWORD=un-mot-de-passe-d-application-google
 
 ## Feuille de route (non inclus dans cette version)
 
-- Intégrations réelles des paiements (Wave, Orange Money, PayDunya, Stripe, PayPal) — actuellement les méthodes sont enregistrées manuellement, sans passerelle de paiement connectée.
-- Application mobile native (React Native / Flutter) avec scan QR/code-barres et mode hors ligne.
+- Encaissement automatisé des factures par Wave, Orange Money, PayDunya ou carte : les règlements de factures sont actuellement enregistrés manuellement. À distinguer du paiement des abonnements, qui dispose déjà de connecteurs Wave et PayDunya configurables.
+- Enrichissement de l'application mobile Capacitor déjà présente (notifications push, scan caméra des reçus/QR codes et modes hors ligne).
 - Génération de facture par IA à partir d'un texte libre.
-- Signature électronique interactive (dessin/upload de signature).
-- Authentification à deux facteurs (2FA), chiffrement AES avancé.
-- Multi-utilisateurs avec rôles et permissions personnalisées par entreprise.
+- Signature électronique qualifiée/certifiée avec identité vérifiée, horodatage probant et preuve d'intégrité ; la signature actuelle est une signature interne simple.
+- Chiffrement avancé des données sensibles et gestion centralisée des clés.
+- Authentification à deux facteurs (2FA), gestion de sessions et durcissement cryptographique.
 - Espace administrateur SaaS (gestion des abonnements, statistiques globales, support).
 - Notifications par SMS/WhatsApp (les relances et envois par **email** sont déjà disponibles, voir factures.html/devis.html).
 - Comptabilité avancée (journal, balance détaillée) — l'export Excel et le résumé comptable (recettes/dépenses/bénéfice/TVA) sont déjà disponibles dans Rapports.
