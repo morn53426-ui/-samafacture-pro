@@ -83,7 +83,7 @@ async function resolvePublicWebhookTarget(rawUrl, lookup = dns.lookup) {
   }
 
   // URL.hostname peut conserver les crochets d'une adresse IPv6 littérale.
-  const hostname = url.hostname.replace(/^\\[|\\]$/g, '').toLowerCase();
+  const hostname = (url.hostname.startsWith('[') && url.hostname.endsWith(']') ? url.hostname.slice(1, -1) : url.hostname).toLowerCase();
   if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') ||
       hostname.endsWith('.local') || hostname.endsWith('.internal')) {
     throw new Error('La cible du webhook ne doit pas être locale.');
