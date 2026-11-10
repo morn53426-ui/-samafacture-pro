@@ -115,6 +115,118 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(res.status, 400);
   });
 
+  test('un devis conserve son objet, sa référence, sa validité et ses conditions', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'devis',
+        date_validite: '2026-12-15',
+        objet: 'Installation réseau',
+        reference_externe: 'BC-CLIENT-014',
+        conditions_reglement: 'Acompte de 40 % à la commande.',
+        lignes: [{ designation: 'Installation', quantite: 1, prix_unitaire: 100000, tva: 18 }]
+      });
+
+    assert.equal(res.status, 201, res.text);
+    assert.equal(res.body.facture.objet, 'Installation réseau');
+    assert.equal(res.body.facture.reference_externe, 'BC-CLIENT-014');
+    assert.equal(String(res.body.facture.date_validite).slice(0, 10), '2026-12-15');
+    assert.equal(res.body.facture.conditions_reglement, 'Acompte de 40 % à la commande.');
+
+    const detail = await request(app)
+      .get(`/api/factures/${res.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.facture.objet, 'Installation réseau');
+    assert.equal(detail.body.facture.reference_externe, 'BC-CLIENT-014');
+  });
+
+  test('la conversion d’un devis en facture conserve ses références et supprime la validité du devis', async () => {
+    const quote = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'devis',
+        date_validite: '2026-12-20',
+        objet: 'Déploiement réseau',
+        reference_externe: 'BC-CONVERSION-02',
+        conditions_reglement: 'Paiement à 15 jours.',
+        lignes: [{ designation: 'Installation', quantite: 1, prix_unitaire: 50000, tva: 18 }]
+      });
+    assert.equal(quote.status, 201, quote.text);
+
+    const converted = await request(app)
+      .post(`/api/factures/${quote.body.facture.id}/transformer-en-facture`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(converted.status, 200, converted.text);
+    assert.equal(converted.body.facture.type, 'facture');
+    assert.equal(converted.body.facture.date_validite, null);
+    assert.equal(converted.body.facture.objet, 'Déploiement réseau');
+    assert.equal(converted.body.facture.reference_externe, 'BC-CONVERSION-02');
+    assert.equal(converted.body.facture.conditions_reglement, 'Paiement à 15 jours.');
+  });
+
+  test('la duplication d’un devis copie toutes les références et conditions', async () => {
+    const quote = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'devis',
+        date_validite: '2026-12-22',
+        objet: 'Maintenance annuelle',
+        reference_externe: 'BC-DUP-03',
+        conditions_reglement: 'Offre valable après validation écrite.',
+        lignes: [{ designation: 'Maintenance', quantite: 1, prix_unitaire: 25000, tva: 18 }]
+      });
+    assert.equal(quote.status, 201, quote.text);
+
+    const duplicate = await request(app)
+      .post(`/api/factures/${quote.body.facture.id}/dupliquer`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(duplicate.status, 201, duplicate.text);
+    assert.equal(duplicate.body.facture.type, 'devis');
+    assert.equal(duplicate.body.facture.date_validite, '2026-12-22');
+    assert.equal(duplicate.body.facture.objet, 'Maintenance annuelle');
+    assert.equal(duplicate.body.facture.reference_externe, 'BC-DUP-03');
+    assert.equal(duplicate.body.facture.conditions_reglement, 'Offre valable après validation écrite.');
+  });
+
+  test('une date de validité invalide est refusée pour un devis', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'devis',
+        date_validite: '15/12/2026',
+        lignes: [{ designation: 'Article', quantite: 1, prix_unitaire: 1000, tva: 0 }]
+      });
+    assert.equal(res.status, 400);
+  });
+
+  test('un objet ou des conditions trop longs sont limités côté serveur', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'devis',
+        objet: 'O'.repeat(250),
+        reference_externe: 'R'.repeat(150),
+        conditions_reglement: 'C'.repeat(6000),
+        lignes: [{ designation: 'Article', quantite: 1, prix_unitaire: 1000, tva: 0 }]
+      });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.facture.objet.length, 190);
+    assert.equal(res.body.facture.reference_externe.length, 100);
+    assert.equal(res.body.facture.conditions_reglement.length, 5000);
+  });
+
+
   test('les numéros de facture sont attribués de façon séquentielle', async () => {
     const creer = () => request(app)
       .post('/api/factures')

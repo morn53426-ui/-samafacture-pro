@@ -462,7 +462,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
  * @openapi
  * /auth/entreprise:
  *   put:
- *     summary: Met à jour les informations d'entreprise, la devise et le modèle de facture par défaut
+ *     summary: Met à jour les coordonnées légales et bancaires de l'entreprise, les conditions de règlement et le modèle de facture/devis
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -476,6 +476,13 @@ router.get('/me', requireAuth, async (req, res, next) => {
  *               entreprise_adresse: { type: string, nullable: true }
  *               entreprise_telephone: { type: string, nullable: true }
  *               entreprise_email: { type: string, nullable: true }
+ *               entreprise_ninea: { type: string, nullable: true }
+ *               entreprise_rccm: { type: string, nullable: true, maxLength: 80 }
+ *               entreprise_site_web: { type: string, nullable: true, maxLength: 190 }
+ *               entreprise_banque: { type: string, nullable: true, maxLength: 120 }
+ *               entreprise_rib: { type: string, nullable: true, maxLength: 100 }
+ *               entreprise_conditions_reglement: { type: string, nullable: true, maxLength: 5000 }
+ *               entreprise_mentions_legales: { type: string, nullable: true, maxLength: 2000 }
  *               entreprise_logo: { type: string, nullable: true, description: 'Image en base64 (data URL), 2 Mo maximum.' }
  *               devise: { type: string, example: 'FCFA' }
  *               facture_template: { type: string, enum: [classique, moderne, minimaliste, elegant, corporate, creatif, prestige, heritage, diamant, epure, azur, circuit, platine, atelier, saveurs], description: "Les modèles elegant/corporate/creatif exigent le plan Pro. Les modèles prestige/heritage/diamant/platine exigent le plan Entreprise." }
@@ -501,7 +508,12 @@ router.get('/me', requireAuth, async (req, res, next) => {
  */
 router.put('/entreprise', requireAuth, async (req, res, next) => {
   try {
-    const { entreprise_nom, entreprise_logo, entreprise_adresse, entreprise_telephone, entreprise_email, entreprise_ninea, devise, facture_template, signature_default, facture_personnalisation } = req.body;
+    const {
+      entreprise_nom, entreprise_logo, entreprise_adresse, entreprise_telephone, entreprise_email,
+      entreprise_ninea, entreprise_rccm, entreprise_site_web, entreprise_banque, entreprise_rib,
+      entreprise_conditions_reglement, entreprise_mentions_legales,
+      devise, facture_template, signature_default, facture_personnalisation
+    } = req.body;
 
     const { error: erreurPerso, cleaned: personnalisationValidee } = validerPersonnalisation(facture_personnalisation);
     if (erreurPerso) {
@@ -517,7 +529,7 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
       }
     }
 
-    const [[userRow]] = await pool.query('SELECT plan FROM users WHERE id = ?', [req.user.id]);
+    const [[userRow]] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
     const proActif = isProPlan(userRow?.plan);
 
     if (signature_default) {
@@ -546,10 +558,31 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
       return res.status(403).json({ error: 'Ce modèle de facture est réservé au plan Entreprise. Passez au plan Entreprise dans Paramètres.', code: 'FONCTIONNALITE_ENTREPRISE' });
     }
 
+    const texteOptionnel = (value, fallback, max) => {
+      if (value === undefined) return fallback ?? null;
+      if (value === null) return null;
+      return String(value).trim().slice(0, max) || null;
+    };
     await pool.query(
-      `UPDATE users SET entreprise_nom = ?, entreprise_logo = ?, entreprise_adresse = ?, entreprise_telephone = ?, entreprise_email = ?, entreprise_ninea = ?, devise = ?, facture_template = ?, signature_default = ?, facture_personnalisation = ?
+      `UPDATE users SET
+        entreprise_nom = ?, entreprise_logo = ?, entreprise_adresse = ?, entreprise_telephone = ?,
+        entreprise_email = ?, entreprise_ninea = ?, entreprise_rccm = ?, entreprise_site_web = ?,
+        entreprise_banque = ?, entreprise_rib = ?, entreprise_conditions_reglement = ?,
+        entreprise_mentions_legales = ?, devise = ?, facture_template = ?, signature_default = ?,
+        facture_personnalisation = ?
        WHERE id = ?`,
-      [entreprise_nom, entreprise_logo || null, entreprise_adresse, entreprise_telephone, entreprise_email, entreprise_ninea, devise || 'FCFA', template, signature_default || null, personnalisationValidee ? JSON.stringify(personnalisationValidee) : null, req.user.id]
+      [
+        entreprise_nom, entreprise_logo || null, entreprise_adresse, entreprise_telephone, entreprise_email,
+        entreprise_ninea,
+        texteOptionnel(entreprise_rccm, userRow.entreprise_rccm, 80),
+        texteOptionnel(entreprise_site_web, userRow.entreprise_site_web, 190),
+        texteOptionnel(entreprise_banque, userRow.entreprise_banque, 120),
+        texteOptionnel(entreprise_rib, userRow.entreprise_rib, 100),
+        texteOptionnel(entreprise_conditions_reglement, userRow.entreprise_conditions_reglement, 5000),
+        texteOptionnel(entreprise_mentions_legales, userRow.entreprise_mentions_legales, 2000),
+        devise || 'FCFA', template, signature_default || null,
+        personnalisationValidee ? JSON.stringify(personnalisationValidee) : null, req.user.id
+      ]
     );
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
     res.json({ user: sanitizeUser(rows[0]) });

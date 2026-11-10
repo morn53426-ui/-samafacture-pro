@@ -76,6 +76,55 @@ describe('Authentification', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.user.email, email);
   });
+
+  test('les informations légales et bancaires de l’entreprise sont enregistrées et conservées', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    const token = login.body.token;
+    const payload = {
+      entreprise_nom: 'Entreprise Test',
+      entreprise_adresse: 'Dakar',
+      entreprise_telephone: '+221 77 000 00 00',
+      entreprise_email: 'contact@test.sn',
+      entreprise_ninea: '123456789',
+      entreprise_rccm: 'SN-DKR-2026-B-1234',
+      entreprise_site_web: 'https://entreprise-test.sn',
+      entreprise_banque: 'Banque Test',
+      entreprise_rib: 'SN00 1111 2222 3333',
+      entreprise_conditions_reglement: 'Paiement à 30 jours.',
+      entreprise_mentions_legales: 'SARL au capital de 1 000 000 FCFA.',
+      devise: 'FCFA',
+      facture_template: 'classique'
+    };
+
+    const saved = await request(app)
+      .put('/api/auth/entreprise')
+      .set('Authorization', `Bearer ${token}`)
+      .send(payload);
+    assert.equal(saved.status, 200, saved.text);
+    assert.equal(saved.body.user.entreprise_rccm, payload.entreprise_rccm);
+    assert.equal(saved.body.user.entreprise_site_web, payload.entreprise_site_web);
+    assert.equal(saved.body.user.entreprise_banque, payload.entreprise_banque);
+    assert.equal(saved.body.user.entreprise_rib, payload.entreprise_rib);
+    assert.equal(saved.body.user.entreprise_conditions_reglement, payload.entreprise_conditions_reglement);
+    assert.equal(saved.body.user.entreprise_mentions_legales, payload.entreprise_mentions_legales);
+
+    // Un ancien client peut encore envoyer le payload historique sans ces nouvelles propriétés :
+    // les réglages ajoutés ne doivent pas être effacés lors d'une sauvegarde du profil.
+    const legacy = { ...payload };
+    delete legacy.entreprise_rccm;
+    delete legacy.entreprise_site_web;
+    delete legacy.entreprise_banque;
+    delete legacy.entreprise_rib;
+    delete legacy.entreprise_conditions_reglement;
+    delete legacy.entreprise_mentions_legales;
+    const savedAgain = await request(app)
+      .put('/api/auth/entreprise')
+      .set('Authorization', `Bearer ${token}`)
+      .send(legacy);
+    assert.equal(savedAgain.status, 200, savedAgain.text);
+    assert.equal(savedAgain.body.user.entreprise_rccm, payload.entreprise_rccm);
+    assert.equal(savedAgain.body.user.entreprise_rib, payload.entreprise_rib);
+  });
 });
 
 // Fermeture des ressources après les hooks de nettoyage métier de ce fichier.

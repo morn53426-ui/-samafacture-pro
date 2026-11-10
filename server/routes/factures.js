@@ -38,6 +38,19 @@ function round2(n) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+function optionalText(value, maxLength) {
+  if (value === undefined || value === null) return null;
+  return String(value).trim().slice(0, maxLength) || null;
+}
+
+function optionalIsoDate(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const text = String(value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
+  const date = new Date(text + 'T00:00:00.000Z');
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text ? undefined : text;
+}
+
 /**
  * Insère toutes les lignes d'une facture/devis en UNE seule requête (multi-row INSERT) plutôt
  * qu'une requête par ligne — voir AMELIORATIONS_SCALABILITE.md. Sur une facture de 20 lignes,
@@ -271,6 +284,10 @@ router.get('/:id', async (req, res, next) => {
  *               type: { type: string, enum: [facture, devis], default: facture }
  *               date_emission: { type: string, format: date }
  *               date_echeance: { type: string, format: date, nullable: true }
+ *               date_validite: { type: string, format: date, nullable: true, description: 'Date limite de validité, uniquement pour un devis.' }
+ *               objet: { type: string, maxLength: 190, description: 'Objet ou prestation.' }
+ *               reference_externe: { type: string, maxLength: 100, description: 'Référence client ou bon de commande.' }
+ *               conditions_reglement: { type: string, maxLength: 5000, description: 'Conditions spécifiques à ce document.' }
  *               remise: { type: number, default: 0 }
  *               frais_livraison: { type: number, default: 0 }
  *               mode_paiement: { type: string, nullable: true }
@@ -291,7 +308,7 @@ router.post('/', async (req, res, next) => {
     if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 100)) {
       return res.status(400).json({ error: 'Idempotency-Key invalide (8 à 100 caractères).' });
     }
-    const { client_id, type, date_emission, date_echeance, remise, frais_livraison, mode_paiement, commentaires, lignes } = req.body;
+    const { client_id, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, remise, frais_livraison, mode_paiement, commentaires, lignes } = req.body;
 
     // Une nouvelle tentative avec la même clé doit retourner le document déjà créé plutôt
     // que créer une seconde facture. La clé est facultative afin de préserver exactement le
@@ -327,6 +344,13 @@ router.post('/', async (req, res, next) => {
     }
 
     const docType = type === 'devis' ? 'devis' : 'facture';
+    const dateValidite = docType === 'devis' ? optionalIsoDate(date_validite) : null;
+    if (dateValidite === undefined) {
+      return res.status(400).json({ error: 'La date de validité du devis est invalide.' });
+    }
+    const objetDocument = optionalText(objet, 190);
+    const referenceDocument = optionalText(reference_externe, 100);
+    const conditionsDocument = optionalText(conditions_reglement, 5000);
 
     // Quota du plan gratuit : 10 factures par mois (les devis restent illimités sur tous les
     // plans). On relit le plan depuis la base plutôt que le jeton JWT, pour qu'un changement
@@ -360,11 +384,12 @@ router.post('/', async (req, res, next) => {
     await conn.beginTransaction();
     const numero = await nextNumero(conn, req.tenantId, docType);
     const [result] = await conn.query(
-      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
-       VALUES (?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
-        date_echeance || null, remiseAppliquee, Number(frais_livraison) || 0, mode_paiement || null,
+        date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
+        remiseAppliquee, Number(frais_livraison) || 0, mode_paiement || null,
         commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
       ]
     );
@@ -487,7 +512,7 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
 
     await conn.beginTransaction();
     const numero = await nextNumero(conn, req.tenantId, 'facture');
-    await conn.query(`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente' WHERE id = ? AND user_id = ?`, [numero, devis.id, req.tenantId]);
+    await conn.query(`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente', date_validite = NULL WHERE id = ? AND user_id = ?`, [numero, devis.id, req.tenantId]);
 
     // Décompte du stock au moment où le devis devient une vraie vente (même règle qu'à la
     // création directe d'une facture, voir POST / ci-dessus) — jamais fait tant que ce
@@ -536,10 +561,11 @@ router.post('/:id/dupliquer', async (req, res, next) => {
     await conn.beginTransaction();
     const numero = await nextNumero(conn, req.tenantId, source.type);
     const [result] = await conn.query(
-      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
-       VALUES (?, ?, ?, ?, CURDATE(), NULL, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
+       VALUES (?, ?, ?, ?, CURDATE(), NULL, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
       [
-        req.tenantId, source.client_id, numero, source.type,
+        req.tenantId, source.client_id, numero, source.type, source.date_validite || null,
+        source.objet || null, source.reference_externe || null, source.conditions_reglement || null,
         source.remise, source.frais_livraison, source.mode_paiement, source.commentaires,
         source.sous_total, source.total_tva, source.total
       ]

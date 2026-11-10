@@ -873,6 +873,127 @@ function createFactureTemplates(helpers) {
     `;
   }
 
+  function documentMetaHtml(facture, isDevis) {
+    const fields = [];
+    if (facture.objet) fields.push(['Objet', escapeHtml(facture.objet)]);
+    if (facture.reference_externe) fields.push(['Référence client / commande', escapeHtml(facture.reference_externe)]);
+    if (isDevis && facture.date_validite) fields.push(['Devis valable jusqu’au', formatDate(facture.date_validite)]);
+    if (!fields.length) return '';
+    return `
+      <section class="sf-doc-meta" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:0 0 22px; padding:13px 16px; border:1px solid #dce2e8; border-left:4px solid #0F766E; border-radius:8px; background:#f8fafc; break-inside:avoid; page-break-inside:avoid;">
+        ${fields.map(([label, value]) => `
+          <div style="min-width:0;">
+            <div style="font-size:0.66rem; text-transform:uppercase; letter-spacing:0.06em; color:#64748b; font-weight:700; margin-bottom:4px;">${label}</div>
+            <div style="font-size:0.88rem; font-weight:600; color:#172033; overflow-wrap:anywhere;">${value}</div>
+          </div>
+        `).join('')}
+      </section>
+    `;
+  }
+
+  function taxBreakdownHtml(facture, lignes) {
+    if (!Array.isArray(lignes) || lignes.length < 2) return '';
+    const subtotal = Math.max(0, Number(facture.sous_total) || 0);
+    const discount = Math.min(Math.max(0, Number(facture.remise) || 0), subtotal);
+    const groups = new Map();
+    for (const line of lignes) {
+      const rate = Number(line.tva) || 0;
+      const base = Math.max(0, (Number(line.quantite) || 0) * (Number(line.prix_unitaire) || 0));
+      const netBase = subtotal > 0 ? base - discount * (base / subtotal) : base;
+      const group = groups.get(rate) || { base: 0, tax: 0 };
+      group.base += netBase;
+      group.tax += netBase * rate / 100;
+      groups.set(rate, group);
+    }
+    if (groups.size < 2) return '';
+    const rows = [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([rate, values]) => `
+      <div style="display:flex; justify-content:space-between; gap:14px; padding:3px 0;">
+        <span>TVA ${rate}% · base ${formatMontant(Math.round(values.base * 100) / 100)}</span>
+        <strong class="mono">${formatMontant(Math.round(values.tax * 100) / 100)}</strong>
+      </div>
+    `).join('');
+    return `
+      <section style="margin:14px 0 0 auto; max-width:360px; color:#475569; font-size:0.76rem; break-inside:avoid; page-break-inside:avoid;">
+        <div style="font-weight:700; color:#334155; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:5px;">Détail de la TVA par taux</div>
+        ${rows}
+        <div style="border-top:1px solid #dce2e8; margin-top:5px; padding-top:5px; display:flex; justify-content:space-between; font-weight:700;">
+          <span>Total TVA</span><span class="mono">${formatMontant(facture.total_tva)}</span>
+        </div>
+      </section>
+    `;
+  }
+
+  function documentSupplementHtml(user, facture, isDevis) {
+    const total = Math.max(0, Number(facture.total) || 0);
+    const paid = Math.min(total, Math.max(0, Number(facture.montant_paye) || 0));
+    const remaining = Math.max(0, total - paid);
+    const terms = facture.conditions_reglement || user.entreprise_conditions_reglement || '';
+    const bankDetails = [
+      user.entreprise_banque ? ['Banque', escapeHtml(user.entreprise_banque)] : null,
+      user.entreprise_rib ? ['RIB / IBAN / compte', escapeHtml(user.entreprise_rib)] : null
+    ].filter(Boolean);
+    const legalDetails = [
+      user.entreprise_ninea ? 'NINEA : ' + escapeHtml(user.entreprise_ninea) : null,
+      user.entreprise_rccm ? 'RCCM : ' + escapeHtml(user.entreprise_rccm) : null,
+      user.entreprise_site_web ? escapeHtml(user.entreprise_site_web) : null
+    ].filter(Boolean);
+    const legalMentions = user.entreprise_mentions_legales
+      ? escapeHtml(user.entreprise_mentions_legales).replace(/\r?\n/g, '<br/>')
+      : '';
+    // La zone Bon pour accord fait partie de tout devis, même sans mentions légales ou coordonnées bancaires configurées.
+
+    return `
+      <style>
+        .sf-doc-extras { margin-top:22px; color:#334155; font-size:0.78rem; }
+        .sf-doc-extras section { break-inside:avoid; page-break-inside:avoid; }
+        .sf-doc-extras .sf-extra-panel { border:1px solid #dce2e8; border-radius:8px; padding:12px 14px; background:#fff; margin-top:10px; }
+        .sf-doc-extras .sf-extra-title { font-size:0.68rem; font-weight:800; text-transform:uppercase; letter-spacing:0.07em; color:#64748b; margin-bottom:7px; }
+        .sf-doc-extras .sf-sign-line { display:inline-block; border-bottom:1px solid #94a3b8; min-width:145px; height:22px; vertical-align:bottom; }
+        @media print { .sf-doc-extras { color:#1e293b; } }
+      </style>
+      <div class="sf-doc-extras">
+        ${!isDevis ? `
+          <section class="sf-extra-panel" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:12px; border-left:4px solid #0F766E; background:#f8fafc;">
+            <div><div class="sf-extra-title">Total TTC</div><strong style="font-size:0.95rem;">${formatMontant(total)}</strong></div>
+            <div><div class="sf-extra-title">Déjà réglé</div><strong style="font-size:0.95rem;">${formatMontant(paid)}</strong></div>
+            <div><div class="sf-extra-title">Reste à payer</div><strong style="font-size:1.05rem; color:${remaining > 0 ? '#B45309' : '#047857'};">${formatMontant(remaining)}</strong></div>
+          </section>
+        ` : ''}
+        ${terms ? `
+          <section class="sf-extra-panel">
+            <div class="sf-extra-title">${isDevis ? 'Conditions et validité de l’offre' : 'Conditions de règlement'}</div>
+            <div style="line-height:1.55;">${escapeHtml(terms).replace(/\r?\n/g, '<br/>')}</div>
+          </section>
+        ` : ''}
+        ${bankDetails.length ? `
+          <section class="sf-extra-panel">
+            <div class="sf-extra-title">Coordonnées de règlement</div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px;">
+              ${bankDetails.map(([label, value]) => `<div><span style="color:#64748b;">${label} :</span> <strong style="overflow-wrap:anywhere;">${value}</strong></div>`).join('')}
+            </div>
+          </section>
+        ` : ''}
+        ${isDevis ? `
+          <section class="sf-extra-panel" style="margin-top:16px;">
+            <div class="sf-extra-title" style="color:#0F766E;">Bon pour accord — acceptation du devis</div>
+            <p style="margin:0 0 12px;">Je confirme accepter le contenu, les quantités, les prix et les conditions indiqués dans le présent devis.</p>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px;">
+              <div>Nom et fonction : <span class="sf-sign-line"></span></div>
+              <div>Date : <span class="sf-sign-line"></span></div>
+              <div>Signature et cachet : <span class="sf-sign-line"></span></div>
+            </div>
+          </section>
+        ` : ''}
+        ${legalDetails.length || legalMentions ? `
+          <section style="margin-top:14px; padding-top:9px; border-top:1px solid #dce2e8; color:#64748b; font-size:0.68rem; line-height:1.5;">
+            ${legalDetails.length ? `<div>${legalDetails.join(' · ')}</div>` : ''}
+            ${legalMentions ? `<div style="margin-top:3px;">${legalMentions}</div>` : ''}
+          </section>
+        ` : ''}
+      </div>
+    `;
+  }
+
   const RENDERERS = {
     classique: renderClassique, moderne: renderModerne, minimaliste: renderMinimaliste,
     elegant: renderElegant, corporate: renderCorporate, creatif: renderCreatif,
@@ -883,9 +1004,29 @@ function createFactureTemplates(helpers) {
 
   function renderInvoiceHtml({ user, facture, lignes, isDevis, qrCode, template, personnalisation }) {
     const render = RENDERERS[template] || renderClassique;
-    const html = render(user, facture, lignes, isDevis, qrCode, personnalisation);
-    // `personnalisation` absent/vide => wrapPersonnalisation renvoie le HTML tel quel : le rendu
-    // par défaut (sans personnalisation) reste identique bit à bit à avant ce changement.
+    let html = render(user, facture, lignes, isDevis, qrCode, personnalisation);
+
+    // Le bloc de références est partagé par les 15 modèles pour conserver les mêmes
+    // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
+    const meta = documentMetaHtml(facture, isDevis);
+    const firstTable = html.indexOf('<table');
+    if (meta && firstTable >= 0) html = html.slice(0, firstTable) + meta + html.slice(firstTable);
+
+    // Les libellés précisent maintenant que les prix unitaires sont HT et les montants de
+    // lignes TTC. Les tableaux gardent leurs couleurs et leur identité visuelle.
+    html = html
+      .replace(/<th([^>]*)>Prix U\.<\/th>/g, '<th$1>Prix unitaire HT</th>')
+      .replace(/<th([^>]*)>Total<\/th>/g, '<th$1>Montant TTC</th>');
+
+    const tableEnd = html.indexOf('</table>');
+    const taxBreakdown = taxBreakdownHtml(facture, lignes);
+    if (taxBreakdown && tableEnd >= 0) {
+      const insertAt = tableEnd + '</table>'.length;
+      html = html.slice(0, insertAt) + taxBreakdown + html.slice(insertAt);
+    }
+
+    html += documentSupplementHtml(user, facture, isDevis);
+    // Le même moteur sert à l'écran, à l'impression et au PDF serveur.
     return wrapPersonnalisation(html, personnalisation);
   }
 
