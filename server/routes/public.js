@@ -1,5 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 const { pool } = require('../config/db');
 
 const router = express.Router();
@@ -135,5 +136,36 @@ router.get('/consulter/:id/:code', verifyLimiter, async (req, res, next) => {
     res.json({ facture, lignes });
   } catch (err) { next(err); }
 });
+
+
+ // Demande de paiement publique : le jeton est imprévisible et seul son hash est conservé.
+ // Cette page affiche la demande et les coordonnées du commerçant ; elle ne confirme pas
+ // un paiement et ne remplace pas une intégration de passerelle de paiement.
+ router.get('/paiement/:token', verifyLimiter, async (req, res, next) => {
+   try {
+     const token = String(req.params.token || '');
+     if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(404).json({ error: 'Lien de paiement introuvable ou expiré.' });
+     const hash = crypto.createHash('sha256').update(token).digest('hex');
+     const [rows] = await pool.query(
+       'SELECT l.montant, l.devise, l.statut, l.expire_at, f.numero, f.total, f.montant_paye, u.entreprise_nom, u.nom AS user_nom, u.entreprise_telephone, u.entreprise_email, u.entreprise_adresse FROM pro_payment_links l JOIN factures f ON f.id = l.facture_id JOIN users u ON u.id = l.user_id WHERE l.token_hash = ? AND l.statut = ? AND (l.expire_at IS NULL OR l.expire_at > NOW()) LIMIT 1',
+       [hash, 'actif']
+     );
+     if (!rows.length) return res.status(404).json({ error: 'Lien de paiement introuvable ou expiré.' });
+     const item = rows[0];
+     res.json({
+       entreprise: item.entreprise_nom || item.user_nom,
+       telephone: item.entreprise_telephone,
+       email: item.entreprise_email,
+       adresse: item.entreprise_adresse,
+       facture: item.numero,
+       montant: Number(item.montant),
+       devise: item.devise,
+       statut: item.statut,
+       expiration: item.expire_at,
+       solde_facture: Math.max(0, Number(item.total) - Number(item.montant_paye)),
+       type: 'demande_de_paiement'
+     });
+   } catch (err) { next(err); }
+ });
 
 module.exports = router;
