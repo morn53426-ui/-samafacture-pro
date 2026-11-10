@@ -87,6 +87,16 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 - méthodes et références de paiement sont nettoyées et limitées à la taille des colonnes ;
 - tests de régression sur frais négatifs, arrondis et références.
 
+### Haute — remise à zéro incomplète des données professionnelles
+
+**Avant :** la route `DELETE /api/auth/donnees` supprimait les factures et les clients sans supprimer les avoirs, acomptes, demandes de remboursement, commandes et autres ressources des modules professionnels. Les clés étrangères `RESTRICT` sur les commandes, avoirs, acomptes et remboursements pouvaient faire échouer la transaction entière. Les anciennes livraisons et événements webhook pouvaient aussi rester en attente.
+
+**Correction proposée :**
+- supprimer les enregistrements enfants dans l'ordre des dépendances avant factures et clients ;
+- effacer les données commerciales, les pièces jointes, caisses, documents, modèles récurrents, compteurs et files webhook ;
+- conserver le compte, l'identité de l'entreprise, le plan, l'équipe, les rôles et les intégrations configurées ;
+- tester le scénario avec commandes, avoirs, acomptes, remboursements, documents, caisses et webhooks actifs.
+
 ## 4. Points à améliorer avant commercialisation
 
 | Priorité | Sujet | Situation constatée / travail restant |
