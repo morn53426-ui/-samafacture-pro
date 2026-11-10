@@ -701,7 +701,7 @@ router.get('/:id/pdf', async (req, res, next) => {
 async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireForce) {
   const [rows] = await pool.query(
     `SELECT f.*, c.nom as client_nom, c.email as client_email,
-            u.entreprise_nom, u.nom as user_nom, u.email as user_email, u.role as user_role
+            u.entreprise_nom, u.nom as user_nom, u.email as user_email, u.role as user_role, u.token_version as user_token_version
      FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
      WHERE f.id = ? AND f.user_id = ?`,
     [factureId, userId]
@@ -729,7 +729,7 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
     // fournirait normalement, à partir des colonnes déjà jointes ci-dessus — pour que
     // l'envoi automatique (sans req, déclenché par le planificateur) se comporte
     // exactement comme l'envoi manuel depuis la route.
-    const pdfBuffer = await genererPdfFacture(facture.id, { id: userId, email: facture.user_email, role: facture.user_role, nom: facture.user_nom });
+    const pdfBuffer = await genererPdfFacture(facture.id, { id: userId, email: facture.user_email, role: facture.user_role, nom: facture.user_nom, token_version: facture.user_token_version });
     attachments = [{ filename: `${label}-${facture.numero}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }];
   } catch (pdfErr) {
     console.error('PDF joint à l\'email échoué (email envoyé sans pièce jointe) :', pdfErr.message);
