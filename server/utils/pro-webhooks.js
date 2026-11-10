@@ -49,7 +49,7 @@ function isPrivateAddress(address) {
     const [a,b] = parts;
     return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) ||
       (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && (b === 168 || (b === 0 && parts[2] === 0) || (b === 0 && parts[2] === 2))) ||
+      (a === 192 && (b === 0 || b === 168 || (b === 88 && parts[2] === 99))) ||
       (a === 198 && (b === 18 || b === 19 || (b === 51 && parts[2] === 100))) ||
       (a === 203 && b === 0 && parts[2] === 113) || a >= 224;
   }
@@ -61,7 +61,7 @@ function isPrivateAddress(address) {
     // documentation et ORCHID sont également interdites.
     return normalized.startsWith('::') ||
       normalized.startsWith('fc') || normalized.startsWith('fd') ||
-      /^fe[89ab]/.test(normalized) || /^fec/.test(normalized) ||
+      /^fe[89ab]/.test(normalized) || /^fe[c-f]/.test(normalized) ||
       normalized.startsWith('ff') || normalized.startsWith('2001:db8:') ||
       normalized.startsWith('2001:10:') || normalized.startsWith('64:ff9b:');
   }
