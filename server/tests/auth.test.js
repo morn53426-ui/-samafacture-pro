@@ -1,6 +1,8 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+const crypto = require('crypto');
+const { pool } = require('../config/db');
 const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 describe('Authentification', () => {
@@ -124,6 +126,63 @@ describe('Authentification', () => {
     assert.equal(savedAgain.status, 200, savedAgain.text);
     assert.equal(savedAgain.body.user.entreprise_rccm, payload.entreprise_rccm);
     assert.equal(savedAgain.body.user.entreprise_rib, payload.entreprise_rib);
+  });
+
+  test('la déconnexion révoque le JWT Bearer utilisé, pas seulement le cookie', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200);
+    const oldToken = login.body.token;
+
+    const logout = await request(app)
+      .post('/api/auth/logout')
+      .set('Authorization', `Bearer ${oldToken}`);
+    assert.equal(logout.status, 204);
+
+    const refused = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${oldToken}`);
+    assert.equal(refused.status, 401);
+
+    const newLogin = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(newLogin.status, 200);
+    const accepted = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${newLogin.body.token}`);
+    assert.equal(accepted.status, 200);
+  });
+
+  test('la réinitialisation du mot de passe révoque les sessions et consomme le lien une seule fois', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200);
+    const oldToken = login.body.token;
+
+    const rawResetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawResetToken).digest('hex');
+    await pool.query(
+      'UPDATE users SET reset_token_hash = ?, reset_token_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = ?',
+      [tokenHash, userId]
+    );
+
+    const reset = await request(app)
+      .post('/api/auth/reinitialiser-mot-de-passe')
+      .send({ token: rawResetToken, password: 'nouveau-mot-de-passe-2026' });
+    assert.equal(reset.status, 200, reset.text);
+
+    const refused = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${oldToken}`);
+    assert.equal(refused.status, 401);
+
+    const reused = await request(app)
+      .post('/api/auth/reinitialiser-mot-de-passe')
+      .send({ token: rawResetToken, password: 'autre-mot-de-passe-2026' });
+    assert.equal(reused.status, 400);
+
+    const newLogin = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'nouveau-mot-de-passe-2026' });
+    assert.equal(newLogin.status, 200);
+    assert.ok(newLogin.body.token);
   });
 });
 
