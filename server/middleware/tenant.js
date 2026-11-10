@@ -29,7 +29,8 @@ async function resolveTenant(req, res, next) {
     req.companyMembership = null;
     req.permissions = ROLE_PERMISSIONS.proprietaire;
 
-    const requestedOwner = req.get('X-SF-Company-Owner');
+    const isInviteAcceptance = (req.baseUrl || '').endsWith('/pro') && (req.path || '').startsWith('/team/invitations/accept');
+    const requestedOwner = isInviteAcceptance ? null : req.get('X-SF-Company-Owner');
     if (requestedOwner) {
       if (!/^\d+$/.test(requestedOwner)) return res.status(400).json({ error: 'Sélection d’entreprise invalide.' });
       const selectedOwner = Number(requestedOwner);
