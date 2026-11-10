@@ -267,10 +267,10 @@ router.get('/clients/:id/statement', async (req, res, next) => {
     const client = await clientOwned(uid, clientId);
     if (!client) return res.status(404).json({ error: 'Client introuvable.' });
     const [factures] = await pool.query('SELECT id, numero, date_emission, date_echeance, total, montant_paye, statut, type FROM factures WHERE user_id = ? AND client_id = ? ORDER BY date_emission DESC, id DESC', [uid, clientId]);
-    const [paiements] = await pool.query('SELECT p.id, p.facture_id, p.montant, p.methode, p.reference, p.date_paiement, f.numero FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.user_id = ? AND f.client_id = ? ORDER BY p.date_paiement DESC', [uid, clientId]);
+    const [paiements] = await pool.query('SELECT p.id, p.facture_id, p.montant, p.methode, p.reference, p.date_paiement, f.numero FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.user_id = ? AND f.user_id = ? AND f.client_id = ? AND f.type = 'facture' ORDER BY p.date_paiement DESC', [uid, uid, clientId]);
     const [remboursements] = await pool.query(
-      "SELECT r.id, r.paiement_id, r.montant, r.motif, r.reference_prestataire, r.traite_le, f.numero FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id JOIN factures f ON f.id = p.facture_id WHERE r.user_id = ? AND r.statut = 'rembourse' AND f.client_id = ? ORDER BY r.traite_le DESC",
-      [uid, clientId]
+      "SELECT r.id, r.paiement_id, r.montant, r.motif, r.reference_prestataire, r.traite_le, f.numero FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id JOIN factures f ON f.id = p.facture_id WHERE r.user_id = ? AND f.user_id = ? AND r.statut = 'rembourse' AND f.client_id = ? AND f.type = 'facture' ORDER BY r.traite_le DESC",
+      [uid, uid, clientId]
     );
     const totalFacture = factures.filter(f => f.type === 'facture' && f.statut !== 'annulee').reduce((s, f) => s + Number(f.total), 0);
     const totalPaye = paiements.reduce((s, p) => s + Number(p.montant), 0);
@@ -564,7 +564,7 @@ router.post('/team/invitations', async (req, res, next) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const role = String(req.body.role || 'employe').trim();
     const allowedRoles = ['administrateur','manager','comptable','commercial','caissier','employe','lecture_seule'];
-    const allowedPermissions = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','integrations.read','integrations.manage','automations.read','automations.manage','audit.read'];
+    const allowedPermissions = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','audit.read'];
     let permissions = ROLE_PERMISSIONS[role];
     if (role === 'personnalise') permissions = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions.filter(p => allowedPermissions.includes(p)))] : [];
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (!allowedRoles.includes(role) && role !== 'personnalise')) return res.status(400).json({ error: 'Adresse email ou rôle invalide.' });
@@ -709,7 +709,7 @@ router.get('/automations', async (req, res, next) => {
 router.post('/automations', async (req, res, next) => {
   try {
     const type = String(req.body.type || '');
-    const allowed = ['relance_impayes_email','relance_impayes_whatsapp','facture_recurrente'];
+    const allowed = ['relance_impayes_email','relance_impayes_whatsapp'];
     const nom = String(req.body.nom || '').trim().slice(0, 150);
     const config = req.body.configuration && typeof req.body.configuration === 'object' ? req.body.configuration : {};
     if (!allowed.includes(type) || !nom) return res.status(400).json({ error: 'Type ou nom d’automatisation invalide.' });
