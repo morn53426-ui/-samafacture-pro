@@ -170,26 +170,41 @@ router.get('/deposits', async (req, res, next) => {
 });
 
 router.post('/deposits', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req), invoiceId = Number(req.body.facture_id), amount = money(req.body.montant);
-    const invoice = await invoiceOwned(uid, invoiceId);
-    if (!invoice || invoice.type !== 'facture' || invoice.statut === 'annulee') return res.status(404).json({ error: 'Facture finale introuvable ou non éligible.' });
     if (!amount) return res.status(400).json({ error: 'Le montant de l’acompte doit être positif.' });
-    const [[sum]] = await pool.query(
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [invoiceRows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE', [invoiceId, uid]);
+    const invoice = invoiceRows[0];
+    if (!invoice || invoice.type !== 'facture' || invoice.statut === 'annulee') {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture finale introuvable ou non éligible.' });
+    }
+    const [[sum]] = await conn.query(
       "SELECT COALESCE(SUM(montant),0) AS total FROM pro_acomptes WHERE user_id = ? AND facture_id = ? AND statut != 'annule'",
       [uid, invoiceId]
     );
-    const alreadyPlanned = Number(sum.total || 0);
-    const available = Number(invoice.total) - Number(invoice.montant_paye) - alreadyPlanned;
-    if (amount > available + 0.001) return res.status(400).json({ error: 'Le montant dépasse le solde qui peut encore être demandé en acompte.' });
+    const available = Number(invoice.total) - Number(invoice.montant_paye) - Number(sum.total || 0);
+    if (amount > available + 0.001) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le montant dépasse le solde qui peut encore être demandé en acompte.' });
+    }
     const numero = randomRef('ACP');
-    const [result] = await pool.query(
+    const [result] = await conn.query(
       'INSERT INTO pro_acomptes (user_id, facture_id, numero, date_emission, montant) VALUES (?, ?, ?, ?, ?)',
       [uid, invoiceId, numero, safeDate(req.body.date_emission), amount]
     );
+    await conn.commit();
     await audit(req, 'acompte.cree', 'acompte', result.insertId, { facture_id: invoiceId, montant: amount });
     res.status(201).json({ id: result.insertId, numero, montant: amount, statut: 'a_encaisser' });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.post('/deposits/:id/receive', async (req, res, next) => {
@@ -280,18 +295,30 @@ router.get('/payments', async (req, res, next) => {
 });
 
 router.post('/payments/:id/refunds', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req), amount = money(req.body.montant), reason = String(req.body.motif || '').trim().slice(0, 500);
-    const [rows] = await pool.query('SELECT * FROM paiements WHERE id = ? AND user_id = ?', [req.params.id, uid]);
-    const payment = rows[0];
-    if (!payment) return res.status(404).json({ error: 'Paiement introuvable.' });
     if (!amount || !reason) return res.status(400).json({ error: 'Montant positif et motif obligatoires.' });
-    const [[sum]] = await pool.query("SELECT COALESCE(SUM(montant),0) AS total FROM pro_refund_requests WHERE user_id = ? AND paiement_id = ? AND statut IN ('a_traiter','approuve','rembourse')", [uid, payment.id]);
-    if (amount > Number(payment.montant) - Number(sum.total || 0) + 0.001) return res.status(400).json({ error: 'Le montant dépasse le paiement non remboursé.' });
-    const [result] = await pool.query('INSERT INTO pro_refund_requests (user_id, paiement_id, montant, motif) VALUES (?, ?, ?, ?)', [uid, payment.id, amount, reason]);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [rows] = await conn.query('SELECT * FROM paiements WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
+    const payment = rows[0];
+    if (!payment) { await conn.rollback(); return res.status(404).json({ error: 'Paiement introuvable.' }); }
+    const [[sum]] = await conn.query("SELECT COALESCE(SUM(montant),0) AS total FROM pro_refund_requests WHERE user_id = ? AND paiement_id = ? AND statut IN ('a_traiter','approuve','rembourse')", [uid, payment.id]);
+    if (amount > Number(payment.montant) - Number(sum.total || 0) + 0.001) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le montant dépasse le paiement non remboursé.' });
+    }
+    const [result] = await conn.query('INSERT INTO pro_refund_requests (user_id, paiement_id, montant, motif) VALUES (?, ?, ?, ?)', [uid, payment.id, amount, reason]);
+    await conn.commit();
     await audit(req, 'remboursement.demande', 'paiement', payment.id, { montant: amount });
     res.status(201).json({ id: result.insertId, statut: 'a_traiter', message: 'Demande enregistrée. Le remboursement effectif doit être effectué auprès du prestataire de paiement.' });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.put('/refunds/:id/status', async (req, res, next) => {
@@ -380,21 +407,33 @@ router.post('/cash/registers', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 router.post('/cash/registers/:id/operations', async (req, res, next) => {
+  let conn;
   try {
     const type = req.body.type;
     const montant = money(req.body.montant);
     const motif = String(req.body.motif || '').trim().slice(0, 255);
     if (!['entree', 'sortie'].includes(type) || !montant || !motif) return res.status(400).json({ error: 'Type, montant positif et motif obligatoires.' });
-    const [rows] = await pool.query('SELECT id FROM pro_caisses WHERE id = ? AND user_id = ? AND active = 1', [req.params.id, owner(req)]);
-    if (!rows.length) return res.status(404).json({ error: 'Caisse introuvable ou inactive.' });
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [rows] = await conn.query('SELECT id, solde_initial FROM pro_caisses WHERE id = ? AND user_id = ? AND active = 1 FOR UPDATE', [req.params.id, owner(req)]);
+    if (!rows.length) { await conn.rollback(); return res.status(404).json({ error: 'Caisse introuvable ou inactive.' }); }
     if (type === 'sortie') {
-      const [[balance]] = await pool.query('SELECT solde_initial + COALESCE(SUM(CASE WHEN type = ? THEN montant WHEN type = ? THEN -montant ELSE 0 END),0) AS solde FROM pro_caisses c LEFT JOIN pro_caisse_operations o ON o.caisse_id = c.id WHERE c.id = ? AND c.user_id = ? GROUP BY c.id', ['entree', 'sortie', req.params.id, owner(req)]);
-      if (montant > Number(balance.solde || 0) + 0.001) return res.status(400).json({ error: 'Solde de caisse insuffisant.' });
+      const [[balance]] = await conn.query('SELECT ? + COALESCE(SUM(CASE WHEN type = ? THEN montant WHEN type = ? THEN -montant ELSE 0 END),0) AS solde FROM pro_caisse_operations WHERE caisse_id = ? AND user_id = ?', [rows[0].solde_initial, 'entree', 'sortie', req.params.id, owner(req)]);
+      if (montant > Number(balance.solde || 0) + 0.001) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Solde de caisse insuffisant.' });
+      }
     }
-    const [result] = await pool.query('INSERT INTO pro_caisse_operations (user_id, caisse_id, type, montant, motif, reference) VALUES (?, ?, ?, ?, ?, ?)', [owner(req), req.params.id, type, montant, motif, String(req.body.reference || '').slice(0, 100) || null]);
+    const [result] = await conn.query('INSERT INTO pro_caisse_operations (user_id, caisse_id, type, montant, motif, reference) VALUES (?, ?, ?, ?, ?, ?)', [owner(req), req.params.id, type, montant, motif, String(req.body.reference || '').slice(0, 100) || null]);
+    await conn.commit();
     await audit(req, 'caisse.operation', 'caisse', req.params.id, { operation_id: result.insertId, type, montant });
     res.status(201).json({ id: result.insertId });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 router.get('/cash/operations', async (req, res, next) => {
   try {
@@ -460,7 +499,7 @@ router.post('/team/invitations/accept', async (req, res, next) => {
     if (String(invite.email).toLowerCase() !== String(req.user.email).toLowerCase()) return res.status(403).json({ error: 'Connectez-vous avec l’adresse email ayant reçu l’invitation.' });
     await pool.query('INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), permissions_json = VALUES(permissions_json), active = 1', [invite.user_id, actor(req), invite.role, invite.permissions_json]);
     await pool.query("UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ?", [actor(req), invite.id]);
-    await audit(req, 'equipe.invitation_acceptee', 'invitation', invite.id, { owner_user_id: invite.user_id });
+    await pool.query('INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)', [invite.user_id, actor(req), 'equipe.invitation_acceptee', 'invitation', String(invite.id), JSON.stringify({ owner_user_id: invite.user_id }), req.ip || null]);
     res.json({ success: true, entreprise_id: invite.user_id, message: 'Invitation acceptée. Reconnectez-vous pour ouvrir l’espace de cette entreprise.' });
   } catch (err) { next(err); }
 });
