@@ -97,6 +97,7 @@ async function creerFacturePaydunya({ amount, description, reference, storeName,
   const res = await fetch(`${paydunyaBaseUrl()}/checkout-invoice/create`, {
     method: 'POST',
     headers: paydunyaHeaders(),
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({
       invoice: {
         total_amount: Math.round(amount),
