@@ -79,6 +79,7 @@
 <main>
   <section class="lp-hero">
     <div>
+      <span class="lp-eyebrow">La facturation pensée pour les entreprises d'Afrique</span>
       <h1>Créez des factures <span class="accent">professionnelles</span> en quelques clics</h1>
       <p class="lead">
         SamaFacture Pro est le logiciel de facturation pensé pour les commerçants, artisans et PME
@@ -88,9 +89,34 @@
         <a href="register.html" class="btn btn-primary" style="padding:12px 22px;">Commencer gratuitement</a>
         <a href="login.html" class="btn btn-outline" style="padding:12px 22px;">Se connecter</a>
       </div>
+      <div class="lp-hero-proof"><span>Simple à prendre en main</span><span>Accessible sur ordinateur et mobile</span></div>
     </div>
-    <div class="lp-hero-img">
-      <img src="images/auth-slide-2.jpg" alt="Remise d'une facture SamaFacture Pro en boutique" loading="eager" />
+    <div class="lp-hero-img lp-home-slider" id="lp-home-slider" role="region" aria-roledescription="carrousel" aria-label="Présentation visuelle de SamaFacture Pro">
+      <div class="lp-home-slides">
+        <figure class="lp-home-slide is-active" data-home-slide role="group" aria-roledescription="diapositive" aria-label="Diapositive 1 sur 3" aria-hidden="false">
+          <img src="images/auth-slide-1.jpg" alt="" loading="eager" fetchpriority="high" decoding="async" />
+          <figcaption><span>GESTION AU QUOTIDIEN</span><strong>Votre activité, mieux organisée.</strong><p>Centralisez vos devis, factures et clients dans un seul espace.</p></figcaption>
+        </figure>
+        <figure class="lp-home-slide" data-home-slide role="group" aria-roledescription="diapositive" aria-label="Diapositive 2 sur 3" aria-hidden="true">
+          <img src="images/auth-slide-2.jpg" alt="" loading="lazy" decoding="async" />
+          <figcaption><span>IMAGE PROFESSIONNELLE</span><strong>Des documents clairs et soignés.</strong><p>Créez des factures professionnelles en quelques clics.</p></figcaption>
+        </figure>
+        <figure class="lp-home-slide" data-home-slide role="group" aria-roledescription="diapositive" aria-label="Diapositive 3 sur 3" aria-hidden="true">
+          <img src="images/auth-slide-3.jpg" alt="" loading="lazy" decoding="async" />
+          <figcaption><span>SUIVI SIMPLIFIÉ</span><strong>Gardez le contrôle de vos encaissements.</strong><p>Suivez les règlements et l’évolution de votre activité plus facilement.</p></figcaption>
+        </figure>
+      </div>
+      <span class="lp-home-counter" data-home-counter aria-live="off">01 / 03</span>
+      <div class="lp-home-controls">
+        <button type="button" class="lp-home-arrow" data-home-prev aria-label="Diapositive précédente">‹</button>
+        <div class="lp-home-dots" role="group" aria-label="Choisir une diapositive">
+          <button type="button" class="lp-home-dot" data-home-dot="0" aria-label="Afficher la diapositive 1" aria-current="true"></button>
+          <button type="button" class="lp-home-dot" data-home-dot="1" aria-label="Afficher la diapositive 2" aria-current="false"></button>
+          <button type="button" class="lp-home-dot" data-home-dot="2" aria-label="Afficher la diapositive 3" aria-current="false"></button>
+        </div>
+        <button type="button" class="lp-home-arrow" data-home-next aria-label="Diapositive suivante">›</button>
+        <button type="button" class="lp-home-pause" data-home-toggle aria-label="Mettre le diaporama en pause" aria-pressed="false">Ⅱ</button>
+      </div>
     </div>
   </section>
 
@@ -139,6 +165,7 @@
 </footer>
 
 <script src="js/api.js"></script>
+<script src="js/landing-slider.js"></script>
 <script>
   // Un visiteur déjà connecté est redirigé directement vers son tableau de bord.
   // Les visiteurs anonymes (et les moteurs de recherche) voient cette page normalement.
