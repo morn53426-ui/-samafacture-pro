@@ -43,6 +43,10 @@ jobs:
         working-directory: server
         run: npm ci
 
+      - name: Vérifier le script de recette staging
+        working-directory: server
+        run: node --check scripts/staging-smoke.js
+
       - name: Exécuter les tests
         working-directory: server
         env:
