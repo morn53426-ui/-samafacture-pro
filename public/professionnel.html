@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tooltip.js"></script>
+<meta charset="UTF-8" />
+<title>Espace professionnel — SamaFacture Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F1B33" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<link rel="apple-touch-icon" href="images/icon-192.png" />
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content pro-workspace">
+    <div class="page-header">
+      <div>
+        <div class="pro-eyebrow"><i class="ic" data-icon="briefcase-business"></i> OUTILS DE GESTION AVANCÉS</div>
+        <h1>Espace professionnel</h1>
+        <p>Ventes, encaissements, équipe, documents, automatisations et intégrations réunis au même endroit.</p>
+      </div>
+      <button class="btn btn-outline" onclick="loadWorkspace()"><i class="ic" data-icon="refresh-cw"></i> Actualiser</button>
+    </div>
+
+    <div class="pro-company-bar card">
+      <div><strong>Espace de travail actif</strong><small>Les membres invités accèdent uniquement aux sociétés auxquelles ils ont été autorisés.</small></div>
+      <select id="company-select" aria-label="Choisir une entreprise"><option value="">Mon espace personnel</option></select>
+    </div>
+
+    <section class="pro-kpis" id="pro-kpis">
+      <article class="pro-kpi"><span>Commandes</span><strong id="kpi-orders">—</strong></article>
+      <article class="pro-kpi"><span>Bons de livraison</span><strong id="kpi-deliveries">—</strong></article>
+      <article class="pro-kpi"><span>Demandes de remboursement</span><strong id="kpi-refunds">—</strong></article>
+      <article class="pro-kpi"><span>Documents archivés</span><strong id="kpi-documents">—</strong></article>
+    </section>
+
+    <div class="pro-module-grid">
+      <section class="card pro-module" id="pro-sales">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="clipboard-list"></i></span><div><h2>Ventes et documents commerciaux</h2><p>Commandes clients, bons de livraison et avoirs.</p></div></div>
+        <form id="order-form" class="pro-form">
+          <div class="field"><label for="order-client">Client *</label><select id="order-client" required><option value="">Choisir un client</option></select></div>
+          <div class="pro-inline-fields">
+            <div class="field"><label for="order-designation">Désignation *</label><input id="order-designation" required maxlength="255" placeholder="Prestation ou article" /></div>
+            <div class="field"><label for="order-qty">Quantité</label><input id="order-qty" type="number" min="0.01" step="0.01" value="1" required /></div>
+            <div class="field"><label for="order-price">Prix unitaire</label><input id="order-price" type="number" min="0" step="0.01" value="0" required /></div>
+          </div>
+          <button class="btn btn-primary" type="submit">Créer une commande</button>
+        </form>
+        <div class="pro-list" id="orders-list"><div class="empty-state">Chargement…</div></div>
+        <div class="pro-subsection"><h3>Bons de livraison</h3><div id="delivery-list" class="pro-list"></div></div>
+        <div class="pro-subsection"><h3>Avoirs</h3>
+          <form id="credit-form" class="pro-form">
+            <div class="field"><label for="credit-invoice">Facture d'origine *</label><select id="credit-invoice" required><option value="">Choisir une facture</option></select></div>
+            <div class="pro-inline-fields">
+              <div class="field"><label for="credit-amount">Montant *</label><input id="credit-amount" type="number" min="0.01" step="0.01" required /></div>
+              <div class="field"><label for="credit-reason">Motif *</label><input id="credit-reason" required maxlength="500" /></div>
+            </div>
+            <button class="btn btn-outline" type="submit">Créer un avoir en brouillon</button>
+          </form>
+          <div id="credits-list" class="pro-list"></div>
+          <small class="pro-note">Un avoir est un document correctif distinct. Sa création ne supprime ni ne modifie la facture d'origine et ne déclenche pas de remboursement.</small>
+        </div>
+      </section>
+
+      <section class="card pro-module" id="pro-clients">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="users"></i></span><div><h2>Clients et relances</h2><p>Historique, relevés de compte et rappels de paiement.</p></div></div>
+        <form id="statement-form" class="pro-form">
+          <div class="field"><label for="statement-client">Client *</label><select id="statement-client" required><option value="">Choisir un client</option></select></div>
+          <div class="pro-actions"><button class="btn btn-primary" type="submit">Voir le relevé de compte</button><button class="btn btn-outline" type="button" onclick="sendReminder('email')">Relancer par email</button><button class="btn btn-outline" type="button" onclick="sendReminder('whatsapp')">Préparer WhatsApp</button></div>
+        </form>
+        <div id="statement-result" class="pro-list"><p class="pro-muted">Sélectionnez un client pour consulter son historique.</p></div>
+      </section>
+
+      <section class="card pro-module" id="pro-payments">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="credit-card"></i></span><div><h2>Paiements et remboursements</h2><p>Transactions enregistrées, demandes de paiement et suivi des remboursements.</p></div></div>
+        <form id="link-form" class="pro-form">
+          <div class="field"><label for="link-invoice">Facture *</label><select id="link-invoice" required><option value="">Choisir une facture</option></select></div>
+          <div class="pro-inline-fields">
+            <div class="field"><label for="link-amount">Montant du lien *</label><input id="link-amount" type="number" min="0.01" step="0.01" required /></div>
+            <div class="field"><label for="link-expiry">Expiration</label><select id="link-expiry"><option value="7">7 jours</option><option value="15">15 jours</option><option value="30">30 jours</option><option value="">Sans expiration</option></select></div>
+          </div>
+          <button class="btn btn-primary" type="submit">Créer un lien et un QR code</button>
+        </form>
+        <div id="new-payment-link" class="pro-result" hidden></div>
+        <div class="pro-subsection"><h3>Liens de paiement</h3><div id="payment-links-list" class="pro-list"></div></div>
+        <div class="pro-subsection"><h3>Dernières transactions</h3><div id="payments-list" class="pro-list"></div></div>
+        <div class="pro-note">Le remboursement est une demande suivie dans SamaFacture Pro. Le débit ou crédit effectif doit être exécuté et confirmé auprès de la banque ou du prestataire de paiement.</div>
+      </section>
+
+      <section class="card pro-module" id="pro-team">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="user-round"></i></span><div><h2>Équipe et autorisations</h2><p>Invitations, rôles prédéfinis et permissions personnalisées.</p></div></div>
+        <form id="invite-form" class="pro-form">
+          <div class="pro-inline-fields">
+            <div class="field"><label for="invite-email">Email du collaborateur *</label><input type="email" id="invite-email" required placeholder="collaborateur@entreprise.com" /></div>
+            <div class="field"><label for="invite-role">Rôle</label><select id="invite-role"><option value="administrateur">Administrateur</option><option value="manager">Manager</option><option value="comptable">Comptable</option><option value="commercial">Commercial</option><option value="caissier">Caissier</option><option value="employe" selected>Employé</option><option value="lecture_seule">Lecture seule</option></select></div>
+          </div>
+          <button class="btn btn-primary" type="submit">Envoyer une invitation</button>
+        </form>
+        <div id="invite-result" class="pro-result" hidden></div>
+        <div id="team-list" class="pro-list"></div>
+        <div class="pro-subsection"><h3>Créer un rôle personnalisé</h3>
+          <form id="role-form" class="pro-form">
+            <div class="field"><label for="role-name">Nom du rôle</label><input id="role-name" required maxlength="100" /></div>
+            <div class="pro-permissions">
+              <label><input type="checkbox" value="clients.read" checked /> Lire les clients</label>
+              <label><input type="checkbox" value="clients.write" /> Modifier les clients</label>
+              <label><input type="checkbox" value="invoices.read" checked /> Lire les factures</label>
+              <label><input type="checkbox" value="invoices.write" /> Créer/modifier des factures</label>
+              <label><input type="checkbox" value="payments.read" /> Lire les paiements</label>
+              <label><input type="checkbox" value="payments.write" /> Gérer les paiements</label>
+              <label><input type="checkbox" value="reports.read" /> Consulter les rapports</label>
+              <label><input type="checkbox" value="cash.write" /> Gérer les caisses</label>
+            </div>
+            <button class="btn btn-outline" type="submit">Enregistrer le rôle</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="card pro-module" id="pro-management">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="building"></i></span><div><h2>Établissements et caisses</h2><p>Gérez les points de vente, les caisses et les mouvements d'espèces.</p></div></div>
+        <form id="establishment-form" class="pro-form">
+          <div class="pro-inline-fields">
+            <div class="field"><label for="establishment-name">Nom de l'établissement *</label><input id="establishment-name" required maxlength="190" /></div>
+            <div class="field"><label for="establishment-code">Code</label><input id="establishment-code" maxlength="40" /></div>
+          </div>
+          <div class="field"><label for="establishment-address">Adresse</label><input id="establishment-address" maxlength="255" /></div>
+          <button class="btn btn-outline" type="submit">Ajouter l'établissement</button>
+        </form>
+        <div id="establishment-list" class="pro-list"></div>
+        <div class="pro-subsection"><h3>Caisses</h3>
+          <form id="register-form" class="pro-form">
+            <div class="pro-inline-fields">
+              <div class="field"><label for="register-name">Nom de la caisse *</label><input id="register-name" required maxlength="120" /></div>
+              <div class="field"><label for="register-branch">Établissement</label><select id="register-branch"><option value="">Aucun établissement</option></select></div>
+              <div class="field"><label for="register-balance">Solde initial</label><input id="register-balance" type="number" min="0" step="0.01" value="0" /></div>
+            </div>
+            <button class="btn btn-outline" type="submit">Créer la caisse</button>
+          </form>
+          <div id="register-list" class="pro-list"></div>
+        </div>
+        <div class="pro-subsection"><h3>Mouvement de caisse</h3>
+          <form id="cash-operation-form" class="pro-form">
+            <div class="pro-inline-fields">
+              <div class="field"><label for="cash-register">Caisse *</label><select id="cash-register" required><option value="">Choisir</option></select></div>
+              <div class="field"><label for="cash-type">Type</label><select id="cash-type"><option value="entree">Entrée</option><option value="sortie">Sortie</option></select></div>
+              <div class="field"><label for="cash-amount">Montant *</label><input id="cash-amount" type="number" min="0.01" step="0.01" required /></div>
+            </div>
+            <div class="field"><label for="cash-reason">Motif *</label><input id="cash-reason" required maxlength="255" /></div>
+            <button class="btn btn-primary" type="submit">Enregistrer le mouvement</button>
+          </form>
+          <div id="cash-operations-list" class="pro-list"></div>
+        </div>
+      </section>
+
+      <section class="card pro-module" id="pro-documents">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="file-check"></i></span><div><h2>Documents et signatures</h2><p>Pièces jointes, archivage et signature interne simple.</p></div></div>
+        <form id="document-form" class="pro-form">
+          <div class="field"><label for="document-file">Fichier PDF, PNG ou JPEG (5 Mo maximum) *</label><input id="document-file" type="file" accept="application/pdf,image/png,image/jpeg" required /></div>
+          <div class="pro-inline-fields">
+            <div class="field"><label for="document-invoice">Facture associée</label><select id="document-invoice"><option value="">Aucune</option></select></div>
+            <div class="field"><label for="document-client">Client associé</label><select id="document-client"><option value="">Aucun</option></select></div>
+          </div>
+          <button class="btn btn-primary" type="submit">Archiver le document</button>
+        </form>
+        <div id="documents-list" class="pro-list"></div>
+        <div class="pro-subsection"><h3>Signature d'un document</h3>
+          <form id="signature-form" class="pro-form">
+            <div class="pro-inline-fields">
+              <div class="field"><label for="signature-document">Document *</label><select id="signature-document" required><option value="">Choisir un document</option></select></div>
+              <div class="field"><label for="signature-name">Nom du signataire *</label><input id="signature-name" required maxlength="190" /></div>
+              <div class="field"><label for="signature-file">Image de signature *</label><input type="file" id="signature-file" accept="image/png,image/jpeg" required /></div>
+            </div>
+            <button class="btn btn-outline" type="submit">Enregistrer la signature</button>
+          </form>
+          <small class="pro-note">Cette fonction enregistre une image et une empreinte de signature dans l'espace de travail. Elle ne constitue pas à elle seule une signature électronique qualifiée ou certifiée.</small>
+        </div>
+      </section>
+
+      <section class="card pro-module" id="pro-reports">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="trending-up"></i></span><div><h2>Marges et analyses</h2><p>Marges estimées, prévisions simples et rapports filtrables.</p></div></div>
+        <div class="pro-inline-fields">
+          <div class="field"><label for="margin-from">Du</label><input type="date" id="margin-from" /></div>
+          <div class="field"><label for="margin-to">Au</label><input type="date" id="margin-to" /></div>
+        </div>
+        <div class="pro-actions"><button class="btn btn-primary" onclick="loadMargins()">Calculer les marges</button><button class="btn btn-outline" onclick="loadForecast()">Prévisions sur 3 mois</button><button class="btn btn-outline" onclick="loadCustomReport()">Rapport mensuel</button></div>
+        <div id="analysis-result" class="pro-list"></div>
+        <small class="pro-note">La marge estimée dépend du prix d'achat renseigné dans chaque fiche produit. Les marges affichées n'incluent pas les frais indirects.</small>
+      </section>
+
+      <section class="card pro-module" id="pro-automation">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="repeat"></i></span><div><h2>Automatisations</h2><p>Relances email planifiées et facturation récurrente.</p></div></div>
+        <form id="automation-form" class="pro-form">
+          <div class="field"><label for="automation-name">Nom *</label><input id="automation-name" required maxlength="150" placeholder="Relance des factures à 7 jours" /></div>
+          <div class="pro-inline-fields">
+            <div class="field"><label for="automation-days">Après combien de jours de retard ?</label><input id="automation-days" type="number" min="1" max="120" value="7" /></div>
+            <div class="field"><label for="automation-frequency">Répéter tous les (jours)</label><input id="automation-frequency" type="number" min="1" max="90" value="7" /></div>
+          </div>
+          <button class="btn btn-primary" type="submit">Activer une relance email automatique</button>
+        </form>
+        <div id="automations-list" class="pro-list"></div>
+        <small class="pro-note">La génération automatique de factures est déjà disponible avec les factures récurrentes. L'envoi WhatsApp automatique nécessite un compte et un fournisseur WhatsApp Business configurés.</small>
+      </section>
+
+      <section class="card pro-module" id="pro-integrations">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="globe"></i></span><div><h2>API et intégrations</h2><p>Clés API, webhooks et suivi des activités sensibles.</p></div></div>
+        <form id="api-key-form" class="pro-form">
+          <div class="field"><label for="api-key-name">Nom de la clé *</label><input id="api-key-name" required maxlength="120" placeholder="Connexion boutique en ligne" /></div>
+          <div class="pro-permissions">
+            <label><input type="checkbox" value="clients:read" /> Lire les clients</label>
+            <label><input type="checkbox" value="products:read" /> Lire les produits</label>
+            <label><input type="checkbox" value="invoices:read" checked /> Lire les factures</label>
+            <label><input type="checkbox" value="invoices:write" /> Créer des factures via API</label>
+          </div>
+          <button class="btn btn-primary" type="submit">Générer une clé API</button>
+        </form>
+        <div id="api-key-result" class="pro-result" hidden></div>
+        <div id="api-keys-list" class="pro-list"></div>
+        <div class="pro-subsection"><h3>Webhooks</h3>
+          <form id="webhook-form" class="pro-form">
+            <div class="field"><label for="webhook-url">URL HTTPS de réception *</label><input id="webhook-url" type="url" required placeholder="https://exemple.com/webhooks/samafacture" /></div>
+            <div class="pro-permissions">
+              <label><input type="checkbox" value="invoice.created" checked /> Facture créée</label>
+              <label><input type="checkbox" value="payment.received" checked /> Paiement reçu</label>
+              <label><input type="checkbox" value="client.created" /> Client créé</label>
+            </div>
+            <button class="btn btn-outline" type="submit">Enregistrer le webhook</button>
+          </form>
+          <div id="webhooks-list" class="pro-list"></div>
+        </div>
+        <div class="pro-subsection"><h3>Journal d'audit</h3><div id="audit-list" class="pro-list"></div></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+requireAuthPage();
+renderSidebar('professionnel');
+
+let clientsCache = [];
+let invoicesCache = [];
+let establishmentsCache = [];
+let cashRegistersCache = [];
+let documentsCache = [];
+
+function el(id) { return document.getElementById(id); }
+function setList(id, html) { el(id).innerHTML = html || '<p class="pro-muted">Aucune donnée pour le moment.</p>'; }
+function optionList(rows, label, value) {
+  return '<option value="">Choisir</option>' + rows.map(r => '<option value="' + escapeHtml(r[value]) + '">' + escapeHtml(r[label]) + '</option>').join('');
+}
+function statusPill(text) { return '<span class="pro-status">' + escapeHtml(text || '—') + '</span>'; }
+
+async function loadWorkspace() {
+  try {
+    const results = await Promise.all([
+      Api.get('/pro/orders'), Api.get('/pro/delivery-notes'), Api.get('/pro/credit-notes'),
+      Api.get('/pro/team'), Api.get('/pro/establishments'), Api.get('/pro/cash/registers'),
+      Api.get('/pro/payments'), Api.get('/pro/payment-links'), Api.get('/pro/documents'),
+      Api.get('/pro/automations'), Api.get('/pro/integrations/api-keys'), Api.get('/pro/integrations/webhooks'),
+      Api.get('/pro/audit'), Api.get('/pro/team/companies'), Api.get('/clients?page=1&limite=100'),
+      Api.get('/factures?type=facture&page=1&limite=100')
+    ]);
+    const [orders, delivery, credits, team, branches, registers, payments, links, docs, automations, keys, webhooks, audit, companies, clients, invoices] = results;
+    clientsCache = clients.clients || [];
+    invoicesCache = invoices.factures || [];
+    establishmentsCache = branches.etablissements || [];
+    cashRegistersCache = registers.caisses || [];
+    documentsCache = docs.documents || [];
+
+    el('kpi-orders').textContent = (orders.commandes || []).length;
+    el('kpi-deliveries').textContent = (delivery.bons_livraison || []).length;
+    el('kpi-refunds').textContent = (payments.remboursements || []).filter(x => x.statut === 'a_traiter' || x.statut === 'approuve').length;
+    el('kpi-documents').textContent = documentsCache.length;
+
+    const clientsOptions = optionList(clientsCache, 'nom', 'id');
+    ['order-client','statement-client','document-client'].forEach(id => {
+      const current = el(id).value;
+      el(id).innerHTML = (id === 'document-client' ? '<option value="">Aucun</option>' : '<option value="">Choisir un client</option>') + clientsCache.map(c => '<option value="' + c.id + '">' + escapeHtml(c.nom) + '</option>').join('');
+      el(id).value = current;
+    });
+    const invoiceOptions = '<option value="">Choisir une facture</option>' + invoicesCache.map(f => '<option value="' + f.id + '">' + escapeHtml(f.numero) + ' — ' + escapeHtml(f.client_nom || '') + ' — ' + formatMontant(f.total) + '</option>').join('');
+    el('credit-invoice').innerHTML = invoiceOptions;
+    el('link-invoice').innerHTML = invoiceOptions;
+    el('document-invoice').innerHTML = '<option value="">Aucune</option>' + invoicesCache.map(f => '<option value="' + f.id + '">' + escapeHtml(f.numero) + '</option>').join('');
+
+    setList('orders-list', (orders.commandes || []).map(o => '<div class="pro-list-row"><div><strong>' + escapeHtml(o.numero) + '</strong><small>' + escapeHtml(o.client_nom) + ' · ' + formatDate(o.date_commande) + ' · ' + formatMontant(o.total, o.devise) + '</small></div><div>' + statusPill(o.statut) + '<button class="btn btn-sm btn-outline" onclick="createDelivery(' + o.id + ')">Bon de livraison</button></div></div>').join(''));
+    setList('delivery-list', (delivery.bons_livraison || []).map(d => '<div class="pro-list-row"><div><strong>' + escapeHtml(d.numero) + '</strong><small>' + escapeHtml(d.destinataire || d.client_nom || '') + ' · ' + formatDate(d.date_livraison) + '</small></div>' + statusPill(d.statut) + '</div>').join(''));
+    setList('credits-list', (credits.avoirs || []).map(a => '<div class="pro-list-row"><div><strong>' + escapeHtml(a.numero) + '</strong><small>Facture ' + escapeHtml(a.facture_numero) + ' · ' + formatMontant(a.montant) + '</small></div><div>' + statusPill(a.statut) + (a.statut === 'brouillon' ? '<button class="btn btn-sm btn-outline" onclick="updateCredit(' + a.id + ',\'valide\')">Valider</button>' : '') + '</div></div>').join(''));
+
+    setList('team-list', [
+      ...(team.membres || []).map(m => '<div class="pro-list-row"><div><strong>' + escapeHtml(m.nom) + '</strong><small>' + escapeHtml(m.email) + ' · ' + escapeHtml(m.role) + '</small></div>' + statusPill(m.active ? 'Actif' : 'Désactivé') + '<button class="btn btn-sm btn-outline" onclick="removeMember(' + m.id + ')">Désactiver</button></div>'),
+      ...(team.invitations || []).map(i => '<div class="pro-list-row"><div><strong>' + escapeHtml(i.email) + '</strong><small>Invitation · ' + escapeHtml(i.role) + ' · expire ' + formatDate(i.expire_at) + '</small></div>' + statusPill(i.statut) + '</div>')
+    ].join(''));
+    setList('establishment-list', (establishmentsCache || []).map(b => '<div class="pro-list-row"><div><strong>' + escapeHtml(b.nom) + '</strong><small>' + escapeHtml(b.code || '') + ' · ' + escapeHtml(b.adresse || '') + '</small></div>' + statusPill(b.actif ? 'Actif' : 'Inactif') + '</div>').join(''));
+    el('register-branch').innerHTML = '<option value="">Aucun établissement</option>' + establishmentsCache.map(b => '<option value="' + b.id + '">' + escapeHtml(b.nom) + '</option>').join('');
+    el('cash-register').innerHTML = '<option value="">Choisir</option>' + cashRegistersCache.map(c => '<option value="' + c.id + '">' + escapeHtml(c.nom) + '</option>').join('');
+    setList('register-list', cashRegistersCache.map(c => '<div class="pro-list-row"><div><strong>' + escapeHtml(c.nom) + '</strong><small>' + escapeHtml(c.etablissement_nom || 'Sans établissement') + ' · ' + escapeHtml(c.devise) + '</small></div><strong>' + formatMontant(c.solde_actuel, c.devise) + '</strong></div>').join(''));
+    setList('cash-operations-list', (await Api.get('/pro/cash/operations')).operations.slice(0, 15).map(o => '<div class="pro-list-row"><div><strong>' + escapeHtml(o.caisse_nom) + '</strong><small>' + escapeHtml(o.motif) + ' · ' + formatDate(o.operation_date) + '</small></div><strong class="' + (o.type === 'entree' ? 'pro-positive' : 'pro-negative') + '">' + (o.type === 'entree' ? '+' : '−') + formatMontant(o.montant) + '</strong></div>').join(''));
+    setList('payments-list', (payments.paiements || []).map(p => '<div class="pro-list-row"><div><strong>' + escapeHtml(p.numero) + ' · ' + escapeHtml(p.client_nom) + '</strong><small>' + escapeHtml(p.methode) + ' · ' + formatDate(p.date_paiement) + '</small></div><div><strong>' + formatMontant(p.montant) + '</strong><button class="btn btn-sm btn-outline" onclick="requestRefund(' + p.id + ',' + p.montant + ')">Demander remboursement</button></div></div>').join(''));
+    setList('payment-links-list', (links.liens || []).map(l => '<div class="pro-list-row"><div><strong>' + escapeHtml(l.numero) + '</strong><small>' + formatMontant(l.montant, l.devise) + ' · ' + formatDate(l.created_at) + '</small></div>' + statusPill(l.statut) + '</div>').join(''));
+    setList('documents-list', documentsCache.map(d => '<div class="pro-list-row"><div><strong>' + escapeHtml(d.nom_fichier) + '</strong><small>' + Math.ceil(d.taille_octets / 1024) + ' Ko · ' + formatDate(d.created_at) + (d.signature_nom ? ' · Signé par ' + escapeHtml(d.signature_nom) : '') + '</small></div><button class="btn btn-sm btn-outline" onclick="downloadDocument(' + d.id + ')">Télécharger</button></div>').join(''));
+    el('signature-document').innerHTML = optionList(documentsCache, 'nom_fichier', 'id');
+    setList('automations-list', (automations.automatisations || []).map(a => '<div class="pro-list-row"><div><strong>' + escapeHtml(a.nom) + '</strong><small>' + escapeHtml(a.type) + ' · prochaine exécution ' + formatDate(a.prochaine_execution) + '</small></div><label class="pro-switch"><input type="checkbox" ' + (a.actif ? 'checked' : '') + ' onchange="toggleAutomation(' + a.id + ',this.checked)" /> Actif</label></div>').join(''));
+    setList('api-keys-list', (keys.cles || []).map(k => '<div class="pro-list-row"><div><strong>' + escapeHtml(k.nom) + '</strong><small>' + escapeHtml((k.scopes || []).join(', ')) + ' · ' + formatDate(k.created_at) + '</small></div>' + statusPill(k.revoked_at ? 'Révoquée' : 'Active') + (!k.revoked_at ? '<button class="btn btn-sm btn-outline" onclick="revokeKey(' + k.id + ')">Révoquer</button>' : '') + '</div>').join(''));
+    setList('webhooks-list', (webhooks.webhooks || []).map(w => '<div class="pro-list-row"><div><strong>' + escapeHtml(w.url) + '</strong><small>' + escapeHtml((w.evenements || []).join(', ')) + '</small></div><button class="btn btn-sm btn-outline" onclick="testWebhook(' + w.id + ')">Tester</button><button class="btn btn-sm btn-outline" onclick="deleteWebhook(' + w.id + ')">Supprimer</button></div>').join(''));
+    setList('audit-list', (audit.journal || []).slice(0, 25).map(a => '<div class="pro-list-row"><div><strong>' + escapeHtml(a.action) + ' · ' + escapeHtml(a.entite) + '</strong><small>' + formatDate(a.created_at) + ' · ' + escapeHtml(a.adresse_ip || '') + '</small></div></div>').join(''));
+
+    const select = el('company-select');
+    const previous = localStorage.getItem('sf_company_owner') || '';
+    select.innerHTML = '<option value="">Mon espace personnel</option>' + (companies.entreprises || []).map(c => '<option value="' + c.id + '">' + escapeHtml(c.entreprise_nom || c.nom || ('Entreprise ' + c.id)) + ' · ' + escapeHtml(c.role) + '</option>').join('');
+    select.value = previous;
+  } catch (err) {
+    showFatalError(err.message);
+  }
+}
+
+async function createDelivery(id) {
+  try { await Api.post('/pro/orders/' + id + '/delivery-note', {}); showToast('Bon de livraison créé.', 'success'); await loadWorkspace(); }
+  catch (e) { alert(e.message); }
+}
+async function updateCredit(id, status) {
+  try { await Api.put('/pro/credit-notes/' + id + '/status', { statut: status }); await loadWorkspace(); }
+  catch (e) { alert(e.message); }
+}
+async function requestRefund(id, max) {
+  const montant = Number(prompt('Montant à demander en remboursement (maximum ' + max + ')', max));
+  if (!Number.isFinite(montant) || montant <= 0) return;
+  const motif = prompt('Motif du remboursement :');
+  if (!motif) return;
+  try { await Api.post('/pro/payments/' + id + '/refunds', { montant, motif }); showToast('Demande de remboursement enregistrée.', 'success'); await loadWorkspace(); }
+  catch (e) { alert(e.message); }
+}
+async function sendReminder(canal) {
+  const clientId = el('statement-client').value;
+  if (!clientId) return alert('Choisissez un client.');
+  try {
+    const result = await Api.post('/pro/clients/' + clientId + '/remind', { canal });
+    if (result.url) window.open(result.url, '_blank', 'noopener');
+    else alert(result.message);
+  } catch (e) { alert(e.message); }
+}
+async function toggleAutomation(id, actif) {
+  try { await Api.put('/pro/automations/' + id, { actif }); await loadWorkspace(); }
+  catch (e) { alert(e.message); }
+}
+async function removeMember(id) {
+  if (!confirm('Désactiver ce membre ?')) return;
+  try { await Api.del('/pro/team/' + id); await loadWorkspace(); } catch (e) { alert(e.message); }
+}
+async function revokeKey(id) {
+  if (!confirm('Révoquer cette clé API ? Les applications qui l’utilisent ne pourront plus se connecter.')) return;
+  try { await Api.del('/pro/integrations/api-keys/' + id); await loadWorkspace(); } catch (e) { alert(e.message); }
+}
+async function deleteWebhook(id) {
+  if (!confirm('Supprimer ce webhook ?')) return;
+  try { await Api.del('/pro/integrations/webhooks/' + id); await loadWorkspace(); } catch (e) { alert(e.message); }
+}
+async function testWebhook(id) {
+  try { const r = await Api.post('/pro/integrations/webhooks/' + id + '/test', {}); alert('Test ajouté à la file. Référence : ' + r.delivery_id); } catch (e) { alert(e.message); }
+}
+async function downloadDocument(id) {
+  try {
+    const headers = { 'Authorization': 'Bearer ' + Api.token(), 'X-Requested-With': 'SamaFacturePro' };
+    const companyOwner = localStorage.getItem('sf_company_owner');
+    if (companyOwner) headers['X-SF-Company-Owner'] = companyOwner;
+    const response = await fetch('/api/pro/documents/' + id + '/download', { headers });
+    if (!response.ok) throw new Error('Téléchargement impossible.');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'document-' + id; a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) { alert(e.message); }
+}
+async function loadMargins() {
+  const qs = new URLSearchParams();
+  if (el('margin-from').value) qs.set('from', el('margin-from').value);
+  if (el('margin-to').value) qs.set('to', el('margin-to').value);
+  try {
+    const data = await Api.get('/pro/reports/margins?' + qs.toString());
+    setList('analysis-result', data.marges.map(m => '<div class="pro-list-row"><div><strong>' + escapeHtml(m.designation) + '</strong><small>Qté : ' + m.quantite + ' · Coût estimé : ' + formatMontant(m.cout_estime) + '</small></div><div><strong>' + formatMontant(m.marge_estimee) + '</strong><small>' + (m.marge_pourcent === null ? 'Coût inconnu' : m.marge_pourcent.toFixed(1) + ' %') + '</small></div></div>').join('') + '<p class="pro-note">' + escapeHtml(data.avertissement) + '</p>');
+  } catch (e) { alert(e.message); }
+}
+async function loadForecast() {
+  try {
+    const data = await Api.get('/pro/reports/forecast');
+    setList('analysis-result', '<p class="pro-note">' + escapeHtml(data.methode) + '</p>' + data.previsions.map(p => '<div class="pro-list-row"><strong>' + escapeHtml(p.mois) + '</strong><strong>' + formatMontant(p.encaissements_estimes) + '</strong></div>').join(''));
+  } catch (e) { alert(e.message); }
+}
+async function loadCustomReport() {
+  try {
+    const data = await Api.get('/pro/reports/custom?group_by=month');
+    setList('analysis-result', data.rows.map(r => '<div class="pro-list-row"><strong>' + escapeHtml(r.label) + '</strong><span>' + r.nb_factures + ' facture(s) · ' + formatMontant(r.total) + ' · encaissé ' + formatMontant(r.encaisse) + '</span></div>').join(''));
+  } catch (e) { alert(e.message); }
+}
+
+el('company-select').addEventListener('change', e => {
+  if (e.target.value) localStorage.setItem('sf_company_owner', e.target.value);
+  else localStorage.removeItem('sf_company_owner');
+  loadWorkspace();
+});
+
+el('order-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const payload = { client_id: Number(el('order-client').value), lignes: [{ designation: el('order-designation').value, quantite: Number(el('order-qty').value), prix_unitaire: Number(el('order-price').value) }] };
+  try { await Api.post('/pro/orders', payload); e.target.reset(); await loadWorkspace(); showToast('Commande créée.', 'success'); } catch (err) { alert(err.message); }
+});
+el('credit-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  try { await Api.post('/pro/credit-notes', { facture_id: Number(el('credit-invoice').value), montant: Number(el('credit-amount').value), motif: el('credit-reason').value }); e.target.reset(); await loadWorkspace(); showToast('Avoir créé en brouillon.', 'success'); } catch (err) { alert(err.message); }
+});
+el('statement-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const clientId = el('statement-client').value;
+  try {
+    const data = await Api.get('/pro/clients/' + clientId + '/statement');
+    setList('statement-result', '<div class="pro-statement-balance"><span>Solde client</span><strong>' + formatMontant(data.solde) + '</strong></div>' + data.factures.map(f => '<div class="pro-list-row"><div><strong>' + escapeHtml(f.numero) + '</strong><small>' + formatDate(f.date_emission) + ' · ' + escapeHtml(f.statut) + '</small></div><span>' + formatMontant(f.total) + ' · payé ' + formatMontant(f.montant_paye) + '</span></div>').join('') + '<h4>Paiements</h4>' + data.paiements.map(p => '<div class="pro-list-row"><span>' + escapeHtml(p.numero) + ' · ' + escapeHtml(p.methode) + '</span><strong>' + formatMontant(p.montant) + '</strong></div>').join(''));
+  } catch (err) { alert(err.message); }
+});
+el('link-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  try {
+    const result = await Api.post('/pro/payment-links', { facture_id: Number(el('link-invoice').value), montant: Number(el('link-amount').value), expire_jours: el('link-expiry').value || null });
+    el('new-payment-link').hidden = false;
+    el('new-payment-link').innerHTML = '<strong>Lien créé</strong><p><a href="' + escapeHtml(result.url) + '" target="_blank" rel="noopener">' + escapeHtml(result.url) + '</a></p><img alt="QR code de paiement" src="' + result.qr_code + '" style="width:180px;height:180px;object-fit:contain;" /><p class="pro-note">Demande de paiement à partager. Le paiement doit être confirmé via le prestataire ou enregistré manuellement après vérification.</p><button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(' + JSON.stringify(result.url) + ').then(()=>showToast(\'Lien copié\',\'success\'))">Copier le lien</button>';
+    await loadWorkspace();
+  } catch (err) { alert(err.message); }
+});
+el('invite-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  try {
+    const result = await Api.post('/pro/team/invitations', { email: el('invite-email').value, role: el('invite-role').value });
+    el('invite-result').hidden = false;
+    el('invite-result').innerHTML = '<strong>Invitation créée</strong><p>' + (result.email_envoye ? 'Email envoyé. ' : 'SMTP non configuré : email non envoyé. ') + '</p><p><a href="' + escapeHtml(result.invitation_url) + '" target="_blank" rel="noopener">Ouvrir le lien d’invitation</a></p>';
+    e.target.reset(); await loadWorkspace();
+  } catch (err) { alert(err.message); }
+});
+el('role-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const permissions = Array.from(e.target.querySelectorAll('input[type=checkbox]:checked')).map(i => i.value);
+  try { await Api.post('/pro/team/roles', { nom: el('role-name').value, permissions }); e.target.reset(); await loadWorkspace(); showToast('Rôle enregistré.', 'success'); } catch (err) { alert(err.message); }
+});
+el('establishment-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  try { await Api.post('/pro/establishments', { nom: el('establishment-name').value, code: el('establishment-code').value, adresse: el('establishment-address').value }); e.target.reset(); await loadWorkspace(); } catch (err) { alert(err.message); }
+});
+el('register-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  try { await Api.post('/pro/cash/registers', { nom: el('register-name').value, etablissement_id: el('register-branch').value || null, solde_initial: Number(el('register-balance').value) }); e.target.reset(); await loadWorkspace(); } catch (err) { alert(err.message); }
+});
+el('cash-operation-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  try { await Api.post('/pro/cash/registers/' + el('cash-register').value + '/operations', { type: el('cash-type').value, montant: Number(el('cash-amount').value), motif: el('cash-reason').value }); e.target.reset(); await loadWorkspace(); } catch (err) { alert(err.message); }
+});
+async function fileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Lecture du fichier impossible.'));
+    reader.readAsDataURL(file);
+  });
+}
+el('document-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const file = el('document-file').files[0];
+  if (!file) return;
+  try {
+    const content = await fileAsDataUrl(file);
+    await Api.post('/pro/documents', { nom_fichier: file.name, mime_type: file.type, contenu_base64: content, facture_id: el('document-invoice').value || null, client_id: el('document-client').value || null });
+    e.target.reset(); await loadWorkspace(); showToast('Document archivé.', 'success');
+  } catch (err) { alert(err.message); }
+});
+el('signature-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const file = el('signature-file').files[0], id = el('signature-document').value;
+  if (!file || !id) return;
+  try {
+    const data = await fileAsDataUrl(file);
+    await Api.post('/pro/documents/' + id + '/signature', { nom: el('signature-name').value, signature_data: data });
+    e.target.reset(); await loadWorkspace(); showToast('Signature interne enregistrée.', 'success');
+  } catch (err) { alert(err.message); }
+});
+el('automation-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  try {
+    await Api.post('/pro/automations', { type: 'relance_impayes_email', nom: el('automation-name').value, configuration: { jours_retard: Number(el('automation-days').value), frequence_jours: Number(el('automation-frequency').value) } });
+    e.target.reset(); await loadWorkspace(); showToast('Automatisation enregistrée.', 'success');
+  } catch (err) { alert(err.message); }
+});
+el('api-key-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const scopes = Array.from(e.target.querySelectorAll('input[type=checkbox]:checked')).map(i => i.value);
+  try {
+    const result = await Api.post('/pro/integrations/api-keys', { nom: el('api-key-name').value, scopes });
+    el('api-key-result').hidden = false;
+    el('api-key-result').innerHTML = '<strong>Clé API créée</strong><p><code>' + escapeHtml(result.token) + '</code></p><p>Copiez-la maintenant. Elle ne sera plus affichée.</p>';
+    e.target.reset(); await loadWorkspace();
+  } catch (err) { alert(err.message); }
+});
+el('webhook-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const evenements = Array.from(e.target.querySelectorAll('input[type=checkbox]:checked')).map(i => i.value);
+  try {
+    const result = await Api.post('/pro/integrations/webhooks', { url: el('webhook-url').value, evenements });
+    alert('Webhook créé. Secret de signature à conserver : ' + result.secret);
+    e.target.reset(); await loadWorkspace();
+  } catch (err) { alert(err.message); }
+});
+
+loadWorkspace();
+</script>
+</body>
+</html>
