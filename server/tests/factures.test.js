@@ -356,5 +356,57 @@ describe('Factures : idempotence des créations', () => {
   });
 });
 
+
+describe('Factures : quota du plan Gratuit', () => {
+  let userId;
+  let token;
+  let clientId;
+
+  before(async () => {
+    await setupTestDatabase();
+    const email = emailDeTest('quota-factures');
+    const inscription = await request(app)
+      .post('/api/auth/register')
+      .send({ nom: 'Compte quota', email, password: 'motdepasse123' });
+    userId = inscription.body.user.id;
+    token = inscription.body.token;
+    const client = await request(app)
+      .post('/api/clients')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Client quota' });
+    clientId = client.body.client.id;
+  });
+
+  after(async () => { await nettoyerUtilisateur(userId); });
+
+  test("une ancienne date d'émission ne contourne pas le quota et les créations concurrentes sont sérialisées", async () => {
+    const { FREE_MONTHLY_INVOICE_LIMIT } = require('../utils/plans');
+    const creer = () => request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        date_emission: '2000-01-01',
+        lignes: [{ designation: 'Facture quota', quantite: 1, prix_unitaire: 100, tva: 0 }]
+      });
+
+    for (let i = 0; i < FREE_MONTHLY_INVOICE_LIMIT - 1; i++) {
+      const result = await creer();
+      assert.equal(result.status, 201, result.text);
+    }
+
+    const concurrent = await Promise.all(Array.from({ length: 4 }, creer));
+    assert.equal(concurrent.filter(r => r.status === 201).length, 1);
+    assert.equal(concurrent.filter(r => r.status === 403 && r.body.code === 'QUOTA_DEPASSE').length, 3);
+
+    const [[row]] = await require('../config/db').pool.query(
+      "SELECT COUNT(*) AS n FROM factures WHERE user_id = ? AND type = 'facture' AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')",
+      [userId]
+    );
+    assert.equal(Number(row.n), FREE_MONTHLY_INVOICE_LIMIT);
+  });
+});
+
 // Fermeture des ressources après les hooks de nettoyage métier de ce fichier.
 after(teardownTestEnvironment);
