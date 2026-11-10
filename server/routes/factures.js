@@ -462,11 +462,11 @@ router.put('/:id/statut', async (req, res, next) => {
   try {
     const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const existing = existingRows[0];
-    if (!existing) { conn.release(); return res.status(404).json({ error: 'Facture introuvable.' }); }
+    if (!existing) return res.status(404).json({ error: 'Facture introuvable.' });
 
     const { statut } = req.body;
     const valides = ['en_attente', 'payee', 'en_retard', 'annulee'];
-    if (!valides.includes(statut)) { conn.release(); return res.status(400).json({ error: 'Statut invalide.' }); }
+    if (!valides.includes(statut)) return res.status(400).json({ error: 'Statut invalide.' });
 
     await conn.beginTransaction();
     await conn.query('UPDATE factures SET statut = ? WHERE id = ? AND user_id = ?', [statut, existing.id, req.tenantId]);
@@ -485,7 +485,7 @@ router.put('/:id/statut', async (req, res, next) => {
     const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     res.json({ facture: rows[0] });
   } catch (err) {
-    await conn.rollback();
+    try { await conn.rollback(); } catch (_) {}
     next(err);
   } finally {
     conn.release();
@@ -957,6 +957,7 @@ router.delete('/:id', async (req, res, next) => {
  *       201: { description: "Paiement enregistré.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
  *       400: { description: "Montant ou méthode invalide.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  *       404: { description: "Facture introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Le devis n'est pas encaissable ou la facture est annulée." }
  */
 router.post('/:id/paiements', async (req, res, next) => {
   let conn;
@@ -1019,6 +1020,18 @@ router.post('/:id/paiements', async (req, res, next) => {
         );
         return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
       }
+    }
+
+    // Un devis n'est pas une créance à encaisser. Une facture annulée ne doit plus
+    // accepter de nouveau règlement ; les deux cas doivent être convertis/régularisés
+    // explicitement avant toute nouvelle écriture de paiement.
+    if (facture.type !== 'facture' || facture.statut === 'annulee') {
+      await conn.rollback();
+      return res.status(409).json({
+        error: facture.type !== 'facture'
+          ? 'Un devis ne peut pas recevoir de paiement. Transformez-le d’abord en facture.'
+          : 'Une facture annulée ne peut pas recevoir de nouveau paiement.'
+      });
     }
 
     // Empêche un paiement de dépasser le solde restant dû (ex. saisie manuelle erronée,
