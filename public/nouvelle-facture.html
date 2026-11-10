@@ -34,7 +34,7 @@
     <div class="grid grid-2 invoice-builder-grid">
       <div class="card invoice-editor-card">
         <div class="invoice-section-heading"><span class="ic"><i class="ic" data-icon="building"></i></span><div><h3>Informations générales</h3><p>Les informations principales de votre document.</p></div></div>
-        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px;">
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px;">
           <div class="field">
             <label>Client *</label>
             <select id="client_id" required></select>
@@ -65,7 +65,7 @@
             <input type="date" id="date_validite" />
           </div>
         </div>
-        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px; margin-top:12px;">
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:12px;">
           <div class="field"><label>Objet / prestation</label><input type="text" id="objet" maxlength="190" placeholder="Ex. Fourniture de matériel informatique" /></div>
           <div class="field"><label>Référence client / bon de commande</label><input type="text" id="reference_externe" maxlength="100" placeholder="Ex. BC-2026-014" /></div>
         </div>
@@ -78,7 +78,7 @@
         </table>
         <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addLigne()">+ Ajouter une ligne</button>
 
-        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px; margin-top:20px;">
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:20px;">
           <div class="field"><label>Remise (montant)</label><input type="number" id="remise" value="0" /></div>
           <div class="field"><label>Frais de livraison</label><input type="number" id="frais_livraison" value="0" /></div>
         </div>
