@@ -72,7 +72,7 @@ function signerTokenTemporaire(user) {
   // Token à usage unique pour cette génération, durée de vie très courte : uniquement
   // le temps que le navigateur headless charge la page (pas un token de session classique).
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, nom: user.nom },
+    { id: user.id, email: user.email, role: user.role, nom: user.nom, token_version: Number(user.token_version) || 0 },
     process.env.JWT_SECRET,
     { expiresIn: '2m' }
   );
