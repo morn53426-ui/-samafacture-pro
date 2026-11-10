@@ -421,12 +421,18 @@ router.post('/mot-de-passe-oublie', resetLimiter, async (req, res, next) => {
       await pool.query('UPDATE users SET reset_token_hash = ?, reset_token_expires = ? WHERE id = ?', [tokenHash, expires, user.id]);
 
       const resetUrl = `${process.env.APP_URL || 'http://localhost:4000'}/reinitialiser-mot-de-passe.html?token=${rawToken}`;
-      await sendMail({
-        to: user.email,
-        subject: 'Réinitialisation de votre mot de passe SamaFacture Pro',
-        text: `Bonjour ${user.nom},\n\nVous avez demandé à réinitialiser votre mot de passe. Cliquez sur ce lien (valable 30 minutes) :\n${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
-        html: `<p>Bonjour ${user.nom},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
-      });
+      try {
+        await sendMail({
+          to: user.email,
+          subject: 'Réinitialisation de votre mot de passe SamaFacture Pro',
+          text: `Bonjour ${user.nom},\n\nVous avez demandé à réinitialiser votre mot de passe. Cliquez sur ce lien (valable 30 minutes) :\n${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
+          html: `<p>Bonjour ${user.nom},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
+        });
+      } catch (mailError) {
+        // La réponse reste identique que l'adresse existe ou non. Le jeton brut n'est
+        // jamais inclus dans ce journal, même en cas de panne SMTP ou de configuration absente.
+        console.error('Échec de l’envoi du message de réinitialisation :', mailError.code || mailError.message);
+      }
     }
 
     res.json(genericMessage);
