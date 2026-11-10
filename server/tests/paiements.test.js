@@ -112,6 +112,22 @@ describe("Paiements d'abonnement", () => {
     } finally {
       await pool.query(`DROP TRIGGER IF EXISTS ${triggerName}`);
     }
+
+    // Après correction de la panne, le même webhook peut être rejoué : le paiement
+    // passe alors à payee et le plan est activé dans la même transaction.
+    const { confirmerPaiementPourTests } = require('../routes/abonnement');
+    const [[retryPayment]] = await pool.query(
+      'SELECT * FROM abonnement_paiements WHERE id = ?',
+      [insert.insertId]
+    );
+    await confirmerPaiementPourTests(retryPayment, 15000);
+    const [[afterRetry]] = await pool.query(
+      'SELECT statut FROM abonnement_paiements WHERE id = ?',
+      [insert.insertId]
+    );
+    const [[userAfterRetry]] = await pool.query('SELECT plan FROM users WHERE id = ?', [userId]);
+    assert.equal(afterRetry.statut, 'payee');
+    assert.equal(userAfterRetry.plan, 'pro');
   });
 
   test("un ancien webhook payé après un paiement plus récent ne rétrograde pas le plan", async () => {
