@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const dns = require('node:dns').promises;
 const net = require('node:net');
+const https = require('node:https');
 const { pool } = require('../config/db');
 
 function encryptionKey() {
@@ -65,24 +66,83 @@ function isPrivateAddress(address) {
   return true;
 }
 
-async function assertPublicWebhookTarget(rawUrl) {
-  const url = new URL(rawUrl);
+async function resolvePublicWebhookTarget(rawUrl, lookup = dns.lookup) {
+  let url;
+  try {
+    url = new URL(String(rawUrl));
+  } catch (_) {
+    throw new Error('URL de webhook invalide.');
+  }
   if (url.protocol !== 'https:' || (url.port && url.port !== '443')) {
     throw new Error('Les webhooks doivent utiliser HTTPS sur le port standard.');
   }
-  const hostname = url.hostname.toLowerCase();
+  if (url.username || url.password) {
+    throw new Error('Les identifiants intégrés dans l’URL du webhook sont interdits.');
+  }
+
+  // URL.hostname peut conserver les crochets d'une adresse IPv6 littérale.
+  const hostname = url.hostname.replace(/^\\[|\\]$/g, '').toLowerCase();
   if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') ||
       hostname.endsWith('.local') || hostname.endsWith('.internal')) {
     throw new Error('La cible du webhook ne doit pas être locale.');
   }
-  if (net.isIP(hostname)) {
-    if (isPrivateAddress(hostname)) throw new Error('Adresse privée interdite pour les webhooks.');
-    return;
+
+  const literalFamily = net.isIP(hostname);
+  let addresses;
+  if (literalFamily) {
+    addresses = [{ address: hostname, family: literalFamily }];
+  } else {
+    addresses = await lookup(hostname, { all: true, verbatim: true });
   }
-  const addresses = await dns.lookup(hostname, { all: true, verbatim: true });
-  if (!addresses.length || addresses.some(entry => isPrivateAddress(entry.address))) {
+
+  if (!Array.isArray(addresses) || !addresses.length ||
+      addresses.some(entry => !entry || isPrivateAddress(entry.address))) {
     throw new Error('Le domaine du webhook pointe vers une adresse non publique.');
   }
+
+  // L'adresse retenue est renvoyée au transport HTTPS. La résolution DNS ne sera
+  // donc pas répétée au moment de la connexion (protection contre le DNS rebinding).
+  return {
+    url,
+    hostname,
+    address: addresses[0].address,
+    family: addresses[0].family || net.isIP(addresses[0].address)
+  };
+}
+
+function createPinnedLookup(address, family) {
+  return function pinnedLookup(_hostname, options, callback) {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
+    }
+    const entry = { address, family };
+    if (options && options.all) return callback(null, [entry]);
+    return callback(null, address, family);
+  };
+}
+
+function sendWebhookRequest(target, headers, body) {
+  return new Promise((resolve, reject) => {
+    const request = https.request(target.url, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Length': Buffer.byteLength(body)
+      },
+      // On conserve le nom de domaine de l'URL pour le Host et la vérification TLS,
+      // mais la socket utilise exclusivement l'IP publique déjà contrôlée.
+      lookup: createPinnedLookup(target.address, target.family),
+      signal: AbortSignal.timeout(10000)
+    }, response => {
+      const statusCode = response.statusCode || 0;
+      response.once('error', reject);
+      response.once('end', () => resolve({ statusCode }));
+      response.resume();
+    });
+    request.once('error', reject);
+    request.end(body);
+  });
 }
 
 async function deliverPendingWebhooks() {
@@ -106,23 +166,17 @@ async function deliverPendingWebhooks() {
         let statusCode = null;
         let ok = false;
         try {
-          await assertPublicWebhookTarget(row.url);
+          const target = await resolvePublicWebhookTarget(row.url);
           const secret = decryptSecret(row.secret_enc);
           const signature = crypto.createHmac('sha256', secret).update(body).digest('hex');
-          const response = await fetch(row.url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-SamaFacture-Event': row.evenement,
-              'X-SamaFacture-Delivery': String(row.id),
-              'X-SamaFacture-Signature': 'sha256=' + signature
-            },
-            body,
-            signal: AbortSignal.timeout(10000),
-            redirect: 'manual'
-          });
-          statusCode = response.status;
-          ok = response.ok;
+          const response = await sendWebhookRequest(target, {
+            'Content-Type': 'application/json',
+            'X-SamaFacture-Event': row.evenement,
+            'X-SamaFacture-Delivery': String(row.id),
+            'X-SamaFacture-Signature': 'sha256=' + signature
+          }, body);
+          statusCode = response.statusCode;
+          ok = statusCode >= 200 && statusCode < 300;
         } catch (err) {
           console.warn('Livraison webhook #' + row.id + ' impossible :', err.message);
         }
@@ -145,4 +199,4 @@ async function deliverPendingWebhooks() {
   }
 }
 
-module.exports = { encryptSecret, decryptSecret, queueWebhookEvent, deliverPendingWebhooks };
+module.exports = { encryptSecret, decryptSecret, queueWebhookEvent, deliverPendingWebhooks, isPrivateAddress, resolvePublicWebhookTarget, createPinnedLookup, sendWebhookRequest };
