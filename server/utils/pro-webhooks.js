@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const dns = require('node:dns').promises;
+const net = require('node:net');
 const { pool } = require('../config/db');
 
 function encryptionKey() {
@@ -39,6 +41,50 @@ async function queueWebhookEvent(userId, eventName, payload) {
   }
 }
 
+
+function isPrivateAddress(address) {
+  if (net.isIP(address) === 4) {
+    const parts = address.split('.').map(Number);
+    const [a,b] = parts;
+    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && (b === 168 || (b === 0 && parts[2] === 0) || (b === 0 && parts[2] === 2))) ||
+      (a === 198 && (b === 18 || b === 19 || (b === 51 && parts[2] === 100))) ||
+      (a === 203 && b === 0 && parts[2] === 113) || a >= 224;
+  }
+  if (net.isIP(address) === 6) {
+    const normalized = address.toLowerCase();
+    if (normalized.startsWith('::ffff:')) {
+      const mapped = normalized.slice(7);
+      if (net.isIP(mapped) === 4) return isPrivateAddress(mapped);
+    }
+    return normalized === '::' || normalized === '::1' ||
+      normalized.startsWith('fc') || normalized.startsWith('fd') ||
+      /^fe[89ab]/.test(normalized) || normalized.startsWith('ff');
+  }
+  return true;
+}
+
+async function assertPublicWebhookTarget(rawUrl) {
+  const url = new URL(rawUrl);
+  if (url.protocol !== 'https:' || (url.port && url.port !== '443')) {
+    throw new Error('Les webhooks doivent utiliser HTTPS sur le port standard.');
+  }
+  const hostname = url.hostname.toLowerCase();
+  if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost') ||
+      hostname.endsWith('.local') || hostname.endsWith('.internal')) {
+    throw new Error('La cible du webhook ne doit pas être locale.');
+  }
+  if (net.isIP(hostname)) {
+    if (isPrivateAddress(hostname)) throw new Error('Adresse privée interdite pour les webhooks.');
+    return;
+  }
+  const addresses = await dns.lookup(hostname, { all: true, verbatim: true });
+  if (!addresses.length || addresses.some(entry => isPrivateAddress(entry.address))) {
+    throw new Error('Le domaine du webhook pointe vers une adresse non publique.');
+  }
+}
+
 async function deliverPendingWebhooks() {
   const conn = await pool.getConnection();
   try {
@@ -60,6 +106,7 @@ async function deliverPendingWebhooks() {
         let statusCode = null;
         let ok = false;
         try {
+          await assertPublicWebhookTarget(row.url);
           const secret = decryptSecret(row.secret_enc);
           const signature = crypto.createHmac('sha256', secret).update(body).digest('hex');
           const response = await fetch(row.url, {
@@ -71,7 +118,8 @@ async function deliverPendingWebhooks() {
               'X-SamaFacture-Signature': 'sha256=' + signature
             },
             body,
-            signal: AbortSignal.timeout(10000)
+            signal: AbortSignal.timeout(10000),
+            redirect: 'manual'
           });
           statusCode = response.status;
           ok = response.ok;
