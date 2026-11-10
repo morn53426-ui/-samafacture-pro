@@ -87,7 +87,7 @@ router.post('/', async (req, res, next) => {
       [req.tenantId, nom, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), positiveInt(stock), categorie || null, description || null, image || null]
     );
 
-    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ?', [result.insertId]);
+    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ produit: rows[0] });
   } catch (err) { next(err); }
 });
@@ -122,7 +122,7 @@ router.put('/:id', async (req, res, next) => {
       return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
     }
     await pool.query(
-      `UPDATE produits SET nom=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, categorie=?, description=?, image=? WHERE id = ?`,
+      `UPDATE produits SET nom=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, categorie=?, description=?, image=? WHERE id = ? AND user_id = ?`,
       [
         nom ?? existing.nom, reference ?? existing.reference,
         prix_ht !== undefined ? positiveNumber(prix_ht, existing.prix_ht) : existing.prix_ht,
@@ -130,11 +130,11 @@ router.put('/:id', async (req, res, next) => {
         tva !== undefined ? percentage(tva, existing.tva) : existing.tva,
         stock !== undefined ? positiveInt(stock, existing.stock) : existing.stock,
         categorie ?? existing.categorie, description ?? existing.description, image ?? existing.image,
-        existing.id
+        existing.id, req.tenantId
       ]
     );
 
-    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ?', [existing.id]);
+    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     res.json({ produit: rows[0] });
   } catch (err) { next(err); }
 });
@@ -165,8 +165,8 @@ router.delete('/:id', async (req, res, next) => {
     // Détache d'abord le produit des lignes de facture existantes (au lieu de compter uniquement
     // sur la contrainte ON DELETE SET NULL de la base, qui peut différer si les tables ont été
     // créées avec une ancienne version du schéma).
-    await conn.query('UPDATE facture_lignes SET produit_id = NULL WHERE produit_id = ?', [existingRows[0].id]);
-    await conn.query('DELETE FROM produits WHERE id = ?', [existingRows[0].id]);
+    await conn.query('UPDATE facture_lignes fl JOIN factures f ON f.id = fl.facture_id SET fl.produit_id = NULL WHERE fl.produit_id = ? AND f.user_id = ?', [existingRows[0].id, req.tenantId]);
+    await conn.query('DELETE FROM produits WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
     await conn.commit();
 
     res.json({ success: true });
