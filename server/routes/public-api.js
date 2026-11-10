@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../config/db');
 const { computeTotals, insererLignesFacture, ajusterStockFacture } = require('./factures');
-const { FREE_MONTHLY_INVOICE_LIMIT, isPaidPlan } = require('../utils/plans');
+const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
 
 const router = express.Router();
@@ -88,21 +88,15 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
     conn = await pool.getConnection();
     await conn.beginTransaction();
 
-    // Même contrôle transactionnel que la création depuis l'interface : un horodatage
-    // éditable (date_emission) ne doit jamais permettre de contourner le quota mensuel.
-    const [[userRow]] = await conn.query('SELECT plan FROM users WHERE id = ? FOR UPDATE', [uid]);
-    if (!isPaidPlan(userRow?.plan)) {
-      const [[count]] = await conn.query(
-        `SELECT COUNT(*) AS n FROM factures
-         WHERE user_id = ? AND type = 'facture'
-           AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
-           AND created_at < DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-01'), INTERVAL 1 MONTH)`,
-        [uid]
-      );
-      if (Number(count.n) >= FREE_MONTHLY_INVOICE_LIMIT) {
-        await conn.rollback();
-        return res.status(403).json({ error: 'Le quota mensuel de factures du plan Gratuit est atteint.', code: 'QUOTA_DEPASSE' });
-      }
+    // Même registre de consommation que les créations depuis l'interface, les duplications
+    // et les conversions. Le contrôle et l'incrément restent dans cette transaction.
+    const quota = await reserveMonthlyInvoiceQuota(conn, uid);
+    if (!quota.allowed) {
+      await conn.rollback();
+      return res.status(403).json({
+        error: `Le quota mensuel de ${quota.limit} factures gratuites est atteint.`,
+        code: 'QUOTA_DEPASSE'
+      });
     }
 
     const numero = 'API-' + new Date().getFullYear() + '-' + crypto.randomBytes(5).toString('hex').toUpperCase();
