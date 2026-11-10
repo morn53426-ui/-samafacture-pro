@@ -263,3 +263,18 @@ CREATE TABLE IF NOT EXISTS pro_audit_logs (
   CONSTRAINT fk_pro_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_audit_actor FOREIGN KEY (acteur_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS pro_team_members (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  owner_user_id INT UNSIGNED NOT NULL,
+  member_user_id INT UNSIGNED NOT NULL,
+  role VARCHAR(60) NOT NULL DEFAULT 'employe',
+  permissions_json JSON NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_pro_team_member (owner_user_id, member_user_id),
+  KEY idx_pro_team_member_user (member_user_id, active),
+  CONSTRAINT fk_pro_team_members_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pro_team_members_member FOREIGN KEY (member_user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
