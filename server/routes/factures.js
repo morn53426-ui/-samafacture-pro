@@ -582,6 +582,7 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
  *         schema: { type: integer }
  *     responses:
  *       201: { description: "Copie créée.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
+ *       403: { description: "Quota mensuel de factures gratuites atteint (code QUOTA_DEPASSE)." }
  *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/:id/dupliquer', async (req, res, next) => {
