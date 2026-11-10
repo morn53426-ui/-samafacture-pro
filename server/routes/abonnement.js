@@ -228,14 +228,27 @@ async function confirmerPaiement(paiement, montantConfirme) {
       throw new Error(`Compte ${current.user_id} introuvable pour le paiement d'abonnement #${current.id}.`);
     }
 
+    // Si un paiement plus récent du même compte a déjà été confirmé, un ancien
+    // webhook arrivé en retard ne doit pas rétrograder le plan actuel.
+    const [newerPaidRows] = await conn.query(
+      `SELECT id FROM abonnement_paiements
+       WHERE user_id = ? AND statut = 'payee'
+         AND (created_at > ? OR (created_at = ? AND id > ?))
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`,
+      [current.user_id, current.created_at, current.created_at, current.id]
+    );
+
     await conn.query(
       "UPDATE abonnement_paiements SET statut = 'payee', paid_at = NOW() WHERE id = ? AND statut != 'payee'",
       [current.id]
     );
-    await conn.query(
-      'UPDATE users SET plan = ? WHERE id = ?',
-      [current.plan, current.user_id]
-    );
+    if (!newerPaidRows.length) {
+      await conn.query(
+        'UPDATE users SET plan = ? WHERE id = ?',
+        [current.plan, current.user_id]
+      );
+    }
 
     await conn.commit();
   } catch (err) {
