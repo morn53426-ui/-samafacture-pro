@@ -91,9 +91,11 @@ la laisser hors de cette politique que deviner et risquer de la casser.
 `server/tests/csrf-cookie-auth.test.js` — 6 tests unitaires purs de `requireAuth` (sans base de
 données ni serveur HTTP, seulement `jsonwebtoken`) : jeton Bearer toujours prioritaire, cookie
 accepté en repli, GET par cookie seul autorisé, POST par cookie seul refusé sans l'en-tête
-anti-CSRF puis autorisé avec. **Validation du dépôt :** le workflow GitHub Actions `Tests automatisés` a exécuté
-`npm test` sur `main` le 10 novembre 2026 : 182 tests réussis, aucun échec ni test ignoré.
-La branche d'audit en cours ajoute des tests de sauvegarde supplémentaires qui restent à exécuter.
+anti-CSRF puis autorisé avec. **Validation du dépôt :** sur `main`, le workflow du 10 novembre 2026 a réussi avec
+182 tests (0 échec, 0 test ignoré). Sur la branche d'audit, un workflow ultérieur a validé
+203 tests (0 échec, 0 test ignoré), y compris les tests de sauvegarde, de révocation de session,
+de quota multi-parcours et de confirmation de paiement. Un dernier ajustement d'ordre de
+verrouillage MySQL a ensuite été poussé et attend sa validation CI propre.
 
 ## 5. Protection des emails de récupération
 
