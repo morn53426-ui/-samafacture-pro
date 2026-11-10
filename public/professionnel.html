@@ -279,7 +279,18 @@ function optionList(rows, label, value) {
 }
 function statusPill(text) { return '<span class="pro-status">' + escapeHtml(text || '—') + '</span>'; }
 let activePermissions = ['*'];
-function can(permission) { return activePermissions.includes('*') || activePermissions.includes(permission); }
+function can(permission) {
+  const implied = {
+    'clients.read':'clients.write', 'products.read':'products.write',
+    'invoices.read':'invoices.write', 'payments.read':'payments.write',
+    'expenses.read':'expenses.write', 'documents.read':'documents.write',
+    'sales.read':'sales.write', 'cash.read':'cash.write',
+    'team.read':'team.manage', 'integrations.read':'integrations.manage',
+    'automations.read':'automations.manage'
+  };
+  return activePermissions.includes('*') || activePermissions.includes(permission) ||
+    (implied[permission] && activePermissions.includes(implied[permission]));
+}
 async function optionalApiGet(path) {
   try { return await Api.get(path); }
   catch (err) {
