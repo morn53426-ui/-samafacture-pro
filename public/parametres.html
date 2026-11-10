@@ -310,7 +310,13 @@
         <div class="field"><label>Adresse</label><input type="text" id="entreprise_adresse" /></div>
         <div class="field"><label>Téléphone</label><input type="tel" id="entreprise_telephone" /></div>
         <div class="field"><label>Email</label><input type="email" id="entreprise_email" /></div>
-        <div class="field"><label>NINEA / Registre de commerce</label><input type="text" id="entreprise_ninea" /></div>
+        <div class="field"><label>NINEA</label><input type="text" id="entreprise_ninea" maxlength="60" /></div>
+        <div class="field"><label>RCCM</label><input type="text" id="entreprise_rccm" maxlength="80" placeholder="Numéro du registre de commerce" /></div>
+        <div class="field"><label>Site web</label><input type="url" id="entreprise_site_web" maxlength="190" placeholder="https://www.votre-entreprise.com" /></div>
+        <div class="field"><label>Banque de règlement</label><input type="text" id="entreprise_banque" maxlength="120" placeholder="Nom de la banque" /></div>
+        <div class="field"><label>RIB / IBAN / compte de règlement</label><input type="text" id="entreprise_rib" maxlength="100" /></div>
+        <div class="field"><label>Conditions de règlement par défaut</label><textarea id="entreprise_conditions_reglement" rows="3" maxlength="5000" placeholder="Ex. Paiement à 30 jours. Acompte de 50 % à la commande."></textarea><div class="helper">Ces conditions apparaissent sur les factures et devis, sauf si vous les remplacez sur un document.</div></div>
+        <div class="field"><label>Mentions légales / pied de page</label><textarea id="entreprise_mentions_legales" rows="3" maxlength="2000" placeholder="Informations légales ou commerciales à afficher en bas des documents."></textarea></div>
         <div class="field">
           <label>Devise</label>
           <select id="devise">
@@ -476,6 +482,12 @@
     document.getElementById('entreprise_telephone').value = u.entreprise_telephone || '';
     document.getElementById('entreprise_email').value = u.entreprise_email || '';
     document.getElementById('entreprise_ninea').value = u.entreprise_ninea || '';
+    document.getElementById('entreprise_rccm').value = u.entreprise_rccm || '';
+    document.getElementById('entreprise_site_web').value = u.entreprise_site_web || '';
+    document.getElementById('entreprise_banque').value = u.entreprise_banque || '';
+    document.getElementById('entreprise_rib').value = u.entreprise_rib || '';
+    document.getElementById('entreprise_conditions_reglement').value = u.entreprise_conditions_reglement || '';
+    document.getElementById('entreprise_mentions_legales').value = u.entreprise_mentions_legales || '';
     document.getElementById('devise').value = u.devise || 'FCFA';
     document.getElementById('facture_template').value = u.facture_template || 'classique';
     fillPersonnalisation(u.facture_personnalisation || null);
@@ -706,6 +718,12 @@
         entreprise_telephone: document.getElementById('entreprise_telephone')?.value || '',
         entreprise_email: document.getElementById('entreprise_email')?.value || '',
         entreprise_ninea: document.getElementById('entreprise_ninea')?.value || '',
+        entreprise_rccm: document.getElementById('entreprise_rccm')?.value || '',
+        entreprise_site_web: document.getElementById('entreprise_site_web')?.value || '',
+        entreprise_banque: document.getElementById('entreprise_banque')?.value || '',
+        entreprise_rib: document.getElementById('entreprise_rib')?.value || '',
+        entreprise_conditions_reglement: document.getElementById('entreprise_conditions_reglement')?.value || '',
+        entreprise_mentions_legales: document.getElementById('entreprise_mentions_legales')?.value || '',
         devise: document.getElementById('devise')?.value || 'FCFA',
         facture_template: template,
         facture_personnalisation: readPersonnalisationPayload()
