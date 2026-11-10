@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 // -----------------------------------------------------------------------------
 // Génère un vrai fichier PDF pour une facture, en réutilisant EXACTEMENT le même
 // rendu HTML/CSS que la page facture-detail.html (logo, QR code, signature, et les
-// 6 modèles existants) plutôt que de réécrire ce rendu une deuxième fois côté serveur
+// 15 modèles existants) plutôt que de réécrire ce rendu une deuxième fois côté serveur
 // avec une librairie PDF séparée — ce qui aurait fini par diverger du rendu à l'écran.
 //
 // Principe : un navigateur headless (Puppeteer) ouvre la vraie page, avec un token
