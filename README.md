@@ -50,6 +50,8 @@ copy .env.example .env    (ou "cp .env.example .env" sous Git Bash/Mac/Linux)
 npm start
 ```
 
+Pour une utilisation locale, le fichier d'exemple définit `NODE_ENV=development` afin d'autoriser le sélecteur manuel de formule pour les tests. Pour tout serveur accessible publiquement, définissez impérativement `NODE_ENV=production` et utilisez des secrets forts ; le changement manuel de formule est refusé par défaut dès que l'environnement n'est pas explicitement `development` ou `test`. Docker Compose force déjà `NODE_ENV=production` dans les conteneurs.
+
 Le fichier `.env` contient déjà les valeurs par défaut d'une installation WAMPserver standard :
 
 ```
