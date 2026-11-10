@@ -95,7 +95,11 @@ anti-CSRF puis autorisé avec. **Validation du dépôt :** le workflow GitHub Ac
 `npm test` sur `main` le 10 novembre 2026 : 182 tests réussis, aucun échec ni test ignoré.
 La branche d'audit en cours ajoute des tests de sauvegarde supplémentaires qui restent à exécuter.
 
-## 5. Ce qui n'a pas été touché dans cette phase
+## 5. Protection des emails de récupération
+
+En production, le service mail n'affiche plus le corps du message dans les journaux lorsqu'aucun SMTP n'est configuré. L'erreur est signalée sans enregistrer le lien de récupération. Le endpoint de mot de passe oublié conserve une réponse générique lorsque l'envoi échoue, afin de ne pas exposer l'existence d'un compte. Le mode de journalisation du contenu reste disponible uniquement en développement local.
+
+## 6. Ce qui n'a pas été touché dans cette phase
 
 - Le stockage `localStorage` côté frontend reste la méthode active aujourd'hui — la version
   de session est vérifiée côté serveur pour qu'un jeton volé ne reste pas accepté après
