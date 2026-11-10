@@ -72,7 +72,7 @@ function permissionForRequest(req) {
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
   }
   if (base.endsWith('/pro')) {
-    if (path.startsWith('/team/invitations/accept') || path.startsWith('/team/companies')) return 'dashboard.read';
+    if (path.startsWith('/team/invitations/accept') || path.startsWith('/team/companies')) return null;
     if (path.startsWith('/team')) return method === 'GET' ? 'team.read' : 'team.manage';
     if (path.startsWith('/payments') || path.startsWith('/payment-links') || path.startsWith('/refunds') || path.startsWith('/deposits')) {
       return method === 'GET' ? 'payments.read' : 'payments.write';
