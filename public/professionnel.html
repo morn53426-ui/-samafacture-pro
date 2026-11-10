@@ -250,6 +250,7 @@ let invoicesCache = [];
 let establishmentsCache = [];
 let cashRegistersCache = [];
 let documentsCache = [];
+let currentPaymentLink = '';
 
 function el(id) { return document.getElementById(id); }
 function setList(id, html) { el(id).innerHTML = html || '<p class="pro-muted">Aucune donnée pour le moment.</p>'; }
@@ -316,13 +317,18 @@ async function loadWorkspace() {
     const select = el('company-select');
     const previous = localStorage.getItem('sf_company_owner') || '';
     select.innerHTML = '<option value="">Mon espace personnel</option>' + (companies.entreprises || []).map(c => '<option value="' + c.id + '">' + escapeHtml(c.entreprise_nom || c.nom || ('Entreprise ' + c.id)) + ' · ' + escapeHtml(c.role) + '</option>').join('');
-    select.value = previous;
+    if (!previous && (companies.entreprises || []).length === 1) {
+      select.value = String(companies.entreprises[0].id);
+      localStorage.setItem('sf_company_owner', select.value);
+    } else {
+      select.value = previous;
+    }
   } catch (err) {
     showFatalError(err.message);
   }
 }
 
-async function createDelivery(id) {
+async function copyPaymentLink() {\n  if (!currentPaymentLink) return;\n  try { await navigator.clipboard.writeText(currentPaymentLink); showToast('Lien copié.', 'success'); }\n  catch (_) { window.prompt('Copiez ce lien :', currentPaymentLink); }\n}\n\nasync function createDelivery(id) {
   try { await Api.post('/pro/orders/' + id + '/delivery-note', {}); showToast('Bon de livraison créé.', 'success'); await loadWorkspace(); }
   catch (e) { alert(e.message); }
 }
@@ -371,7 +377,7 @@ async function downloadDocument(id) {
     const headers = { 'Authorization': 'Bearer ' + Api.token(), 'X-Requested-With': 'SamaFacturePro' };
     const companyOwner = localStorage.getItem('sf_company_owner');
     if (companyOwner) headers['X-SF-Company-Owner'] = companyOwner;
-    const response = await fetch('/api/pro/documents/' + id + '/download', { headers });
+    const response = await fetch(API_BASE + '/pro/documents/' + id + '/download', { headers });
     if (!response.ok) throw new Error('Téléchargement impossible.');
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
@@ -428,8 +434,9 @@ el('link-form').addEventListener('submit', async e => {
   e.preventDefault();
   try {
     const result = await Api.post('/pro/payment-links', { facture_id: Number(el('link-invoice').value), montant: Number(el('link-amount').value), expire_jours: el('link-expiry').value || null });
+    currentPaymentLink = result.url;
     el('new-payment-link').hidden = false;
-    el('new-payment-link').innerHTML = '<strong>Lien créé</strong><p><a href="' + escapeHtml(result.url) + '" target="_blank" rel="noopener">' + escapeHtml(result.url) + '</a></p><img alt="QR code de paiement" src="' + result.qr_code + '" style="width:180px;height:180px;object-fit:contain;" /><p class="pro-note">Demande de paiement à partager. Le paiement doit être confirmé via le prestataire ou enregistré manuellement après vérification.</p><button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(' + JSON.stringify(result.url) + ').then(()=>showToast(\'Lien copié\',\'success\'))">Copier le lien</button>';
+    el('new-payment-link').innerHTML = '<strong>Lien créé</strong><p><a href="' + escapeHtml(result.url) + '" target="_blank" rel="noopener">' + escapeHtml(result.url) + '</a></p><img alt="QR code de paiement" src="' + result.qr_code + '" style="width:180px;height:180px;object-fit:contain;" /><p class="pro-note">Demande de paiement à partager. Le paiement doit être confirmé via le prestataire ou enregistré manuellement après vérification.</p><button class="btn btn-sm btn-outline" type="button" onclick="copyPaymentLink()">Copier le lien</button>';
     await loadWorkspace();
   } catch (err) { alert(err.message); }
 });
