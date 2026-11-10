@@ -97,7 +97,8 @@
         </form>
         <div id="new-payment-link" class="pro-result" hidden></div>
         <div class="pro-subsection"><h3>Liens de paiement</h3><div id="payment-links-list" class="pro-list"></div></div>
-        <div class="pro-subsection"><h3>Dernières transactions</h3><div id="payments-list" class="pro-list"></div></div>\n        <div class="pro-subsection"><h3>Demandes de remboursement</h3><div id="refunds-list" class="pro-list"></div></div>
+        <div class="pro-subsection"><h3>Dernières transactions</h3><div id="payments-list" class="pro-list"></div></div>
+        <div class="pro-subsection"><h3>Demandes de remboursement</h3><div id="refunds-list" class="pro-list"></div></div>
         <div class="pro-note">Le remboursement est une demande suivie dans SamaFacture Pro. Le débit ou crédit effectif doit être exécuté et confirmé auprès de la banque ou du prestataire de paiement.</div>
       </section>
 
@@ -339,15 +340,34 @@ async function loadWorkspace() {
   }
 }
 
-async function copyPaymentLink() {\n  if (!currentPaymentLink) return;\n  try { await navigator.clipboard.writeText(currentPaymentLink); showToast('Lien copié.', 'success'); }\n  catch (_) { window.prompt('Copiez ce lien :', currentPaymentLink); }\n}\n\nasync function createDelivery(id) {
+async function copyPaymentLink() {
+  if (!currentPaymentLink) return;
+  try { await navigator.clipboard.writeText(currentPaymentLink); showToast('Lien copié.', 'success'); }
+  catch (_) { window.prompt('Copiez ce lien :', currentPaymentLink); }
+}
+
+async function createDelivery(id) {
   try { await Api.post('/pro/orders/' + id + '/delivery-note', {}); showToast('Bon de livraison créé.', 'success'); await loadWorkspace(); }
   catch (e) { alert(e.message); }
 }
-async function receiveDeposit(id) {\n  const methode = prompt('Méthode de règlement (espèces, virement, Wave, etc.) :');\n  if (!methode) return;\n  const reference = prompt('Référence du règlement (facultatif) :') || '';\n  try { await Api.post('/pro/deposits/' + id + '/receive', { methode, reference }); await loadWorkspace(); showToast('Acompte encaissé et ajouté au solde de la facture.', 'success'); }\n  catch (e) { alert(e.message); }\n}\nasync function updateCredit(id, status) {
+async function receiveDeposit(id) {
+  const methode = prompt('Méthode de règlement (espèces, virement, Wave, etc.) :');
+  if (!methode) return;
+  const reference = prompt('Référence du règlement (facultatif) :') || '';
+  try { await Api.post('/pro/deposits/' + id + '/receive', { methode, reference }); await loadWorkspace(); showToast('Acompte encaissé et ajouté au solde de la facture.', 'success'); }
+  catch (e) { alert(e.message); }
+}
+async function updateCredit(id, status) {
   try { await Api.put('/pro/credit-notes/' + id + '/status', { statut: status }); await loadWorkspace(); }
   catch (e) { alert(e.message); }
 }
-async function updateRefund(id, statut) {\n  let reference_prestataire = '';\n  if (statut === 'rembourse') { reference_prestataire = prompt('Référence du remboursement réellement exécuté auprès du prestataire :') || ''; if (!reference_prestataire) return; }\n  try { await Api.put('/pro/refunds/' + id + '/status', { statut, reference_prestataire }); await loadWorkspace(); showToast('Statut de remboursement mis à jour.', 'success'); }\n  catch (e) { alert(e.message); }\n}\nasync function requestRefund(id, max) {
+async function updateRefund(id, statut) {
+  let reference_prestataire = '';
+  if (statut === 'rembourse') { reference_prestataire = prompt('Référence du remboursement réellement exécuté auprès du prestataire :') || ''; if (!reference_prestataire) return; }
+  try { await Api.put('/pro/refunds/' + id + '/status', { statut, reference_prestataire }); await loadWorkspace(); showToast('Statut de remboursement mis à jour.', 'success'); }
+  catch (e) { alert(e.message); }
+}
+async function requestRefund(id, max) {
   const montant = Number(prompt('Montant à demander en remboursement (maximum ' + max + ')', max));
   if (!Number.isFinite(montant) || montant <= 0) return;
   const motif = prompt('Motif du remboursement :');
@@ -436,7 +456,8 @@ el('deposit-form').addEventListener('submit', async e => {
     e.target.reset(); await loadWorkspace(); showToast('Demande d’acompte créée.', 'success');
   } catch (err) { alert(err.message); }
 });
-\nel('credit-form').addEventListener('submit', async e => {
+
+el('credit-form').addEventListener('submit', async e => {
   e.preventDefault();
   try { await Api.post('/pro/credit-notes', { facture_id: Number(el('credit-invoice').value), montant: Number(el('credit-amount').value), motif: el('credit-reason').value }); e.target.reset(); await loadWorkspace(); showToast('Avoir créé en brouillon.', 'success'); } catch (err) { alert(err.message); }
 });
