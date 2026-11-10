@@ -243,7 +243,10 @@ async function genererFactureDepuisModele(id, userId) {
     // cette correction, cette fonction dupliquait le calcul en appliquant la TVA sur le HT
     // brut (sans tenir compte de la remise), ce qui surestimait la TVA des factures
     // générées automatiquement dès qu'un modèle récurrent avait une remise configurée.
-    const { computedLignes, sous_total, total_tva, total, remise: remiseAppliquee } = computeTotals(lignes, modele.remise, modele.frais_livraison);
+    const {
+      computedLignes, sous_total, total_tva, total,
+      remise: remiseAppliquee, frais_livraison: livraisonAppliquee
+    } = computeTotals(lignes, modele.remise, modele.frais_livraison);
 
     // Numérotation atomique (même mécanisme que POST /api/factures)
     const prefix = 'FAC';
@@ -260,7 +263,7 @@ async function genererFactureDepuisModele(id, userId) {
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
        VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, modele.client_id, numero, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
+      [userId, modele.client_id, numero, remiseAppliquee, livraisonAppliquee, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
     );
     const factureId = result.insertId;
 
