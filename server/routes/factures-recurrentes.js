@@ -98,7 +98,7 @@ router.post('/', async (req, res, next) => {
       ]
     );
 
-    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ?', [result.insertId]);
+    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ recurrente: { ...rows[0], lignes: lignesClean } });
   } catch (err) { next(err); }
 });
@@ -149,7 +149,7 @@ router.put('/:id', async (req, res, next) => {
 
     await pool.query(
       `UPDATE factures_recurrentes SET libelle=?, frequence=?, prochaine_date=?, remise=?, frais_livraison=?, mode_paiement=?, commentaires=?, actif=?, envoi_auto_email=?
-       WHERE id = ?`,
+       WHERE id = ? AND user_id = ?`,
       [
         libelle ?? existing.libelle,
         freqValides.includes(frequence) ? frequence : existing.frequence,
@@ -160,11 +160,11 @@ router.put('/:id', async (req, res, next) => {
         commentaires ?? existing.commentaires,
         actif !== undefined ? (actif ? 1 : 0) : existing.actif,
         envoi_auto_email !== undefined ? (envoi_auto_email ? 1 : 0) : existing.envoi_auto_email,
-        existing.id
+        existing.id, req.tenantId
       ]
     );
 
-    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ?', [existing.id]);
+    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     res.json({ recurrente: { ...rows[0], lignes: JSON.parse(rows[0].lignes_json) } });
   } catch (err) { next(err); }
 });
@@ -188,7 +188,7 @@ router.delete('/:id', async (req, res, next) => {
   try {
     const [existingRows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     if (!existingRows.length) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
-    await pool.query('DELETE FROM factures_recurrentes WHERE id = ?', [existingRows[0].id]);
+    await pool.query('DELETE FROM factures_recurrentes WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
     res.json({ success: true });
   } catch (err) { next(err); }
 });
