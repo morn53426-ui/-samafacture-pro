@@ -40,7 +40,7 @@ function renderSidebar(activePage) {
   const navHtml = nav.map(section => `
     ${section.group ? `<div class="nav-group-label">${section.group}</div>` : ''}
     ${section.items.map(item => `
-      <a href="${item.href}" class="nav-item ${activePage === item.id ? 'active' : ''}">
+      <a href="${item.href}" class="nav-item ${activePage === item.id ? 'active' : ''}" onclick="closeSidebar()">
         <span class="ic">${Icon(item.icon)}</span><span>${item.label}</span>
       </a>
     `).join('')}
@@ -54,9 +54,9 @@ function renderSidebar(activePage) {
           <div class="name">SamaFacture</div>
           <div class="sub">Pro</div>
         </div>
-        <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu">${Icon('menu')}</button>
+        <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu" aria-controls="app-navigation" aria-expanded="false">${Icon('menu')}</button>
       </div>
-      <nav class="sidebar-nav">${navHtml}</nav>
+      <nav class="sidebar-nav" id="app-navigation" aria-label="Navigation principale">${navHtml}</nav>
       <div class="sidebar-foot">
         <button type="button" class="install-app-btn" style="display:none;" onclick="installApp()"><span class="ic">${Icon('smartphone')}</span> Installer l'application</button>
         ${window.SamaTheme ? SamaTheme.boutonHtml() : ''}
@@ -77,13 +77,21 @@ function toggleSidebar() {
   const btn = document.getElementById('mobile-toggle-btn');
   const isOpen = sidebar?.classList.toggle('open');
   overlay?.classList.toggle('show', !!isOpen);
-  if (btn) btn.innerHTML = isOpen ? Icon('x') : Icon('menu');
+  if (btn) {
+    btn.innerHTML = isOpen ? Icon('x') : Icon('menu');
+    btn.setAttribute('aria-expanded', String(!!isOpen));
+    btn.setAttribute('aria-label', isOpen ? 'Fermer le menu' : 'Ouvrir le menu');
+  }
 }
 function closeSidebar() {
   document.getElementById('app-sidebar')?.classList.remove('open');
   document.getElementById('sidebar-overlay')?.classList.remove('show');
   const btn = document.getElementById('mobile-toggle-btn');
-  if (btn) btn.innerHTML = Icon('menu');
+  if (btn) {
+    btn.innerHTML = Icon('menu');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-label', 'Ouvrir le menu');
+  }
 }
 
 function renderTopbar(title, subtitle) {
