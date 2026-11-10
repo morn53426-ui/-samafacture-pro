@@ -483,29 +483,56 @@ router.post('/', async (req, res, next) => {
 router.put('/:id/statut', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
+    await conn.beginTransaction();
+    // La facture est lue avec un verrou dans la transaction : l'état consulté pour
+    // vérifier le solde ne peut pas devenir obsolète pendant la modification.
+    const [existingRows] = await conn.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
     const existing = existingRows[0];
-    if (!existing) return res.status(404).json({ error: 'Facture introuvable.' });
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture introuvable.' });
+    }
 
     const { statut } = req.body;
     const valides = ['en_attente', 'payee', 'en_retard', 'annulee'];
-    if (!valides.includes(statut)) return res.status(400).json({ error: 'Statut invalide.' });
+    if (!valides.includes(statut)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Statut invalide.' });
+    }
 
-    await conn.beginTransaction();
-    await conn.query('UPDATE factures SET statut = ? WHERE id = ? AND user_id = ?', [statut, existing.id, req.tenantId]);
+    // Un statut "payee" ne doit jamais remplacer un encaissement : cela fausserait
+    // les soldes clients et les rapports. Les paiements doivent être enregistrés via
+    // POST /:id/paiements, qui contrôle le montant restant et met à jour le statut.
+    if (statut === 'payee' &&
+        (existing.type !== 'facture' || Number(existing.montant_paye) < Number(existing.total))) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Impossible de marquer cette facture comme payée tant que son montant total n’a pas été encaissé et enregistré.',
+        code: 'PAIEMENT_INCOMPLET'
+      });
+    }
 
-    // Symétrie avec le décompte automatique du stock (voir POST / et /transformer-en-facture
-    // ci-dessus) : annuler une facture doit restituer le stock déjà décompté, et ré-annuler
-    // l'annulation (repasser à un autre statut) doit le redécompter — sinon le stock affiché
-    // dérive silencieusement de la réalité à chaque annulation/réactivation.
+    await conn.query(
+      'UPDATE factures SET statut = ? WHERE id = ? AND user_id = ?',
+      [statut, existing.id, req.tenantId]
+    );
+
+    // Symétrie avec le décompte automatique du stock : annuler restitue le stock,
+    // réactiver une facture annulée le redécompte dans la même transaction.
     if (existing.type === 'facture' && existing.statut !== 'annulee' && statut === 'annulee') {
-      await ajusterStockFacture(conn, existing.id, req.tenantId, +1); // restitue (+ stock)
+      await ajusterStockFacture(conn, existing.id, req.tenantId, +1);
     } else if (existing.type === 'facture' && existing.statut === 'annulee' && statut !== 'annulee') {
-      await ajusterStockFacture(conn, existing.id, req.tenantId, -1); // redécompte (- stock)
+      await ajusterStockFacture(conn, existing.id, req.tenantId, -1);
     }
 
     await conn.commit();
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    const [rows] = await pool.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ?',
+      [existing.id, req.tenantId]
+    );
     res.json({ facture: rows[0] });
   } catch (err) {
     try { await conn.rollback(); } catch (_) {}
