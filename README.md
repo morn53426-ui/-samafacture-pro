@@ -246,7 +246,7 @@ TEST_DB_NAME=ma_base_de_test npm test
 
 ### Où les ajouter
 
-Les tests se trouvent dans `server/tests/`. Chaque nouveau fichier `*.test.js` y est automatiquement détecté (`node --test tests/`, le testeur intégré à Node.js — aucune dépendance supplémentaire à part `supertest` pour simuler des requêtes HTTP). `tests/setup.js` fournit les outils communs (email de test unique, nettoyage automatique des données créées).
+Les tests se trouvent dans `server/tests/`. Chaque nouveau fichier `*.test.js` y est automatiquement détecté par `npm test`. Les fichiers sont exécutés séquentiellement car ils partagent une base MySQL de test ; les scénarios de concurrence restent testés explicitement à l'intérieur des suites concernées. `tests/setup.js` fournit les outils communs (email de test unique, nettoyage automatique des données créées).
 
 **Recommandation** : avant chaque mise à jour importante du code de facturation ou d'authentification, lancez `npm test` — c'est exactement le genre de vérification qui aurait détecté immédiatement le bug `consulter.html` évoqué plus haut.
 
