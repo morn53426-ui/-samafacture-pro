@@ -71,6 +71,8 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 **Correction proposée :**
 - `computeTotals()` renvoie maintenant les frais de livraison normalisés, utilisés par la création standard, l'API publique et les factures récurrentes ;
 - les frais de livraison des factures dupliquées sont revalidés ;
+- quantités, prix unitaires et taux de TVA sont normalisés à deux décimales avant calcul, comme dans les colonnes MySQL ;
+- le sous-total est arrondi avant remise et total TTC ;
 - les paiements sont arrondis au centime avant comparaison et écriture, les montants nuls après arrondi sont refusés ;
 - méthodes et références de paiement sont nettoyées et limitées à la taille des colonnes ;
 - tests de régression sur frais négatifs, arrondis et références.
