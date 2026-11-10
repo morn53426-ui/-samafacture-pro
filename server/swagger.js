@@ -78,7 +78,7 @@ const definition = {
           objet: { type: 'string', nullable: true, maxLength: 190 },
           reference_externe: { type: 'string', nullable: true, maxLength: 100 },
           conditions_reglement: { type: 'string', nullable: true, maxLength: 5000 },
-          sous_total: { type: 'number' }
+          sous_total: { type: 'number' },
           total_tva: { type: 'number' },
           remise: { type: 'number' },
           frais_livraison: { type: 'number' },
