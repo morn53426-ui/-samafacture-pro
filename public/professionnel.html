@@ -317,12 +317,7 @@ async function loadWorkspace() {
     const select = el('company-select');
     const previous = localStorage.getItem('sf_company_owner') || '';
     select.innerHTML = '<option value="">Mon espace personnel</option>' + (companies.entreprises || []).map(c => '<option value="' + c.id + '">' + escapeHtml(c.entreprise_nom || c.nom || ('Entreprise ' + c.id)) + ' · ' + escapeHtml(c.role) + '</option>').join('');
-    if (!previous && (companies.entreprises || []).length === 1) {
-      select.value = String(companies.entreprises[0].id);
-      localStorage.setItem('sf_company_owner', select.value);
-    } else {
-      select.value = previous;
-    }
+    select.value = previous;
   } catch (err) {
     showFatalError(err.message);
   }
