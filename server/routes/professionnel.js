@@ -431,7 +431,9 @@ router.post('/team/invitations', async (req, res, next) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const role = String(req.body.role || 'employe').trim();
     const allowedRoles = ['administrateur','manager','comptable','commercial','caissier','employe','lecture_seule'];
-    let permissions = Array.isArray(req.body.permissions) ? req.body.permissions : ROLE_PERMISSIONS[role];
+    const allowedPermissions = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','integrations.read','integrations.manage','automations.read','automations.manage','audit.read'];
+    let permissions = ROLE_PERMISSIONS[role];
+    if (role === 'personnalise') permissions = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions.filter(p => allowedPermissions.includes(p)))] : [];
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (!allowedRoles.includes(role) && role !== 'personnalise')) return res.status(400).json({ error: 'Adresse email ou rôle invalide.' });
     if (!Array.isArray(permissions) || !permissions.length || permissions.length > 30) return res.status(400).json({ error: 'Les permissions du rôle sont invalides.' });
     const [already] = await pool.query('SELECT id FROM pro_team_members WHERE owner_user_id = ? AND active = 1 AND member_user_id IN (SELECT id FROM users WHERE email = ?)', [owner(req), email]);
