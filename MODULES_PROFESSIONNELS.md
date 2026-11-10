@@ -66,7 +66,7 @@ L'envoi WhatsApp automatique n'est pas activé : il nécessite une intégration 
 
 ## Mise à niveau de la base de données
 
-La version de schéma proposée par la PR #3 est portée à 7. La migration ajoute notamment `users.token_version` et `facture_usage_mensuelle` ; les tables professionnelles existantes restent en place. Le compteur mensuel des factures gratuites est conservé même après suppression d'une facture et s'applique aux créations, duplications, conversions de devis et factures récurrentes. Avant le déploiement, effectuez une sauvegarde MySQL vérifiée et testez la migration v5 → v7 sur une copie de staging.
+La version de schéma proposée par la PR #3 est portée à 7. La migration ajoute notamment `users.token_version` et `facture_usage_mensuelle` ; les tables professionnelles existantes restent en place. Le registre mensuel suit toutes les factures créées pendant la période, y compris sous un plan payant ; la limite de 10 est appliquée aux comptes Gratuit. Un retour de Pro vers Gratuit au milieu du mois ne réinitialise donc pas le compteur. Une suppression de facture ne libère pas une unité déjà consommée. Le registre s'applique aux créations, API publique, duplications, conversions de devis et factures récurrentes. Avant le déploiement, effectuez une sauvegarde MySQL vérifiée et testez la migration v5 → v7 sur une copie de staging.
 
 ## Configuration à prévoir
 
