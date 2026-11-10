@@ -1491,3 +1491,247 @@ img {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* SamaFacture Pro — système visuel commun à toutes les pages */
+:root {
+  --surface-muted: color-mix(in srgb, var(--cream) 72%, var(--paper));
+  --border-strong: color-mix(in srgb, var(--line) 78%, var(--ink-soft));
+  --focus-ring: 0 0 0 4px color-mix(in srgb, var(--emerald) 18%, transparent);
+}
+.page-header {
+  position: relative;
+  padding: 4px 0 18px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.page-header h1 {
+  font-size: clamp(1.45rem, 2.5vw, 2rem);
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1.16;
+  margin: 0;
+}
+.page-header p {
+  color: var(--ink-soft);
+  font-size: 0.91rem;
+  line-height: 1.5;
+  margin: 7px 0 0;
+  max-width: 68ch;
+}
+.topbar h1, .lp-hero h1, .auth-form-card h2 { letter-spacing: -0.045em; }
+.card {
+  border-color: color-mix(in srgb, var(--line) 90%, var(--paper));
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(15, 27, 51, 0.025), 0 7px 22px rgba(15, 27, 51, 0.045);
+}
+.card > h3:first-child, .card > h2:first-child {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.card:has(> table) { padding: 0; overflow-x: auto; }
+.card:has(> table) > table { margin: 0; }
+.card table thead th {
+  background: var(--surface-muted);
+  color: var(--ink-soft);
+  font-size: 0.69rem;
+  letter-spacing: 0.075em;
+  font-weight: 700;
+  border-bottom-color: var(--line);
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.card table tbody td { padding-top: 13px; padding-bottom: 13px; }
+.card table tbody tr { transition: background-color var(--dur-fast) var(--ease-standard); }
+
+/* Pictogrammes SVG cohérents dans la navigation, les actions et les cartes. */
+.icon {
+  width: 1.12em;
+  height: 1.12em;
+  stroke-width: 1.9;
+  vertical-align: -0.15em;
+  flex: 0 0 auto;
+}
+.ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.btn .ic, .btn .icon { width: 1.05em; height: 1.05em; }
+.btn {
+  border-radius: 10px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  box-shadow: 0 1px 1px rgba(15, 27, 51, 0.035);
+}
+.btn-primary { box-shadow: 0 4px 12px rgba(14, 169, 128, 0.16); }
+.btn-danger { box-shadow: none; }
+.btn-sm { padding: 8px 11px; border-radius: 9px; font-size: 0.8rem; }
+
+/* Barre latérale : icônes comme repères visuels, tout en gardant le menu compact. */
+.nav-item {
+  gap: 10px;
+  min-height: 46px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-weight: 550;
+}
+.nav-item .ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #BFCBE2;
+  font-size: 1.02rem;
+  transition: color var(--dur-fast), background var(--dur-fast), transform var(--dur-fast);
+}
+.nav-item .ic .icon { width: 18px; height: 18px; }
+.nav-item:hover .ic { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.nav-item.active .ic { color: #fff; background: rgba(255, 255, 255, 0.16); }
+.nav-group-label {
+  margin-top: 22px;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.11em;
+}
+.sidebar-brand .mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.22);
+}
+
+/* Cartes KPI, états vides et formulaires. */
+.stat-card { gap: 12px; min-height: 150px; }
+.stat-card .stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  font-size: 1.18rem;
+}
+.stat-card .stat-icon .icon { width: 21px; height: 21px; }
+.stat-card .stat-label { font-size: 0.78rem; font-weight: 650; letter-spacing: 0.01em; }
+.empty-state .ic {
+  width: 58px;
+  height: 58px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--emerald);
+}
+.empty-state .ic .icon { width: 25px; height: 25px; }
+.field label {
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+}
+input[type=text], input[type=email], input[type=password], input[type=number],
+input[type=date], input[type=tel], input[type=search], input[type=url], select, textarea {
+  min-height: 43px;
+  border-color: var(--border-strong);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 1px rgba(15, 27, 51, 0.025);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--emerald);
+  box-shadow: var(--focus-ring);
+}
+textarea { line-height: 1.55; }
+
+/* Modales plus nettes et mieux détachées du fond. */
+[id$="modal"], div[style*="z-index:60"] {
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+[id$="modal"] > .card, div[style*="z-index:60"] > .card {
+  border: 1px solid color-mix(in srgb, var(--line) 76%, var(--paper));
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+}
+
+/* Site public, centre d'aide et pages d'authentification. */
+.lp-header { padding-top: 18px; padding-bottom: 18px; }
+.lp-header .brand img {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  box-shadow: var(--shadow-sm);
+}
+.lp-header nav a:not(.btn) {
+  padding: 8px 10px;
+  border-radius: 9px;
+  transition: color var(--dur-fast), background var(--dur-fast);
+}
+.lp-header nav a:not(.btn):hover {
+  color: var(--emerald);
+  background: var(--emerald-light);
+}
+.lp-hero {
+  padding-top: clamp(36px, 6vw, 76px);
+  padding-bottom: clamp(48px, 7vw, 88px);
+  gap: clamp(28px, 5vw, 64px);
+}
+.lp-hero h1 {
+  max-width: 13ch;
+  font-size: clamp(2rem, 4.4vw, 3.35rem);
+  line-height: 1.08;
+}
+.lp-hero p.lead { line-height: 1.75; }
+.lp-hero-img {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+}
+.lp-feature-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--dur-base), box-shadow var(--dur-base), border-color var(--dur-base);
+}
+.lp-feature-card .ic { width: 48px; height: 48px; border-radius: 14px; }
+.lp-content { padding-top: clamp(24px, 4vw, 48px); }
+.lp-content > h1 {
+  font-size: clamp(1.8rem, 3.2vw, 2.5rem);
+  letter-spacing: -0.04em;
+}
+.lp-content .card { margin-bottom: 16px; }
+.auth-form-card {
+  max-width: 390px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 18px 52px rgba(15, 27, 51, 0.12);
+}
+.auth-form-card .auth-form-badge .mark { width: 38px; height: 38px; border-radius: 11px; }
+.auth-form-card .auth-form-badge span { color: var(--ink); letter-spacing: 0.045em; }
+
+/* Contraste adapté au thème sombre. */
+:root[data-theme="dark"] .icon-navy,
+:root:not([data-theme="light"]) .icon-navy { background: #26334D; color: #B9C8E8; }
+:root[data-theme="dark"] .lp-feature-card,
+:root:not([data-theme="light"]) .lp-feature-card {
+  background: var(--paper);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .card:has(> table) thead th,
+:root:not([data-theme="light"]) .card:has(> table) thead th {
+  background: color-mix(in srgb, var(--paper) 84%, var(--ink));
+}
+
+@media (max-width: 900px) {
+  .nav-item .ic { width: 36px; height: 36px; }
+  .sidebar-brand { padding: 16px 18px; }
+}
+@media (max-width: 640px) {
+  .page-header { padding-bottom: 14px; margin-bottom: 16px; }
+  .page-header h1 { font-size: clamp(1.35rem, 6vw, 1.7rem); }
+  .card:has(> table) { border-radius: 13px; }
+  .lp-header { padding-left: 18px; padding-right: 18px; }
+  .lp-features { padding: 42px 18px; }
+  .lp-features h2 { font-size: 1.55rem; margin-bottom: 28px; }
+  .auth-form-card { padding: 30px 22px 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-feature-card, .lp-header nav a:not(.btn), .nav-item .ic { transition: none; }
+}
