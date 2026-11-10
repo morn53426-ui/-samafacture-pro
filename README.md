@@ -111,10 +111,13 @@ Pour héberger l'application en dehors de votre machine :
 Pour un hébergement auto-géré avec Docker plutôt qu'une plateforme comme Render/Railway :
 
 ```bash
-cp server/.env.example server/.env   # renseignez vos valeurs (JWT_SECRET est généré
-                                      # automatiquement au premier démarrage si laissé tel quel)
+cp server/.env.example server/.env   # renseignez toutes les variables avant le démarrage
+# Générez JWT_SECRET avec `openssl rand -hex 48` et DATA_ENCRYPTION_KEY avec `openssl rand -hex 32`.
+# En production, le serveur refuse de démarrer avec le JWT_SECRET de démonstration.
+docker compose --env-file server/.env config --quiet
 docker compose --env-file server/.env up -d --build
-docker compose logs -f app
+docker compose --env-file server/.env ps
+docker compose --env-file server/.env logs -f app
 ```
 
 `docker-compose.yml` (à la racine du dépôt) démarre deux services : l'API (`Dockerfile`, basé
@@ -124,7 +127,7 @@ un MySQL managé externe, supprimez le service `mysql` du fichier et pointez `DB
 votre base dans `server/.env`.
 
 Le conteneur applicatif inclut :
-- une vérification de santé Docker (`HEALTHCHECK`) réutilisant `/api/health` (qui teste la vraie connexion MySQL) ;
+- une vérification de disponibilité Docker (`HEALTHCHECK`) sur `/api/ready`, qui contrôle MySQL et Redis lorsqu'il est configuré (`/api/health` vérifie seulement que le processus HTTP répond) ;
 - `dumb-init` comme processus n°1, pour que l'arrêt propre déjà implémenté dans `app.js` (fin des requêtes en cours, fermeture du pool MySQL) se déclenche réellement à l'arrêt du conteneur ;
 - un utilisateur système non-root.
 
@@ -134,11 +137,10 @@ réel). N'oubliez pas `TRUST_PROXY=true` dans `server/.env` lorsque l'app tourne
 reverse proxy — sinon le rate-limiting et les logs verraient l'IP du proxy au lieu de celle
 du visiteur.
 
-**CORS en production** : définissez `ALLOWED_ORIGINS` dans `server/.env` (ex.
-`https://votredomaine.com`) avant une mise en production réelle. Sans cette variable, l'API
-reste ouverte à toute origine (comportement historique du projet, conservé pour ne pas casser
-un déploiement existant) — un avertissement s'affiche au démarrage si `NODE_ENV=production`
-et que la variable est absente.
+**CORS en production** : définissez `ALLOWED_ORIGINS` dans `server/.env` si des clients
+cross-origin doivent être autorisés (ex. `https://votredomaine.com`). En production, si la
+variable est absente, les requêtes cross-origin sont refusées par défaut ; les requêtes
+same-origin servies par l'application continuent de fonctionner.
 
 ### Tests et validation
 
@@ -151,9 +153,16 @@ d'isolation multi-entreprises et de permissions, de génération PDF, ainsi que 
 autonomes de sécurité des webhooks. Le résultat réel (succès ou échec) est consultable
 dans l'onglet **Actions** de GitHub après l'exécution du workflow.
 
-La CI ne remplace pas la recette de staging : avant la mise en production, il reste nécessaire
-de vérifier les parcours complets dans un navigateur, les emails réels, les webhooks vers des
-destinations de test contrôlées, les sauvegardes et la restauration.
+Un contrôle HTTP non destructif de l'instance de staging peut être lancé avec
+`SAMAFACTURE_BASE_URL=https://staging.votre-domaine.tld npm run smoke:staging`
+depuis le dossier `server/`. Il vérifie la liveness, la readiness MySQL/Redis, la page
+d'accueil et le refus d'une route API sans jeton. Pour les contrôles métier, la recette
+détaillée est documentée dans [RECETTE_PREPRODUCTION.md](RECETTE_PREPRODUCTION.md).
+
+La CI et le smoke test ne remplacent pas la recette de staging : il faut encore vérifier
+les parcours complets dans un navigateur, les emails réels de test, les webhooks vers des
+destinations de test contrôlées, ainsi que la sauvegarde et sa restauration dans une base
+distincte.
 
 ## Sécurité et fiabilité
 
