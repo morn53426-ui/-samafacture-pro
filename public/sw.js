@@ -1,6 +1,6 @@
 // v2 : force la purge du cache v1, qui pouvait contenir des pages HTML avec une CSP obsolète
 // mise en cache par erreur (voir correctif du fetch handler plus bas).
-const CACHE_NAME = 'samafacture-shell-v3';
+const CACHE_NAME = 'samafacture-shell-v4';
 
 // Fichiers statiques de l'interface (l'API n'est jamais mise en cache : les données doivent
 // toujours être à jour).
