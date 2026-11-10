@@ -9,7 +9,8 @@ function renderSidebar(activePage) {
       { id: 'factures', icon: 'file-text', label: 'Factures', href: 'factures.html' },
       { id: 'devis', icon: 'file-stack', label: 'Devis', href: 'devis.html' },
       { id: 'nouvelle-facture', icon: 'plus', label: 'Nouvelle facture', href: 'nouvelle-facture.html' },
-      { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' }
+      { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
+      { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' }
     ]},
     { group: 'Catalogue', items: [
       { id: 'produits', icon: 'package', label: 'Produits', href: 'produits.html' }
