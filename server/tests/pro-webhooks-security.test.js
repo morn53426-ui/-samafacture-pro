@@ -17,7 +17,7 @@ test('les plages IPv4 privées, locales et réservées sont bloquées', () => {
   for (const address of [
     '0.0.0.0', '10.20.30.40', '100.64.0.1', '127.0.0.1',
     '169.254.10.20', '172.16.0.1', '172.31.255.254',
-    '192.0.2.10', '192.168.1.1', '198.18.0.1',
+    '192.0.0.1', '192.0.2.10', '192.88.99.1', '192.168.1.1', '198.18.0.1',
     '198.51.100.20', '203.0.113.5', '224.0.0.1', '255.255.255.255'
   ]) {
     assert.equal(isPrivateAddress(address), true, address + ' doit être refusée');
@@ -29,7 +29,7 @@ test('les plages IPv4 privées, locales et réservées sont bloquées', () => {
 test('les plages IPv6 locales, mappées et réservées sont bloquées', () => {
   for (const address of [
     '::', '::1', '::ffff:127.0.0.1', 'fc00::1', 'fd12:3456::1',
-    'fe80::1', 'fec0::1', 'ff02::1', '2001:db8::1', '2001:10::1'
+    'fe80::1', 'fec0::1', 'fed0::1', 'feff::1', 'ff02::1', '2001:db8::1', '2001:10::1'
   ]) {
     assert.equal(isPrivateAddress(address), true, address + ' doit être refusée');
   }
