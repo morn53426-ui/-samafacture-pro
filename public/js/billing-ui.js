@@ -101,14 +101,14 @@
           tone: 'tone-gold',
           label: 'En attente',
           value: String(stats.factures_en_attente && stats.factures_en_attente.n != null ? stats.factures_en_attente.n : 0),
-          meta: formatMontant(stats.factures_en_attente && stats.factures_en_attente.total || 0) + ' à recevoir'
+          meta: formatMontant(stats.factures_en_attente && stats.factures_en_attente.total || 0) + ' en attente de règlement'
         },
         {
           icon: 'alert-triangle',
           tone: 'tone-clay',
           label: 'En retard',
           value: String(stats.factures_en_retard && stats.factures_en_retard.n != null ? stats.factures_en_retard.n : 0),
-          meta: formatMontant(stats.factures_en_retard && stats.factures_en_retard.total || 0) + ' à relancer'
+          meta: formatMontant(stats.factures_en_retard && stats.factures_en_retard.total || 0) + ' de factures échues'
         }
       ];
 
