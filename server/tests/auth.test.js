@@ -162,7 +162,7 @@ describe('Authentification', () => {
   });
 
   test('la remise à zéro efface toutes les données opérationnelles professionnelles sans supprimer le compte ni ses paramètres', async () => {
-    const login = await request(app).post('/api/auth/login').send({ email, password: 'nouveau-mot-de-passe-2026' });
+    const login = await request(app).post('/api/auth/login').send({ email, password });
     assert.equal(login.status, 200);
     const token = login.body.token;
     const suffix = String(Date.now());
