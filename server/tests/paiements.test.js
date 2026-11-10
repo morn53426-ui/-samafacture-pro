@@ -73,6 +73,75 @@ describe("Paiements d'abonnement", () => {
     assert.equal(utilisateur.plan, 'starter');
   });
 
+  test("un échec de mise à jour du plan annule aussi la confirmation du paiement", async () => {
+    const reference = `test-atomic-${Date.now()}`;
+    const [insert] = await pool.query(
+      `INSERT INTO abonnement_paiements (user_id, plan, montant, devise, fournisseur, reference, internal_reference, statut)
+       VALUES (?, 'pro', 15000, 'XOF', 'paydunya', ?, ?, 'en_attente')`,
+      [userId, reference, reference]
+    );
+    const triggerName = 'trg_sf_test_fail_plan_upgrade';
+    await pool.query(`
+      CREATE TRIGGER ${triggerName}
+      BEFORE UPDATE ON users
+      FOR EACH ROW
+      BEGIN
+        IF NEW.id = ${Number(userId)} AND NEW.plan = 'pro' THEN
+          SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'forced plan update failure';
+        END IF;
+      END
+    `);
+
+    try {
+      const { confirmerPaiementPourTests } = require('../routes/abonnement');
+      const [[payment]] = await pool.query('SELECT * FROM abonnement_paiements WHERE id = ?', [insert.insertId]);
+      await assert.rejects(
+        confirmerPaiementPourTests(payment, 15000),
+        /forced plan update failure/i
+      );
+
+      const [[afterPayment]] = await pool.query(
+        'SELECT statut, paid_at FROM abonnement_paiements WHERE id = ?',
+        [insert.insertId]
+      );
+      assert.equal(afterPayment.statut, 'en_attente');
+      assert.equal(afterPayment.paid_at, null);
+
+      const [[user]] = await pool.query('SELECT plan FROM users WHERE id = ?', [userId]);
+      assert.equal(user.plan, 'starter');
+    } finally {
+      await pool.query(`DROP TRIGGER IF EXISTS ${triggerName}`);
+    }
+  });
+
+  test("un ancien webhook payé après un paiement plus récent ne rétrograde pas le plan", async () => {
+    const oldReference = `test-old-${Date.now()}`;
+    const newReference = `test-new-${Date.now()}`;
+    const [oldInsert] = await pool.query(
+      `INSERT INTO abonnement_paiements (user_id, plan, montant, devise, fournisseur, reference, internal_reference, statut, created_at)
+       VALUES (?, 'starter', 5000, 'XOF', 'wave', ?, ?, 'en_attente', DATE_SUB(NOW(), INTERVAL 1 DAY))`,
+      [userId, oldReference, oldReference]
+    );
+    const [newInsert] = await pool.query(
+      `INSERT INTO abonnement_paiements (user_id, plan, montant, devise, fournisseur, reference, internal_reference, statut)
+       VALUES (?, 'pro', 15000, 'XOF', 'wave', ?, ?, 'en_attente')`,
+      [userId, newReference, newReference]
+    );
+
+    const { confirmerPaiementPourTests } = require('../routes/abonnement');
+    const [[newer]] = await pool.query('SELECT * FROM abonnement_paiements WHERE id = ?', [newInsert.insertId]);
+    const [[older]] = await pool.query('SELECT * FROM abonnement_paiements WHERE id = ?', [oldInsert.insertId]);
+
+    await confirmerPaiementPourTests(newer, 15000);
+    await confirmerPaiementPourTests(older, 5000);
+
+    const [[user]] = await pool.query('SELECT plan FROM users WHERE id = ?', [userId]);
+    assert.equal(user.plan, 'pro');
+
+    const [[oldAfter]] = await pool.query('SELECT statut FROM abonnement_paiements WHERE id = ?', [oldInsert.insertId]);
+    assert.equal(oldAfter.statut, 'payee');
+  });
+
   test('un montant confirmé différent du montant attendu est refusé (pas de crédit)', async () => {
     const reference = `test-montant-${Date.now()}`;
     const [insert] = await pool.query(
