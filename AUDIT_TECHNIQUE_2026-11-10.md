@@ -64,6 +64,17 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 - feuille de route mise à jour pour ne pas présenter les rôles d'équipe, le wrapper mobile Capacitor ou la signature interne comme des fonctionnalités inexistantes ;
 - paiements d'abonnement et règlements de factures explicitement distingués.
 
+### Haute — cohérence des montants comptables
+
+**Avant :** les frais de livraison négatifs pouvaient être calculés comme zéro, mais enregistrés comme une valeur négative dans certaines routes. Les paiements acceptaient aussi plus de deux décimales avant leur insertion dans les colonnes MySQL `DECIMAL(14,2)`, ce qui pouvait produire des arrondis différents entre saisie, transaction et affichage. Certaines références pouvaient dépasser la taille de la colonne MySQL.
+
+**Correction proposée :**
+- `computeTotals()` renvoie maintenant les frais de livraison normalisés, utilisés par la création standard, l'API publique et les factures récurrentes ;
+- les frais de livraison des factures dupliquées sont revalidés ;
+- les paiements sont arrondis au centime avant comparaison et écriture, les montants nuls après arrondi sont refusés ;
+- méthodes et références de paiement sont nettoyées et limitées à la taille des colonnes ;
+- tests de régression sur frais négatifs, arrondis et références.
+
 ## 4. Points à améliorer avant commercialisation
 
 | Priorité | Sujet | Situation constatée / travail restant |
