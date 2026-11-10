@@ -109,7 +109,7 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
     const dateEmission = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.date_emission || '')) ? req.body.date_emission : new Date().toISOString().slice(0, 10);
     const [result] = await conn.query(
       'INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, statut, remise, frais_livraison, commentaires, sous_total, total_tva, total, verification_code, idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, clientId, numero, 'facture', dateEmission, req.body.date_echeance || null, 'en_attente', totals.remise, Number(req.body.frais_livraison) || 0, String(req.body.commentaires || '').slice(0, 2000) || null, totals.sous_total, totals.total_tva, totals.total, crypto.randomBytes(4).toString('hex').toUpperCase(), idempotencyKey]
+      [uid, clientId, numero, 'facture', dateEmission, req.body.date_echeance || null, 'en_attente', totals.remise, totals.frais_livraison, String(req.body.commentaires || '').slice(0, 2000) || null, totals.sous_total, totals.total_tva, totals.total, crypto.randomBytes(4).toString('hex').toUpperCase(), idempotencyKey]
     );
     await insererLignesFacture(conn, result.insertId, totals.computedLignes);
     await ajusterStockFacture(conn, result.insertId, uid, -1);
