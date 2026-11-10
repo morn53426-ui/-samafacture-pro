@@ -296,6 +296,43 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(numerosUniques.size, numeros.length, `numéros en double détectés : ${numeros.join(', ')}`);
   });
 
+  test('une facture ne peut pas être déclarée payée sans encaissement complet enregistré', async () => {
+    const created = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Statut payé sécurisé', quantite: 1, prix_unitaire: 1000, tva: 0 }] });
+    assert.equal(created.status, 201, created.text);
+    const factureId = created.body.facture.id;
+
+    const paidWithoutCollection = await request(app)
+      .put(`/api/factures/${factureId}/statut`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ statut: 'payee' });
+    assert.equal(paidWithoutCollection.status, 409, paidWithoutCollection.text);
+    assert.equal(paidWithoutCollection.body.code, 'PAIEMENT_INCOMPLET');
+
+    const partial = await request(app)
+      .post(`/api/factures/${factureId}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 500, methode: 'Espèces' });
+    assert.equal(partial.status, 201, partial.text);
+    assert.equal(partial.body.facture.statut, 'en_attente');
+
+    const paidWithPartialCollection = await request(app)
+      .put(`/api/factures/${factureId}/statut`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ statut: 'payee' });
+    assert.equal(paidWithPartialCollection.status, 409, paidWithPartialCollection.text);
+
+    const remaining = await request(app)
+      .post(`/api/factures/${factureId}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 500, methode: 'Espèces' });
+    assert.equal(remaining.status, 201, remaining.text);
+    assert.equal(remaining.body.facture.statut, 'payee');
+    assert.equal(Number(remaining.body.facture.montant_paye), 1000);
+  });
+
   test('un paiement négatif ou nul est refusé', async () => {
     const facture = await request(app)
       .post('/api/factures')
