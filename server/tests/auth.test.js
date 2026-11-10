@@ -22,7 +22,7 @@ describe('Authentification', () => {
   test('inscription avec des informations valides crée un compte et renvoie un jeton', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Utilisateur Test', email, password, entreprise_nom: 'Boutique Test' });
+      .send({ nom: 'Utilisateur Test', email, password, entreprise_nom: 'Entreprise Test' });
 
     assert.equal(res.status, 201);
     assert.ok(res.body.token, 'un jeton JWT doit être renvoyé');
@@ -263,7 +263,7 @@ describe('Authentification', () => {
     // Les paramètres et l'identité du compte sont conservés ; les intégrations ne sont pas
     // supprimées silencieusement, mais leur ancienne file d'événements est vidée.
     const [[user]] = await pool.query('SELECT entreprise_nom, plan FROM users WHERE id = ?', [userId]);
-    assert.equal(user.entreprise_nom, 'Boutique Test');
+    assert.equal(user.entreprise_nom, 'Entreprise Test');
     assert.equal(Number((await pool.query('SELECT COUNT(*) AS n FROM pro_webhooks WHERE user_id = ?', [userId]))[0][0].n), 1);
     assert.equal(Number((await pool.query('SELECT COUNT(*) AS n FROM pro_api_keys WHERE user_id = ?', [userId]))[0][0].n), 1);
 
@@ -271,7 +271,7 @@ describe('Authentification', () => {
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${token}`);
     assert.equal(stillAuthenticated.status, 200);
-    assert.equal(stillAuthenticated.body.user.entreprise_nom, 'Boutique Test');
+    assert.equal(stillAuthenticated.body.user.entreprise_nom, 'Entreprise Test');
   });
 
   test('la réinitialisation du mot de passe révoque les sessions et consomme le lien une seule fois', async () => {
