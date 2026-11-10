@@ -632,6 +632,10 @@ router.post('/documents', async (req, res, next) => {
     if (!name || !allowed.includes(mime) || !raw) return res.status(400).json({ error: 'Nom, type PDF/JPEG/PNG et contenu requis.' });
     const content = Buffer.from(raw, 'base64');
     if (!content.length || content.length > 5 * 1024 * 1024) return res.status(400).json({ error: 'Le document doit peser moins de 5 Mo.' });
+    const isPdf = mime === 'application/pdf' && content.subarray(0, 5).toString('ascii') === '%PDF-';
+    const isPng = mime === 'image/png' && content.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]));
+    const isJpeg = mime === 'image/jpeg' && content.length >= 3 && content[0] === 0xff && content[1] === 0xd8 && content[2] === 0xff;
+    if (!isPdf && !isPng && !isJpeg) return res.status(400).json({ error: 'Le contenu du fichier ne correspond pas à son type PDF/JPEG/PNG déclaré.' });
     if (req.body.facture_id && !await invoiceOwned(uid, Number(req.body.facture_id))) return res.status(404).json({ error: 'Facture introuvable.' });
     if (req.body.client_id && !await clientOwned(uid, Number(req.body.client_id))) return res.status(404).json({ error: 'Client introuvable.' });
     const [result] = await pool.query('INSERT INTO pro_documents (user_id, facture_id, client_id, nom_fichier, mime_type, taille_octets, contenu) VALUES (?, ?, ?, ?, ?, ?, ?)', [uid, req.body.facture_id || null, req.body.client_id || null, name, mime, content.length, content]);
@@ -653,6 +657,10 @@ router.post('/documents/:id/signature', async (req, res, next) => {
     const nom = String(req.body.nom || '').trim().slice(0, 190);
     const data = String(req.body.signature_data || '');
     if (!nom || !/^data:image\/(png|jpeg);base64,/.test(data) || data.length > 700000) return res.status(400).json({ error: 'Nom du signataire et signature PNG/JPEG valides requis.' });
+    const signatureBytes = Buffer.from(data.slice(data.indexOf(',') + 1), 'base64');
+    const signaturePng = data.startsWith('data:image/png;') && signatureBytes.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]));
+    const signatureJpeg = data.startsWith('data:image/jpeg;') && signatureBytes.length >= 3 && signatureBytes[0] === 0xff && signatureBytes[1] === 0xd8 && signatureBytes[2] === 0xff;
+    if (!signaturePng && !signatureJpeg) return res.status(400).json({ error: 'La signature image ne possède pas un contenu PNG/JPEG valide.' });
     const hash = crypto.createHash('sha256').update(data).digest('hex');
     const [result] = await pool.query('UPDATE pro_documents SET signature_nom = ?, signature_data = ?, signature_hash = ?, signed_at = NOW() WHERE id = ? AND user_id = ?', [nom, data, hash, req.params.id, owner(req)]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Document introuvable.' });
