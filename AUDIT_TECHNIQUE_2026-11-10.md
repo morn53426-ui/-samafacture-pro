@@ -24,7 +24,7 @@ La revue a porté sur le code serveur Node.js/Express, MySQL, les schémas et mi
 
 **Avant :** la déconnexion supprimait le cookie, mais ne révoquait pas un JWT Bearer déjà copié ou volé. La réinitialisation du mot de passe ne rendait pas non plus les anciens JWT invalides. Un lien de réinitialisation pouvait être présenté simultanément à deux requêtes.
 
-**Correction proposée :**
+**Correction apportée sur la branche de la PR #3 :**
 - ajout de `users.token_version` (migration v6) ;
 - vérification de cette version à chaque authentification ;
 - incrément de la version lors de la déconnexion et de la réinitialisation ;
@@ -38,7 +38,7 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 
 **Avant :** sans SMTP configuré, le service email affichait le contenu complet du message sur la sortie standard, y compris le lien de réinitialisation et son jeton. Ce mode est utile en développement, mais un journal de production ne doit pas devenir un canal de récupération de comptes.
 
-**Correction proposée :**
+**Correction apportée sur la branche de la PR #3 :**
 - le fallback qui affiche le contenu des messages est réservé au développement ;
 - en production, un SMTP absent provoque une erreur sans journaliser le contenu ;
 - le parcours « mot de passe oublié » conserve une réponse générique même si l'envoi échoue ;
@@ -53,24 +53,39 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 - initialisation rétrocompatible depuis les factures existantes du mois lors de la première réservation ;
 - fonction commune `reserveMonthlyInvoiceQuota()` avec verrouillage du compte et réservation dans la même transaction que l'opération ;
 - contrôle appliqué à la création standard, à l'API publique, à la duplication d'une facture, à la conversion d'un devis et à la génération d'une facture récurrente ;
+- verrouillage du compte avant le verrou du modèle récurrent, afin de conserver un ordre cohérent entre les transactions de création ;
 - une suppression de facture ne libère plus une unité déjà consommée ;
-- migration de schéma v7 et tests de régression des parcours de contournement.
+- le compteur suit aussi les factures créées sous une formule payante : revenir au plan Gratuit au milieu du mois ne redonne pas un quota neuf ;
+- migration de schéma v7 et tests de régression couvrant création, API publique, duplication, conversion de devis, récurrence, suppression et changement de formule.
 
 ### Critique — changement manuel de formule sans paiement
 
 **Avant :** la route authentifiée `PUT /api/auth/plan` permettait à tout utilisateur connecté d'attribuer directement à son compte le plan `starter`, `pro` ou `entreprise`. Le contrôle des fonctionnalités basé sur le plan pouvait donc être contourné sans paiement confirmé.
 
 **Correction apportée sur la branche de la PR #3 :**
-- la route refuse les changements manuels dès que `NODE_ENV=production` (HTTP 403, code `PLAN_MANUAL_DISABLED`) ;
+- la route autorise le changement manuel uniquement lorsque `NODE_ENV` vaut explicitement `development` ou `test` ; tout environnement absent/inconnu ou de production reçoit HTTP 403 (`PLAN_MANUAL_DISABLED`) ;
 - le serveur expose un indicateur `manual_plan_selection` et l'interface masque le sélecteur de test en production ;
 - un test de régression vérifie qu'un compte Gratuit ne peut pas s'attribuer le plan Entreprise ;
 - les plans payants doivent être activés par le traitement d'un paiement d'abonnement confirmé.
+
+### Haute — confirmation des paiements d'abonnement
+
+**Avant :** le paiement pouvait passer à `payee` dans une première écriture, puis la mise à jour du plan échouer dans une seconde écriture. Un webhook répété ne réparait alors pas le compte, car le paiement était déjà marqué comme traité. Un ancien callback pouvait également remplacer une formule plus récente.
+
+**Correction apportée sur la branche de la PR #3 :**
+- verrouillage du paiement et du compte avec `SELECT ... FOR UPDATE` ;
+- mise à jour du statut du paiement et du plan dans une seule transaction MySQL ; en cas d'échec, les deux écritures sont annulées et le webhook peut être rejoué ;
+- un callback ancien ne rétrograde pas une formule activée par un paiement plus récent ;
+- délais de 15 secondes sur les appels de création et de confirmation Wave/PayDunya, et encodage des références fournisseur dans les URL ;
+- tests d'idempotence, de rollback/rejeu et d'arrivée tardive des callbacks.
+
+Les comptes marchands Wave/PayDunya n'ont toutefois pas été testés en conditions réelles dans cet audit. Une recette sandbox reste obligatoire avant toute activation commerciale.
 
 ### Haute — sauvegardes MySQL
 
 **Avant :** la date de sauvegarde quotidienne était enregistrée avant de confirmer le succès de `mysqldump`. Un échec pouvait empêcher une nouvelle tentative le même jour. La commande manuelle pouvait terminer avec un code de succès alors que le dump avait échoué.
 
-**Correction proposée :**
+**Correction apportée sur la branche de la PR #3 :**
 - attendre la fermeture du processus et vérifier son code de sortie ;
 - pipeline de compression surveillé, fichiers temporaires et renommage uniquement après réussite ;
 - libération du verrou quotidien et nouvelle tentative après échec ;
@@ -91,7 +106,7 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 
 **Avant :** les frais de livraison négatifs pouvaient être calculés comme zéro, mais enregistrés comme une valeur négative dans certaines routes. Les paiements acceptaient aussi plus de deux décimales avant leur insertion dans les colonnes MySQL `DECIMAL(14,2)`, ce qui pouvait produire des arrondis différents entre saisie, transaction et affichage. Certaines références pouvaient dépasser la taille de la colonne MySQL.
 
-**Correction proposée :**
+**Correction apportée sur la branche de la PR #3 :**
 - `computeTotals()` renvoie maintenant les frais de livraison normalisés, utilisés par la création standard, l'API publique et les factures récurrentes ;
 - les frais de livraison des factures dupliquées sont revalidés ;
 - quantités, prix unitaires et taux de TVA sont normalisés à deux décimales avant calcul, comme dans les colonnes MySQL ;
@@ -104,7 +119,7 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 
 **Avant :** la route `DELETE /api/auth/donnees` supprimait les factures et les clients sans supprimer les avoirs, acomptes, demandes de remboursement, commandes et autres ressources des modules professionnels. Les clés étrangères `RESTRICT` sur les commandes, avoirs, acomptes et remboursements pouvaient faire échouer la transaction entière. Les anciennes livraisons et événements webhook pouvaient aussi rester en attente.
 
-**Correction proposée :**
+**Correction apportée sur la branche de la PR #3 :**
 - supprimer les enregistrements enfants dans l'ordre des dépendances avant factures et clients ;
 - effacer les données commerciales, les pièces jointes, caisses, documents, modèles récurrents, compteurs et files webhook ;
 - conserver le compte, l'identité de l'entreprise, le plan, l'équipe, les rôles et les intégrations configurées ;
@@ -143,4 +158,4 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 
 Le dépôt présente déjà une base fonctionnelle conséquente et une suite de tests utile. La PR #3 corrige des défauts précis de sécurité, de quota, de sauvegarde et de documentation sans toucher directement à `main`.
 
-**Statut recommandé :** ne pas fusionner et ne pas commercialiser comme totalement prêt tant que la CI du dernier commit de la PR #3, la recette de préproduction, les paiements réels/sandbox selon le périmètre vendu, la restauration de sauvegarde et les vérifications de protection des données n'ont pas été validés.
+**Statut recommandé :** ne pas fusionner et ne pas commercialiser comme totalement prêt tant que la CI du dernier commit de la PR #3, la recette de préproduction, les paiements sandbox selon le périmètre vendu, la restauration de sauvegarde hors serveur et les vérifications de protection des données n'ont pas été validés.
