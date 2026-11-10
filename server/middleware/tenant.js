@@ -93,7 +93,21 @@ function permissionForRequest(req) {
 
 function requirePermission(req, res, next) {
   const permission = permissionForRequest(req);
-  if (!permission || req.permissions.includes('*') || req.permissions.includes(permission)) return next();
+  const writeImpliesRead = {
+    'clients.read': 'clients.write',
+    'products.read': 'products.write',
+    'invoices.read': 'invoices.write',
+    'payments.read': 'payments.write',
+    'expenses.read': 'expenses.write',
+    'documents.read': 'documents.write',
+    'sales.read': 'sales.write',
+    'cash.read': 'cash.write',
+    'team.read': 'team.manage',
+    'integrations.read': 'integrations.manage',
+    'automations.read': 'automations.manage'
+  };
+  if (!permission || req.permissions.includes('*') || req.permissions.includes(permission) ||
+      (writeImpliesRead[permission] && req.permissions.includes(writeImpliesRead[permission]))) return next();
   return res.status(403).json({ error: 'Cette action n’est pas autorisée pour votre rôle.' });
 }
 
