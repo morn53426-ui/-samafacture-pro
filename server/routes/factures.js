@@ -367,51 +367,74 @@ router.post('/', async (req, res, next) => {
     // qu'un tiers puisse deviner l'URL de vérification d'une autre facture en changeant l'id.
     const verificationCode = crypto.randomBytes(5).toString('hex');
 
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
+    let factureId;
+    let numero;
+    const MAX_DEADLOCK_RETRIES = 3;
 
-    // Réserve une unité dans le compteur du mois, dans la même transaction que
-    // l'insertion : les autres parcours de création utilisent le même registre.
-    if (docType === 'facture') {
-      const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
-      if (!quota.allowed) {
-        await conn.rollback();
-        notifierUtilisateur(req.tenantId, 'alerte_quota', {
-          message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
-        });
-        return res.status(403).json({
-          error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant pour continuer.`,
-          code: 'QUOTA_DEPASSE'
-        });
+    // MySQL peut choisir cette transaction comme victime d'un deadlock, notamment
+    // lorsque plusieurs modules écrivent simultanément dans les mêmes index. Une erreur
+    // ER_LOCK_DEADLOCK annule la transaction entière : on la rejoue donc sur une nouvelle
+    // connexion, sans conserver de numéro, quota ou stock partiellement réservé.
+    for (let attempt = 1; attempt <= MAX_DEADLOCK_RETRIES; attempt++) {
+      conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+
+        // Réserve une unité dans le compteur du mois, dans la même transaction que
+        // l'insertion : les autres parcours de création utilisent le même registre.
+        if (docType === 'facture') {
+          const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
+          if (!quota.allowed) {
+            await conn.rollback();
+            notifierUtilisateur(req.tenantId, 'alerte_quota', {
+              message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
+            });
+            return res.status(403).json({
+              error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant pour continuer.`,
+              code: 'QUOTA_DEPASSE'
+            });
+          }
+        }
+
+        numero = await nextNumero(conn, req.tenantId, docType);
+        const [result] = await conn.query(
+          `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
+            date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
+            remiseAppliquee, livraisonAppliquee, mode_paiement || null,
+            commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
+          ]
+        );
+        factureId = result.insertId;
+
+        await insererLignesFacture(conn, factureId, computedLignes);
+
+        // Décompte automatique du stock : uniquement pour une vraie facture (une vente
+        // effective), jamais pour un devis. Le stock est restauré symétriquement lors
+        // d'une annulation ou suppression.
+        if (docType === 'facture') {
+          await appliquerAjustementsStock(conn, req.tenantId, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
+        }
+
+        await conn.commit();
+        break;
+      } catch (transactionError) {
+        await conn.rollback().catch(() => {});
+        if (transactionError?.code !== 'ER_LOCK_DEADLOCK' || attempt === MAX_DEADLOCK_RETRIES) {
+          throw transactionError;
+        }
+        console.warn(
+          `Deadlock MySQL lors de la création d'un document pour le compte ${req.tenantId} (tentative ${attempt}/${MAX_DEADLOCK_RETRIES}) — nouvelle tentative.`
+        );
+        await new Promise(resolve => setTimeout(resolve, attempt * 40));
+      } finally {
+        conn.release();
+        conn = null;
       }
     }
 
-    const numero = await nextNumero(conn, req.tenantId, docType);
-    const [result] = await conn.query(
-      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
-        date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
-        remiseAppliquee, livraisonAppliquee, mode_paiement || null,
-        commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
-      ]
-    );
-    const factureId = result.insertId;
-
-    await insererLignesFacture(conn, factureId, computedLignes);
-
-    // Décompte automatique du stock : uniquement pour une vraie facture (une vente
-    // effective), jamais pour un devis (simple proposition, pas encore de vente). Ne
-    // bloque jamais la création si le stock devient négatif — beaucoup de commerçants
-    // vendent volontairement en rupture temporaire (réassort à venir) ; c'est une
-    // indication, pas une contrainte dure. Restauré symétriquement si la facture est
-    // supprimée ou annulée (voir DELETE /:id et PUT /:id/statut plus bas).
-    if (docType === 'facture') {
-      await appliquerAjustementsStock(conn, req.tenantId, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
-    }
-
-    await conn.commit();
     const [factureRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [factureId]);
     res.status(201).json({ facture: factureRows[0] });
     if (docType === 'facture') {
