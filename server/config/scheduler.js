@@ -158,9 +158,14 @@ function startScheduler() {
     verifierFacturesRecurrentes();
     expirerPaiementsAbonnementEnAttente();
     executerRelancesAutomatiques();
-    livrerWebhooksEnAttente();
   }, intervalMs);
   timer.unref(); // ne bloque pas l'arrêt propre du serveur
+
+  // Les webhooks sont traités à part pour respecter les délais de retry (1, 5, 30 min...)
+  // sans attendre le prochain passage horaire du moteur de factures récurrentes.
+  const webhookIntervalMs = Math.max(10000, Number(process.env.WEBHOOK_DELIVERY_INTERVAL_MS) || 30000);
+  const webhookTimer = setInterval(livrerWebhooksEnAttente, webhookIntervalMs);
+  webhookTimer.unref();
 }
 
 module.exports = { startScheduler, verifierFacturesRecurrentes, expirerPaiementsAbonnementEnAttente, executerRelancesAutomatiques, livrerWebhooksEnAttente };
