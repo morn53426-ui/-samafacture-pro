@@ -78,13 +78,13 @@ router.get('/', async (req, res, next) => {
  */
 router.post('/', async (req, res, next) => {
   try {
-    const { nom, reference, prix_ht, tva, stock, categorie, description, image } = req.body;
+    const { nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image } = req.body;
     if (!nom) return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
 
     const [result] = await pool.query(
-      `INSERT INTO produits (user_id, nom, reference, prix_ht, tva, stock, categorie, description, image)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.tenantId, nom, reference || null, positiveNumber(prix_ht), percentage(tva), positiveInt(stock), categorie || null, description || null, image || null]
+      `INSERT INTO produits (user_id, nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.tenantId, nom, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), positiveInt(stock), categorie || null, description || null, image || null]
     );
 
     const [rows] = await pool.query('SELECT * FROM produits WHERE id = ?', [result.insertId]);
@@ -115,17 +115,18 @@ router.put('/:id', async (req, res, next) => {
     const existing = existingRows[0];
     if (!existing) return res.status(404).json({ error: 'Produit introuvable.' });
 
-    const { nom, reference, prix_ht, tva, stock, categorie, description, image } = req.body;
+    const { nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image } = req.body;
     // Même règle qu'à la création (POST /produits) : le nom est obligatoire. Sans ce
     // contrôle, `{ nom: "" }` effaçait silencieusement le nom d'un produit existant.
     if (nom !== undefined && !nom) {
       return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
     }
     await pool.query(
-      `UPDATE produits SET nom=?, reference=?, prix_ht=?, tva=?, stock=?, categorie=?, description=?, image=? WHERE id = ?`,
+      `UPDATE produits SET nom=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, categorie=?, description=?, image=? WHERE id = ?`,
       [
         nom ?? existing.nom, reference ?? existing.reference,
         prix_ht !== undefined ? positiveNumber(prix_ht, existing.prix_ht) : existing.prix_ht,
+        prix_achat !== undefined ? positiveNumber(prix_achat, existing.prix_achat) : existing.prix_achat,
         tva !== undefined ? percentage(tva, existing.tva) : existing.tva,
         stock !== undefined ? positiveInt(stock, existing.stock) : existing.stock,
         categorie ?? existing.categorie, description ?? existing.description, image ?? existing.image,
