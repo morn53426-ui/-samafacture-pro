@@ -98,7 +98,7 @@ En-têtes fournis :
 - `X-SamaFacture-Delivery` : identifiant de livraison ;
 - `X-SamaFacture-Signature` : signature HMAC-SHA256 sous la forme `sha256=...`.
 
-La signature est calculée sur le corps JSON exact reçu, avec le secret affiché une seule fois à la création du webhook. Le système effectue jusqu'à cinq tentatives en cas d'échec. Une réponse HTTP 2xx signifie que la livraison a réussi.
+La signature est calculée sur le corps JSON exact reçu, avec le secret affiché une seule fois à la création du webhook. Le système vérifie la file environ toutes les 30 secondes (réglable avec `WEBHOOK_DELIVERY_INTERVAL_MS`) et effectue jusqu'à cinq tentatives avec délais croissants en cas d'échec. Une réponse HTTP 2xx signifie que la livraison a réussi.
 
 Les destinations doivent être accessibles publiquement en HTTPS sur le port standard. Les hôtes locaux et les adresses privées sont refusés afin de réduire le risque SSRF.
 
