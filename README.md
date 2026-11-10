@@ -312,7 +312,7 @@ Le passage à un plan payant (Starter, Pro, Entreprise) peut se faire réellemen
 - **Wave for Business** — paiement direct
 - **PayDunya** — agrégateur qui gère en une seule intégration Orange Money **et** la carte bancaire (Visa/Mastercard)
 
-En développement et en test uniquement, un sélecteur manuel de plan permet de vérifier les fonctionnalités sans transaction. Il est désactivé en production : les plans payants doivent être activés par un paiement d'abonnement confirmé (ou par une opération d'administration contrôlée).
+En développement et en test uniquement, un sélecteur manuel de plan permet de vérifier les fonctionnalités sans transaction. Il est désactivé en production : les plans payants doivent être activés par un paiement d'abonnement confirmé.
 
 ### Configurer Wave
 1. Créez un compte sur [business.wave.com](https://business.wave.com), section "Developers" (validation sous 48–72h, NINEA requis)
