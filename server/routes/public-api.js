@@ -54,7 +54,7 @@ router.get('/invoices', requireScope('invoices:read'), async (req, res, next) =>
   try {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
     const [rows] = await pool.query(
-      'SELECT f.id, f.numero, f.type, f.date_emission, f.date_echeance, f.statut, f.total, f.montant_paye, f.devise, c.nom AS client_nom FROM factures f JOIN clients c ON c.id = f.client_id WHERE f.user_id = ? ORDER BY f.date_emission DESC, f.id DESC LIMIT ?',
+      'SELECT f.id, f.numero, f.type, f.date_emission, f.date_echeance, f.statut, f.total, f.montant_paye, u.devise, c.nom AS client_nom FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id WHERE f.user_id = ? ORDER BY f.date_emission DESC, f.id DESC LIMIT ?',
       [req.apiUserId, limit]
     );
     res.json({ data: rows });
@@ -62,7 +62,7 @@ router.get('/invoices', requireScope('invoices:read'), async (req, res, next) =>
 });
 
 router.post('/invoices', requireScope('invoices:write'), async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
     const uid = req.apiUserId;
     const clientId = Number(req.body.client_id);
@@ -91,6 +91,7 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
       if (Number(count.n) >= FREE_MONTHLY_INVOICE_LIMIT) return res.status(403).json({ error: 'Le quota mensuel de factures du plan Gratuit est atteint.' });
     }
 
+    conn = await pool.getConnection();
     await conn.beginTransaction();
     const numero = 'API-' + new Date().getFullYear() + '-' + crypto.randomBytes(5).toString('hex').toUpperCase();
     const dateEmission = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.date_emission || '')) ? req.body.date_emission : new Date().toISOString().slice(0, 10);
@@ -104,14 +105,14 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
     await queueWebhookEvent(uid, 'invoice.created', { invoice_id: result.insertId, numero, total: totals.total }).catch(e => console.warn('Webhook queue failed:', e.message));
     res.status(201).json({ facture: { id: result.insertId, numero, total: totals.total, statut: 'en_attente' } });
   } catch (err) {
-    try { await conn.rollback(); } catch (_) {}
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
     if (err.code === 'ER_DUP_ENTRY' && req.get('Idempotency-Key')) {
       const [existing] = await pool.query('SELECT id, numero, total, statut FROM factures WHERE user_id = ? AND idempotency_key = ? LIMIT 1', [req.apiUserId, req.get('Idempotency-Key').trim()]);
       if (existing.length) return res.status(200).json({ facture: existing[0], idempotent_replay: true });
     }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
