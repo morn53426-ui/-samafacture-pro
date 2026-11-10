@@ -39,7 +39,7 @@ Par défaut, WAMPserver expose MySQL sur `localhost:3306` avec l'utilisateur `ro
 
 ### 2. Installer Node.js
 
-Si ce n'est pas déjà fait, installez [Node.js](https://nodejs.org/) (version 18 ou plus récente). WAMPserver ne fournit que MySQL/Apache/PHP ; Node.js s'installe séparément et fait tourner le backend de l'application.
+Si ce n'est pas déjà fait, installez [Node.js](https://nodejs.org/) (version 22 ou plus récente). WAMPserver ne fournit que MySQL/Apache/PHP ; Node.js s'installe séparément et fait tourner le backend de l'application.
 
 ### 3. Configurer et lancer le serveur
 
@@ -124,7 +124,7 @@ docker compose --env-file server/.env logs -f app
 ```
 
 `docker-compose.yml` (à la racine du dépôt) démarre deux services : l'API (`Dockerfile`, basé
-sur `node:20-bookworm-slim` avec Chromium système pour la génération PDF) et une base MySQL
+sur `node:24-bookworm-slim` avec Chromium système pour la génération PDF) et une base MySQL
 dédiée dans un réseau Docker privé — jamais exposée directement sur Internet. Si vous préférez
 un MySQL managé externe, supprimez le service `mysql` du fichier et pointez `DB_HOST` vers
 votre base dans `server/.env`.
