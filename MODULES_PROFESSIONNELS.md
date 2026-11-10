@@ -1,6 +1,6 @@
 # Modules professionnels — SamaFacture Pro
 
-Ce document décrit le périmètre effectivement ajouté sur la branche `ui/modern-responsive-polish`. Il ne signifie pas que le PR a été fusionné ou que la version est déployée.
+Ce document décrit le périmètre présent dans le code de la branche `main` après la fusion des modules professionnels. La réussite des tests GitHub ne signifie pas à elle seule que la version est déployée ou validée en préproduction.
 
 ## 1. Ventes
 - Commandes clients enregistrées avec lignes, total et statut.
@@ -66,7 +66,7 @@ L'envoi WhatsApp automatique n'est pas activé : il nécessite une intégration 
 
 ## Mise à niveau de la base de données
 
-La version de schéma est portée à 4. Au démarrage, le backend applique la migration professionnelle de manière idempotente. Avant le déploiement, effectuez néanmoins une sauvegarde MySQL vérifiée. Ne supprimez pas les tables existantes : les nouvelles tables sont préfixées par `pro_`.
+La version de schéma est portée à 5. Au démarrage, le backend applique la migration professionnelle de manière idempotente. Avant le déploiement, effectuez néanmoins une sauvegarde MySQL vérifiée. Ne supprimez pas les tables existantes : les nouvelles tables sont préfixées par `pro_`.
 
 ## Configuration à prévoir
 
