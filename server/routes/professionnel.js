@@ -132,18 +132,32 @@ router.get('/credit-notes', async (req, res, next) => {
 });
 
 router.post('/credit-notes', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req), invoiceId = Number(req.body.facture_id), amount = money(req.body.montant), motif = String(req.body.motif || '').trim().slice(0, 500);
-    const invoice = await invoiceOwned(uid, invoiceId);
-    if (!invoice) return res.status(404).json({ error: 'Facture introuvable.' });
     if (!amount || !motif) return res.status(400).json({ error: 'Montant positif et motif obligatoires.' });
-    const [[sum]] = await pool.query('SELECT COALESCE(SUM(montant),0) AS total FROM pro_avoirs WHERE user_id = ? AND facture_id = ? AND statut != ?', [uid, invoiceId, 'rejete']);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [invoiceRows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE', [invoiceId, uid]);
+    const invoice = invoiceRows[0];
+    if (!invoice) { await conn.rollback(); return res.status(404).json({ error: 'Facture introuvable.' }); }
+    const [[sum]] = await conn.query("SELECT COALESCE(SUM(montant),0) AS total FROM pro_avoirs WHERE user_id = ? AND facture_id = ? AND statut != 'rejete'", [uid, invoiceId]);
     const available = Number(invoice.total) - Number(sum.total || 0);
-    if (amount > available + 0.001) return res.status(400).json({ error: 'Le montant de cet avoir dépasse le montant encore disponible sur la facture.' });
-    const [result] = await pool.query('INSERT INTO pro_avoirs (user_id, facture_id, numero, date_emission, montant, motif) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, randomRef('AVR'), safeDate(req.body.date_emission), amount, motif]);
-    await audit(req, 'avoir.cree', 'avoir', result.insertId, { facture_id: invoiceId, montant: amount });
-    res.status(201).json({ id: result.insertId, statut: 'brouillon', montant: amount });
-  } catch (err) { next(err); }
+    if (amount > available + 0.001) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le montant de cet avoir dépasse le montant encore disponible sur la facture.' });
+    }
+    const numero = randomRef('AVR');
+    const [result] = await conn.query('INSERT INTO pro_avoirs (user_id, facture_id, numero, date_emission, montant, motif) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, numero, safeDate(req.body.date_emission), amount, motif]);
+    await conn.commit();
+    await audit(req, 'avoir.cree', 'avoir', result.insertId, { facture_id: invoiceId, montant: amount, numero });
+    res.status(201).json({ id: result.insertId, numero, statut: 'brouillon', montant: amount });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.put('/credit-notes/:id/status', async (req, res, next) => {
@@ -342,22 +356,37 @@ router.get('/payment-links', async (req, res, next) => {
 });
 
 router.post('/payment-links', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req), invoiceId = Number(req.body.facture_id), amount = money(req.body.montant);
-    const invoice = await invoiceOwned(uid, invoiceId);
-    if (!invoice) return res.status(404).json({ error: 'Facture introuvable.' });
+    if (!amount) return res.status(400).json({ error: 'Le montant du lien doit être positif.' });
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [invoiceRows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE', [invoiceId, uid]);
+    const invoice = invoiceRows[0];
+    if (!invoice) { await conn.rollback(); return res.status(404).json({ error: 'Facture introuvable.' }); }
     const remaining = Number(invoice.total) - Number(invoice.montant_paye);
-    if (!amount || amount > remaining + 0.001) return res.status(400).json({ error: 'Le montant du lien doit être positif et ne pas dépasser le solde restant.' });
+    if (amount > remaining + 0.001 || remaining <= 0) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le montant du lien dépasse le solde restant ou la facture est déjà réglée.' });
+    }
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expires = req.body.expire_jours ? new Date(Date.now() + Math.min(90, Math.max(1, Number(req.body.expire_jours))) * 86400000) : null;
-    const [result] = await pool.query('INSERT INTO pro_payment_links (user_id, facture_id, token_hash, montant, devise, expire_at) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, tokenHash, amount, String(req.body.devise || 'FCFA').slice(0, 10), expires]);
+    const devise = String(req.body.devise || 'FCFA').slice(0, 10);
+    const [result] = await conn.query('INSERT INTO pro_payment_links (user_id, facture_id, token_hash, montant, devise, expire_at) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, tokenHash, amount, devise, expires]);
+    await conn.commit();
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
     const url = base + '/paiement.html?token=' + token;
     const qr = await QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 1, width: 320 });
     await audit(req, 'lien_paiement.cree', 'facture', invoiceId, { montant: amount, link_id: result.insertId });
-    res.status(201).json({ id: result.insertId, url, qr_code: qr, montant: amount, devise: req.body.devise || 'FCFA', mode: 'demande_de_paiement' });
-  } catch (err) { next(err); }
+    res.status(201).json({ id: result.insertId, url, qr_code: qr, montant: amount, devise, mode: 'demande_de_paiement' });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 /* ---------------------- ÉTABLISSEMENTS / CAISSES ------------------------ */
@@ -583,7 +612,7 @@ router.get('/reports/margins', async (req, res, next) => {
 router.get('/reports/forecast', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      "SELECT DATE_FORMAT(date_emission, '%Y-%m') AS mois, SUM(montant_paye) AS encaissements, SUM(total) AS facturation FROM factures WHERE user_id = ? AND type = 'facture' AND statut != 'annulee' AND date_emission >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH) GROUP BY mois ORDER BY mois",
+      "SELECT DATE_FORMAT(p.date_paiement, '%Y-%m') AS mois, SUM(p.montant) AS encaissements, COUNT(*) AS nb_paiements FROM paiements p JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id WHERE p.user_id = ? AND f.type = 'facture' AND f.statut != 'annulee' AND p.date_paiement >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH) GROUP BY mois ORDER BY mois",
       [owner(req)]
     );
     const monthlyAverage = rows.length ? rows.reduce((s, r) => s + Number(r.encaissements || 0), 0) / 6 : 0;
