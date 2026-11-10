@@ -74,7 +74,9 @@ function userDeTest(overrides = {}) {
 
 const lignesDeTest = [
   { designation: 'Prestation de conseil', quantite: 2, prix_unitaire: 40000, tva: 18, total_ligne: 94400 },
-  { designation: 'Frais de dossier', quantite: 1, prix_unitaire: 18600, tva: 18, total_ligne: 21948 }
+  { designation: 'Frais de dossier', quantite: 1, prix_unitaire: 18600, tva: 18, total_ligne: 21948 },
+  // Une ligne exonérée garantit que les tests couvrent bien plusieurs taux de TVA.
+  { designation: 'Document exonéré', quantite: 1, prix_unitaire: 5000, tva: 0, total_ligne: 5000 }
 ];
 
 describe('Modèles de facture (public/js/facture-templates.js)', () => {
