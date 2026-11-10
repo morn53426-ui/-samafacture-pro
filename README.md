@@ -146,8 +146,9 @@ Les tests se lancent depuis `server/` avec `npm test`. Ils nécessitent une base
 MySQL de test dédiée (par défaut `samafacture_test`) et ne doivent jamais pointer vers la
 base de production. Le workflow `.github/workflows/test.yml` exécute automatiquement cette
 suite sur les pull requests vers `main` et les pushs sur `main`, avec un service MySQL 8.0
-isolé. Il inclut les tests d'authentification, de facturation, de concurrence/idempotence et
-les tests autonomes de sécurité des webhooks. Le résultat réel (succès ou échec) est consultable
+isolé. Il inclut les tests d'authentification, de facturation, de concurrence/idempotence,
+d'isolation multi-entreprises et de permissions, de génération PDF, ainsi que les tests
+autonomes de sécurité des webhooks. Le résultat réel (succès ou échec) est consultable
 dans l'onglet **Actions** de GitHub après l'exécution du workflow.
 
 La CI ne remplace pas la recette de staging : avant la mise en production, il reste nécessaire
@@ -212,7 +213,7 @@ Une sauvegarde qui reste uniquement sur le serveur qui peut tomber en panne n'es
 
 ## Tests automatisés
 
-Des tests couvrent l'authentification, les factures (calcul de la TVA, remises, validation des montants, numérotation concurrente, paiements et idempotence) et la sécurité des webhooks (plages IP non publiques, résolution DNS, protection contre le DNS rebinding et chiffrement des secrets).
+Des tests couvrent l'authentification, les factures (calcul de la TVA, remises, validation des montants, numérotation concurrente, paiements et idempotence) l'isolation multi-entreprises (espaces, membres, rôles lecture seule et références croisées), la génération PDF (signature `%PDF-`, téléchargement binaire) et la sécurité des webhooks (plages IP non publiques, résolution DNS, protection contre le DNS rebinding et chiffrement des secrets).
 
 ### Lancer les tests
 
