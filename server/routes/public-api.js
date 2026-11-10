@@ -45,7 +45,7 @@ router.get('/clients', requireScope('clients:read'), async (req, res, next) => {
 
 router.get('/products', requireScope('products:read'), async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT id, nom, reference, prix_ht, prix_achat, tva, stock, categorie, description FROM produits WHERE user_id = ? ORDER BY nom LIMIT 500', [req.apiUserId]);
+    const [rows] = await pool.query('SELECT id, nom, reference, prix_ht, tva, stock, categorie, description FROM produits WHERE user_id = ? ORDER BY nom LIMIT 500', [req.apiUserId]);
     res.json({ data: rows });
   } catch (err) { next(err); }
 });
