@@ -336,7 +336,7 @@ router.post('/google', async (req, res, next) => {
  * /auth/logout:
  *   post:
  *     summary: Révoque les sessions actives puis efface le cookie HttpOnly.
- *     description: Incrémente la version de session du compte : tous les JWT émis avant cette déconnexion deviennent invalides, sur navigateur et mobile.
+ *     description: "Incrémente la version de session du compte : tous les JWT émis avant cette déconnexion deviennent invalides, sur navigateur et mobile."
  *     tags: [Auth]
  *     responses:
  *       204: { description: "Cookie effacé." }
