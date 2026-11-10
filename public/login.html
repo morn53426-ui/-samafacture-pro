@@ -60,7 +60,12 @@
 <script src="js/auth-slider.js"></script>
 <script src="js/google-auth.js"></script>
 <script>
-  function redirectAfterLogin() {\n    const next = new URLSearchParams(location.search).get('next') || '';\n    if (next && /^[a-zA-Z0-9_./?=&%-]+$/.test(next) && !next.includes('..') && !next.startsWith('//')) location.href = next;\n    else location.href = 'dashboard.html';\n  }\n  if (Api.token()) redirectAfterLogin();
+  function redirectAfterLogin() {
+    const next = new URLSearchParams(location.search).get('next') || '';
+    if (next && /^[a-zA-Z0-9_./?=&%-]+$/.test(next) && !next.includes('..') && !next.startsWith('//')) location.href = next;
+    else location.href = 'dashboard.html';
+  }
+  if (Api.token()) redirectAfterLogin();
   initAuthSlider();
   initGoogleButton('google-btn');
 
