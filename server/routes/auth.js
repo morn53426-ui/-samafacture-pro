@@ -662,7 +662,9 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  *             properties: { plan: { type: string, enum: [gratuit, starter, pro, entreprise] } }
  *     responses:
  *       200:
- *         description: Plan mis à jour.
+ *         description: Plan mis à jour en développement/test.
+ *       403:
+ *         description: Sélection manuelle désactivée en production (code PLAN_MANUAL_DISABLED).
  *         content:
  *           application/json:
  *             schema: { type: object, properties: { user: { $ref: '#/components/schemas/Utilisateur' } } }
