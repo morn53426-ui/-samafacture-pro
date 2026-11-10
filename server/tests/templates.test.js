@@ -121,6 +121,28 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     });
   }
 
+  test('un devis conserve sa zone Bon pour accord même sans coordonnées bancaires ou mentions légales', () => {
+    const user = userDeTest({
+      entreprise_ninea: null, entreprise_rccm: null, entreprise_site_web: null,
+      entreprise_banque: null, entreprise_rib: null,
+      entreprise_conditions_reglement: null, entreprise_mentions_legales: null
+    });
+    const quote = factureDeTest({
+      numero: 'DV-SANS-OPTIONS',
+      date_validite: null,
+      objet: null,
+      reference_externe: null,
+      conditions_reglement: null
+    });
+    const html = templates.renderInvoiceHtml({
+      user, facture: quote, lignes: lignesDeTest,
+      isDevis: true, qrCode: null, template: 'classique'
+    });
+    assert.match(html, /Bon pour accord/);
+    assert.match(html, /Signature et cachet/);
+    assert.doesNotMatch(html, /undefined|NaN/);
+  });
+
   test('les données personnalisées sont échappées et les compléments optionnels restent facultatifs', () => {
     const html = templates.renderInvoiceHtml({
       user: userDeTest({
