@@ -28,9 +28,9 @@
 
     <div class="card" style="padding:0;">
       <table>
-        <thead><tr><th>Produit</th><th>Référence</th><th>Prix HT</th><th>TVA</th><th>Stock</th><th></th></tr></thead>
+        <thead><tr><th>Produit</th><th>Référence</th><th>Prix HT</th><th>Prix d'achat</th><th>TVA</th><th>Stock</th><th></th></tr></thead>
         <tbody id="produits-body">
-          <tr class="row-skeleton"><td colspan="6"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
           <tr class="row-skeleton"><td colspan="6"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
           <tr class="row-skeleton"><td colspan="6"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
           <tr class="row-skeleton"><td colspan="6"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
@@ -50,10 +50,10 @@
       <div class="field"><label>Nom *</label><input type="text" id="nom" required /></div>
       <div class="field"><label>Référence</label><input type="text" id="reference" /></div>
       <div style="display:flex; gap:12px;">
-        <div class="field" style="flex:1;"><label>Prix HT (FCFA) *</label><input type="number" id="prix_ht" min="0" step="1" required /></div>
+        <div class="field" style="flex:1;"><label>Prix de vente HT (FCFA) *</label><input type="number" id="prix_ht" min="0" step="1" required /></div>
         <div class="field" style="flex:1;"><label>TVA (%)</label><input type="number" id="tva" min="0" max="100" step="1" value="0" /></div>
       </div>
-      <div class="field"><label>Stock disponible</label><input type="number" id="stock" min="0" step="1" value="0" /></div>
+      <div class="field"><label>Prix d’achat (FCFA)</label><input type="number" id="prix_achat" min="0" step="1" value="0" /><small class="helper">Utilisé pour estimer la marge. Laissez 0 si le coût est inconnu.</small></div>\n      <div class="field"><label>Stock disponible</label><input type="number" id="stock" min="0" step="1" value="0" /></div>
       <div class="field"><label>Catégorie</label><input type="text" id="categorie" /></div>
       <div class="field"><label>Description</label><textarea id="description"></textarea></div>
       <div style="display:flex; gap:10px; justify-content:flex-end;">
@@ -110,7 +110,7 @@
     document.getElementById('nom').value = p.nom || '';
     document.getElementById('reference').value = p.reference || '';
     document.getElementById('prix_ht').value = p.prix_ht;
-    document.getElementById('tva').value = p.tva;
+    document.getElementById('tva').value = p.tva;\n    document.getElementById('prix_achat').value = p.prix_achat || 0;
     document.getElementById('stock').value = p.stock;
     document.getElementById('categorie').value = p.categorie || '';
     document.getElementById('description').value = p.description || '';
@@ -133,7 +133,7 @@
     const payload = {
       nom: document.getElementById('nom').value,
       reference: document.getElementById('reference').value,
-      prix_ht: parseFloat(document.getElementById('prix_ht').value) || 0,
+      prix_ht: parseFloat(document.getElementById('prix_ht').value) || 0,\n      prix_achat: parseFloat(document.getElementById('prix_achat').value) || 0,
       tva: parseFloat(document.getElementById('tva').value) || 0,
       stock: parseInt(document.getElementById('stock').value) || 0,
       categorie: document.getElementById('categorie').value,
