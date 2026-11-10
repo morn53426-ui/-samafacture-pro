@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Invitation — SamaFacture Pro</title>
+<link rel="stylesheet" href="css/style.css" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<style>
+body{min-height:100vh;background:var(--cream);display:grid;place-items:center;padding:24px}
+.invite-card{width:min(100%,480px);background:var(--paper);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow-xl);padding:36px;position:relative;overflow:hidden}
+.invite-card:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,var(--emerald),var(--gold))}
+</style>
+</head>
+<body>
+<main class="invite-card">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px"><img src="images/icon-192.png" alt="" style="width:38px;height:38px;border-radius:10px"><strong style="font-family:var(--font-display)">SamaFacture Pro</strong></div>
+  <div id="invite-content"><h1>Invitation d’équipe</h1><p>Vérification du lien…</p></div>
+</main>
+<script src="js/api.js"></script>
+<script>
+(function(){
+ const token=new URLSearchParams(location.search).get('token')||'';
+ const root=document.getElementById('invite-content');
+ if(!/^[a-f0-9]{64}$/i.test(token)){root.innerHTML='<h1>Invitation invalide</h1><p>Le lien d’invitation est incomplet.</p>';return;}
+ if(!Api.token()){
+   const next='invitation.html?token='+encodeURIComponent(token);
+   root.innerHTML='<h1>Vous avez été invité</h1><p>Connectez-vous avec l’adresse email qui a reçu l’invitation. Si vous n’avez pas encore de compte, créez-en un avec cette même adresse.</p><a class="btn btn-primary" style="width:100%" href="login.html?next='+encodeURIComponent(next)+'">Se connecter pour accepter</a><a style="display:block;text-align:center;margin-top:14px;color:var(--emerald)" href="register.html?next='+encodeURIComponent(next)+'">Créer un compte</a>';
+   return;
+ }
+ root.innerHTML='<h1>Rejoindre une équipe</h1><p>En acceptant, l’entreprise qui vous a invité pourra vous donner accès à son espace de travail selon les autorisations définies pour votre rôle.</p><button class="btn btn-primary" id="accept-invite" style="width:100%">Accepter l’invitation</button><div id="invite-error" style="margin-top:14px"></div>';
+ document.getElementById('accept-invite').addEventListener('click',async()=>{
+   const button=document.getElementById('accept-invite');
+   button.disabled=true;button.textContent='Acceptation…';
+   try{
+     const result=await Api.post('/pro/team/invitations/accept',{token});
+     localStorage.setItem('sf_company_owner',String(result.entreprise_id));
+     root.innerHTML='<h1>Invitation acceptée</h1><p>'+escapeHtml(result.message)+'</p><a class="btn btn-primary" style="width:100%" href="professionnel.html">Ouvrir l’espace professionnel</a>';
+   }catch(err){
+     document.getElementById('invite-error').innerHTML='<div class="error-box">'+escapeHtml(err.message)+'</div>';
+     button.disabled=false;button.textContent='Réessayer';
+   }
+ });
+})();
+</script>
+</body>
+</html>
