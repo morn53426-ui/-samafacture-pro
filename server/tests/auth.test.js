@@ -53,6 +53,24 @@ describe('Authentification', () => {
     assert.ok(res.body.token);
   });
 
+  test('les informations de paiement indiquent que le sélecteur manuel est désactivé en production', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200, login.text);
+
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const response = await request(app)
+        .get('/api/abonnement/moyens-disponibles')
+        .set('Authorization', `Bearer ${login.body.token}`);
+      assert.equal(response.status, 200, response.text);
+      assert.equal(response.body.manual_plan_selection, false);
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
   test('le sélecteur manuel de plan ne peut pas attribuer un plan payant en production', async () => {
     const login = await request(app).post('/api/auth/login').send({ email, password });
     assert.equal(login.status, 200, login.text);
