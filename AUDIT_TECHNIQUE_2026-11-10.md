@@ -102,6 +102,25 @@ Les comptes marchands Wave/PayDunya n'ont toutefois pas été testés en conditi
 - feuille de route mise à jour pour ne pas présenter les rôles d'équipe, le wrapper mobile Capacitor ou la signature interne comme des fonctionnalités inexistantes ;
 - paiements d'abonnement et règlements de factures explicitement distingués.
 
+### Haute — statut « payée » sans encaissement
+
+**Avant :** la route `PUT /api/factures/:id/statut` acceptait `statut=payee` même si aucun règlement n'avait été enregistré ou si seul un acompte partiel existait. Le solde client et les rapports pouvaient alors afficher une facture payée sans encaissement correspondant.
+
+**Correction sur la branche de la PR #3 :**
+- lecture de la facture avec `SELECT ... FOR UPDATE` dans la transaction de modification ;
+- refus HTTP 409 (`PAIEMENT_INCOMPLET`) si le document est un devis ou si le montant encaissé reste inférieur au total ;
+- le passage à « payée » reste automatique lorsque le dernier règlement enregistré atteint le total ;
+- test couvrant le refus sans paiement, le refus après paiement partiel et la réussite après solde complet.
+
+### Haute — réutilisation d'une clé idempotente entre deux factures
+
+**Avant :** la même `Idempotency-Key` pouvait être présentée sur une autre facture du même compte. L'API renvoyait alors le premier document comme un rejeu réussi, au lieu de signaler que la clé appartenait à une autre facture.
+
+**Correction sur la branche de la PR #3 :**
+- comparaison de `facture_id` avec l'identifiant demandé lors du contrôle optimiste, dans la transaction et après collision de contrainte unique ;
+- réponse HTTP 409 (`IDEMPOTENCY_KEY_REUTILISEE`) si la clé est liée à une autre facture ;
+- test de non-régression confirmant qu'aucun montant n'est ajouté à la seconde facture.
+
 ### Haute — cohérence des montants comptables
 
 **Avant :** les frais de livraison négatifs pouvaient être calculés comme zéro, mais enregistrés comme une valeur négative dans certaines routes. Les paiements acceptaient aussi plus de deux décimales avant leur insertion dans les colonnes MySQL `DECIMAL(14,2)`, ce qui pouvait produire des arrondis différents entre saisie, transaction et affichage. Certaines références pouvaient dépasser la taille de la colonne MySQL.
@@ -145,7 +164,7 @@ Les comptes marchands Wave/PayDunya n'ont toutefois pas été testés en conditi
 
 ## 5. Recette obligatoire avant fusion et déploiement
 
-1. Attendre le succès du workflow CI sur le dernier commit de la PR #3.
+1. CI validée sur le commit de code `fe0d1dae7246638bf5b5a8e8278ea6f54d8d7666` le 10 novembre 2026 : 206 tests réussis, 0 échec, 0 test ignoré ; Docker, Compose, npm ci et tests MySQL validés. Toute nouvelle modification de code doit repasser cette CI.
 2. Déployer la branche sur un environnement staging isolé, avec une base de test séparée et des secrets propres à staging.
 3. Vérifier la migration v5 → v7 sur une copie de base, notamment l'ajout de `token_version` et de `facture_usage_mensuelle`, sans suppression de données.
 4. Tester la déconnexion sur plusieurs appareils, la réinitialisation de mot de passe, l'expiration/réutilisation des liens et l'isolation entre entreprises.
@@ -158,4 +177,4 @@ Les comptes marchands Wave/PayDunya n'ont toutefois pas été testés en conditi
 
 Le dépôt présente déjà une base fonctionnelle conséquente et une suite de tests utile. La PR #3 corrige des défauts précis de sécurité, de quota, de sauvegarde et de documentation sans toucher directement à `main`.
 
-**Statut recommandé :** ne pas fusionner et ne pas commercialiser comme totalement prêt tant que la CI du dernier commit de la PR #3, la recette de préproduction, les paiements sandbox selon le périmètre vendu, la restauration de sauvegarde hors serveur et les vérifications de protection des données n'ont pas été validés.
+**Statut recommandé :** les correctifs de code de la PR #3 sont validés par la CI (206/206). Garder la PR en brouillon et ne pas déployer/commercialiser comme totalement prêt tant que la recette de préproduction, les paiements sandbox selon le périmètre vendu, la restauration effective de sauvegarde hors serveur et les vérifications de protection des données n'ont pas été validés.
