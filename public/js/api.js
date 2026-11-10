@@ -141,7 +141,13 @@ function formatMontant(n, devise) {
 
 function formatDate(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
+  // MySQL renvoie parfois les DATETIME sous la forme "YYYY-MM-DD HH:mm:ss".
+  // Le séparateur espace n'est pas interprété uniformément par Safari iOS ;
+  // on le convertit en forme ISO locale sans ajouter de décalage artificiel.
+  const normalized = typeof iso === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(iso)
+    ? iso.replace(' ', 'T')
+    : iso;
+  const d = new Date(normalized);
   if (isNaN(d)) return iso;
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
