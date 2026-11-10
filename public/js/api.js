@@ -41,6 +41,7 @@ const Api = {
   clearSession() {
     localStorage.removeItem('sf_token');
     localStorage.removeItem('sf_user');
+    localStorage.removeItem('sf_company_owner');
     // Efface aussi le cookie de session HttpOnly posé en parallèle depuis la connexion (voir
     // SECURITY_REPORT.md et server/routes/auth.js, /auth/logout). Best-effort et non bloquant :
     // clearSession() reste synchrone comme avant (tous les appels existants, ex. sidebar.js,
