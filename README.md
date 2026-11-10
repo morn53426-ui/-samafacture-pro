@@ -168,7 +168,7 @@ distincte.
 
 Les points suivants ont été audités et corrigés :
 - **Protection XSS** : toutes les données saisies par les utilisateurs (noms, notes, commentaires...) sont échappées avant affichage.
-- **Clé JWT** : générée aléatoirement et sauvegardée automatiquement dans `.env` au premier démarrage (plus de valeur par défaut prévisible).
+- **Clé JWT** : générée automatiquement et sauvegardée dans `.env` en développement ; en production, un `JWT_SECRET` explicite d'au moins 32 caractères est obligatoire et le serveur refuse de démarrer avec la valeur de démonstration.
 - **Anti brute-force** : les tentatives de connexion et de création de compte sont limitées par adresse IP.
 - **Numérotation des factures** : incrément atomique via une table de compteurs dédiée, sans risque de doublon même en cas de requêtes simultanées.
 - **Validation serveur** : les montants, quantités et taux de TVA négatifs ou aberrants sont rejetés/corrigés côté serveur, pas seulement côté formulaire.
