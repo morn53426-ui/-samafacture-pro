@@ -940,8 +940,7 @@ function createFactureTemplates(helpers) {
     const legalMentions = user.entreprise_mentions_legales
       ? escapeHtml(user.entreprise_mentions_legales).replace(/\r?\n/g, '<br/>')
       : '';
-    const hasAny = !isDevis || terms || bankDetails.length || legalDetails.length || legalMentions;
-    if (!hasAny) return '';
+    // La zone Bon pour accord fait partie de tout devis, même sans mentions légales ou coordonnées bancaires configurées.
 
     return `
       <style>
