@@ -25,7 +25,7 @@ La revue a porté sur le code serveur Node.js/Express, MySQL, les schémas et mi
 **Avant :** la déconnexion supprimait le cookie, mais ne révoquait pas un JWT Bearer déjà copié ou volé. La réinitialisation du mot de passe ne rendait pas non plus les anciens JWT invalides. Un lien de réinitialisation pouvait être présenté simultanément à deux requêtes.
 
 **Correction proposée :**
-- ajout de `users.token_version` (migration de schéma v6) ;
+- ajout de `users.token_version` (migration v6) ;
 - vérification de cette version à chaque authentification ;
 - incrément de la version lors de la déconnexion et de la réinitialisation ;
 - consommation atomique du lien de réinitialisation ;
@@ -48,12 +48,23 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 
 **Avant :** l'API publique comptait les factures avec la date d'émission fournie par le client. Une date ancienne permettait de ne pas être comptabilisée dans le quota du mois courant. Le contrôle de quota du parcours principal était effectué avant sa transaction et pouvait être dépassé par plusieurs créations simultanées.
 
-**Correction proposée :**
-- calcul sur `created_at`, indépendant de la date d'émission saisie ;
-- verrouillage de la ligne du compte pendant le contrôle et la création ;
-- application du même contrôle transactionnel à l'interface et à l'API publique ;
-- index `(user_id, type, created_at)` pour accélérer le décompte ;
-- tests de dates anciennes et de requêtes concurrentes.
+**Correction apportée sur la branche de la PR #3 :**
+- registre durable `facture_usage_mensuelle`, une ligne par compte et par mois ;
+- initialisation rétrocompatible depuis les factures existantes du mois lors de la première réservation ;
+- fonction commune `reserveMonthlyInvoiceQuota()` avec verrouillage du compte et réservation dans la même transaction que l'opération ;
+- contrôle appliqué à la création standard, à l'API publique, à la duplication d'une facture, à la conversion d'un devis et à la génération d'une facture récurrente ;
+- une suppression de facture ne libère plus une unité déjà consommée ;
+- migration de schéma v7 et tests de régression des parcours de contournement.
+
+### Critique — changement manuel de formule sans paiement
+
+**Avant :** la route authentifiée `PUT /api/auth/plan` permettait à tout utilisateur connecté d'attribuer directement à son compte le plan `starter`, `pro` ou `entreprise`. Le contrôle des fonctionnalités basé sur le plan pouvait donc être contourné sans paiement confirmé.
+
+**Correction apportée sur la branche de la PR #3 :**
+- la route refuse les changements manuels dès que `NODE_ENV=production` (HTTP 403, code `PLAN_MANUAL_DISABLED`) ;
+- le serveur expose un indicateur `manual_plan_selection` et l'interface masque le sélecteur de test en production ;
+- un test de régression vérifie qu'un compte Gratuit ne peut pas s'attribuer le plan Entreprise ;
+- les plans payants doivent être activés par le traitement d'un paiement d'abonnement confirmé.
 
 ### Haute — sauvegardes MySQL
 
@@ -71,6 +82,8 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 - image Docker passée à Node 24 et build rendu reproductible avec `npm ci` et le lockfile obligatoire ;
 - workflow CI aligné sur Node 24 et les actions GitHub v7 ;
 - version de schéma et description des 15 modèles corrigées ;
+- sélecteur manuel de formule désactivé en production ;
+- registre de quota mensuel persistant partagé par les différents parcours de création de facture ;
 - feuille de route mise à jour pour ne pas présenter les rôles d'équipe, le wrapper mobile Capacitor ou la signature interne comme des fonctionnalités inexistantes ;
 - paiements d'abonnement et règlements de factures explicitement distingués.
 
@@ -119,9 +132,9 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 
 1. Attendre le succès du workflow CI sur le dernier commit de la PR #3.
 2. Déployer la branche sur un environnement staging isolé, avec une base de test séparée et des secrets propres à staging.
-3. Vérifier les migrations v5 → v6 sur une copie de base, sans suppression de données.
+3. Vérifier la migration v5 → v7 sur une copie de base, notamment l'ajout de `token_version` et de `facture_usage_mensuelle`, sans suppression de données.
 4. Tester la déconnexion sur plusieurs appareils, la réinitialisation de mot de passe, l'expiration/réutilisation des liens et l'isolation entre entreprises.
-5. Créer des factures/devis, appliquer remises et TVA, enregistrer paiements partiels, annuler/dupliquer/transformer et tester les quotas concurrents.
+5. Créer des factures/devis, appliquer remises et TVA, enregistrer paiements partiels, annuler/dupliquer/transformer et tester les quotas concurrents, y compris la génération récurrente et la suppression d'une facture déjà comptabilisée.
 6. Tester génération et restauration PDF, emails SMTP de test, webhooks HTTPS publics contrôlés et paiements fournisseurs en mode test.
 7. Effectuer une sauvegarde, vérifier l'archive, puis la restaurer dans une base temporaire distincte.
 8. Faire une recette responsive et une vérification sécurité ciblée ; ne pas utiliser de données personnelles réelles en staging.
@@ -130,4 +143,4 @@ La déconnexion révoque les sessions actives du compte, pas uniquement la sessi
 
 Le dépôt présente déjà une base fonctionnelle conséquente et une suite de tests utile. La PR #3 corrige des défauts précis de sécurité, de quota, de sauvegarde et de documentation sans toucher directement à `main`.
 
-**Statut recommandé :** ne pas fusionner et ne pas commercialiser comme totalement prêt tant que la CI de la dernière version, la recette de préproduction, les paiements réels/sandbox selon le périmètre vendu, la restauration de sauvegarde et les vérifications de protection des données n'ont pas été validés.
+**Statut recommandé :** ne pas fusionner et ne pas commercialiser comme totalement prêt tant que la CI du dernier commit de la PR #3, la recette de préproduction, les paiements réels/sandbox selon le périmètre vendu, la restauration de sauvegarde et les vérifications de protection des données n'ont pas été validés.
