@@ -157,6 +157,79 @@ router.put('/credit-notes/:id/status', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+/* ---------------------------- ACOMPTES ---------------------------------- */
+router.get('/deposits', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT a.*, f.numero AS facture_numero, c.nom AS client_nom FROM pro_acomptes a JOIN factures f ON f.id = a.facture_id JOIN clients c ON c.id = f.client_id WHERE a.user_id = ? ORDER BY a.date_emission DESC, a.id DESC LIMIT 250',
+      [owner(req)]
+    );
+    res.json({ acomptes: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/deposits', async (req, res, next) => {
+  try {
+    const uid = owner(req), invoiceId = Number(req.body.facture_id), amount = money(req.body.montant);
+    const invoice = await invoiceOwned(uid, invoiceId);
+    if (!invoice || invoice.type !== 'facture' || invoice.statut === 'annulee') return res.status(404).json({ error: 'Facture finale introuvable ou non éligible.' });
+    if (!amount) return res.status(400).json({ error: 'Le montant de l’acompte doit être positif.' });
+    const [[sum]] = await pool.query(
+      "SELECT COALESCE(SUM(montant),0) AS total FROM pro_acomptes WHERE user_id = ? AND facture_id = ? AND statut != 'annule'",
+      [uid, invoiceId]
+    );
+    const alreadyPlanned = Number(sum.total || 0);
+    const available = Number(invoice.total) - Number(invoice.montant_paye) - alreadyPlanned;
+    if (amount > available + 0.001) return res.status(400).json({ error: 'Le montant dépasse le solde qui peut encore être demandé en acompte.' });
+    const numero = randomRef('ACP');
+    const [result] = await pool.query(
+      'INSERT INTO pro_acomptes (user_id, facture_id, numero, date_emission, montant) VALUES (?, ?, ?, ?, ?)',
+      [uid, invoiceId, numero, safeDate(req.body.date_emission), amount]
+    );
+    await audit(req, 'acompte.cree', 'acompte', result.insertId, { facture_id: invoiceId, montant: amount });
+    res.status(201).json({ id: result.insertId, numero, montant: amount, statut: 'a_encaisser' });
+  } catch (err) { next(err); }
+});
+
+router.post('/deposits/:id/receive', async (req, res, next) => {
+  const conn = await pool.getConnection();
+  try {
+    const uid = owner(req);
+    const methode = String(req.body.methode || '').trim().slice(0, 50);
+    const reference = String(req.body.reference || '').trim().slice(0, 190) || null;
+    if (!methode) return res.status(400).json({ error: 'La méthode de règlement est obligatoire.' });
+    await conn.beginTransaction();
+    const [depositRows] = await conn.query('SELECT * FROM pro_acomptes WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
+    const deposit = depositRows[0];
+    if (!deposit) { await conn.rollback(); return res.status(404).json({ error: 'Acompte introuvable.' }); }
+    if (deposit.statut === 'encaisse') { await conn.rollback(); return res.json({ success: true, idempotent_replay: true }); }
+    if (deposit.statut !== 'a_encaisser') { await conn.rollback(); return res.status(409).json({ error: 'Cet acompte n’est plus encaissable.' }); }
+    const [invoiceRows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE', [deposit.facture_id, uid]);
+    const invoice = invoiceRows[0];
+    if (!invoice || invoice.type !== 'facture' || invoice.statut === 'annulee') { await conn.rollback(); return res.status(409).json({ error: 'La facture liée n’est plus disponible.' }); }
+    const remaining = Math.max(0, Number(invoice.total) - Number(invoice.montant_paye));
+    if (Number(deposit.montant) > remaining + 0.001) { await conn.rollback(); return res.status(409).json({ error: 'Le solde de la facture est devenu inférieur au montant de cet acompte.' }); }
+    await conn.query(
+      'INSERT INTO paiements (user_id, facture_id, montant, methode, reference) VALUES (?, ?, ?, ?, ?)',
+      [uid, invoice.id, deposit.montant, methode, reference || ('ACOMPTE-' + deposit.numero)]
+    );
+    const paid = Number(invoice.montant_paye) + Number(deposit.montant);
+    const status = paid >= Number(invoice.total) ? 'payee' : invoice.statut;
+    await conn.query('UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ? AND user_id = ?', [paid, status, invoice.id, uid]);
+    await conn.query("UPDATE pro_acomptes SET statut = 'encaisse', methode = ?, reference_paiement = ?, encaisse_le = NOW() WHERE id = ? AND user_id = ?", [methode, reference, deposit.id, uid]);
+    await conn.commit();
+    await audit(req, 'acompte.encaisse', 'acompte', deposit.id, { facture_id: invoice.id, montant: deposit.montant, methode });
+    queueWebhookEvent(uid, 'payment.received', { invoice_id: invoice.id, montant: Number(deposit.montant), methode, type: 'acompte' }).catch(err => console.warn('Webhook acompte ignoré :', err.message));
+    res.json({ success: true, facture_id: invoice.id, montant_encaisse: Number(deposit.montant), solde_restant: Math.max(0, Number(invoice.total) - paid) });
+  } catch (err) {
+    try { await conn.rollback(); } catch (_) {}
+    next(err);
+  } finally {
+    conn.release();
+  }
+});
+
 /* --------------------------- CLIENTS ----------------------------------- */
 router.get('/clients/:id/statement', async (req, res, next) => {
   try {
