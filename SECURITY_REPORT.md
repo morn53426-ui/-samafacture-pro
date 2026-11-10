@@ -10,7 +10,7 @@ n'a été touché (Phase 4 — API publiques/DTO — reste à faire séparément
 Déjà en place dans `server/config/secrets.js` (`ensureJwtSecret()`, appelée au démarrage dans
 `server/app.js` et `server/cluster.js`) — vérifié à nouveau à cette occasion : le serveur lève une
 exception fatale si `NODE_ENV=production` et `JWT_SECRET` absent/faible, plutôt que d'en générer un
-silencieusement. Voir `AUDIT_PRODUCTION.md` §1.3 pour le détail du risque que ça corrige.
+silencieusement. Cela empêche qu'un secret vide ou faible permette de fabriquer des jetons JWT valides.
 
 ## 2. Cookie de session HttpOnly — migration progressive
 
@@ -33,10 +33,10 @@ comportement observable de l'application n'a pas changé aujourd'hui (le fronten
 cet en-tête). C'est la base pour qu'une future page ou un futur client puisse s'appuyer uniquement
 sur le cookie, sans que web et mobile aient besoin de migrer en même temps.
 
-Un analyseur de cookies minimal a été écrit à la main dans `server/app.js` plutôt que d'ajouter la
-dépendance `cookie-parser` — `server/package-lock.json` est déjà signalé absent dans
-`AUDIT_PRODUCTION.md` §1.1, ajouter une dépendance non déclarée dans le lock file aurait aggravé ce
-problème plutôt que d'avancer sur autre chose.
+Un analyseur de cookies minimal a été écrit à la main dans `server/app.js` plutôt que d'ajouter
+la dépendance `cookie-parser` : le besoin est limité à la lecture du cookie `sf_token`, et le
+projet dispose maintenant d'un `server/package-lock.json` utilisé pour les installations
+reproductibles.
 
 Une route `POST /auth/logout` a été ajoutée pour effacer ce cookie ; `Api.clearSession()`
 (`public/js/api.js`) l'appelle désormais en tâche de fond (best-effort, non bloquant — la
@@ -45,8 +45,7 @@ déconnexion locale immédiate, elle, ne dépend jamais du réseau).
 ### Protection CSRF ajoutée en même temps, pas après
 Un cookie envoyé automatiquement par le navigateur sur toute requête — y compris déclenchée depuis
 un site tiers — réintroduit un risque CSRF qui n'existait pas avec la seule authentification par
-en-tête `Authorization` (noté dans `AUDIT_PRODUCTION.md` §4, "à traiter en même temps que la
-migration, pas après"). Deux couches, l'une n'annulant pas l'autre :
+en-tête `Authorization` (à traiter en même temps que toute migration vers une session par cookie). Deux couches, l'une n'annulant pas l'autre :
 1. `SameSite=Lax` sur le cookie lui-même.
 2. Un en-tête personnalisé obligatoire (`X-Requested-With: SamaFacturePro`, envoyé
    systématiquement par `Api.request()`) pour toute requête **qui modifie des données**
@@ -86,17 +85,17 @@ la laisser hors de cette politique que deviner et risquer de la casser.
 `server/tests/csrf-cookie-auth.test.js` — 6 tests unitaires purs de `requireAuth` (sans base de
 données ni serveur HTTP, seulement `jsonwebtoken`) : jeton Bearer toujours prioritaire, cookie
 accepté en repli, GET par cookie seul autorisé, POST par cookie seul refusé sans l'en-tête
-anti-CSRF puis autorisé avec. **Non exécutés dans cet environnement** — `jsonwebtoken` n'est pas
-installé ici (`server/node_modules/` absent, voir `AUDIT_PRODUCTION.md` §1.1) — la logique a été
-relue pas à pas contre chaque cas de test, mais à confirmer avec `npm test` une fois `npm install`
-fait de votre côté.
+anti-CSRF puis autorisé avec. **Validation du dépôt :** le workflow GitHub Actions `Tests automatisés` a exécuté
+`npm test` sur `main` le 10 novembre 2026 : 182 tests réussis, aucun échec ni test ignoré.
+La branche d'audit en cours ajoute des tests de sauvegarde supplémentaires qui restent à exécuter.
 
 ## 5. Ce qui n'a pas été touché dans cette phase
 
 - Le stockage `localStorage` côté frontend reste la méthode active aujourd'hui — c'est
   volontairement une migration *progressive* : rien n'oblige encore à en dépendre.
-- `AUDIT_PRODUCTION.md` §2.1/§2.2 (fuite de `verification_code`/`reset_token_hash`) — Phase 4, pas
-  celle-ci.
+- Les réponses API qui retournent des objets complets (`SELECT *`) doivent continuer à être
+revues pour limiter les champs exposés ; `sanitizeUser()` retire déjà les champs internes du
+compte, dont `reset_token_hash`.
 - CORS (`server/app.js`) n'a pas été modifié — le cookie n'est utile qu'en same-origin
   aujourd'hui (web servi par ce même serveur Express) ; l'activer en cross-origin
   (`credentials: true` + liste stricte d'origines) serait à faire seulement si un frontend séparé
