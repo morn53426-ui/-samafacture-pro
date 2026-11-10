@@ -55,13 +55,15 @@ function isPrivateAddress(address) {
   }
   if (net.isIP(address) === 6) {
     const normalized = address.toLowerCase();
-    if (normalized.startsWith('::ffff:')) {
-      const mapped = normalized.slice(7);
-      if (net.isIP(mapped) === 4) return isPrivateAddress(mapped);
-    }
-    return normalized === '::' || normalized === '::1' ||
+    // Les adresses IPv4-mappées et IPv4-compatibles sont refusées ici :
+    // leur traitement varie selon les piles réseau et elles ne sont pas nécessaires
+    // pour un webhook public. Les plages ULA, link-local, site-local, multicast,
+    // documentation et ORCHID sont également interdites.
+    return normalized.startsWith('::') ||
       normalized.startsWith('fc') || normalized.startsWith('fd') ||
-      /^fe[89ab]/.test(normalized) || normalized.startsWith('ff');
+      /^fe[89ab]/.test(normalized) || /^fec/.test(normalized) ||
+      normalized.startsWith('ff') || normalized.startsWith('2001:db8:') ||
+      normalized.startsWith('2001:10:') || normalized.startsWith('64:ff9b:');
   }
   return true;
 }
