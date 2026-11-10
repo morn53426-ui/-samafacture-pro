@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { OAuth2Client } = require('google-auth-library');
 const { pool } = require('../config/db');
+const { isRedisConfigured, getRedisClient } = require('../config/redis');
 const { requireAuth } = require('../middleware/auth');
 const { isValidImageDataUrl } = require('../utils/validation');
 const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = require('../utils/plans');
@@ -71,9 +72,32 @@ function validerPersonnalisation(personnalisation) {
   return { cleaned: Object.keys(cleaned).length ? cleaned : null };
 }
 
+// Les limiteurs d'authentification utilisent Redis en production multi-worker afin
+// que chaque instance applique le même quota. Sans REDIS_URL, le mode local reste autonome.
+function createAuthRateLimitStore(prefix) {
+  if (!isRedisConfigured()) return null;
+  try {
+    const { RedisStore } = require('rate-limit-redis');
+    const redisClient = getRedisClient();
+    if (!redisClient) return null;
+    return new RedisStore({
+      prefix: `samafacture:rate-limit:${prefix}:`,
+      sendCommand: (...args) => redisClient.sendCommand(args)
+    });
+  } catch (err) {
+    console.warn('⚠️ Stockage Redis des limiteurs auth indisponible, repli local :', err.message);
+    return null;
+  }
+}
+
+const loginRateLimitStore = createAuthRateLimitStore('login');
+const registerRateLimitStore = createAuthRateLimitStore('register');
+const resetRateLimitStore = createAuthRateLimitStore('password-reset');
+
 // Anti brute-force : limite les tentatives de connexion par adresse IP.
 // Les tentatives réussies ne comptent pas dans le quota, seuls les échecs.
 const loginLimiter = rateLimit({
+  ...(loginRateLimitStore ? { store: loginRateLimitStore } : {}),
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
   skipSuccessfulRequests: true,
@@ -84,6 +108,7 @@ const loginLimiter = rateLimit({
 
 // Limite aussi les créations de compte pour éviter la génération massive de comptes.
 const registerLimiter = rateLimit({
+  ...(registerRateLimitStore ? { store: registerRateLimitStore } : {}),
   windowMs: 60 * 60 * 1000, // 1 heure
   max: 20,
   standardHeaders: true,
@@ -93,6 +118,7 @@ const registerLimiter = rateLimit({
 
 // Limite les demandes de réinitialisation de mot de passe (évite le spam d'emails).
 const resetLimiter = rateLimit({
+  ...(resetRateLimitStore ? { store: resetRateLimitStore } : {}),
   windowMs: 15 * 60 * 1000,
   max: 5,
   standardHeaders: true,
@@ -722,11 +748,8 @@ router.delete('/donnees', requireAuth, async (req, res, next) => {
 });
 
 function sanitizeUser(user) {
-  // Retire toutes les colonnes internes/secrètes avant de renvoyer l'utilisateur au frontend —
-  // pas seulement password_hash. reset_token_hash/reset_token_expires étaient jusqu'ici renvoyés
-  // tels quels sur /auth/me et toutes les routes qui passent par cette fonction (voir
-  // AUDIT_PRODUCTION.md §2.2) : même si seul le propriétaire du compte pouvait les lire, envoyer
-  // le hash d'un jeton de réinitialisation actif au JavaScript client n'a aucune raison d'être.
+  // Retire toutes les colonnes internes/secrètes avant de renvoyer l'utilisateur au frontend :
+  // mot de passe, jetons de réinitialisation et version interne de session.
   const { password_hash, reset_token_hash, reset_token_expires, token_version, ...rest } = user;
   // La colonne est stockée en JSON texte (voir migration facture_personnalisation) ; on la renvoie
   // au client déjà parsée pour lui éviter un JSON.parse. Une valeur corrompue ne doit jamais faire
