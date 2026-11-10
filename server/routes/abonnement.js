@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { captureException } = require('../config/monitoring');
+const { isManualPlanSelectionEnabled } = require('../config/runtime');
 const {
   waveConfigured, paydunyaConfigured,
   creerSessionWave, verifierSignatureWave, consulterSessionWave,
@@ -41,7 +42,7 @@ function baseUrl(req) {
  *               properties:
  *                 wave: { type: boolean }
  *                 paydunya: { type: boolean }
- *                 manual_plan_selection: { type: boolean, description: 'Disponible uniquement en développement/test.' }
+ *                 manual_plan_selection: { type: boolean, description: 'Disponible uniquement lorsque NODE_ENV vaut development ou test.' }
  *                 tarifs: { type: object, properties: { starter: { type: integer }, pro: { type: integer }, entreprise: { type: integer } } }
  */
 router.get('/moyens-disponibles', requireAuth, (req, res) => {
@@ -49,7 +50,7 @@ router.get('/moyens-disponibles', requireAuth, (req, res) => {
     wave: waveConfigured(),
     paydunya: paydunyaConfigured(),
     tarifs: TARIFS,
-    manual_plan_selection: process.env.NODE_ENV !== 'production'
+    manual_plan_selection: isManualPlanSelectionEnabled()
   });
 });
 
