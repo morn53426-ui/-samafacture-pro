@@ -5,6 +5,8 @@ const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission, ROLE_PERMISSIONS } = require('../middleware/tenant');
 const { sendMail } = require('../config/mailer');
+const { encryptSecret } = require('../utils/pro-webhooks');
+const net = require('net');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -77,11 +79,12 @@ router.post('/orders', async (req, res, next) => {
       normalized.push({ designation, quantite, prix_unitaire: prix, total: ligneTotal, produit_id: idOk(line.produit_id) ? Number(line.produit_id) : null });
     }
     total = Math.round(total * 100) / 100;
+    const orderNumber = randomRef('CMD');
     const [result] = await pool.query(
       'INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, date_livraison_prevue, devise, total, lignes_json, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, clientId, randomRef('CMD'), 'confirmee', safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, String(req.body.devise || 'FCFA').slice(0, 10), total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
+      [uid, clientId, orderNumber, 'confirmee', safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, String(req.body.devise || 'FCFA').slice(0, 10), total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
     );
-    await audit(req, 'commande.creee', 'commande', result.insertId, { numero: randomRef('CMD') });
+    await audit(req, 'commande.creee', 'commande', result.insertId, { numero: orderNumber });
     res.status(201).json({ id: result.insertId, total, lignes: normalized });
   } catch (err) { next(err); }
 });
@@ -571,11 +574,18 @@ router.post('/integrations/webhooks', async (req, res, next) => {
     let parsed;
     try { parsed = new URL(url); } catch (_) { return res.status(400).json({ error: 'URL de webhook invalide.' }); }
     if (!['https:'].includes(parsed.protocol) && process.env.NODE_ENV === 'production') return res.status(400).json({ error: 'Les webhooks doivent utiliser HTTPS en production.' });
+    const host = parsed.hostname.toLowerCase();
+    const literalIp = net.isIP(host);
+    const privateIpv4 = literalIp === 4 && (/^(10|127|0)\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host));
+    const privateIpv6 = literalIp === 6 && (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80'));
+    if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || privateIpv4 || privateIpv6) {
+      return res.status(400).json({ error: 'Les webhooks ne peuvent pas cibler un hôte local ou une adresse IP privée.' });
+    }
     const allowedEvents = ['invoice.created','payment.received','client.created'];
     const events = Array.isArray(req.body.evenements) ? [...new Set(req.body.evenements.filter(x => allowedEvents.includes(x)))] : [];
     if (!events.length) return res.status(400).json({ error: 'Sélectionnez au moins un événement valide.' });
     const secret = crypto.randomBytes(32).toString('hex');
-    const [result] = await pool.query('INSERT INTO pro_webhooks (user_id, url, secret_enc, evenements_json) VALUES (?, ?, ?, ?)', [owner(req), url, secret, JSON.stringify(events)]);
+    const [result] = await pool.query('INSERT INTO pro_webhooks (user_id, url, secret_enc, evenements_json) VALUES (?, ?, ?, ?)', [owner(req), url, encryptSecret(secret), JSON.stringify(events)]);
     await audit(req, 'webhook.cree', 'webhook', result.insertId, { url, events });
     res.status(201).json({ id: result.insertId, url, evenements: events, secret, warning: 'Conservez le secret : il ne sera pas réaffiché.' });
   } catch (err) { next(err); }
