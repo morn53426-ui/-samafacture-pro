@@ -11,6 +11,7 @@ const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 const { genererPdfFacture } = require('../utils/pdf');
 const { notifierUtilisateur } = require('../realtime');
 const { enqueuePdfJob, getPdfJob, getPdfPath } = require('../pdf-queue');
+const { queueWebhookEvent } = require('../utils/pro-webhooks');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -384,6 +385,9 @@ router.post('/', async (req, res, next) => {
     await conn.commit();
     const [factureRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [factureId]);
     res.status(201).json({ facture: factureRows[0] });
+    if (docType === 'facture') {
+      queueWebhookEvent(req.tenantId, 'invoice.created', { invoice_id: factureId, numero, total }).catch(err => console.warn('Webhook invoice.created ignoré :', err.message));
+    }
   } catch (err) {
     if (conn) await conn.rollback();
     if (err?.code === 'ER_DUP_ENTRY' && req.get('Idempotency-Key')) {
@@ -943,6 +947,7 @@ router.post('/:id/paiements', async (req, res, next) => {
     const nouveauStatut = nouveauMontantPaye >= Number(facture.total) ? 'payee' : facture.statut;
     await conn.query('UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ?', [nouveauMontantPaye, nouveauStatut, facture.id]);
     await conn.commit();
+    queueWebhookEvent(req.tenantId, 'payment.received', { facture_id: facture.id, montant: montantNum, methode }).catch(err => console.warn('Webhook payment.received ignoré :', err.message));
 
     const [updatedRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [facture.id]);
     res.status(201).json({ facture: updatedRows[0] });
