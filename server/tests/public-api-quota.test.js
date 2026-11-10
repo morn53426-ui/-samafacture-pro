@@ -52,8 +52,24 @@ describe('API publique : quota mensuel des factures gratuites', () => {
       });
 
     for (let i = 0; i < FREE_MONTHLY_INVOICE_LIMIT - 1; i++) {
-      const created = await createInvoice();
+      const created = await request(app)
+        .post('/api/v1/invoices')
+        .set('X-SamaFacture-Key', apiKey)
+        .send({
+          client_id: clientId,
+          date_emission: '2000-01-01',
+          frais_livraison: i === 0 ? -2500 : 0,
+          lignes: [{ designation: 'Facture API quota', quantite: 1, prix_unitaire: 100, tva: 0 }]
+        });
       assert.equal(created.status, 201, created.text);
+      if (i === 0) {
+        const [[invoice]] = await pool.query(
+          'SELECT frais_livraison, total FROM factures WHERE id = ? AND user_id = ?',
+          [created.body.facture.id, userId]
+        );
+        assert.equal(Number(invoice.frais_livraison), 0);
+        assert.equal(Number(invoice.total), 100);
+      }
     }
 
     const concurrent = await Promise.all(Array.from({ length: 4 }, createInvoice));
