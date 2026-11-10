@@ -61,7 +61,7 @@
 
       return '<tr class="billing-invoice-row row-clickable" tabindex="0" role="button" data-invoice-id="' + id +
         '" aria-label="Consulter la facture ' + numero + '" onclick="printFacture(' + id +
-        ')" onkeydown="if(event.key===\\'Enter\\') printFacture(' + id + ')">' +
+        ')" onkeydown="if(event.key===&quot;Enter&quot;) printFacture(' + id + ')">' +
         '<td data-label="Référence"><span class="billing-reference">' + numero + '</span></td>' +
         '<td data-label="Client"><span class="billing-client-name">' + client + '</span></td>' +
         '<td data-label="Émission">' + formatDate(f.date_emission) + '</td>' +
