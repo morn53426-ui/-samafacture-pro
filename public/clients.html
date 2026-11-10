@@ -23,7 +23,7 @@
         <h1>Clients</h1>
         <p>Gérez votre portefeuille clients</p>
       </div>
-      <button class="btn btn-primary" onclick="openModal()">+ Nouveau client</button>
+      <button class="btn btn-primary" onclick="openModal()"><span class="ic">${Icon('plus')}</span> Nouveau client</button>
     </div>
 
     <div class="card" style="margin-bottom:18px; padding:14px 18px;">
@@ -102,8 +102,8 @@
         <td class="mono" style="color:${c.total_du > 0 ? 'var(--clay)' : 'var(--ink-soft)'};">${formatMontant(c.total_du)}</td>
         <td class="mono">${formatMontant(c.total_facture)}</td>
         <td style="text-align:right;" onclick="event.stopPropagation();">
-          <button class="btn btn-sm btn-outline" onclick='editClient(${c.id})'>Modifier</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteClient(${c.id})">Supprimer</button>
+          <button class="btn btn-sm btn-outline" onclick='editClient(${c.id})'>${Icon('edit-3')} Modifier</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteClient(${c.id})">${Icon('trash-2')} Supprimer</button>
         </td>
       </tr>
     `).join('') : `<tr><td colspan="5"><div class="empty-state"><div class="ic">${Icon('users')}</div>Aucun client. Ajoutez votre premier client !</div></td></tr>`;
