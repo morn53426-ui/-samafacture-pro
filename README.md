@@ -6,6 +6,8 @@ SamaFacture Pro est une plateforme de facturation et de gestion destinée aux co
 
 Pour l'API publique versionnée, ses permissions, ses exemples de requêtes et la signature des webhooks, consultez [API_PUBLIQUE.md](API_PUBLIQUE.md).
 
+Pour configurer et utiliser les modèles complets de factures et devis, consultez [GUIDE_MODELES_FACTURES_DEVIS.md](GUIDE_MODELES_FACTURES_DEVIS.md).
+
 ## Ce qui est inclus
 
 - **Backend** : Node.js + Express + **MySQL** (`mysql2`), authentification JWT + bcrypt, API REST complète.
@@ -17,11 +19,12 @@ Pour l'API publique versionnée, ses permissions, ses exemples de requêtes et l
   - Produits (CRUD, prix HT, TVA, stock)
   - Factures et devis : création avec lignes multiples, calcul automatique (sous-total, TVA, remise, livraison, total)
   - Transformation d'un devis en facture en un clic
+  - Documents enrichis : objet, référence de commande, validité du devis, détail de TVA par taux, suivi du payé/reste à payer, conditions et zone « Bon pour accord »
   - Enregistrement de paiements (Wave, Orange Money, PayDunya, Stripe, espèces, etc.) avec mise à jour automatique du statut
   - Vue facture imprimable → export PDF via l'impression du navigateur (Ctrl/Cmd+P → "Enregistrer en PDF")
   - Dépenses (CRUD) pour suivre les sorties d'argent
   - Rapports : ventes par jour/semaine/mois/année/client/produit, export CSV, résumé comptable (recettes, dépenses, bénéfice net, TVA collectée)
-  - Paramètres entreprise : logo, nom, adresse, devise, **6 modèles de facture** (Classique, Moderne, Minimaliste, ✦ Élégant, ✦ Corporate, ✦ Créatif — les 3 derniers réservés au plan Pro), affichés sur les factures
+  - Paramètres entreprise : identité, coordonnées légales, banque/RIB, conditions de règlement, logo et personnalisation visuelle ; **15 modèles de facture/devis** partagés entre aperçu, impression et PDF
   - Centre d'aide (FAQ), Support technique (formulaire de contact) et Politique de confidentialité
   - Interface responsive : menu latéral escamotable sur mobile/tablette, tableaux et grilles adaptatifs
   - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature électronique, factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle)
