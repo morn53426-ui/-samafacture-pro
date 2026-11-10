@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
 const { FREE_MONTHLY_INVOICE_LIMIT, isPaidPlan } = require('../utils/plans');
 const { sendMail } = require('../config/mailer');
@@ -10,9 +11,10 @@ const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 const { genererPdfFacture } = require('../utils/pdf');
 const { notifierUtilisateur } = require('../realtime');
 const { enqueuePdfJob, getPdfJob, getPdfPath } = require('../pdf-queue');
+const { queueWebhookEvent } = require('../utils/pro-webhooks');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, requirePermission);
 
 async function nextNumero(conn, userId, type) {
   const prefix = type === 'devis' ? 'DEV' : 'FAC';
@@ -175,7 +177,7 @@ router.get('/', async (req, res, next) => {
     const { page, limite, offset } = getPagination(req.query);
 
     let whereSql = ' WHERE f.user_id = ?';
-    const params = [req.user.id];
+    const params = [req.tenantId];
     if (type) { whereSql += ' AND f.type = ?'; params.push(type); }
     if (statut) { whereSql += ' AND f.statut = ?'; params.push(statut); }
     if (client_id) { whereSql += ' AND f.client_id = ?'; params.push(client_id); }
@@ -221,7 +223,7 @@ router.get('/:id', async (req, res, next) => {
     const [rows] = await pool.query(
       `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone, c.adresse as client_adresse
        FROM factures f JOIN clients c ON c.id = f.client_id WHERE f.id = ? AND f.user_id = ?`,
-      [req.params.id, req.user.id]
+      [req.params.id, req.tenantId]
     );
     const facture = rows[0];
     if (!facture) return res.status(404).json({ error: 'Facture introuvable.' });
@@ -230,7 +232,7 @@ router.get('/:id', async (req, res, next) => {
     // on le génère à la volée au premier affichage plutôt que de migrer toute la table.
     if (!facture.verification_code) {
       facture.verification_code = crypto.randomBytes(5).toString('hex');
-      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ? AND user_id = ?', [facture.verification_code, facture.id, req.tenantId]);
     }
 
     const [[lignes], [paiements]] = await Promise.all([
@@ -297,7 +299,7 @@ router.post('/', async (req, res, next) => {
     if (idempotencyKey) {
       const [existing] = await pool.query(
         'SELECT * FROM factures WHERE user_id = ? AND idempotency_key = ?',
-        [req.user.id, idempotencyKey]
+        [req.tenantId, idempotencyKey]
       );
       if (existing.length) return res.status(200).json({ facture: existing[0], idempotent_replay: true });
     }
@@ -305,7 +307,7 @@ router.post('/', async (req, res, next) => {
     if (!client_id || !Array.isArray(lignes) || lignes.length === 0) {
       return res.status(400).json({ error: 'Un client et au moins une ligne de produit sont requis.' });
     }
-    const [clientRows] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client_id, req.user.id]);
+    const [clientRows] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client_id, req.tenantId]);
     if (!clientRows.length) {
       return res.status(400).json({ error: 'Client invalide.' });
     }
@@ -316,7 +318,7 @@ router.post('/', async (req, res, next) => {
     if (produitIds.length) {
       const [ownedRows] = await pool.query(
         `SELECT id FROM produits WHERE user_id = ? AND id IN (${produitIds.map(() => '?').join(',')})`,
-        [req.user.id, ...produitIds]
+        [req.tenantId, ...produitIds]
       );
       const ownedIds = new Set(ownedRows.map(r => r.id));
       for (const l of lignes) {
@@ -330,15 +332,15 @@ router.post('/', async (req, res, next) => {
     // plans). On relit le plan depuis la base plutôt que le jeton JWT, pour qu'un changement
     // de plan prenne effet immédiatement sans attendre l'expiration de la session.
     if (docType === 'facture') {
-      const [[userRow]] = await pool.query('SELECT plan FROM users WHERE id = ?', [req.user.id]);
+      const [[userRow]] = await pool.query('SELECT plan FROM users WHERE id = ?', [req.tenantId]);
       if (!isPaidPlan(userRow?.plan)) {
         const [[{ n: countThisMonth }]] = await pool.query(
           `SELECT COUNT(*) as n FROM factures
            WHERE user_id = ? AND type = 'facture' AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')`,
-          [req.user.id]
+          [req.tenantId]
         );
         if (countThisMonth >= FREE_MONTHLY_INVOICE_LIMIT) {
-          notifierUtilisateur(req.user.id, 'alerte_quota', {
+          notifierUtilisateur(req.tenantId, 'alerte_quota', {
             message: `Vous avez atteint la limite de ${FREE_MONTHLY_INVOICE_LIMIT} factures du plan Gratuit ce mois-ci.`
           });
           return res.status(403).json({
@@ -356,12 +358,12 @@ router.post('/', async (req, res, next) => {
 
     conn = await pool.getConnection();
     await conn.beginTransaction();
-    const numero = await nextNumero(conn, req.user.id, docType);
+    const numero = await nextNumero(conn, req.tenantId, docType);
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
        VALUES (?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        req.user.id, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
+        req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
         date_echeance || null, remiseAppliquee, Number(frais_livraison) || 0, mode_paiement || null,
         commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
       ]
@@ -377,19 +379,22 @@ router.post('/', async (req, res, next) => {
     // indication, pas une contrainte dure. Restauré symétriquement si la facture est
     // supprimée ou annulée (voir DELETE /:id et PUT /:id/statut plus bas).
     if (docType === 'facture') {
-      await appliquerAjustementsStock(conn, req.user.id, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
+      await appliquerAjustementsStock(conn, req.tenantId, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
     }
 
     await conn.commit();
     const [factureRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [factureId]);
     res.status(201).json({ facture: factureRows[0] });
+    if (docType === 'facture') {
+      queueWebhookEvent(req.tenantId, 'invoice.created', { invoice_id: factureId, numero, total }).catch(err => console.warn('Webhook invoice.created ignoré :', err.message));
+    }
   } catch (err) {
     if (conn) await conn.rollback();
     if (err?.code === 'ER_DUP_ENTRY' && req.get('Idempotency-Key')) {
       try {
         const [existing] = await pool.query(
           'SELECT * FROM factures WHERE user_id = ? AND idempotency_key = ?',
-          [req.user.id, req.get('Idempotency-Key').trim()]
+          [req.tenantId, req.get('Idempotency-Key').trim()]
         );
         if (existing.length) return res.status(200).json({ facture: existing[0], idempotent_replay: true });
       } catch (replayErr) { return next(replayErr); }
@@ -426,7 +431,7 @@ router.post('/', async (req, res, next) => {
 router.put('/:id/statut', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const existing = existingRows[0];
     if (!existing) { conn.release(); return res.status(404).json({ error: 'Facture introuvable.' }); }
 
@@ -435,20 +440,20 @@ router.put('/:id/statut', async (req, res, next) => {
     if (!valides.includes(statut)) { conn.release(); return res.status(400).json({ error: 'Statut invalide.' }); }
 
     await conn.beginTransaction();
-    await conn.query('UPDATE factures SET statut = ? WHERE id = ?', [statut, existing.id]);
+    await conn.query('UPDATE factures SET statut = ? WHERE id = ? AND user_id = ?', [statut, existing.id, req.tenantId]);
 
     // Symétrie avec le décompte automatique du stock (voir POST / et /transformer-en-facture
     // ci-dessus) : annuler une facture doit restituer le stock déjà décompté, et ré-annuler
     // l'annulation (repasser à un autre statut) doit le redécompter — sinon le stock affiché
     // dérive silencieusement de la réalité à chaque annulation/réactivation.
     if (existing.type === 'facture' && existing.statut !== 'annulee' && statut === 'annulee') {
-      await ajusterStockFacture(conn, existing.id, req.user.id, +1); // restitue (+ stock)
+      await ajusterStockFacture(conn, existing.id, req.tenantId, +1); // restitue (+ stock)
     } else if (existing.type === 'facture' && existing.statut === 'annulee' && statut !== 'annulee') {
-      await ajusterStockFacture(conn, existing.id, req.user.id, -1); // redécompte (- stock)
+      await ajusterStockFacture(conn, existing.id, req.tenantId, -1); // redécompte (- stock)
     }
 
     await conn.commit();
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ?', [existing.id]);
+    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     res.json({ facture: rows[0] });
   } catch (err) {
     await conn.rollback();
@@ -476,23 +481,23 @@ router.put('/:id/statut', async (req, res, next) => {
 router.post('/:id/transformer-en-facture', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [devisRows] = await pool.query(`SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis'`, [req.params.id, req.user.id]);
+    const [devisRows] = await pool.query(`SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis'`, [req.params.id, req.tenantId]);
     const devis = devisRows[0];
     if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
 
     await conn.beginTransaction();
-    const numero = await nextNumero(conn, req.user.id, 'facture');
-    await conn.query(`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente' WHERE id = ?`, [numero, devis.id]);
+    const numero = await nextNumero(conn, req.tenantId, 'facture');
+    await conn.query(`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente' WHERE id = ? AND user_id = ?`, [numero, devis.id, req.tenantId]);
 
     // Décompte du stock au moment où le devis devient une vraie vente (même règle qu'à la
     // création directe d'une facture, voir POST / ci-dessus) — jamais fait tant que ce
     // n'était qu'un devis.
     const [lignesDevis] = await conn.query('SELECT produit_id, quantite FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL', [devis.id]);
-    await appliquerAjustementsStock(conn, req.user.id, lignesDevis.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
+    await appliquerAjustementsStock(conn, req.tenantId, lignesDevis.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
 
     await conn.commit();
 
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ?', [devis.id]);
+    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [devis.id, req.tenantId]);
     res.json({ facture: rows[0] });
   } catch (err) {
     await conn.rollback();
@@ -522,19 +527,19 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
 router.post('/:id/dupliquer', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [sourceRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [sourceRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const source = sourceRows[0];
     if (!source) return res.status(404).json({ error: 'Document introuvable.' });
 
     const [lignesSource] = await pool.query('SELECT * FROM facture_lignes WHERE facture_id = ?', [source.id]);
 
     await conn.beginTransaction();
-    const numero = await nextNumero(conn, req.user.id, source.type);
+    const numero = await nextNumero(conn, req.tenantId, source.type);
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
        VALUES (?, ?, ?, ?, CURDATE(), NULL, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
       [
-        req.user.id, source.client_id, numero, source.type,
+        req.tenantId, source.client_id, numero, source.type,
         source.remise, source.frais_livraison, source.mode_paiement, source.commentaires,
         source.sous_total, source.total_tva, source.total
       ]
@@ -544,7 +549,7 @@ router.post('/:id/dupliquer', async (req, res, next) => {
     await insererLignesFacture(conn, nouvelId, lignesSource);
 
     await conn.commit();
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ?', [nouvelId]);
+    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [nouvelId, req.tenantId]);
     res.status(201).json({ facture: rows[0] });
   } catch (err) {
     await conn.rollback();
@@ -579,16 +584,16 @@ router.post('/:id/dupliquer', async (req, res, next) => {
 router.post('/:id/pdf/async', async (req, res, next) => {
   try {
     if (!process.env.REDIS_URL) return res.status(503).json({ error: "La génération PDF asynchrone n'est pas configurée." });
-    const [rows] = await pool.query('SELECT id FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [rows] = await pool.query('SELECT id FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     if (!rows.length) return res.status(404).json({ error: 'Document introuvable.' });
-    const jobId = await enqueuePdfJob({ factureId: req.params.id, user: req.user });
+    const jobId = await enqueuePdfJob({ factureId: req.params.id, user: { ...req.user, id: req.tenantId } });
     res.status(202).json({ job_id: jobId, status: 'queued' });
   } catch (err) { next(err); }
 });
 
 router.get('/:id/pdf/jobs/:jobId', async (req, res, next) => {
   try {
-    const job = await getPdfJob(req.params.jobId, req.user.id);
+    const job = await getPdfJob(req.params.jobId, req.tenantId);
     if (!job) return res.status(404).json({ error: 'Job PDF introuvable.' });
     if (String(job.factureId) !== String(req.params.id)) return res.status(404).json({ error: 'Job PDF introuvable.' });
     if (job.status === 'completed') {
@@ -600,12 +605,12 @@ router.get('/:id/pdf/jobs/:jobId', async (req, res, next) => {
 
 router.get('/:id/pdf/jobs/:jobId/download', async (req, res, next) => {
   try {
-    const job = await getPdfJob(req.params.jobId, req.user.id);
+    const job = await getPdfJob(req.params.jobId, req.tenantId);
     if (!job || String(job.factureId) !== String(req.params.id) || job.status !== 'completed') {
       return res.status(404).json({ error: 'PDF non disponible.' });
     }
     const file = await getPdfPath(req.params.jobId);
-    const [rows] = await pool.query('SELECT numero, type FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [rows] = await pool.query('SELECT numero, type FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     if (!rows.length) return res.status(404).json({ error: 'Document introuvable.' });
     const prefixe = rows[0].type === 'devis' ? 'devis' : 'facture';
     res.download(file, `${prefixe}-${rows[0].numero}.pdf`, err => { if (err && !res.headersSent) next(err); });
@@ -614,11 +619,11 @@ router.get('/:id/pdf/jobs/:jobId/download', async (req, res, next) => {
 
 router.get('/:id/pdf', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT id, numero, type FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [rows] = await pool.query('SELECT id, numero, type FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const facture = rows[0];
     if (!facture) return res.status(404).json({ error: 'Document introuvable.' });
 
-    const pdfBuffer = await genererPdfFacture(facture.id, req.user);
+    const pdfBuffer = await genererPdfFacture(facture.id, { ...req.user, id: req.tenantId });
     const prefixe = facture.type === 'devis' ? 'devis' : 'facture';
     res.set({
       'Content-Type': 'application/pdf',
@@ -680,7 +685,7 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
 
   if (!facture.verification_code) {
     facture.verification_code = crypto.randomBytes(5).toString('hex');
-    await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+    await pool.query('UPDATE factures SET verification_code = ? WHERE id = ? AND user_id = ?', [facture.verification_code, facture.id, userId]);
   }
 
   const consultUrl = `${baseUrl}/consulter.html?id=${facture.id}&code=${facture.verification_code}`;
@@ -715,7 +720,7 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
 router.post('/:id/envoyer', async (req, res, next) => {
   try {
     const baseUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-    const resultat = await envoyerFactureParEmail(req.params.id, req.user.id, baseUrl, req.body && req.body.email);
+    const resultat = await envoyerFactureParEmail(req.params.id, req.tenantId, baseUrl, req.body && req.body.email);
     res.json(resultat);
   } catch (err) {
     if (err.message === 'Document introuvable.') return res.status(404).json({ error: err.message });
@@ -756,7 +761,7 @@ router.post('/:id/relancer', async (req, res, next) => {
       `SELECT f.*, c.nom as client_nom, c.email as client_email, u.entreprise_nom, u.nom as user_nom
        FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
        WHERE f.id = ? AND f.user_id = ? AND f.type = 'facture'`,
-      [req.params.id, req.user.id]
+      [req.params.id, req.tenantId]
     );
     const facture = rows[0];
     if (!facture) return res.status(404).json({ error: 'Facture introuvable.' });
@@ -777,7 +782,7 @@ router.post('/:id/relancer', async (req, res, next) => {
 
     let attachments;
     try {
-      const pdfBuffer = await genererPdfFacture(facture.id, req.user);
+      const pdfBuffer = await genererPdfFacture(facture.id, { ...req.user, id: req.tenantId });
       attachments = [{ filename: `facture-${facture.numero}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }];
     } catch (pdfErr) {
       console.error('PDF joint à la relance échoué (email envoyé sans pièce jointe) :', pdfErr.message);
@@ -813,7 +818,7 @@ router.post('/:id/relancer', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const existing = existingRows[0];
     if (!existing) { conn.release(); return res.status(404).json({ error: 'Facture introuvable.' }); }
 
@@ -822,9 +827,9 @@ router.delete('/:id', async (req, res, next) => {
     // annulée (son stock avait alors déjà été restitué par PUT /:id/statut — le restituer
     // une seconde fois créerait un stock fantôme supérieur à la réalité).
     if (existing.type === 'facture' && existing.statut !== 'annulee') {
-      await ajusterStockFacture(conn, existing.id, req.user.id, +1);
+      await ajusterStockFacture(conn, existing.id, req.tenantId, +1);
     }
-    await conn.query('DELETE FROM factures WHERE id = ?', [existing.id]);
+    await conn.query('DELETE FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
@@ -879,10 +884,10 @@ router.post('/:id/paiements', async (req, res, next) => {
     if (idempotencyKey) {
       const [existingPayment] = await pool.query(
         'SELECT p.*, f.* FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.user_id = ? AND p.idempotency_key = ?',
-        [req.user.id, idempotencyKey]
+        [req.tenantId, idempotencyKey]
       );
       if (existingPayment.length) {
-        const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.user.id]);
+        const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.tenantId]);
         return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
       }
     }
@@ -894,7 +899,7 @@ router.post('/:id/paiements', async (req, res, next) => {
     // double-clic) ne se basent jamais sur le même montant_paye de départ — même bug de
     // fond que la numérotation concurrente des factures (voir nextNumero), appliqué ici au
     // solde d'une facture pour ne jamais perdre un paiement en cas d'écritures simultanées.
-    const [factureRows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, req.user.id]);
+    const [factureRows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, req.tenantId]);
     const facture = factureRows[0];
     if (!facture) {
       await conn.rollback();
@@ -910,13 +915,13 @@ router.post('/:id/paiements', async (req, res, next) => {
     if (idempotencyKey) {
       const [paymentRows] = await conn.query(
         'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
-        [req.user.id, idempotencyKey]
+        [req.tenantId, idempotencyKey]
       );
       if (paymentRows.length) {
         await conn.rollback();
         const [existingFacture] = await pool.query(
           'SELECT * FROM factures WHERE id = ? AND user_id = ?',
-          [paymentRows[0].facture_id, req.user.id]
+          [paymentRows[0].facture_id, req.tenantId]
         );
         return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
       }
@@ -935,19 +940,20 @@ router.post('/:id/paiements', async (req, res, next) => {
 
     await conn.query(
       `INSERT INTO paiements (user_id, facture_id, montant, methode, reference, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)`,
-      [req.user.id, facture.id, montantNum, methode, reference || null, idempotencyKey]
+      [req.tenantId, facture.id, montantNum, methode, reference || null, idempotencyKey]
     );
 
     const nouveauMontantPaye = Number(facture.montant_paye) + montantNum;
     const nouveauStatut = nouveauMontantPaye >= Number(facture.total) ? 'payee' : facture.statut;
     await conn.query('UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ?', [nouveauMontantPaye, nouveauStatut, facture.id]);
     await conn.commit();
+    queueWebhookEvent(req.tenantId, 'payment.received', { facture_id: facture.id, montant: montantNum, methode }).catch(err => console.warn('Webhook payment.received ignoré :', err.message));
 
     const [updatedRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [facture.id]);
     res.status(201).json({ facture: updatedRows[0] });
 
     if (nouveauStatut === 'payee' && facture.statut !== 'payee') {
-      notifierUtilisateur(req.user.id, 'facture_payee', { facture: updatedRows[0] });
+      notifierUtilisateur(req.tenantId, 'facture_payee', { facture: updatedRows[0] });
     }
   } catch (err) {
     if (conn) await conn.rollback();
@@ -956,10 +962,10 @@ router.post('/:id/paiements', async (req, res, next) => {
         const key = req.get('Idempotency-Key').trim();
         const [existingPayment] = await pool.query(
           'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ?',
-          [req.user.id, key]
+          [req.tenantId, key]
         );
         if (existingPayment.length) {
-          const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.user.id]);
+          const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.tenantId]);
           return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
         }
       } catch (replayErr) { return next(replayErr); }

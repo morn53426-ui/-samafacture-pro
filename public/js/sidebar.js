@@ -9,7 +9,8 @@ function renderSidebar(activePage) {
       { id: 'factures', icon: 'file-text', label: 'Factures', href: 'factures.html' },
       { id: 'devis', icon: 'file-stack', label: 'Devis', href: 'devis.html' },
       { id: 'nouvelle-facture', icon: 'plus', label: 'Nouvelle facture', href: 'nouvelle-facture.html' },
-      { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' }
+      { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
+      { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' }
     ]},
     { group: 'Catalogue', items: [
       { id: 'produits', icon: 'package', label: 'Produits', href: 'produits.html' }
@@ -40,7 +41,7 @@ function renderSidebar(activePage) {
   const navHtml = nav.map(section => `
     ${section.group ? `<div class="nav-group-label">${section.group}</div>` : ''}
     ${section.items.map(item => `
-      <a href="${item.href}" class="nav-item ${activePage === item.id ? 'active' : ''}">
+      <a href="${item.href}" class="nav-item ${activePage === item.id ? 'active' : ''}" onclick="closeSidebar()">
         <span class="ic">${Icon(item.icon)}</span><span>${item.label}</span>
       </a>
     `).join('')}
@@ -54,15 +55,15 @@ function renderSidebar(activePage) {
           <div class="name">SamaFacture</div>
           <div class="sub">Pro</div>
         </div>
-        <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu">${Icon('menu')}</button>
+        <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu" aria-controls="app-navigation" aria-expanded="false">${Icon('menu')}</button>
       </div>
-      <nav class="sidebar-nav">${navHtml}</nav>
+      <nav class="sidebar-nav" id="app-navigation" aria-label="Navigation principale">${navHtml}</nav>
       <div class="sidebar-foot">
         <button type="button" class="install-app-btn" style="display:none;" onclick="installApp()"><span class="ic">${Icon('smartphone')}</span> Installer l'application</button>
         ${window.SamaTheme ? SamaTheme.boutonHtml() : ''}
         <div class="plan-badge"><span class="ic">${Icon('star')}</span> ${planLabels[user?.plan] || 'Plan Gratuit'}</div>
         <div>${escapeHtml(user?.entreprise_nom || user?.nom)}</div>
-        <div style="margin-top:10px; cursor:pointer; color:#B7C0DA; display:flex; align-items:center; gap:6px;" onclick="Api.clearSession(); location.href='login.html';"><span class="ic">${Icon('arrow-right')}</span> Se déconnecter</div>
+        <div style="margin-top:10px; cursor:pointer; color:#B7C0DA; display:flex; align-items:center; gap:6px;" onclick="Api.clearSession(); location.href='login.html';"><span class="ic">${Icon('log-out')}</span> Se déconnecter</div>
       </div>
     </aside>
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -77,13 +78,21 @@ function toggleSidebar() {
   const btn = document.getElementById('mobile-toggle-btn');
   const isOpen = sidebar?.classList.toggle('open');
   overlay?.classList.toggle('show', !!isOpen);
-  if (btn) btn.innerHTML = isOpen ? Icon('x') : Icon('menu');
+  if (btn) {
+    btn.innerHTML = isOpen ? Icon('x') : Icon('menu');
+    btn.setAttribute('aria-expanded', String(!!isOpen));
+    btn.setAttribute('aria-label', isOpen ? 'Fermer le menu' : 'Ouvrir le menu');
+  }
 }
 function closeSidebar() {
   document.getElementById('app-sidebar')?.classList.remove('open');
   document.getElementById('sidebar-overlay')?.classList.remove('show');
   const btn = document.getElementById('mobile-toggle-btn');
-  if (btn) btn.innerHTML = Icon('menu');
+  if (btn) {
+    btn.innerHTML = Icon('menu');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-label', 'Ouvrir le menu');
+  }
 }
 
 function renderTopbar(title, subtitle) {

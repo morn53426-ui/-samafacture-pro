@@ -23,7 +23,7 @@
         <h1>Dépenses</h1>
         <p>Suivez les sorties d'argent de votre activité</p>
       </div>
-      <button class="btn btn-primary" onclick="openModal()">+ Nouvelle dépense</button>
+      <button class="btn btn-primary" onclick="openModal()"><i class="ic" data-icon="plus"></i> Nouvelle dépense</button>
     </div>
 
     <div class="card" style="padding:0;">
@@ -74,8 +74,8 @@
         <td>${formatDate(d.date_depense)}</td>
         <td class="mono" style="color:var(--clay);">${formatMontant(d.montant)}</td>
         <td style="text-align:right;">
-          <button class="btn btn-sm btn-outline" onclick='editDepense(${d.id})'>Modifier</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteDepense(${d.id})">Supprimer</button>
+          <button class="btn btn-sm btn-outline" onclick='editDepense(${d.id})'>${Icon('edit-3')} Modifier</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteDepense(${d.id})">${Icon('trash-2')} Supprimer</button>
         </td>
       </tr>
     `).join('') : `<tr><td colspan="5"><div class="empty-state"><div class="ic">${Icon('wallet')}</div>Aucune dépense enregistrée</div></td></tr>`;

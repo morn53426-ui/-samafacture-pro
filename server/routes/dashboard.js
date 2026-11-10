@@ -1,9 +1,10 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant, requirePermission } = require('../middleware/tenant');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, requirePermission);
 
 // Dashboard is read-heavy. Keep a very short per-user cache and, more importantly,
 // deduplicate concurrent requests for the same user. This prevents opening several
@@ -148,7 +149,7 @@ async function buildDashboard(userId) {
  *         description: Statistiques calculées pour l'utilisateur connecté.
  */
 router.get('/', async (req, res, next) => {
-  const userId = req.user.id;
+  const userId = req.tenantId;
   const key = String(userId);
   const now = Date.now();
 

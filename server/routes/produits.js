@@ -1,11 +1,12 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage, positiveInt } = require('../utils/validation');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, requirePermission);
 
 /**
  * @openapi
@@ -38,11 +39,11 @@ router.get('/', async (req, res, next) => {
 
     const [[{ total }]] = await pool.query(
       `SELECT COUNT(*) as total FROM produits WHERE user_id = ?${q ? ' AND nom LIKE ?' : ''}`,
-      [req.user.id, ...searchParams]
+      [req.tenantId, ...searchParams]
     );
     const [rows] = await pool.query(
       `SELECT * FROM produits WHERE user_id = ?${q ? ' AND nom LIKE ?' : ''} ORDER BY nom LIMIT ? OFFSET ?`,
-      [req.user.id, ...searchParams, limite, offset]
+      [req.tenantId, ...searchParams, limite, offset]
     );
 
     res.json({ produits: rows, pagination: buildPaginationMeta(page, limite, total) });
@@ -77,16 +78,16 @@ router.get('/', async (req, res, next) => {
  */
 router.post('/', async (req, res, next) => {
   try {
-    const { nom, reference, prix_ht, tva, stock, categorie, description, image } = req.body;
+    const { nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image } = req.body;
     if (!nom) return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
 
     const [result] = await pool.query(
-      `INSERT INTO produits (user_id, nom, reference, prix_ht, tva, stock, categorie, description, image)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, nom, reference || null, positiveNumber(prix_ht), percentage(tva), positiveInt(stock), categorie || null, description || null, image || null]
+      `INSERT INTO produits (user_id, nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.tenantId, nom, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), positiveInt(stock), categorie || null, description || null, image || null]
     );
 
-    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ?', [result.insertId]);
+    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ produit: rows[0] });
   } catch (err) { next(err); }
 });
@@ -110,29 +111,30 @@ router.post('/', async (req, res, next) => {
  */
 router.put('/:id', async (req, res, next) => {
   try {
-    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const existing = existingRows[0];
     if (!existing) return res.status(404).json({ error: 'Produit introuvable.' });
 
-    const { nom, reference, prix_ht, tva, stock, categorie, description, image } = req.body;
+    const { nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image } = req.body;
     // Même règle qu'à la création (POST /produits) : le nom est obligatoire. Sans ce
     // contrôle, `{ nom: "" }` effaçait silencieusement le nom d'un produit existant.
     if (nom !== undefined && !nom) {
       return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
     }
     await pool.query(
-      `UPDATE produits SET nom=?, reference=?, prix_ht=?, tva=?, stock=?, categorie=?, description=?, image=? WHERE id = ?`,
+      `UPDATE produits SET nom=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, categorie=?, description=?, image=? WHERE id = ? AND user_id = ?`,
       [
         nom ?? existing.nom, reference ?? existing.reference,
         prix_ht !== undefined ? positiveNumber(prix_ht, existing.prix_ht) : existing.prix_ht,
+        prix_achat !== undefined ? positiveNumber(prix_achat, existing.prix_achat) : existing.prix_achat,
         tva !== undefined ? percentage(tva, existing.tva) : existing.tva,
         stock !== undefined ? positiveInt(stock, existing.stock) : existing.stock,
         categorie ?? existing.categorie, description ?? existing.description, image ?? existing.image,
-        existing.id
+        existing.id, req.tenantId
       ]
     );
 
-    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ?', [existing.id]);
+    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     res.json({ produit: rows[0] });
   } catch (err) { next(err); }
 });
@@ -156,15 +158,15 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     if (!existingRows.length) return res.status(404).json({ error: 'Produit introuvable.' });
 
     await conn.beginTransaction();
     // Détache d'abord le produit des lignes de facture existantes (au lieu de compter uniquement
     // sur la contrainte ON DELETE SET NULL de la base, qui peut différer si les tables ont été
     // créées avec une ancienne version du schéma).
-    await conn.query('UPDATE facture_lignes SET produit_id = NULL WHERE produit_id = ?', [existingRows[0].id]);
-    await conn.query('DELETE FROM produits WHERE id = ?', [existingRows[0].id]);
+    await conn.query('UPDATE facture_lignes fl JOIN factures f ON f.id = fl.facture_id SET fl.produit_id = NULL WHERE fl.produit_id = ? AND f.user_id = ?', [existingRows[0].id, req.tenantId]);
+    await conn.query('DELETE FROM produits WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
     await conn.commit();
 
     res.json({ success: true });

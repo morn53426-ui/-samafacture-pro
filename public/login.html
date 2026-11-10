@@ -60,7 +60,12 @@
 <script src="js/auth-slider.js"></script>
 <script src="js/google-auth.js"></script>
 <script>
-  if (Api.token()) location.href = 'dashboard.html';
+  function redirectAfterLogin() {
+    const next = new URLSearchParams(location.search).get('next') || '';
+    if (next && /^[a-zA-Z0-9_./?=&%-]+$/.test(next) && !next.includes('..') && !next.startsWith('//')) location.href = next;
+    else location.href = 'dashboard.html';
+  }
+  if (Api.token()) redirectAfterLogin();
   initAuthSlider();
   initGoogleButton('google-btn');
 
@@ -79,7 +84,7 @@
     try {
       const { token, user } = await Api.post('/auth/login', { email, password });
       Api.setSession(token, user);
-      location.href = 'dashboard.html';
+      redirectAfterLogin();
     } catch (err) {
       errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
       restore();

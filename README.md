@@ -2,7 +2,9 @@
 
 Plateforme de facturation pour commerçants, freelances, artisans et PME — inspirée de Brisk Invoicing, pensée pour l'Afrique (Wave, Orange Money, PayDunya).
 
-Ceci est une **base fonctionnelle (MVP)** couvrant le cœur du cahier des charges : authentification, gestion des clients, produits, factures, devis, paiements et tableau de bord. Le reste du cahier des charges (app mobile native, 2FA, IA de génération de facture, multi-utilisateurs avancé, etc.) est indiqué en fin de document comme feuille de route.
+SamaFacture Pro est une plateforme de facturation et de gestion destinée aux commerçants, indépendants et PME. Le périmètre principal comprend l'authentification, les clients, le catalogue, les factures/devis, les encaissements, les dépenses et les rapports. Une extension de modules professionnels (commandes, avoirs, acomptes, équipes, établissements, caisses, documents, analyses, automatisations et intégrations API/webhooks) est décrite dans [MODULES_PROFESSIONNELS.md](MODULES_PROFESSIONNELS.md), avec ses limites actuelles.
+
+Pour l'API publique versionnée, ses permissions, ses exemples de requêtes et la signature des webhooks, consultez [API_PUBLIQUE.md](API_PUBLIQUE.md).
 
 ## Ce qui est inclus
 
@@ -109,10 +111,13 @@ Pour héberger l'application en dehors de votre machine :
 Pour un hébergement auto-géré avec Docker plutôt qu'une plateforme comme Render/Railway :
 
 ```bash
-cp server/.env.example server/.env   # renseignez vos valeurs (JWT_SECRET est généré
-                                      # automatiquement au premier démarrage si laissé tel quel)
+cp server/.env.example server/.env   # renseignez toutes les variables avant le démarrage
+# Générez JWT_SECRET avec `openssl rand -hex 48` et DATA_ENCRYPTION_KEY avec `openssl rand -hex 32`.
+# En production, le serveur refuse de démarrer avec le JWT_SECRET de démonstration.
+docker compose --env-file server/.env config --quiet
 docker compose --env-file server/.env up -d --build
-docker compose logs -f app
+docker compose --env-file server/.env ps
+docker compose --env-file server/.env logs -f app
 ```
 
 `docker-compose.yml` (à la racine du dépôt) démarre deux services : l'API (`Dockerfile`, basé
@@ -122,7 +127,7 @@ un MySQL managé externe, supprimez le service `mysql` du fichier et pointez `DB
 votre base dans `server/.env`.
 
 Le conteneur applicatif inclut :
-- une vérification de santé Docker (`HEALTHCHECK`) réutilisant `/api/health` (qui teste la vraie connexion MySQL) ;
+- une vérification de disponibilité Docker (`HEALTHCHECK`) sur `/api/ready`, qui contrôle MySQL et Redis lorsqu'il est configuré (`/api/health` vérifie seulement que le processus HTTP répond) ;
 - `dumb-init` comme processus n°1, pour que l'arrêt propre déjà implémenté dans `app.js` (fin des requêtes en cours, fermeture du pool MySQL) se déclenche réellement à l'arrêt du conteneur ;
 - un utilisateur système non-root.
 
@@ -132,24 +137,38 @@ réel). N'oubliez pas `TRUST_PROXY=true` dans `server/.env` lorsque l'app tourne
 reverse proxy — sinon le rate-limiting et les logs verraient l'IP du proxy au lieu de celle
 du visiteur.
 
-**CORS en production** : définissez `ALLOWED_ORIGINS` dans `server/.env` (ex.
-`https://votredomaine.com`) avant une mise en production réelle. Sans cette variable, l'API
-reste ouverte à toute origine (comportement historique du projet, conservé pour ne pas casser
-un déploiement existant) — un avertissement s'affiche au démarrage si `NODE_ENV=production`
-et que la variable est absente.
+**CORS en production** : définissez `ALLOWED_ORIGINS` dans `server/.env` si des clients
+cross-origin doivent être autorisés (ex. `https://votredomaine.com`). En production, si la
+variable est absente, les requêtes cross-origin sont refusées par défaut ; les requêtes
+same-origin servies par l'application continuent de fonctionner.
 
-### Intégration continue
+### Tests et validation
 
-`.github/workflows/tests.yml` exécute automatiquement `npm test` contre une vraie base MySQL
-(service Docker fourni par GitHub Actions) à chaque push et pull request sur `main`. C'est la
-vérification que l'audit de ce projet n'a pas pu faire lui-même faute d'accès réseau/MySQL
-dans l'environnement d'analyse — cette CI donne la confirmation réelle que les tests passent.
+Les tests se lancent depuis `server/` avec `npm test`. Ils nécessitent une base
+MySQL de test dédiée (par défaut `samafacture_test`) et ne doivent jamais pointer vers la
+base de production. Le workflow `.github/workflows/test.yml` exécute automatiquement cette
+suite sur les pull requests vers `main` et les pushs sur `main`, avec un service MySQL 8.0
+isolé. Il inclut les tests d'authentification, de facturation, de concurrence/idempotence,
+d'isolation multi-entreprises et de permissions, de génération PDF, ainsi que les tests
+autonomes de sécurité des webhooks. Le résultat réel (succès ou échec) est consultable
+dans l'onglet **Actions** de GitHub après l'exécution du workflow.
+
+Un contrôle HTTP non destructif de l'instance de staging peut être lancé avec
+`SAMAFACTURE_BASE_URL=https://staging.votre-domaine.tld npm run smoke:staging`
+depuis le dossier `server/`. Il vérifie la liveness, la readiness MySQL/Redis, la page
+d'accueil et le refus d'une route API sans jeton. Pour les contrôles métier, la recette
+détaillée est documentée dans [RECETTE_PREPRODUCTION.md](RECETTE_PREPRODUCTION.md).
+
+La CI et le smoke test ne remplacent pas la recette de staging : il faut encore vérifier
+les parcours complets dans un navigateur, les emails réels de test, les webhooks vers des
+destinations de test contrôlées, ainsi que la sauvegarde et sa restauration dans une base
+distincte.
 
 ## Sécurité et fiabilité
 
 Les points suivants ont été audités et corrigés :
 - **Protection XSS** : toutes les données saisies par les utilisateurs (noms, notes, commentaires...) sont échappées avant affichage.
-- **Clé JWT** : générée aléatoirement et sauvegardée automatiquement dans `.env` au premier démarrage (plus de valeur par défaut prévisible).
+- **Clé JWT** : générée automatiquement et sauvegardée dans `.env` en développement ; en production, un `JWT_SECRET` explicite d'au moins 32 caractères est obligatoire et le serveur refuse de démarrer avec la valeur de démonstration.
 - **Anti brute-force** : les tentatives de connexion et de création de compte sont limitées par adresse IP.
 - **Numérotation des factures** : incrément atomique via une table de compteurs dédiée, sans risque de doublon même en cas de requêtes simultanées.
 - **Validation serveur** : les montants, quantités et taux de TVA négatifs ou aberrants sont rejetés/corrigés côté serveur, pas seulement côté formulaire.
@@ -203,7 +222,7 @@ Une sauvegarde qui reste uniquement sur le serveur qui peut tomber en panne n'es
 
 ## Tests automatisés
 
-Des tests couvrent l'authentification et la création de factures — en particulier le calcul de la TVA (avec et sans remise) et la numérotation séquentielle, **y compris sous concurrence** (10 créations de facture lancées en parallèle, pour vérifier qu'aucun numéro n'est jamais dupliqué).
+Des tests couvrent l'authentification, les factures (calcul de la TVA, remises, validation des montants, numérotation concurrente, paiements et idempotence) l'isolation multi-entreprises (espaces, membres, rôles lecture seule et références croisées), la génération PDF (signature `%PDF-`, téléchargement binaire) et la sécurité des webhooks (plages IP non publiques, résolution DNS, protection contre le DNS rebinding et chiffrement des secrets).
 
 ### Lancer les tests
 

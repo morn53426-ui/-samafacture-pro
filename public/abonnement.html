@@ -14,40 +14,72 @@
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 </head>
-<body>
+<body class="subscription-page">
 <div class="app-shell">
   <div id="sidebar-root"></div>
   <main class="main-content">
-    <div class="page-header">
-      <div><h1>Abonnement</h1><p>Comparez les offres et gérez votre plan</p></div>
+    <div class="page-header subscription-page-header">
+      <div>
+        <div class="subscription-eyebrow"><span class="ic">${Icon('gem')}</span> OFFRES & ABONNEMENTS</div>
+        <h1>Un plan adapté à votre activité</h1>
+        <p>Choisissez les outils qui vous aident à gérer et développer votre entreprise.</p>
+      </div>
     </div>
 
-    <div class="card" style="max-width:820px;">
-      <h3 style="margin-top:0;">Mon abonnement</h3>
-      <p style="color:var(--ink-soft);">
-        Le plan <strong>Pro</strong> débloque la signature électronique, 3 modèles de facture premium (Élégant,
-        Corporate, Créatif) et l'export Excel. Le plan <strong>Gratuit</strong> est limité à 10 factures par mois
-        (devis illimités).
-      </p>
-      <div id="plan-msg"></div>
-      <div id="plan-cards"></div>
-      <div id="plan-fallback" style="display:none;">
+    <section class="subscription-current card" aria-labelledby="current-plan-title">
+      <div class="subscription-current-icon"><span class="ic">${Icon('shield-check')}</span></div>
+      <div class="subscription-current-copy">
+        <span class="subscription-overline">VOTRE ESPACE</span>
+        <h2 id="current-plan-title">Votre abonnement actuel</h2>
+        <p id="current-plan-description">Chargement de votre formule…</p>
+      </div>
+      <div class="subscription-current-value">
+        <span class="subscription-overline">FORMULE ACTIVE</span>
+        <strong id="current-plan-name">—</strong>
+        <span id="current-plan-status" class="subscription-status"><span class="status-dot"></span> Compte connecté</span>
+      </div>
+    </section>
+
+    <div id="plan-msg" aria-live="polite"></div>
+
+    <section class="subscription-offers" aria-labelledby="offers-title">
+      <div class="subscription-section-heading">
+        <div>
+          <span class="subscription-overline">NOS FORMULES</span>
+          <h2 id="offers-title">Comparez les offres</h2>
+          <p>Des outils adaptés à chaque étape de votre activité.</p>
+        </div>
+        <div class="subscription-billing-note"><span class="ic">${Icon('calendar-days')}</span> Tarifs mensuels en FCFA</div>
+      </div>
+      <div id="plan-cards" class="subscription-plan-grid">
+        <div class="subscription-loading card"><span class="loading-spinner"></span> Chargement des offres…</div>
+      </div>
+    </section>
+
+    <section class="subscription-trust">
+      <div><span class="ic">${Icon('lock')}</span><span><strong>Paiement sécurisé</strong><small>Redirection vers le fournisseur configuré.</small></span></div>
+      <div><span class="ic">${Icon('smartphone')}</span><span><strong>Paiements locaux</strong><small>Wave et PayDunya selon la configuration du serveur.</small></span></div>
+      <div><span class="ic">${Icon('help-circle')}</span><span><strong>Accompagnement</strong><small>Un espace de facturation pensé pour les professionnels.</small></span></div>
+    </section>
+
+    <section id="plan-fallback" class="subscription-test card" style="display:none;">
+      <div class="subscription-test-heading">
+        <span class="ic">${Icon('info')}</span>
+        <div><strong>Mode de test</strong><p>Aucun fournisseur de paiement n’est configuré sur ce serveur. Ce réglage sert uniquement à tester les droits des formules ; il ne réalise aucun paiement.</p></div>
+      </div>
+      <div class="subscription-test-controls">
         <div class="field">
-          <label>Plan actuel</label>
+          <label for="plan-select">Formule de test</label>
           <select id="plan-select">
             <option value="gratuit">Gratuit — 10 factures/mois</option>
             <option value="starter">Starter — factures illimitées</option>
-            <option value="pro">Pro — toutes les fonctionnalités</option>
-            <option value="entreprise">Entreprise — multi-sociétés (bientôt)</option>
+            <option value="pro">Pro — fonctionnalités premium</option>
+            <option value="entreprise">Entreprise — options à venir</option>
           </select>
         </div>
-        <button type="button" class="btn btn-primary" onclick="changePlan(this)">Changer de plan</button>
-        <p class="helper" style="margin-top:10px;">
-          Aucune passerelle de paiement (Wave/PayDunya) n'est configurée sur ce serveur : ce sélecteur permet de
-          tester les fonctionnalités des différents plans gratuitement, en local.
-        </p>
+        <button type="button" class="btn btn-outline" onclick="changePlan(this)">Appliquer le plan de test</button>
       </div>
-    </div>
+    </section>
   </main>
 </div>
 
@@ -58,48 +90,155 @@
   requireAuthPage();
   renderSidebar('abonnement');
 
+  const PLAN_LABELS = {
+    gratuit: 'Gratuit',
+    starter: 'Starter',
+    pro: 'Pro',
+    entreprise: 'Entreprise'
+  };
+
+  const PLAN_DESCRIPTIONS = {
+    gratuit: 'Pour démarrer et gérer vos premiers documents.',
+    starter: 'Pour facturer sans limite et structurer votre activité.',
+    pro: 'Pour gagner du temps avec les outils avancés de SamaFacture Pro.',
+    entreprise: 'Pour les structures qui ont besoin d’options avancées.'
+  };
+
+  const PLANS = [
+    {
+      id: 'gratuit',
+      nom: 'Gratuit',
+      description: 'L’essentiel pour commencer.',
+      icon: 'activity',
+      features: [
+        'Jusqu’à 10 factures par mois',
+        'Devis illimités',
+        'Gestion des clients et produits'
+      ]
+    },
+    {
+      id: 'starter',
+      nom: 'Starter',
+      description: 'Pour une activité qui se développe.',
+      icon: 'trending-up',
+      features: [
+        'Factures illimitées',
+        'Devis illimités',
+        'Gestion des clients et produits'
+      ]
+    },
+    {
+      id: 'pro',
+      nom: 'Pro',
+      description: 'Pour travailler avec des outils avancés.',
+      icon: 'sparkles',
+      popular: true,
+      features: [
+        'Tous les avantages Starter',
+        'Signature électronique',
+        '3 modèles premium de facture',
+        'Export Excel'
+      ]
+    },
+    {
+      id: 'entreprise',
+      nom: 'Entreprise',
+      description: 'Pour les organisations en croissance.',
+      icon: 'building',
+      comingSoon: true,
+      features: [
+        'Avantages du plan Pro',
+        'Modèles exclusifs Entreprise',
+        'Options multi-sociétés en préparation'
+      ]
+    }
+  ];
+
+  function renderCurrentPlan(planId) {
+    const plan = PLAN_LABELS[planId] ? planId : 'gratuit';
+    document.getElementById('current-plan-name').textContent = PLAN_LABELS[plan];
+    document.getElementById('current-plan-description').textContent = PLAN_DESCRIPTIONS[plan];
+    document.getElementById('current-plan-status').innerHTML =
+      '<span class="status-dot"></span> Formule associée à votre compte';
+    document.getElementById('plan-select').value = plan;
+  }
+
+  function renderPlanCard(plan, user, moyens) {
+    const isCurrent = user.plan === plan.id;
+    const isFree = plan.id === 'gratuit';
+    const isSoon = !!plan.comingSoon;
+    const price = plan.id === 'gratuit' ? 0 : Number(moyens.tarifs?.[plan.id] || 0);
+    const priceHtml = isFree
+      ? '<span class="plan-price-free">Gratuit</span>'
+      : '<span class="plan-price-value">' + formatMontant(price, 'FCFA') + '</span><span class="plan-price-period">/ mois</span>';
+
+    let actions = '';
+    if (isCurrent) {
+      actions = '<div class="plan-current-action"><span class="ic">' + Icon('check-circle') + '</span> Votre formule actuelle</div>';
+    } else if (isSoon) {
+      actions = '<button type="button" class="btn btn-outline plan-action" disabled><span class="ic">' + Icon('clock') + '</span> Bientôt disponible</button>';
+    } else if (isFree) {
+      actions = '<div class="plan-free-note">Inclus sans frais</div>';
+    } else {
+      const providers = [];
+      if (moyens.wave) {
+        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="payerAbonnement(\'' + plan.id + '\', \'wave\', this)">' + Icon('smartphone') + ' Payer avec Wave</button>');
+      }
+      if (moyens.paydunya) {
+        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="payerAbonnement(\'' + plan.id + '\', \'paydunya\', this)">' + Icon('credit-card') + ' Orange Money / Carte</button>');
+      }
+      actions = providers.length
+        ? '<div class="plan-payment-actions">' + providers.join('') + '</div>'
+        : '<div class="plan-unavailable"><span class="ic">' + Icon('info') + '</span> Paiement en ligne non configuré</div>';
+    }
+
+    return '<article class="subscription-plan-card' +
+      (plan.popular ? ' is-popular' : '') +
+      (isCurrent ? ' is-current' : '') +
+      (isSoon ? ' is-coming-soon' : '') +
+      '" data-plan="' + plan.id + '">' +
+      (plan.popular ? '<div class="plan-popular-ribbon">LE PLUS POPULAIRE</div>' : '') +
+      '<div class="plan-card-top">' +
+        '<span class="plan-icon">' + Icon(plan.icon) + '</span>' +
+        (isCurrent ? '<span class="plan-current-badge">Plan actuel</span>' : '') +
+        (isSoon ? '<span class="plan-soon-badge">À venir</span>' : '') +
+      '</div>' +
+      '<h3>' + plan.nom + '</h3>' +
+      '<p class="plan-description">' + plan.description + '</p>' +
+      '<div class="plan-price">' + priceHtml + '</div>' +
+      '<div class="plan-divider"></div>' +
+      '<p class="plan-includes">CE QUI EST INCLUS</p>' +
+      '<ul class="plan-feature-list">' + plan.features.map(feature =>
+        '<li><span class="ic">' + Icon('check') + '</span>' + feature + '</li>'
+      ).join('') + '</ul>' +
+      '<div class="plan-card-actions">' + actions + '</div>' +
+    '</article>';
+  }
+
   async function loadPlans() {
-    const user = Api.currentUser();
+    const user = Api.currentUser() || {};
+    renderCurrentPlan(user.plan || 'gratuit');
+
     let moyens;
     try {
       moyens = await Api.get('/abonnement/moyens-disponibles');
     } catch (err) {
-      document.getElementById('plan-cards').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('plan-cards').innerHTML =
+        '<div class="error-box">Impossible de charger les offres : ' + escapeHtml(err.message) + '</div>';
       return;
     }
 
-    const plans = [
-      { id: 'gratuit', nom: 'Gratuit', prix: 0, desc: '10 factures/mois, devis illimités' },
-      { id: 'starter', nom: 'Starter', prix: moyens.tarifs.starter, desc: 'Factures illimitées' },
-      { id: 'pro', nom: 'Pro', prix: moyens.tarifs.pro, desc: 'Signature électronique, modèles premium, export Excel' },
-      { id: 'entreprise', nom: 'Entreprise', prix: moyens.tarifs.entreprise, desc: 'Multi-sociétés (bientôt)' }
-    ];
+    const safeMoyens = {
+      wave: !!moyens.wave,
+      paydunya: !!moyens.paydunya,
+      tarifs: moyens.tarifs || {}
+    };
 
-    const aucunMoyenConfigure = !moyens.wave && !moyens.paydunya;
+    document.getElementById('plan-cards').innerHTML = PLANS
+      .map(plan => renderPlanCard(plan, user, safeMoyens))
+      .join('');
 
-    document.getElementById('plan-cards').innerHTML = `
-      <div class="grid" style="grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 14px 0;">
-        ${plans.map(p => `
-          <div class="card" style="padding:16px; ${user.plan === p.id ? 'border-color:var(--emerald); box-shadow:0 0 0 2px var(--emerald-light);' : ''}">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <strong>${p.nom}</strong>
-              ${user.plan === p.id ? '<span class="badge badge-payee">Plan actuel</span>' : ''}
-            </div>
-            <div class="mono" style="font-size:1.3rem; font-weight:700; margin:6px 0;">${p.prix > 0 ? formatMontant(p.prix, 'FCFA') + '<span style=\'font-size:0.7rem;font-weight:400;color:var(--ink-soft);\'>/mois</span>' : 'Gratuit'}</div>
-            <div class="helper" style="margin:0 0 10px;">${p.desc}</div>
-            ${p.id !== 'gratuit' && user.plan !== p.id ? `
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <button class="btn btn-sm btn-primary" ${moyens.wave ? '' : 'disabled title="Wave non configuré"'} onclick="payerAbonnement('${p.id}', 'wave', this)">${Icon('smartphone')} Payer avec Wave</button>
-                <button class="btn btn-sm btn-outline" ${moyens.paydunya ? '' : 'disabled title="Non configuré"'} onclick="payerAbonnement('${p.id}', 'paydunya', this)">${Icon('credit-card')} Orange Money / Carte bancaire</button>
-              </div>
-            ` : ''}
-          </div>
-        `).join('')}
-      </div>
-    `;
-
-    // Si aucune passerelle n'est configurée sur ce serveur, on laisse le sélecteur manuel
-    // disponible pour pouvoir tester les fonctionnalités sans paiement réel.
+    const aucunMoyenConfigure = !safeMoyens.wave && !safeMoyens.paydunya;
     document.getElementById('plan-fallback').style.display = aucunMoyenConfigure ? 'block' : 'none';
   }
 
@@ -107,9 +246,10 @@
     const restore = setButtonLoading(btn, 'Redirection…');
     try {
       const { checkout_url } = await Api.post('/abonnement/payer', { plan, fournisseur });
+      if (!checkout_url) throw new Error('Le fournisseur n’a pas retourné de lien de paiement.');
       location.href = checkout_url;
     } catch (err) {
-      document.getElementById('plan-msg').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('plan-msg').innerHTML = '<div class="error-box">' + escapeHtml(err.message) + '</div>';
       restore();
     }
   }
@@ -120,9 +260,12 @@
     try {
       const { user } = await Api.put('/auth/plan', { plan });
       localStorage.setItem('sf_user', JSON.stringify(user));
-      document.getElementById('plan-msg').innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:0.85rem;">Plan mis à jour ✓ Rechargez la page pour voir les options débloquées dans le menu.</div>`;
+      renderCurrentPlan(user.plan || plan);
+      document.getElementById('plan-msg').innerHTML =
+        '<div class="success-notice"><span class="ic">' + Icon('check-circle') + '</span> Plan de test mis à jour. Rechargez la page pour actualiser les options.</div>';
+      await loadPlans();
     } catch (err) {
-      document.getElementById('plan-msg').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('plan-msg').innerHTML = '<div class="error-box">' + escapeHtml(err.message) + '</div>';
     } finally {
       restore();
     }

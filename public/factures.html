@@ -18,43 +18,49 @@
 <div class="app-shell">
   <div id="sidebar-root"></div>
   <main class="main-content">
-    <div class="page-header">
+    <div class="page-header billing-page-header">
       <div>
-        <h1>Factures</h1>
-        <p>Suivez le statut de toutes vos factures</p>
+        <div class="billing-eyebrow"><i class="ic" data-icon="receipt"></i> GESTION COMMERCIALE</div>
+        <h1>Facturation</h1>
+        <p>Suivez vos factures, vos encaissements et les règlements à recevoir.</p>
       </div>
-      <a href="nouvelle-facture.html" class="btn btn-primary">+ Nouvelle facture</a>
+      <a href="nouvelle-facture.html" class="btn btn-primary billing-create-btn"><i class="ic" data-icon="plus"></i> Créer une facture</a>
     </div>
 
-    <div style="display:flex; gap:8px; margin-bottom:16px;">
-      <button class="btn btn-sm btn-outline" data-filter="" onclick="filterStatut('')">Toutes</button>
-      <button class="btn btn-sm btn-outline" data-filter="en_attente" onclick="filterStatut('en_attente')">En attente</button>
-      <button class="btn btn-sm btn-outline" data-filter="payee" onclick="filterStatut('payee')">Payées</button>
-      <button class="btn btn-sm btn-outline" data-filter="en_retard" onclick="filterStatut('en_retard')">En retard</button>
-    </div>
+    <section class="billing-stats" id="billing-stats" aria-label="Résumé de la facturation">
+      <article class="billing-stat-card"><span class="billing-stat-icon tone-emerald"><i class="ic" data-icon="banknote"></i></span><span class="billing-stat-label">Chiffre d’affaires</span><strong class="billing-stat-value">—</strong><small class="billing-stat-meta">Chargement des données…</small></article>
+      <article class="billing-stat-card"><span class="billing-stat-icon tone-emerald"><i class="ic" data-icon="check-circle"></i></span><span class="billing-stat-label">Factures payées</span><strong class="billing-stat-value">—</strong><small class="billing-stat-meta">Chargement des données…</small></article>
+      <article class="billing-stat-card"><span class="billing-stat-icon tone-gold"><i class="ic" data-icon="clock"></i></span><span class="billing-stat-label">En attente</span><strong class="billing-stat-value">—</strong><small class="billing-stat-meta">Chargement des données…</small></article>
+      <article class="billing-stat-card"><span class="billing-stat-icon tone-clay"><i class="ic" data-icon="alert-triangle"></i></span><span class="billing-stat-label">En retard</span><strong class="billing-stat-value">—</strong><small class="billing-stat-meta">Chargement des données…</small></article>
+    </section>
 
-    <div class="card" style="padding:0;">
-      <table>
-        <thead><tr><th>N°</th><th>Client</th><th>Émission</th><th>Échéance</th><th>Total</th><th>Statut</th><th></th></tr></thead>
-        <tbody id="factures-body">
-          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div id="pagination"></div>
-  </main>
+    <section class="billing-list-section">
+      <div class="billing-list-heading"><div><span class="billing-overline">SUIVI DES DOCUMENTS</span><h2>Vos factures</h2><p>Consultez un document ou ouvrez ses actions de gestion.</p></div><span class="billing-list-hint"><i class="ic" data-icon="info"></i> Sélectionnez une ligne pour consulter le document</span></div>
+      <div class="billing-filter-bar" role="group" aria-label="Filtrer les factures par statut">
+        <button class="billing-filter is-active" data-filter="" aria-pressed="true" onclick="filterStatut('')"><i class="ic" data-icon="file-stack"></i> Toutes</button>
+        <button class="billing-filter" data-filter="en_attente" aria-pressed="false" onclick="filterStatut('en_attente')"><i class="ic" data-icon="clock"></i> En attente</button>
+        <button class="billing-filter" data-filter="payee" aria-pressed="false" onclick="filterStatut('payee')"><i class="ic" data-icon="check-circle"></i> Payées</button>
+        <button class="billing-filter" data-filter="en_retard" aria-pressed="false" onclick="filterStatut('en_retard')"><i class="ic" data-icon="alert-circle"></i> En retard</button>
+      </div>
+      <div class="card billing-table-card">
+        <div class="billing-table-topline"><div><strong>Liste des factures</strong><span>Vos documents les plus récents</span></div><span class="billing-table-secure"><i class="ic" data-icon="shield-check"></i> Espace sécurisé</span></div>
+        <table class="billing-table">
+          <thead><tr><th>Référence</th><th>Client</th><th>Émission</th><th>Échéance</th><th>Montant</th><th>Reste dû</th><th>Statut</th><th>Actions</th></tr></thead>
+          <tbody id="factures-body"><tr class="row-skeleton"><td colspan="8"><div class="skeleton-bar" style="width:100%;"></div></td></tr><tr class="row-skeleton"><td colspan="8"><div class="skeleton-bar" style="width:100%;"></div></td></tr><tr class="row-skeleton"><td colspan="8"><div class="skeleton-bar" style="width:100%;"></div></td></tr></tbody>
+        </table>
+      </div>
+      <div id="pagination"></div>
+    </section>
 </div>
 
 <div id="pay-modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
   <div class="card" style="width:380px; max-width:92vw;">
-    <h3>Enregistrer un paiement</h3>
+    <div class="payment-modal-heading"><span class="payment-modal-icon"><i class="ic" data-icon="hand-coins"></i></span><div><span class="billing-overline">ENCAISSEMENT</span><h3>Enregistrer un règlement</h3><p>Ajoutez un paiement total ou partiel à cette facture.</p></div></div>
+    <div id="pay-context" class="payment-modal-context"></div>
     <div id="pay-error"></div>
     <form id="pay-form">
       <input type="hidden" id="pay-facture-id" />
-      <div class="field"><label>Montant *</label><input type="number" id="pay-montant" required /></div>
+      <div class="field"><label for="pay-montant">Montant du règlement *</label><div class="payment-amount-input"><input type="number" id="pay-montant" min="0.01" step="0.01" required /><span>FCFA</span></div><small class="field-hint" id="pay-remaining-hint"></small></div>
       <div class="field">
         <label>Méthode *</label>
         <select id="pay-methode" required>
@@ -65,7 +71,7 @@
       <div class="field"><label>Référence</label><input type="text" id="pay-reference" /></div>
       <div style="display:flex; gap:10px; justify-content:flex-end;">
         <button type="button" class="btn btn-outline" onclick="closePayModal()">Annuler</button>
-        <button type="submit" class="btn btn-primary">Enregistrer</button>
+        <button type="submit" class="btn btn-primary"><i class="ic" data-icon="check"></i> Enregistrer le règlement</button>
       </div>
     </form>
   </div>
@@ -90,6 +96,7 @@
 <script src="js/api.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/sidebar.js"></script>
+<script src="js/billing-ui.js"></script>
 <script>
   requireAuthPage();
   renderSidebar('factures');
@@ -102,30 +109,17 @@
     const qs = new URLSearchParams({ type: 'facture', page: currentPage });
     if (currentStatut) qs.set('statut', currentStatut);
     const { factures, pagination } = await Api.get('/factures?' + qs.toString());
-    document.getElementById('factures-body').innerHTML = factures.length ? factures.map(f => `
-      <tr class="row-clickable" tabindex="0" role="button" aria-label="Voir la facture ${escapeHtml(f.numero)}"
-          onclick="printFacture(${f.id})" onkeydown="if(event.key==='Enter') printFacture(${f.id})">
-        <td class="mono">${escapeHtml(f.numero)}</td>
-        <td>${escapeHtml(f.client_nom)}</td>
-        <td>${formatDate(f.date_emission)}</td>
-        <td>${formatDate(f.date_echeance)}</td>
-        <td class="mono">${formatMontant(f.total)}</td>
-        <td>${statutBadge(f.statut)}</td>
-        <td style="text-align:right; white-space:nowrap;" onclick="event.stopPropagation();">
-          ${f.statut !== 'payee' ? `<button class="btn btn-sm btn-outline" onclick="openPayModal(${f.id})">Encaisser</button>` : ''}
-          <button class="btn btn-sm btn-outline" onclick="printFacture(${f.id})">Imprimer</button>
-          <button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))}, "envoyer")'>Envoyer</button>
-          ${f.statut === 'en_attente' || f.statut === 'en_retard' ? `<button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))}, "relancer")'>Relancer</button>` : ''}
-          <button class="btn btn-sm btn-outline" onclick="dupliquerFacture(${f.id})">Dupliquer</button>
-        </td>
-      </tr>
-    `).join('') : `<tr><td colspan="7"><div class="empty-state"><div class="ic">${Icon('file-text')}</div>Aucune facture pour l'instant</div></td></tr>`;
+    renderBillingRows(factures);
     renderPagination('pagination', pagination, (p) => load(p));
   }
 
   function filterStatut(s) {
     currentStatut = s;
-    document.querySelectorAll('[data-filter]').forEach(b => b.classList.toggle('btn-primary', b.dataset.filter === s));
+    document.querySelectorAll('[data-filter]').forEach(b => {
+      const active = b.dataset.filter === s;
+      b.classList.toggle('is-active', active);
+      b.setAttribute('aria-pressed', String(active));
+    });
     load(1);
   }
 
@@ -133,6 +127,21 @@
     document.getElementById('pay-facture-id').value = id;
     document.getElementById('pay-form').reset();
     document.getElementById('pay-error').innerHTML = '';
+    const facture = (window.__sfBillingInvoices || []).find(item => String(item.id) === String(id));
+    const context = document.getElementById('pay-context');
+    const amount = document.getElementById('pay-montant');
+    const hint = document.getElementById('pay-remaining-hint');
+    if (facture) {
+      const restant = Math.max(0, Number(facture.total || 0) - Number(facture.montant_paye || 0));
+      context.innerHTML = '<span>Facture <strong>' + escapeHtml(facture.numero) + '</strong></span><span>Client : ' + escapeHtml(facture.client_nom || '—') + '</span><span class="payment-context-balance">Solde restant : <strong>' + formatMontant(restant) + '</strong></span>';
+      amount.max = String(restant);
+      amount.value = restant > 0 ? String(restant) : '';
+      hint.textContent = restant > 0 ? 'Vous pouvez enregistrer un règlement partiel ou total.' : '';
+    } else {
+      context.textContent = '';
+      amount.removeAttribute('max');
+      hint.textContent = '';
+    }
     document.getElementById('pay-modal').style.display = 'flex';
   }
   function closePayModal() { document.getElementById('pay-modal').style.display = 'none'; }
@@ -197,6 +206,7 @@
     }
   }
 
+  loadBillingSummary();
   load().catch(err => showFatalError(err.message));
 </script>
 </body>

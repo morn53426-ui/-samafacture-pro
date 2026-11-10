@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 4;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -168,6 +168,7 @@ async function runMigrations(conn) {
     { table: 'users', column: 'reset_token_expires', definition: 'DATETIME' },
     { table: 'users', column: 'signature_default', definition: 'MEDIUMTEXT' },
     { table: 'users', column: 'facture_personnalisation', definition: 'TEXT' },
+    { table: 'produits', column: 'prix_achat', definition: 'DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER prix_ht' },
     { table: 'factures', column: 'verification_code', definition: 'VARCHAR(10)' },
     { table: 'factures', column: 'idempotency_key', definition: 'VARCHAR(100)' },
     { table: 'paiements', column: 'idempotency_key', definition: 'VARCHAR(100)' },
@@ -270,6 +271,23 @@ async function runMigrations(conn) {
       await conn.query(`ALTER TABLE \`${table}\` ADD ${unique ? 'UNIQUE INDEX' : 'INDEX'} \`${name}\` ${columns}`);
     }
   }
+
+  // Modules professionnels (achats/ventes avancés, équipe, documents, caisse,
+  // automatisations et intégrations). Le script ne contient que des CREATE TABLE
+  // IF NOT EXISTS ; il peut donc être rejoué après une interruption de démarrage.
+  const professionalMigrationPath = path.join(__dirname, '..', 'database', 'migrations', '003_professional_modules.sql');
+  const professionalSql = fs.readFileSync(professionalMigrationPath, 'utf8');
+  const professionalStatements = professionalSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of professionalStatements) {
+    await conn.query(statement);
+  }
+
 }
 
 module.exports = { pool, initDatabase };

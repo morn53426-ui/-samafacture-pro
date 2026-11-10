@@ -2,10 +2,11 @@ const express = require('express');
 const XLSX = require('xlsx');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { isProPlan } = require('../utils/plans');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, requirePermission);
 
 // Récupère les mêmes lignes que /ventes, factorisé pour être réutilisé par l'export Excel.
 async function fetchVentes(userId, { from, to, group_by = 'month' }) {
@@ -66,7 +67,7 @@ async function fetchVentes(userId, { from, to, group_by = 'month' }) {
  */
 router.get('/ventes', async (req, res, next) => {
   try {
-    const rows = await fetchVentes(req.user.id, req.query);
+    const rows = await fetchVentes(req.tenantId, req.query);
     res.json({ group_by: req.query.group_by || 'month', rows });
   } catch (err) { next(err); }
 });
@@ -92,7 +93,7 @@ router.get('/ventes', async (req, res, next) => {
  */
 router.get('/export-excel', async (req, res, next) => {
   try {
-    const [[userRow]] = await pool.query('SELECT plan FROM users WHERE id = ?', [req.user.id]);
+    const [[userRow]] = await pool.query('SELECT plan FROM users WHERE id = ?', [req.tenantId]);
     if (!isProPlan(userRow?.plan)) {
       return res.status(403).json({ error: "L'export Excel est réservé au plan Pro. Passez à un plan payant dans Paramètres.", code: 'FONCTIONNALITE_PRO' });
     }
@@ -100,10 +101,10 @@ router.get('/export-excel', async (req, res, next) => {
     const { from, to } = req.query;
     const groupBy = req.query.group_by || 'month';
 
-    const ventes = await fetchVentes(req.user.id, req.query);
+    const ventes = await fetchVentes(req.tenantId, req.query);
 
     const dateFilterD = [];
-    const paramsD = [req.user.id];
+    const paramsD = [req.tenantId];
     if (from) { dateFilterD.push('date_depense >= ?'); paramsD.push(from); }
     if (to) { dateFilterD.push('date_depense <= ?'); paramsD.push(to); }
     const whereD = dateFilterD.length ? ' AND ' + dateFilterD.join(' AND ') : '';
@@ -154,7 +155,7 @@ router.get('/export-excel', async (req, res, next) => {
  */
 router.get('/comptabilite', async (req, res, next) => {
   try {
-    const userId = req.user.id;
+    const userId = req.tenantId;
     const { from, to } = req.query;
 
     const dateFilterF = [];

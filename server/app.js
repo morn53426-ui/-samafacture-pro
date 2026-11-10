@@ -38,6 +38,8 @@ const facturesRecurrentesRoutes = require('./routes/factures-recurrentes');
 const publicRoutes = require('./routes/public');
 const abonnementRoutes = require('./routes/abonnement');
 const assistantRoutes = require('./routes/assistant');
+const professionnelRoutes = require('./routes/professionnel');
+const publicApiRoutes = require('./routes/public-api');
 const { startScheduler } = require('./config/scheduler');
 const { startBackupScheduler } = require('./config/backup');
 const { getRuntimeConfig, validateProductionConfig } = require('./config/runtime');
@@ -274,6 +276,8 @@ app.use('/api/factures-recurrentes', facturesRecurrentesRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/abonnement', abonnementRoutes);
 app.use('/api/assistant', assistantRoutes);
+app.use('/api/pro', professionnelRoutes);
+app.use('/api/v1', publicApiRoutes);
 
 // Documentation interactive de l'API (générée depuis les commentaires @openapi des
 // routes). Sécurisée par défaut en production : contrairement à avant (activée par défaut,

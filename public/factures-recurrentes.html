@@ -23,7 +23,7 @@
         <h1>Factures récurrentes <span class="plan-badge" style="vertical-align:middle;"><i class="ic" data-icon="star"></i> Pro</span></h1>
         <p>Automatisez la facturation de vos abonnements et prestations régulières</p>
       </div>
-      <button class="btn btn-primary" onclick="openModal()">+ Nouvelle facture récurrente</button>
+      <button class="btn btn-primary" onclick="openModal()"><i class="ic" data-icon="plus"></i> Nouvelle facture récurrente</button>
     </div>
 
     <div id="error-box"></div>
@@ -120,9 +120,9 @@
         <td data-label="Générées" class="mono">${r.factures_generees}</td>
         <td data-label="Statut"><span class="badge ${r.actif ? 'badge-payee' : 'badge-annulee'}">${r.actif ? 'Active' : 'En pause'}</span></td>
         <td style="text-align:right; white-space:nowrap;">
-          <button class="btn btn-sm btn-outline" onclick="genererMaintenant(${r.id})" title="Générer une facture immédiatement">Générer maintenant</button>
-          <button class="btn btn-sm btn-outline" onclick="toggleActif(${r.id}, ${r.actif ? 0 : 1})">${r.actif ? 'Mettre en pause' : 'Réactiver'}</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteRecurrente(${r.id})">Supprimer</button>
+          <button class="btn btn-sm btn-outline" onclick="genererMaintenant(${r.id})" title="Générer une facture immédiatement">${Icon('file-plus')} Générer maintenant</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleActif(${r.id}, ${r.actif ? 0 : 1})">${Icon(r.actif ? 'pause-circle' : 'play-circle')} ${r.actif ? 'Mettre en pause' : 'Réactiver'}</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteRecurrente(${r.id})">${Icon('trash-2')} Supprimer</button>
         </td>
       </tr>
     `).join('') : `<tr><td colspan="7"><div class="empty-state"><div class="ic">${Icon('repeat')}</div>Aucune facture récurrente. Créez-en une pour automatiser vos abonnements !</div></td></tr>`;

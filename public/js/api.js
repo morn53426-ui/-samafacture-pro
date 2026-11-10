@@ -41,6 +41,7 @@ const Api = {
   clearSession() {
     localStorage.removeItem('sf_token');
     localStorage.removeItem('sf_user');
+    localStorage.removeItem('sf_company_owner');
     // Efface aussi le cookie de session HttpOnly posé en parallèle depuis la connexion (voir
     // SECURITY_REPORT.md et server/routes/auth.js, /auth/logout). Best-effort et non bloquant :
     // clearSession() reste synchrone comme avant (tous les appels existants, ex. sidebar.js,
@@ -71,6 +72,8 @@ const Api = {
     };
     const token = this.token();
     if (token) headers['Authorization'] = `Bearer ${token}`;
+    const companyOwner = localStorage.getItem('sf_company_owner');
+    if (companyOwner) headers['X-SF-Company-Owner'] = companyOwner;
 
     let res;
     try {
@@ -138,7 +141,13 @@ function formatMontant(n, devise) {
 
 function formatDate(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
+  // MySQL renvoie parfois les DATETIME sous la forme "YYYY-MM-DD HH:mm:ss".
+  // Le séparateur espace n'est pas interprété uniformément par Safari iOS ;
+  // on le convertit en forme ISO locale sans ajouter de décalage artificiel.
+  const normalized = typeof iso === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(iso)
+    ? iso.replace(' ', 'T')
+    : iso;
+  const d = new Date(normalized);
   if (isNaN(d)) return iso;
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 }

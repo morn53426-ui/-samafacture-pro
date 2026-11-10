@@ -56,10 +56,10 @@ USER samafacture
 WORKDIR /app/server
 EXPOSE 4000
 
-# Vérification de santé : réutilise directement /api/health (voir app.js), qui teste la
-# vraie connexion MySQL et pas seulement que le process Node répond.
+# Vérification de disponibilité : /api/ready vérifie une requête MySQL et Redis lorsqu'il est
+# configuré. /api/health reste une sonde de vie qui ne dépend volontairement pas de la base.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+  CMD node -e "require('http').get('http://localhost:4000/api/ready', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 # dumb-init comme PID 1 : transmet correctement SIGTERM/SIGINT au process Node pour que
 # l'arrêt propre déjà implémenté dans app.js (fermeture du pool MySQL, requêtes en cours

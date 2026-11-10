@@ -1,11 +1,12 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
 const { computeTotals, insererLignesFacture } = require('./factures');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, requirePermission);
 
 function addInterval(date, frequence) {
   const d = new Date(date);
@@ -34,7 +35,7 @@ router.get('/', async (req, res, next) => {
       `SELECT r.*, c.nom as client_nom FROM factures_recurrentes r
        JOIN clients c ON c.id = r.client_id
        WHERE r.user_id = ? ORDER BY r.prochaine_date ASC`,
-      [req.user.id]
+      [req.tenantId]
     );
     res.json({ recurrentes: rows.map(r => ({ ...r, lignes: JSON.parse(r.lignes_json) })) });
   } catch (err) { next(err); }
@@ -74,7 +75,7 @@ router.post('/', async (req, res, next) => {
     if (!client_id || !libelle || !Array.isArray(lignes) || lignes.length === 0) {
       return res.status(400).json({ error: 'Client, libellé et au moins une ligne sont requis.' });
     }
-    const [clientRows] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client_id, req.user.id]);
+    const [clientRows] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client_id, req.tenantId]);
     if (!clientRows.length) return res.status(400).json({ error: 'Client invalide.' });
 
     const freqValides = ['hebdomadaire', 'mensuelle', 'annuelle'];
@@ -91,13 +92,13 @@ router.post('/', async (req, res, next) => {
       `INSERT INTO factures_recurrentes (user_id, client_id, libelle, frequence, prochaine_date, remise, frais_livraison, mode_paiement, commentaires, lignes_json, envoi_auto_email)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        req.user.id, client_id, libelle, freq, prochaine_date || new Date().toISOString().slice(0, 10),
+        req.tenantId, client_id, libelle, freq, prochaine_date || new Date().toISOString().slice(0, 10),
         positiveNumber(remise, 0), positiveNumber(frais_livraison, 0), mode_paiement || null, commentaires || null,
         JSON.stringify(lignesClean), envoi_auto_email ? 1 : 0
       ]
     );
 
-    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ?', [result.insertId]);
+    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ recurrente: { ...rows[0], lignes: lignesClean } });
   } catch (err) { next(err); }
 });
@@ -133,7 +134,7 @@ router.post('/', async (req, res, next) => {
  */
 router.put('/:id', async (req, res, next) => {
   try {
-    const [existingRows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const existing = existingRows[0];
     if (!existing) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
 
@@ -148,7 +149,7 @@ router.put('/:id', async (req, res, next) => {
 
     await pool.query(
       `UPDATE factures_recurrentes SET libelle=?, frequence=?, prochaine_date=?, remise=?, frais_livraison=?, mode_paiement=?, commentaires=?, actif=?, envoi_auto_email=?
-       WHERE id = ?`,
+       WHERE id = ? AND user_id = ?`,
       [
         libelle ?? existing.libelle,
         freqValides.includes(frequence) ? frequence : existing.frequence,
@@ -159,11 +160,11 @@ router.put('/:id', async (req, res, next) => {
         commentaires ?? existing.commentaires,
         actif !== undefined ? (actif ? 1 : 0) : existing.actif,
         envoi_auto_email !== undefined ? (envoi_auto_email ? 1 : 0) : existing.envoi_auto_email,
-        existing.id
+        existing.id, req.tenantId
       ]
     );
 
-    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ?', [existing.id]);
+    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     res.json({ recurrente: { ...rows[0], lignes: JSON.parse(rows[0].lignes_json) } });
   } catch (err) { next(err); }
 });
@@ -185,9 +186,9 @@ router.put('/:id', async (req, res, next) => {
  */
 router.delete('/:id', async (req, res, next) => {
   try {
-    const [existingRows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     if (!existingRows.length) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
-    await pool.query('DELETE FROM factures_recurrentes WHERE id = ?', [existingRows[0].id]);
+    await pool.query('DELETE FROM factures_recurrentes WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -209,7 +210,7 @@ router.delete('/:id', async (req, res, next) => {
  */
 router.post('/:id/generer', async (req, res, next) => {
   try {
-    const facture = await genererFactureDepuisModele(req.params.id, req.user.id);
+    const facture = await genererFactureDepuisModele(req.params.id, req.tenantId);
     if (!facture) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
     res.status(201).json({ facture });
   } catch (err) { next(err); }

@@ -1,0 +1,70 @@
+name: Tests automatisés
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests Node.js et MySQL
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: samafacture_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+          --health-start-period=30s
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Valider Docker Compose et le chemin des variables
+        run: |
+          cp server/.env.example server/.env
+          docker compose --env-file server/.env config --quiet
+
+      - name: Construire l'image Docker sans publication
+        run: docker build --tag samafacture-pro:ci .
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Installer les dépendances
+        working-directory: server
+        run: npm ci
+
+      - name: Vérifier le script de recette staging
+        working-directory: server
+        run: node --check scripts/staging-smoke.js
+
+      - name: Exécuter les tests
+        working-directory: server
+        env:
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: samafacture_test
+          TEST_DB_NAME: samafacture_test
+          JWT_SECRET: ci-secret-ne-pas-utiliser-en-production
+          APP_URL: http://127.0.0.1:4000
+        run: npm test
