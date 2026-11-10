@@ -52,7 +52,7 @@ describe('Génération PDF de facture', () => {
       });
 
     assert.equal(res.status, 200);
-    assert.match(res.headers['content-type'], /^application\\/pdf(?:;|$)/);
+    assert.ok(res.headers['content-type'] === 'application/pdf' || res.headers['content-type'].startsWith('application/pdf;'), 'le fichier doit être servi en application/pdf');
     assert.match(res.headers['content-disposition'], /^attachment; filename="facture-/);
     // Un fichier PDF valide commence toujours par la signature "%PDF-".
     assert.equal(res.body.slice(0, 5).toString('latin1'), '%PDF-');
