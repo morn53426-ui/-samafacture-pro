@@ -5,6 +5,7 @@ const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 const { notifierUtilisateur } = require('../realtime');
 const { ajusterStockFacture } = require('./factures');
+const { queueWebhookEvent } = require('../utils/pro-webhooks');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -136,6 +137,7 @@ router.post('/', async (req, res, next) => {
     const [rows] = await pool.query('SELECT * FROM clients WHERE id = ?', [result.insertId]);
     res.status(201).json({ client: rows[0] });
     notifierUtilisateur(req.tenantId, 'nouveau_client', { client: rows[0] });
+    queueWebhookEvent(req.tenantId, 'client.created', { client_id: rows[0].id, nom: rows[0].nom }).catch(err => console.warn('Webhook client.created ignoré :', err.message));
   } catch (err) { next(err); }
 });
 
