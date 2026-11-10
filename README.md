@@ -20,14 +20,14 @@ Pour configurer et utiliser les modèles complets de factures et devis, consulte
   - Factures et devis : création avec lignes multiples, calcul automatique (sous-total, TVA, remise, livraison, total)
   - Transformation d'un devis en facture en un clic
   - Documents enrichis : objet, référence de commande, validité du devis, détail de TVA par taux, suivi du payé/reste à payer, conditions et zone « Bon pour accord »
-  - Enregistrement de paiements (Wave, Orange Money, PayDunya, Stripe, espèces, etc.) avec mise à jour automatique du statut
+  - Enregistrement manuel des règlements (Wave, Orange Money, PayDunya, espèces, virement, etc.) avec mise à jour automatique du solde et du statut ; aucun débit automatique par ces prestataires pour les factures
   - Vue facture imprimable → export PDF via l'impression du navigateur (Ctrl/Cmd+P → "Enregistrer en PDF")
   - Dépenses (CRUD) pour suivre les sorties d'argent
   - Rapports : ventes par jour/semaine/mois/année/client/produit, export CSV, résumé comptable (recettes, dépenses, bénéfice net, TVA collectée)
   - Paramètres entreprise : identité, coordonnées légales, banque/RIB, conditions de règlement, logo et personnalisation visuelle ; **15 modèles de facture/devis** partagés entre aperçu, impression et PDF
   - Centre d'aide (FAQ), Support technique (formulaire de contact) et Politique de confidentialité
   - Interface responsive : menu latéral escamotable sur mobile/tablette, tableaux et grilles adaptatifs
-  - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature électronique, factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle)
+  - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature interne simple (non qualifiée), factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle)
 
 ## Installation avec WAMPserver
 
