@@ -125,7 +125,15 @@
               <label><input type="checkbox" value="payments.read" /> Lire les paiements</label>
               <label><input type="checkbox" value="payments.write" /> Gérer les paiements</label>
               <label><input type="checkbox" value="reports.read" /> Consulter les rapports</label>
+              <label><input type="checkbox" value="cash.read" /> Consulter les caisses</label>
               <label><input type="checkbox" value="cash.write" /> Gérer les caisses</label>
+              <label><input type="checkbox" value="team.read" /> Consulter l’équipe</label>
+              <label><input type="checkbox" value="team.manage" /> Gérer l’équipe</label>
+              <label><input type="checkbox" value="automations.read" /> Voir les automatisations</label>
+              <label><input type="checkbox" value="automations.manage" /> Gérer les automatisations</label>
+              <label><input type="checkbox" value="integrations.read" /> Voir les intégrations</label>
+              <label><input type="checkbox" value="integrations.manage" /> Gérer les intégrations</label>
+              <label><input type="checkbox" value="audit.read" /> Lire le journal d’audit</label>
             </div>
             <button class="btn btn-outline" type="submit">Enregistrer le rôle</button>
           </form>
@@ -429,7 +437,7 @@ async function sendReminder(canal) {
   if (!clientId) return alert('Choisissez un client.');
   try {
     const result = await Api.post('/pro/clients/' + clientId + '/remind', { canal });
-    if (result.url) window.open(result.url, '_blank', 'noopener');
+    if (result.url) window.location.assign(result.url);
     else alert(result.message);
   } catch (e) { alert(e.message); }
 }
