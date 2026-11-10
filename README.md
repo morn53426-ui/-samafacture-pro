@@ -2,7 +2,9 @@
 
 Plateforme de facturation pour commerçants, freelances, artisans et PME — inspirée de Brisk Invoicing, pensée pour l'Afrique (Wave, Orange Money, PayDunya).
 
-Ceci est une **base fonctionnelle (MVP)** couvrant le cœur du cahier des charges : authentification, gestion des clients, produits, factures, devis, paiements et tableau de bord. Le reste du cahier des charges (app mobile native, 2FA, IA de génération de facture, multi-utilisateurs avancé, etc.) est indiqué en fin de document comme feuille de route.
+SamaFacture Pro est une plateforme de facturation et de gestion destinée aux commerçants, indépendants et PME. Le périmètre principal comprend l'authentification, les clients, le catalogue, les factures/devis, les encaissements, les dépenses et les rapports. Une extension de modules professionnels (commandes, avoirs, acomptes, équipes, établissements, caisses, documents, analyses, automatisations et intégrations API/webhooks) est décrite dans [MODULES_PROFESSIONNELS.md](MODULES_PROFESSIONNELS.md), avec ses limites actuelles.
+
+Pour l'API publique versionnée, ses permissions, ses exemples de requêtes et la signature des webhooks, consultez [API_PUBLIQUE.md](API_PUBLIQUE.md).
 
 ## Ce qui est inclus
 
@@ -138,12 +140,13 @@ reste ouverte à toute origine (comportement historique du projet, conservé pou
 un déploiement existant) — un avertissement s'affiche au démarrage si `NODE_ENV=production`
 et que la variable est absente.
 
-### Intégration continue
+### Tests et validation
 
-`.github/workflows/tests.yml` exécute automatiquement `npm test` contre une vraie base MySQL
-(service Docker fourni par GitHub Actions) à chaque push et pull request sur `main`. C'est la
-vérification que l'audit de ce projet n'a pas pu faire lui-même faute d'accès réseau/MySQL
-dans l'environnement d'analyse — cette CI donne la confirmation réelle que les tests passent.
+Les tests d'intégration se lancent depuis `server/` avec `npm test`. Ils nécessitent une base
+MySQL de test dédiée (par défaut `samafacture_test`) et ne doivent jamais pointer vers la base
+de production. À la date de cette mise à jour, aucun workflow GitHub Actions de test n'est
+présent dans `.github/workflows/`. Les tests d'intégration MySQL et les parcours navigateur
+doivent donc être exécutés sur un environnement de staging avant mise en production.
 
 ## Sécurité et fiabilité
 
