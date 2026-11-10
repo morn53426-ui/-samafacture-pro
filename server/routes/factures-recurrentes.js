@@ -236,6 +236,11 @@ async function genererFactureDepuisModele(id, userId) {
   try {
     await conn.beginTransaction();
 
+    // Tous les parcours qui créent une facture verrouillent d'abord le compte, puis
+    // la ressource métier (facture/devis/modèle récurrent). Garder ce même ordre ici
+    // évite les cycles de verrous entre génération récurrente et création manuelle.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
+
     // SELECT ... FOR UPDATE verrouille la ligne le temps de la transaction : si le
     // vérificateur périodique et un appel manuel (ou deux workers en mode cluster)
     // tentent de générer la même facture en même temps, le second attend que le premier
