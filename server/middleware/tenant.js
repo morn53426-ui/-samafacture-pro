@@ -32,20 +32,18 @@ async function resolveTenant(req, res, next) {
     const requestedOwner = req.get('X-SF-Company-Owner');
     if (requestedOwner) {
       if (!/^\d+$/.test(requestedOwner)) return res.status(400).json({ error: 'Sélection d’entreprise invalide.' });
-      const [rows] = await pool.query(
-        'SELECT owner_user_id, role, permissions_json FROM pro_team_members WHERE member_user_id = ? AND owner_user_id = ? AND active = 1 LIMIT 1',
-        [req.actorId, Number(requestedOwner)]
-      );
-      if (!rows.length) return res.status(403).json({ error: 'Vous ne faites pas partie de cette entreprise.' });
-      req.tenantId = Number(rows[0].owner_user_id);
-      req.companyMembership = rows[0];
-      req.permissions = parsePermissions(rows[0].permissions_json, rows[0].role);
-    } else {
-      const [rows] = await pool.query(
-        'SELECT owner_user_id, role, permissions_json FROM pro_team_members WHERE member_user_id = ? AND active = 1 ORDER BY id ASC',
-        [req.actorId]
-      );
-      if (rows.length === 1 && Number(rows[0].owner_user_id) !== req.actorId) {
+      const selectedOwner = Number(requestedOwner);
+      if (selectedOwner === req.actorId) {
+        // Le membre peut toujours revenir à son espace personnel.
+        req.tenantId = req.actorId;
+        req.companyMembership = null;
+        req.permissions = ROLE_PERMISSIONS.proprietaire;
+      } else {
+        const [rows] = await pool.query(
+          'SELECT owner_user_id, role, permissions_json FROM pro_team_members WHERE member_user_id = ? AND owner_user_id = ? AND active = 1 LIMIT 1',
+          [req.actorId, selectedOwner]
+        );
+        if (!rows.length) return res.status(403).json({ error: 'Vous ne faites pas partie de cette entreprise.' });
         req.tenantId = Number(rows[0].owner_user_id);
         req.companyMembership = rows[0];
         req.permissions = parsePermissions(rows[0].permissions_json, rows[0].role);
@@ -72,6 +70,7 @@ function permissionForRequest(req) {
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
   }
   if (base.endsWith('/pro')) {
+    if (path.startsWith('/team/invitations/accept')) return 'dashboard.read';
     if (path.startsWith('/team/companies')) return 'dashboard.read';
     if (path.startsWith('/team')) return method === 'GET' ? 'team.read' : 'team.manage';
     if (path.startsWith('/payments') || path.startsWith('/payment-links')) return method === 'GET' ? 'payments.read' : 'payments.write';
