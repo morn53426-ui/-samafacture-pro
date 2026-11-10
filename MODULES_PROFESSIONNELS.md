@@ -66,7 +66,7 @@ L'envoi WhatsApp automatique n'est pas activé : il nécessite une intégration 
 
 ## Mise à niveau de la base de données
 
-La version de schéma est portée à 6. Au démarrage, le backend applique la migration professionnelle de manière idempotente. Avant le déploiement, effectuez néanmoins une sauvegarde MySQL vérifiée. Ne supprimez pas les tables existantes : les nouvelles tables sont préfixées par `pro_`.
+La version de schéma proposée par la PR #3 est portée à 7. La migration ajoute notamment `users.token_version` et `facture_usage_mensuelle` ; les tables professionnelles existantes restent en place. Le compteur mensuel des factures gratuites est conservé même après suppression d'une facture et s'applique aux créations, duplications, conversions de devis et factures récurrentes. Avant le déploiement, effectuez une sauvegarde MySQL vérifiée et testez la migration v5 → v7 sur une copie de staging.
 
 ## Configuration à prévoir
 
