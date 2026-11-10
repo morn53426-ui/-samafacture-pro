@@ -62,7 +62,7 @@ function renderSidebar(activePage) {
         ${window.SamaTheme ? SamaTheme.boutonHtml() : ''}
         <div class="plan-badge"><span class="ic">${Icon('star')}</span> ${planLabels[user?.plan] || 'Plan Gratuit'}</div>
         <div>${escapeHtml(user?.entreprise_nom || user?.nom)}</div>
-        <div style="margin-top:10px; cursor:pointer; color:#B7C0DA; display:flex; align-items:center; gap:6px;" onclick="Api.clearSession(); location.href='login.html';"><span class="ic">${Icon('arrow-right')}</span> Se déconnecter</div>
+        <div style="margin-top:10px; cursor:pointer; color:#B7C0DA; display:flex; align-items:center; gap:6px;" onclick="Api.clearSession(); location.href='login.html';"><span class="ic">${Icon('log-out')}</span> Se déconnecter</div>
       </div>
     </aside>
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
