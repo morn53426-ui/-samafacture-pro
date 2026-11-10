@@ -133,10 +133,7 @@
       document.getElementById('page-title').textContent = isQuote ? 'Nouveau devis' : 'Nouvelle facture';
       document.getElementById('invoice-due-field').hidden = isQuote;
       document.getElementById('quote-validity-field').hidden = !isQuote;
-      document.getElementById('submit-facture-btn').innerHTML = isQuote
-        ? '<i class="ic" data-icon="file-stack"></i> Créer le devis'
-        : '<i class="ic" data-icon="file-check"></i> Créer la facture';
-      if (typeof renderIcons === 'function') renderIcons();
+      document.getElementById('submit-facture-btn').textContent = isQuote ? 'Créer le devis' : 'Créer la facture';
     };
     document.querySelectorAll('input[name=doc_type]').forEach(r => r.addEventListener('change', syncDocumentType));
     syncDocumentType();
