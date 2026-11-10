@@ -120,6 +120,17 @@ CREATE TABLE IF NOT EXISTS factures (
   UNIQUE KEY uk_factures_user_idempotency (user_id, idempotency_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Quota mensuel des factures gratuites : le compteur est conservé même si une facture
+-- est supprimée après sa création. Une ligne par compte et par mois.
+CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
+  user_id INT UNSIGNED NOT NULL,
+  periode DATE NOT NULL,
+  nombre_factures INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, periode),
+  CONSTRAINT fk_facture_usage_mensuelle_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ---------------------------------------------------------------------------
 -- Lignes de facture / devis
 -- ---------------------------------------------------------------------------
