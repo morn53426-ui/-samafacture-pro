@@ -515,7 +515,7 @@ router.delete('/team/:memberId', async (req, res, next) => {
 router.get('/team/companies', async (req, res, next) => {
   try {
     const [rows] = await pool.query('SELECT m.owner_user_id AS id, u.entreprise_nom, u.nom, m.role FROM pro_team_members m JOIN users u ON u.id = m.owner_user_id WHERE m.member_user_id = ? AND m.active = 1', [actor(req)]);
-    res.json({ entreprises: rows, entreprise_active: owner(req) });
+    res.json({ entreprises: rows, entreprise_active: owner(req), permissions: req.permissions || [] });
   } catch (err) { next(err); }
 });
 
