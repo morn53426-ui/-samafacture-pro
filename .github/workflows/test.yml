@@ -32,6 +32,14 @@ jobs:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
 
+      - name: Valider Docker Compose et le chemin des variables
+        run: |
+          cp server/.env.example server/.env
+          docker compose --env-file server/.env config --quiet
+
+      - name: Construire l'image Docker sans publication
+        run: docker build --tag samafacture-pro:ci .
+
       - name: Installer Node.js
         uses: actions/setup-node@v4
         with:
