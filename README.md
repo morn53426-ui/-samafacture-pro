@@ -142,11 +142,17 @@ et que la variable est absente.
 
 ### Tests et validation
 
-Les tests d'intégration se lancent depuis `server/` avec `npm test`. Ils nécessitent une base
-MySQL de test dédiée (par défaut `samafacture_test`) et ne doivent jamais pointer vers la base
-de production. À la date de cette mise à jour, aucun workflow GitHub Actions de test n'est
-présent dans `.github/workflows/`. Les tests d'intégration MySQL et les parcours navigateur
-doivent donc être exécutés sur un environnement de staging avant mise en production.
+Les tests se lancent depuis `server/` avec `npm test`. Ils nécessitent une base
+MySQL de test dédiée (par défaut `samafacture_test`) et ne doivent jamais pointer vers la
+base de production. Le workflow `.github/workflows/test.yml` exécute automatiquement cette
+suite sur les pull requests vers `main` et les pushs sur `main`, avec un service MySQL 8.0
+isolé. Il inclut les tests d'authentification, de facturation, de concurrence/idempotence et
+les tests autonomes de sécurité des webhooks. Le résultat réel (succès ou échec) est consultable
+dans l'onglet **Actions** de GitHub après l'exécution du workflow.
+
+La CI ne remplace pas la recette de staging : avant la mise en production, il reste nécessaire
+de vérifier les parcours complets dans un navigateur, les emails réels, les webhooks vers des
+destinations de test contrôlées, les sauvegardes et la restauration.
 
 ## Sécurité et fiabilité
 
@@ -206,7 +212,7 @@ Une sauvegarde qui reste uniquement sur le serveur qui peut tomber en panne n'es
 
 ## Tests automatisés
 
-Des tests couvrent l'authentification et la création de factures — en particulier le calcul de la TVA (avec et sans remise) et la numérotation séquentielle, **y compris sous concurrence** (10 créations de facture lancées en parallèle, pour vérifier qu'aucun numéro n'est jamais dupliqué).
+Des tests couvrent l'authentification, les factures (calcul de la TVA, remises, validation des montants, numérotation concurrente, paiements et idempotence) et la sécurité des webhooks (plages IP non publiques, résolution DNS, protection contre le DNS rebinding et chiffrement des secrets).
 
 ### Lancer les tests
 
