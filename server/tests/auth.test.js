@@ -71,6 +71,31 @@ describe('Authentification', () => {
     }
   });
 
+  test('le sélecteur manuel de plan est désactivé si NODE_ENV est absent', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200, login.text);
+
+    const previousNodeEnv = process.env.NODE_ENV;
+    delete process.env.NODE_ENV;
+    try {
+      const availability = await request(app)
+        .get('/api/abonnement/moyens-disponibles')
+        .set('Authorization', `Bearer ${login.body.token}`);
+      assert.equal(availability.status, 200, availability.text);
+      assert.equal(availability.body.manual_plan_selection, false);
+
+      const response = await request(app)
+        .put('/api/auth/plan')
+        .set('Authorization', `Bearer ${login.body.token}`)
+        .send({ plan: 'pro' });
+      assert.equal(response.status, 403, response.text);
+      assert.equal(response.body.code, 'PLAN_MANUAL_DISABLED');
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
   test('le sélecteur manuel de plan ne peut pas attribuer un plan payant en production', async () => {
     const login = await request(app).post('/api/auth/login').send({ email, password });
     assert.equal(login.status, 200, login.text);
