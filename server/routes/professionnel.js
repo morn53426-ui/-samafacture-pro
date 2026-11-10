@@ -107,13 +107,14 @@ router.post('/orders/:id/delivery-note', async (req, res, next) => {
     const order = rows[0];
     if (!order) return res.status(404).json({ error: 'Commande introuvable.' });
     const [clientRows] = await pool.query('SELECT nom, adresse FROM clients WHERE id = ? AND user_id = ?', [order.client_id, uid]);
+    const numero = randomRef('BL');
     const [result] = await pool.query(
       'INSERT INTO pro_bons_livraison (user_id, commande_id, numero, date_livraison, destinataire, adresse_livraison, lignes_json, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, order.id, randomRef('BL'), safeDate(req.body.date_livraison), clientRows[0]?.nom || null, req.body.adresse_livraison || clientRows[0]?.adresse || null, order.lignes_json, String(req.body.notes || '').slice(0, 2000) || null]
+      [uid, order.id, numero, safeDate(req.body.date_livraison), clientRows[0]?.nom || null, req.body.adresse_livraison || clientRows[0]?.adresse || null, order.lignes_json, String(req.body.notes || '').slice(0, 2000) || null]
     );
     await pool.query('UPDATE pro_commandes SET statut = ? WHERE id = ? AND user_id = ?', ['preparee', order.id, uid]);
-    await audit(req, 'bon_livraison.cree', 'bon_livraison', result.insertId, { commande_id: order.id });
-    res.status(201).json({ id: result.insertId, numero: result.insertId });
+    await audit(req, 'bon_livraison.cree', 'bon_livraison', result.insertId, { commande_id: order.id, numero });
+    res.status(201).json({ id: result.insertId, numero });
   } catch (err) { next(err); }
 });
 
@@ -267,9 +268,14 @@ router.get('/clients/:id/statement', async (req, res, next) => {
     if (!client) return res.status(404).json({ error: 'Client introuvable.' });
     const [factures] = await pool.query('SELECT id, numero, date_emission, date_echeance, total, montant_paye, statut, type FROM factures WHERE user_id = ? AND client_id = ? ORDER BY date_emission DESC, id DESC', [uid, clientId]);
     const [paiements] = await pool.query('SELECT p.id, p.facture_id, p.montant, p.methode, p.reference, p.date_paiement, f.numero FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.user_id = ? AND f.client_id = ? ORDER BY p.date_paiement DESC', [uid, clientId]);
+    const [remboursements] = await pool.query(
+      "SELECT r.id, r.paiement_id, r.montant, r.motif, r.reference_prestataire, r.traite_le, f.numero FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id JOIN factures f ON f.id = p.facture_id WHERE r.user_id = ? AND r.statut = 'rembourse' AND f.client_id = ? ORDER BY r.traite_le DESC",
+      [uid, clientId]
+    );
     const totalFacture = factures.filter(f => f.type === 'facture' && f.statut !== 'annulee').reduce((s, f) => s + Number(f.total), 0);
     const totalPaye = paiements.reduce((s, p) => s + Number(p.montant), 0);
-    res.json({ client, factures, paiements, solde: Math.round((totalFacture - totalPaye) * 100) / 100 });
+    const totalRembourse = remboursements.reduce((s, r) => s + Number(r.montant), 0);
+    res.json({ client, factures, paiements, remboursements, total_paye: totalPaye, total_rembourse: totalRembourse, solde: Math.round((totalFacture - totalPaye + totalRembourse) * 100) / 100 });
   } catch (err) { next(err); }
 });
 
@@ -336,16 +342,75 @@ router.post('/payments/:id/refunds', async (req, res, next) => {
 });
 
 router.put('/refunds/:id/status', async (req, res, next) => {
+  let conn;
   try {
     const statut = req.body.statut;
     if (!['approuve', 'rejete', 'rembourse'].includes(statut)) return res.status(400).json({ error: 'Statut invalide.' });
     const reference = String(req.body.reference_prestataire || '').trim().slice(0, 190) || null;
     if (statut === 'rembourse' && !reference) return res.status(400).json({ error: 'La référence du remboursement réellement exécuté est obligatoire.' });
-    const [result] = await pool.query('UPDATE pro_refund_requests SET statut = ?, reference_prestataire = ?, traite_par = ?, traite_le = NOW() WHERE id = ? AND user_id = ? AND statut IN (?, ?)', [statut, reference, actor(req), req.params.id, owner(req), 'a_traiter', 'approuve']);
-    if (!result.affectedRows) return res.status(404).json({ error: 'Demande introuvable ou déjà traitée.' });
+
+    if (statut !== 'rembourse') {
+      const [result] = await pool.query(
+        'UPDATE pro_refund_requests SET statut = ?, traite_par = ?, traite_le = NOW() WHERE id = ? AND user_id = ? AND statut = ?',
+        [statut, actor(req), req.params.id, owner(req), 'a_traiter']
+      );
+      if (!result.affectedRows) return res.status(404).json({ error: 'Demande introuvable ou déjà traitée.' });
+    } else {
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+      const [refundRows] = await conn.query(
+        'SELECT * FROM pro_refund_requests WHERE id = ? AND user_id = ? FOR UPDATE',
+        [req.params.id, owner(req)]
+      );
+      const refund = refundRows[0];
+      if (!refund || !['a_traiter', 'approuve'].includes(refund.statut)) {
+        await conn.rollback();
+        return res.status(404).json({ error: 'Demande introuvable ou déjà traitée.' });
+      }
+      const [paymentRows] = await conn.query(
+        'SELECT * FROM paiements WHERE id = ? AND user_id = ? FOR UPDATE',
+        [refund.paiement_id, owner(req)]
+      );
+      const payment = paymentRows[0];
+      if (!payment) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'Le paiement d’origine est introuvable.' });
+      }
+      const [invoiceRows] = await conn.query(
+        'SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE',
+        [payment.facture_id, owner(req)]
+      );
+      const invoice = invoiceRows[0];
+      if (!invoice || Number(invoice.montant_paye) + 0.001 < Number(refund.montant)) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'Le montant remboursé dépasse les encaissements encore comptabilisés sur la facture.' });
+      }
+      const remainingPaid = Math.max(0, Number(invoice.montant_paye) - Number(refund.montant));
+      const today = new Date().toISOString().slice(0, 10);
+      const newInvoiceStatus = invoice.statut === 'annulee'
+        ? 'annulee'
+        : (remainingPaid + 0.001 >= Number(invoice.total)
+          ? 'payee'
+          : (invoice.date_echeance && String(invoice.date_echeance) < today ? 'en_retard' : 'en_attente'));
+      await conn.query(
+        'UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ? AND user_id = ?',
+        [remainingPaid, newInvoiceStatus, invoice.id, owner(req)]
+      );
+      await conn.query(
+        "UPDATE pro_refund_requests SET statut = 'rembourse', reference_prestataire = ?, traite_par = ?, traite_le = NOW() WHERE id = ? AND user_id = ?",
+        [reference, actor(req), refund.id, owner(req)]
+      );
+      await conn.commit();
+    }
+
     await audit(req, 'remboursement.statut_modifie', 'remboursement', req.params.id, { statut, reference });
-    res.json({ success: true, statut });
-  } catch (err) { next(err); }
+    res.json({ success: true, statut, solde_facture_ajuste: statut === 'rembourse' });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.get('/payment-links', async (req, res, next) => {
