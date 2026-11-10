@@ -1232,3 +1232,262 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
 .icon {
   width: 1em; height: 1em; display: inline-block; vertical-align: -0.125em; flex-shrink: 0;
 }
+
+
+/* ==========================================================================
+   SamaFacture Pro — finition UI / responsive (2026)
+   Couche complémentaire : conserve les composants et la palette existants.
+   ========================================================================== */
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 6rem;
+}
+
+body {
+  min-width: 320px;
+  overflow-x: clip;
+}
+
+.app-shell {
+  min-height: 100svh;
+}
+
+.main-content,
+.grid,
+.grid > *,
+.card {
+  min-width: 0;
+}
+
+.main-content {
+  max-width: 1680px;
+}
+
+.grid-4 {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.grid-2 {
+  grid-template-columns: minmax(0, 1.65fr) minmax(260px, 1fr);
+}
+
+.card {
+  border-color: var(--line);
+  border-radius: var(--radius);
+}
+
+.card h3,
+.page-header h1,
+.topbar h1 {
+  overflow-wrap: anywhere;
+}
+
+.topbar {
+  align-items: flex-start;
+}
+
+.topbar > div:first-child {
+  min-width: 0;
+}
+
+.topbar h1 {
+  font-size: clamp(1.3rem, 2.1vw, 1.85rem);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+
+.topbar p {
+  font-size: 0.9rem;
+}
+
+.page-header {
+  align-items: center;
+  gap: 16px;
+}
+
+.page-header > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page-header > div:last-child .btn {
+  width: auto;
+}
+
+.stat-card .stat-value {
+  font-size: clamp(1.15rem, 2vw, 1.6rem);
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+
+.card table {
+  width: 100%;
+}
+
+.card table th,
+.card table td {
+  vertical-align: middle;
+}
+
+.btn {
+  min-height: 40px;
+}
+
+.btn-sm {
+  min-height: 36px;
+}
+
+.field label {
+  margin-bottom: 7px;
+}
+
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 3px;
+}
+
+canvas,
+video,
+img {
+  max-width: 100%;
+}
+
+.sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201, 210, 232, 0.28) transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:not(.card-skeleton) {
+    transition: box-shadow var(--dur-base) var(--ease-standard),
+      transform var(--dur-base) var(--ease-standard),
+      border-color var(--dur-base) var(--ease-standard);
+  }
+
+  .card:not(.card-skeleton):hover {
+    border-color: color-mix(in srgb, var(--emerald) 22%, var(--line));
+    box-shadow: var(--shadow-md);
+  }
+
+  .btn:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+}
+
+@media (max-width: 1100px) {
+  .grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .main-content {
+    margin-left: 0;
+    padding: calc(88px + env(safe-area-inset-top)) clamp(14px, 3vw, 24px)
+      calc(42px + env(safe-area-inset-bottom));
+  }
+
+  .sidebar.open {
+    max-height: 100svh;
+    overflow: hidden;
+  }
+
+  .sidebar.open .sidebar-nav {
+    max-height: calc(100svh - 180px);
+    overscroll-behavior: contain;
+  }
+
+  .sidebar.open .sidebar-foot {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .topbar {
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .main-content {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .grid-2 {
+    gap: 14px;
+  }
+
+  .card {
+    padding: clamp(14px, 3.5vw, 18px);
+    border-radius: 12px;
+  }
+
+  .card table {
+    min-width: 480px;
+  }
+
+  .card table th,
+  .card table td {
+    white-space: nowrap;
+  }
+
+  .page-header {
+    align-items: stretch;
+  }
+
+  .page-header > div:last-child {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .page-header > div:last-child .btn {
+    width: 100%;
+  }
+
+  .lp-header {
+    padding-top: max(14px, env(safe-area-inset-top));
+  }
+
+  .auth-form-side {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 380px) {
+  .grid-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stat-card .stat-value {
+    font-size: 1.3rem;
+  }
+
+  .topbar h1 {
+    font-size: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
