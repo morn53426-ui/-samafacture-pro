@@ -233,10 +233,14 @@ describe('Authentification', () => {
       [userId, webhook.insertId]
     );
     await pool.query(
-      "INSERT INTO pro_api_keys (user_id, nom, token_hash, scopes_json) VALUES (?, 'Clé conservée', ?, '[\"invoices:read\"]')",
-      [userId, require('crypto').createHash('sha256').update('api-key-preserve-' + suffix).digest('hex')]
+      'INSERT INTO pro_api_keys (user_id, nom, token_hash, scopes_json) VALUES (?, ?, ?, ?)',
+      [
+        userId,
+        'Clé conservée',
+        require('crypto').createHash('sha256').update('api-key-preserve-' + suffix).digest('hex'),
+        JSON.stringify(['invoices:read'])
+      ]
     );
-
     const reset = await request(app)
       .delete('/api/auth/donnees')
       .set('Authorization', `Bearer ${token}`);
