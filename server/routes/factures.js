@@ -104,7 +104,14 @@ function computeTotals(lignes, remise, frais_livraison) {
   total_tva = round2(total_tva);
   const total = round2(sous_total - remiseVal + total_tva + livraisonVal);
 
-  return { computedLignes, sous_total: round2(sous_total), total_tva, total, remise: remiseVal };
+  return {
+    computedLignes,
+    sous_total: round2(sous_total),
+    total_tva,
+    total,
+    remise: remiseVal,
+    frais_livraison: round2(livraisonVal)
+  };
 }
 
 /**
@@ -352,7 +359,10 @@ router.post('/', async (req, res, next) => {
     const referenceDocument = optionalText(reference_externe, 100);
     const conditionsDocument = optionalText(conditions_reglement, 5000);
 
-    const { computedLignes, sous_total, total_tva, total, remise: remiseAppliquee } = computeTotals(lignes, remise, frais_livraison);
+    const {
+      computedLignes, sous_total, total_tva, total,
+      remise: remiseAppliquee, frais_livraison: livraisonAppliquee
+    } = computeTotals(lignes, remise, frais_livraison);
     // Code court utilisé pour la vérification publique de la facture (via QR code) : évite
     // qu'un tiers puisse deviner l'URL de vérification d'une autre facture en changeant l'id.
     const verificationCode = crypto.randomBytes(5).toString('hex');
@@ -392,7 +402,7 @@ router.post('/', async (req, res, next) => {
       [
         req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
         date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
-        remiseAppliquee, Number(frais_livraison) || 0, mode_paiement || null,
+        remiseAppliquee, livraisonAppliquee, mode_paiement || null,
         commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
       ]
     );
@@ -569,7 +579,7 @@ router.post('/:id/dupliquer', async (req, res, next) => {
       [
         req.tenantId, source.client_id, numero, source.type, source.date_validite || null,
         source.objet || null, source.reference_externe || null, source.conditions_reglement || null,
-        source.remise, source.frais_livraison, source.mode_paiement, source.commentaires,
+        source.remise, positiveNumber(source.frais_livraison, 0), source.mode_paiement, source.commentaires,
         source.sous_total, source.total_tva, source.total
       ]
     );
@@ -905,9 +915,13 @@ router.post('/:id/paiements', async (req, res, next) => {
       return res.status(400).json({ error: 'Idempotency-Key invalide (8 à 100 caractères).' });
     }
     const { montant, methode, reference } = req.body;
-    const montantNum = Number(montant);
-    if (!Number.isFinite(montantNum) || montantNum <= 0 || !methode) {
-      return res.status(400).json({ error: 'Montant (positif) et méthode de paiement requis.' });
+    // Les montants stockés en DECIMAL(14,2) doivent être ramenés aux centimes AVANT
+    // validation, comparaison, insertion et mise à jour du solde.
+    const montantNum = round2(Number(montant));
+    const methodeValidee = String(methode ?? '').trim().slice(0, 50);
+    const referenceValidee = optionalText(reference, 100);
+    if (!Number.isFinite(montantNum) || montantNum <= 0 || montantNum > 999999999999.99 || !methodeValidee) {
+      return res.status(400).json({ error: 'Montant positif (au centime) et méthode de paiement valides requis.' });
     }
 
     if (idempotencyKey) {
@@ -969,14 +983,14 @@ router.post('/:id/paiements', async (req, res, next) => {
 
     await conn.query(
       `INSERT INTO paiements (user_id, facture_id, montant, methode, reference, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)`,
-      [req.tenantId, facture.id, montantNum, methode, reference || null, idempotencyKey]
+      [req.tenantId, facture.id, montantNum, methodeValidee, referenceValidee, idempotencyKey]
     );
 
     const nouveauMontantPaye = Number(facture.montant_paye) + montantNum;
     const nouveauStatut = nouveauMontantPaye >= Number(facture.total) ? 'payee' : facture.statut;
     await conn.query('UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ?', [nouveauMontantPaye, nouveauStatut, facture.id]);
     await conn.commit();
-    queueWebhookEvent(req.tenantId, 'payment.received', { facture_id: facture.id, montant: montantNum, methode }).catch(err => console.warn('Webhook payment.received ignoré :', err.message));
+    queueWebhookEvent(req.tenantId, 'payment.received', { facture_id: facture.id, montant: montantNum, methode: methodeValidee }).catch(err => console.warn('Webhook payment.received ignoré :', err.message));
 
     const [updatedRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [facture.id]);
     res.status(201).json({ facture: updatedRows[0] });
