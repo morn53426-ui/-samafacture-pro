@@ -10,6 +10,7 @@ const { requireAuth } = require('../middleware/auth');
 const { isValidImageDataUrl } = require('../utils/validation');
 const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = require('../utils/plans');
 const { sendMail } = require('../config/mailer');
+const { isManualPlanSelectionEnabled } = require('../config/runtime');
 
 const router = express.Router();
 const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
@@ -650,7 +651,7 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  * @openapi
  * /auth/plan:
  *   put:
- *     summary: Change manuellement le plan en développement/test uniquement ; désactivé en production
+ *     summary: Change manuellement le plan en développement/test uniquement ; désactivé si l'environnement n'est pas explicitement development/test
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -664,7 +665,7 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  *       200:
  *         description: Plan mis à jour en développement/test.
  *       403:
- *         description: Sélection manuelle désactivée en production (code PLAN_MANUAL_DISABLED).
+ *         description: Sélection manuelle réservée aux environnements development/test (code PLAN_MANUAL_DISABLED).
  *         content:
  *           application/json:
  *             schema: { type: object, properties: { user: { $ref: '#/components/schemas/Utilisateur' } } }
@@ -674,9 +675,9 @@ router.put('/plan', requireAuth, async (req, res, next) => {
     // Le sélecteur manuel sert uniquement au développement et aux tests. En production,
     // laisser cette route attribuer "pro" ou "entreprise" permettrait à n'importe quel
     // utilisateur connecté de contourner les paiements d'abonnement.
-    if (process.env.NODE_ENV === 'production') {
+    if (!isManualPlanSelectionEnabled()) {
       return res.status(403).json({
-        error: 'Le changement de formule doit passer par un paiement confirmé.',
+        error: 'Le changement manuel de formule est réservé aux environnements de développement et de test.',
         code: 'PLAN_MANUAL_DISABLED'
       });
     }
