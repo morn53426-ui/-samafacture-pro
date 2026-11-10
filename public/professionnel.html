@@ -97,7 +97,7 @@
         </form>
         <div id="new-payment-link" class="pro-result" hidden></div>
         <div class="pro-subsection"><h3>Liens de paiement</h3><div id="payment-links-list" class="pro-list"></div></div>
-        <div class="pro-subsection"><h3>Dernières transactions</h3><div id="payments-list" class="pro-list"></div></div>
+        <div class="pro-subsection"><h3>Dernières transactions</h3><div id="payments-list" class="pro-list"></div></div>\n        <div class="pro-subsection"><h3>Demandes de remboursement</h3><div id="refunds-list" class="pro-list"></div></div>
         <div class="pro-note">Le remboursement est une demande suivie dans SamaFacture Pro. Le débit ou crédit effectif doit être exécuté et confirmé auprès de la banque ou du prestataire de paiement.</div>
       </section>
 
@@ -321,6 +321,7 @@ async function loadWorkspace() {
     setList('register-list', cashRegistersCache.map(c => '<div class="pro-list-row"><div><strong>' + escapeHtml(c.nom) + '</strong><small>' + escapeHtml(c.etablissement_nom || 'Sans établissement') + ' · ' + escapeHtml(c.devise) + '</small></div><strong>' + formatMontant(c.solde_actuel, c.devise) + '</strong></div>').join(''));
     setList('cash-operations-list', (await Api.get('/pro/cash/operations')).operations.slice(0, 15).map(o => '<div class="pro-list-row"><div><strong>' + escapeHtml(o.caisse_nom) + '</strong><small>' + escapeHtml(o.motif) + ' · ' + formatDate(o.operation_date) + '</small></div><strong class="' + (o.type === 'entree' ? 'pro-positive' : 'pro-negative') + '">' + (o.type === 'entree' ? '+' : '−') + formatMontant(o.montant) + '</strong></div>').join(''));
     setList('payments-list', (payments.paiements || []).map(p => '<div class="pro-list-row"><div><strong>' + escapeHtml(p.numero) + ' · ' + escapeHtml(p.client_nom) + '</strong><small>' + escapeHtml(p.methode) + ' · ' + formatDate(p.date_paiement) + '</small></div><div><strong>' + formatMontant(p.montant) + '</strong><button class="btn btn-sm btn-outline" onclick="requestRefund(' + p.id + ',' + p.montant + ')">Demander remboursement</button></div></div>').join(''));
+    setList('refunds-list', (payments.remboursements || []).map(r => '<div class="pro-list-row"><div><strong>Demande #' + r.id + ' · Paiement #' + r.paiement_id + '</strong><small>' + formatMontant(r.montant) + ' · ' + escapeHtml(r.motif) + ' · ' + formatDate(r.created_at) + '</small></div><div>' + statusPill(r.statut) + (r.statut === 'a_traiter' ? '<button class="btn btn-sm btn-outline" onclick="updateRefund(' + r.id + ',\\'approuve\\')">Approuver</button><button class="btn btn-sm btn-outline" onclick="updateRefund(' + r.id + ',\\'rejete\\')">Rejeter</button>' : '') + (r.statut === 'approuve' ? '<button class="btn btn-sm btn-primary" onclick="updateRefund(' + r.id + ',\\'rembourse\\')">Confirmer remboursé</button>' : '') + '</div></div>').join(''));
     setList('payment-links-list', (links.liens || []).map(l => '<div class="pro-list-row"><div><strong>' + escapeHtml(l.numero) + '</strong><small>' + formatMontant(l.montant, l.devise) + ' · ' + formatDate(l.created_at) + '</small></div>' + statusPill(l.statut) + '</div>').join(''));
     setList('documents-list', documentsCache.map(d => '<div class="pro-list-row"><div><strong>' + escapeHtml(d.nom_fichier) + '</strong><small>' + Math.ceil(d.taille_octets / 1024) + ' Ko · ' + formatDate(d.created_at) + (d.signature_nom ? ' · Signé par ' + escapeHtml(d.signature_nom) : '') + '</small></div><button class="btn btn-sm btn-outline" onclick="downloadDocument(' + d.id + ')">Télécharger</button></div>').join(''));
     el('signature-document').innerHTML = optionList(documentsCache, 'nom_fichier', 'id');
@@ -346,7 +347,7 @@ async function receiveDeposit(id) {\n  const methode = prompt('Méthode de règl
   try { await Api.put('/pro/credit-notes/' + id + '/status', { statut: status }); await loadWorkspace(); }
   catch (e) { alert(e.message); }
 }
-async function requestRefund(id, max) {
+async function updateRefund(id, statut) {\n  let reference_prestataire = '';\n  if (statut === 'rembourse') { reference_prestataire = prompt('Référence du remboursement réellement exécuté auprès du prestataire :') || ''; if (!reference_prestataire) return; }\n  try { await Api.put('/pro/refunds/' + id + '/status', { statut, reference_prestataire }); await loadWorkspace(); showToast('Statut de remboursement mis à jour.', 'success'); }\n  catch (e) { alert(e.message); }\n}\nasync function requestRefund(id, max) {
   const montant = Number(prompt('Montant à demander en remboursement (maximum ' + max + ')', max));
   if (!Number.isFinite(montant) || montant <= 0) return;
   const motif = prompt('Motif du remboursement :');
