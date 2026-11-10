@@ -34,6 +34,16 @@ La revue a porté sur le code serveur Node.js/Express, MySQL, les schémas et mi
 
 La déconnexion révoque les sessions actives du compte, pas uniquement la session de l'appareil courant. Les appareils devront se reconnecter.
 
+### Haute — jetons de réinitialisation dans les journaux
+
+**Avant :** sans SMTP configuré, le service email affichait le contenu complet du message sur la sortie standard, y compris le lien de réinitialisation et son jeton. Ce mode est utile en développement, mais un journal de production ne doit pas devenir un canal de récupération de comptes.
+
+**Correction proposée :**
+- le fallback qui affiche le contenu des messages est réservé au développement ;
+- en production, un SMTP absent provoque une erreur sans journaliser le contenu ;
+- le parcours « mot de passe oublié » conserve une réponse générique même si l'envoi échoue ;
+- un test confirme qu'aucun jeton n'est écrit dans les logs de production.
+
 ### Haute — quota mensuel de factures
 
 **Avant :** l'API publique comptait les factures avec la date d'émission fournie par le client. Une date ancienne permettait de ne pas être comptabilisée dans le quota du mois courant. Le contrôle de quota du parcours principal était effectué avant sa transaction et pouvait être dépassé par plusieurs créations simultanées.
