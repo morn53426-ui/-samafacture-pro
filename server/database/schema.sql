@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   nom VARCHAR(150) NOT NULL,
   email VARCHAR(190) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  token_version INT UNSIGNED NOT NULL DEFAULT 0,
   role VARCHAR(30) NOT NULL DEFAULT 'administrateur', -- administrateur | comptable | employe | commercial | manager
   entreprise_nom VARCHAR(190),
   entreprise_logo MEDIUMTEXT,
@@ -107,6 +108,7 @@ CREATE TABLE IF NOT EXISTS factures (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_factures_user (user_id),
   KEY idx_factures_client (client_id),
+  KEY idx_factures_user_type_created_at (user_id, type, created_at),
   KEY idx_factures_user_type_statut (user_id, type, statut),
   KEY idx_factures_user_type_date (user_id, type, date_emission),
   KEY idx_factures_user_date (user_id, date_emission),
