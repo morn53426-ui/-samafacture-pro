@@ -209,6 +209,21 @@ router.delete('/:id', async (req, res, next) => {
     if (!existingRows.length) return res.status(404).json({ error: 'Client introuvable.' });
 
     await conn.beginTransaction();
+
+    // Une référence inter-entreprises anormale ne doit jamais être supprimée en cascade
+    // avec le client d'une autre entreprise. Les routes de création vérifient déjà le
+    // propriétaire, mais cette garde protège aussi les bases historiques/importées.
+    const [foreignInvoices] = await conn.query(
+      'SELECT id FROM factures WHERE client_id = ? AND user_id <> ? LIMIT 1 FOR UPDATE',
+      [existingRows[0].id, req.tenantId]
+    );
+    if (foreignInvoices.length) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Suppression refusée : des factures appartenant à une autre entreprise référencent ce client.'
+      });
+    }
+
     // Supprime d'abord les factures/devis du client (les lignes et paiements associés sont
     // supprimés automatiquement grâce à ON DELETE CASCADE), afin que la suppression du client
     // fonctionne toujours, même s'il a un historique de facturation.
