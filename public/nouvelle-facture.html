@@ -56,11 +56,20 @@
             <label>Date d'émission</label>
             <input type="date" id="date_emission" />
           </div>
-          <div class="field">
+          <div class="field" id="invoice-due-field">
             <label>Date d'échéance</label>
             <input type="date" id="date_echeance" />
           </div>
+          <div class="field" id="quote-validity-field" hidden>
+            <label>Devis valable jusqu'au</label>
+            <input type="date" id="date_validite" />
+          </div>
         </div>
+        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px; margin-top:12px;">
+          <div class="field"><label>Objet / prestation</label><input type="text" id="objet" maxlength="190" placeholder="Ex. Fourniture de matériel informatique" /></div>
+          <div class="field"><label>Référence client / bon de commande</label><input type="text" id="reference_externe" maxlength="100" placeholder="Ex. BC-2026-014" /></div>
+        </div>
+        <div class="field"><label>Conditions de règlement / validité</label><textarea id="conditions_reglement" rows="3" maxlength="5000" placeholder="Conditions particulières de paiement ou de validité du devis."></textarea></div>
 
         <div class="invoice-section-heading invoice-lines-heading"><span class="ic"><i class="ic" data-icon="file-stack"></i></span><div><h3>Articles</h3><p>Ajoutez les prestations ou produits facturés.</p></div></div>
         <table class="invoice-lines-table">
@@ -119,10 +128,22 @@
       clients.map(cl => `<option value="${cl.id}">${escapeHtml(cl.nom)}</option>`).join('');
     addLigne();
 
-    document.querySelectorAll('input[name=doc_type]').forEach(r => r.addEventListener('change', () => {
-      const type = document.querySelector('input[name=doc_type]:checked').value;
-      document.getElementById('page-title').textContent = type === 'devis' ? 'Nouveau devis' : 'Nouvelle facture';
-    }));
+    const syncDocumentType = () => {
+      const isQuote = document.querySelector('input[name=doc_type]:checked').value === 'devis';
+      document.getElementById('page-title').textContent = isQuote ? 'Nouveau devis' : 'Nouvelle facture';
+      document.getElementById('invoice-due-field').hidden = isQuote;
+      document.getElementById('quote-validity-field').hidden = !isQuote;
+      document.getElementById('submit-facture-btn').innerHTML = isQuote
+        ? '<i class="ic" data-icon="file-stack"></i> Créer le devis'
+        : '<i class="ic" data-icon="file-check"></i> Créer la facture';
+      if (typeof renderIcons === 'function') renderIcons();
+    };
+    document.querySelectorAll('input[name=doc_type]').forEach(r => r.addEventListener('change', syncDocumentType));
+    syncDocumentType();
+    const { user } = await Api.get('/auth/me');
+    if (user?.entreprise_conditions_reglement) {
+      document.getElementById('conditions_reglement').value = user.entreprise_conditions_reglement;
+    }
   }
 
   function addLigne() {
@@ -220,7 +241,11 @@
       client_id,
       type: document.querySelector('input[name=doc_type]:checked').value,
       date_emission: document.getElementById('date_emission').value,
-      date_echeance: document.getElementById('date_echeance').value,
+      date_echeance: document.querySelector('input[name=doc_type]:checked').value === 'facture' ? document.getElementById('date_echeance').value : null,
+      date_validite: document.querySelector('input[name=doc_type]:checked').value === 'devis' ? document.getElementById('date_validite').value : null,
+      objet: document.getElementById('objet').value,
+      reference_externe: document.getElementById('reference_externe').value,
+      conditions_reglement: document.getElementById('conditions_reglement').value,
       remise: parseFloat(document.getElementById('remise').value) || 0,
       frais_livraison: parseFloat(document.getElementById('frais_livraison').value) || 0,
       mode_paiement: document.getElementById('mode_paiement').value,
