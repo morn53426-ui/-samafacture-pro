@@ -97,8 +97,9 @@
         <form id="invite-form" class="pro-form">
           <div class="pro-inline-fields">
             <div class="field"><label for="invite-email">Email du collaborateur *</label><input type="email" id="invite-email" required placeholder="collaborateur@entreprise.com" /></div>
-            <div class="field"><label for="invite-role">Rôle</label><select id="invite-role"><option value="administrateur">Administrateur</option><option value="manager">Manager</option><option value="comptable">Comptable</option><option value="commercial">Commercial</option><option value="caissier">Caissier</option><option value="employe" selected>Employé</option><option value="lecture_seule">Lecture seule</option></select></div>
+            <div class="field"><label for="invite-role">Rôle</label><select id="invite-role"><option value="administrateur">Administrateur</option><option value="manager">Manager</option><option value="comptable">Comptable</option><option value="commercial">Commercial</option><option value="caissier">Caissier</option><option value="employe" selected>Employé</option><option value="lecture_seule">Lecture seule</option><option value="personnalise">Rôle personnalisé</option></select></div>
           </div>
+          <div class="field" id="invite-custom-role-wrap" hidden><label for="invite-custom-role">Permissions du rôle personnalisé</label><select id="invite-custom-role"><option value="">Choisir un rôle enregistré</option></select></div>
           <button class="btn btn-primary" type="submit">Envoyer une invitation</button>
         </form>
         <div id="invite-result" class="pro-result" hidden></div>
@@ -250,6 +251,7 @@ let invoicesCache = [];
 let establishmentsCache = [];
 let cashRegistersCache = [];
 let documentsCache = [];
+let customRolesCache = [];
 let currentPaymentLink = '';
 
 function el(id) { return document.getElementById(id); }
@@ -270,6 +272,8 @@ async function loadWorkspace() {
       Api.get('/factures?type=facture&page=1&limite=100')
     ]);
     const [orders, delivery, credits, team, branches, registers, payments, links, docs, automations, keys, webhooks, audit, companies, clients, invoices] = results;
+    customRolesCache = team.roles || [];
+    el('invite-custom-role').innerHTML = '<option value="">Choisir un rôle enregistré</option>' + customRolesCache.map(r => '<option value="' + r.id + '">' + escapeHtml(r.nom) + '</option>').join('');
     clientsCache = clients.clients || [];
     invoicesCache = invoices.factures || [];
     establishmentsCache = branches.etablissements || [];
@@ -435,10 +439,16 @@ el('link-form').addEventListener('submit', async e => {
     await loadWorkspace();
   } catch (err) { alert(err.message); }
 });
+el('invite-role').addEventListener('change', () => { el('invite-custom-role-wrap').hidden = el('invite-role').value !== 'personnalise'; });
 el('invite-form').addEventListener('submit', async e => {
   e.preventDefault();
   try {
-    const result = await Api.post('/pro/team/invitations', { email: el('invite-email').value, role: el('invite-role').value });
+    const role = el('invite-role').value;
+    const customRole = role === 'personnalise' ? customRolesCache.find(r => String(r.id) === String(el('invite-custom-role').value)) : null;
+    if (role === 'personnalise' && !customRole) return alert('Choisissez un rôle personnalisé enregistré.');
+    const payload = { email: el('invite-email').value, role };
+    if (customRole) payload.permissions = customRole.permissions || [];
+    const result = await Api.post('/pro/team/invitations', payload);
     el('invite-result').hidden = false;
     el('invite-result').innerHTML = '<strong>Invitation créée</strong><p>' + (result.email_envoye ? 'Email envoyé. ' : 'SMTP non configuré : email non envoyé. ') + '</p><p><a href="' + escapeHtml(result.invitation_url) + '" target="_blank" rel="noopener">Ouvrir le lien d’invitation</a></p>';
     e.target.reset(); await loadWorkspace();
