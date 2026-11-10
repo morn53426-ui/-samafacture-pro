@@ -69,6 +69,22 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(facture.total, 11120); // 10000 - 1000 + 1620 + 500
   });
 
+  test('des frais de livraison négatifs ne sont ni calculés ni enregistrés', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        frais_livraison: -5000,
+        lignes: [{ designation: 'Livraison invalide', quantite: 1, prix_unitaire: 10000, tva: 0 }]
+      });
+
+    assert.equal(res.status, 201, res.text);
+    assert.equal(Number(res.body.facture.frais_livraison), 0);
+    assert.equal(Number(res.body.facture.total), 10000);
+  });
+
   test('une remise supérieure au sous-total est plafonnée (pas de base imposable négative)', async () => {
     const res = await request(app)
       .post('/api/factures')
@@ -275,6 +291,34 @@ describe('Factures : calcul et numérotation', () => {
       .send({ montant: 1000, methode: 'Espèces' });
     assert.equal(paiementValide.status, 201);
     assert.equal(paiementValide.body.facture.statut, 'payee');
+  });
+
+  test('un montant de paiement est arrondi au centime avant insertion et solde', async () => {
+    const facture = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Arrondi', quantite: 1, prix_unitaire: 100, tva: 0 }] });
+    assert.equal(facture.status, 201);
+
+    const tooSmall = await request(app)
+      .post(`/api/factures/${facture.body.facture.id}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 0.004, methode: 'Espèces' });
+    assert.equal(tooSmall.status, 400);
+
+    const rounded = await request(app)
+      .post(`/api/factures/${facture.body.facture.id}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 10.005, methode: '  Espèces  ', reference: '  Caisse  ' });
+    assert.equal(rounded.status, 201, rounded.text);
+    assert.equal(Number(rounded.body.facture.montant_paye), 10.01);
+
+    const detail = await request(app)
+      .get(`/api/factures/${facture.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(detail.status, 200);
+    assert.equal(Number(detail.body.paiements[0].montant), 10.01);
+    assert.equal(detail.body.paiements[0].methode, 'Espèces');
   });
 
   test('plusieurs paiements partiels simultanés sur la même facture ne se perdent jamais (correction de la race condition sur le solde)', async () => {
