@@ -2,8 +2,9 @@ const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const crypto = require('crypto');
-const { pool } = require('../config/db');
 const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+// setup.js définit DB_NAME=TEST_DB_NAME avant le chargement du pool MySQL.
+const { pool } = require('../config/db');
 
 describe('Authentification', () => {
   let userId;
