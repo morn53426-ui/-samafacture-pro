@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
 const { computeTotals, insererLignesFacture } = require('./factures');
+const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -213,7 +214,15 @@ router.post('/:id/generer', async (req, res, next) => {
     const facture = await genererFactureDepuisModele(req.params.id, req.tenantId);
     if (!facture) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
     res.status(201).json({ facture });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err?.code === 'QUOTA_DEPASSE') {
+      return res.status(403).json({
+        error: err.message,
+        code: 'QUOTA_DEPASSE'
+      });
+    }
+    next(err);
+  }
 });
 
 /**
@@ -235,6 +244,17 @@ async function genererFactureDepuisModele(id, userId) {
     if (!modele) {
       await conn.rollback();
       return null;
+    }
+
+    // Une facture issue d'un modèle récurrent consomme la même unité mensuelle
+    // qu'une facture créée manuellement. En cas de quota atteint, la transaction est
+    // annulée et la prochaine échéance reste inchangée pour permettre une reprise après
+    // le renouvellement du mois ou le passage à un plan payant.
+    const quota = await reserveMonthlyInvoiceQuota(conn, userId);
+    if (!quota.allowed) {
+      const error = new Error(`Le plan Gratuit est limité à ${quota.limit} factures par mois.`);
+      error.code = 'QUOTA_DEPASSE';
+      throw error;
     }
 
     const lignes = JSON.parse(modele.lignes_json);
