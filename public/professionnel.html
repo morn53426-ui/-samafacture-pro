@@ -381,6 +381,10 @@ async function loadWorkspace() {
     select.innerHTML = '<option value="">Mon espace personnel</option>' + (companies.entreprises || []).map(c => '<option value="' + c.id + '">' + escapeHtml(c.entreprise_nom || c.nom || ('Entreprise ' + c.id)) + ' · ' + escapeHtml(c.role) + '</option>').join('');
     select.value = previous;
   } catch (err) {
+    if (String(err.message || '').includes('Vous ne faites pas partie de cette entreprise') && localStorage.getItem('sf_company_owner')) {
+      localStorage.removeItem('sf_company_owner');
+      return loadWorkspace();
+    }
     showFatalError(err.message);
   }
 }
