@@ -35,6 +35,10 @@ function factureDeTest(overrides = {}) {
     client_email: 'client@test.sn',
     date_emission: '2026-08-01',
     date_echeance: '2026-08-31',
+    date_validite: '2026-08-15',
+    objet: 'Installation informatique',
+    reference_externe: 'BC-2026-014',
+    conditions_reglement: 'Acompte de 30 % à la commande.',
     statut: 'en_attente',
     sous_total: 100000,
     total_tva: 18000,
@@ -55,6 +59,13 @@ function userDeTest(overrides = {}) {
     entreprise_adresse: 'Dakar, Sénégal',
     entreprise_telephone: '+221 33 000 00 00',
     entreprise_email: 'contact@entreprise-test.sn',
+    entreprise_ninea: '123456789',
+    entreprise_rccm: 'SN-DKR-2026-B-1234',
+    entreprise_site_web: 'https://entreprise-test.sn',
+    entreprise_banque: 'Banque de Test',
+    entreprise_rib: 'SN00 1111 2222 3333',
+    entreprise_conditions_reglement: 'Paiement à 30 jours.',
+    entreprise_mentions_legales: 'SARL au capital de 1 000 000 FCFA.',
     entreprise_logo: null,
     signature_default: null,
     ...overrides
@@ -82,6 +93,15 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       assert.ok(html && html.length > 200, 'le HTML généré ne doit pas être vide');
       assert.match(html, /FA-2026-0042/, 'le numéro de facture doit apparaître');
       assert.match(html, /Client Test SARL/, 'le nom du client doit apparaître');
+      assert.match(html, /Installation informatique/, 'l’objet du document doit apparaître');
+      assert.match(html, /BC-2026-014/, 'la référence client doit apparaître');
+      assert.match(html, /Prix unitaire HT/, 'le prix unitaire doit être identifié comme HT');
+      assert.match(html, /Montant TTC/, 'le total de ligne doit être identifié comme TTC');
+      assert.match(html, /Reste à payer/, 'le solde restant dû doit apparaître');
+      assert.match(html, /Détail de la TVA par taux/, 'les taux de TVA multiples doivent être détaillés');
+      assert.match(html, /SN-DKR-2026-B-1234/, 'le RCCM de l’entreprise doit apparaître');
+      assert.match(html, /Banque de Test/, 'les coordonnées bancaires doivent apparaître');
+      assert.match(html, /Acompte de 30 % à la commande/, 'les conditions du document doivent apparaître');
       assert.doesNotMatch(html, /undefined|NaN/, 'aucune valeur non définie ne doit fuiter dans le HTML');
     });
 
@@ -93,9 +113,31 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       });
       assert.ok(html && html.length > 200);
       assert.match(html, /DV-2026-0007/);
+      assert.match(html, /Devis valable jusqu’au/, 'la date de validité du devis doit apparaître');
+      assert.match(html, /Bon pour accord/, 'le devis doit proposer une zone d’acceptation');
+      assert.match(html, /Signature et cachet/, 'la zone d’acceptation doit prévoir une signature client');
+      assert.doesNotMatch(html, /Reste à payer/, 'un devis ne doit pas afficher un solde à payer');
       assert.doesNotMatch(html, /undefined|NaN/);
     });
   }
+
+  test('les données personnalisées sont échappées et les compléments optionnels restent facultatifs', () => {
+    const html = templates.renderInvoiceHtml({
+      user: userDeTest({
+        entreprise_rccm: null, entreprise_banque: null, entreprise_rib: null,
+        entreprise_conditions_reglement: null, entreprise_mentions_legales: null
+      }),
+      facture: factureDeTest({
+        objet: '<img src=x onerror=alert(1)>',
+        reference_externe: null,
+        conditions_reglement: null
+      }),
+      lignes: lignesDeTest, isDevis: false, qrCode: null, template: 'classique'
+    });
+    assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+    assert.doesNotMatch(html, /<img src=x onerror/);
+    assert.doesNotMatch(html, /undefined|NaN/);
+  });
 
   test('un identifiant de modèle inconnu retombe sur le modèle "classique" (comportement déjà existant, non modifié)', () => {
     const html = templates.renderInvoiceHtml({
