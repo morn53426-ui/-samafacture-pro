@@ -23,7 +23,7 @@
         <h1>Factures</h1>
         <p>Suivez le statut de toutes vos factures</p>
       </div>
-      <a href="nouvelle-facture.html" class="btn btn-primary">+ Nouvelle facture</a>
+      <a href="nouvelle-facture.html" class="btn btn-primary"><span class="ic">${Icon('plus')}</span> Nouvelle facture</a>
     </div>
 
     <div style="display:flex; gap:8px; margin-bottom:16px;">
@@ -112,11 +112,11 @@
         <td class="mono">${formatMontant(f.total)}</td>
         <td>${statutBadge(f.statut)}</td>
         <td style="text-align:right; white-space:nowrap;" onclick="event.stopPropagation();">
-          ${f.statut !== 'payee' ? `<button class="btn btn-sm btn-outline" onclick="openPayModal(${f.id})">Encaisser</button>` : ''}
-          <button class="btn btn-sm btn-outline" onclick="printFacture(${f.id})">Imprimer</button>
+          ${f.statut !== 'payee' ? `<button class="btn btn-sm btn-outline" onclick="openPayModal(${f.id})">${Icon('credit-card')} Encaisser</button>` : ''}
+          <button class="btn btn-sm btn-outline" onclick="printFacture(${f.id})">${Icon('printer')} Imprimer</button>
           <button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))}, "envoyer")'>Envoyer</button>
           ${f.statut === 'en_attente' || f.statut === 'en_retard' ? `<button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))}, "relancer")'>Relancer</button>` : ''}
-          <button class="btn btn-sm btn-outline" onclick="dupliquerFacture(${f.id})">Dupliquer</button>
+          <button class="btn btn-sm btn-outline" onclick="dupliquerFacture(${f.id})">${Icon('copy')} Dupliquer</button>
         </td>
       </tr>
     `).join('') : `<tr><td colspan="7"><div class="empty-state"><div class="ic">${Icon('file-text')}</div>Aucune facture pour l'instant</div></td></tr>`;
