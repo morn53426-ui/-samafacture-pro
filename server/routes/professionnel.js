@@ -716,7 +716,7 @@ router.post('/integrations/webhooks', async (req, res, next) => {
     const url = String(req.body.url || '').trim();
     let parsed;
     try { parsed = new URL(url); } catch (_) { return res.status(400).json({ error: 'URL de webhook invalide.' }); }
-    if (!['https:'].includes(parsed.protocol) && process.env.NODE_ENV === 'production') return res.status(400).json({ error: 'Les webhooks doivent utiliser HTTPS en production.' });
+    if (parsed.protocol !== 'https:' || (parsed.port && parsed.port !== '443')) return res.status(400).json({ error: 'Les webhooks doivent utiliser HTTPS sur le port standard.' });
     const host = parsed.hostname.toLowerCase();
     const literalIp = net.isIP(host);
     const privateIpv4 = literalIp === 4 && (/^(10|127|0)\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host));
