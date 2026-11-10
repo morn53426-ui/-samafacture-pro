@@ -7,12 +7,12 @@
 # Le contexte doit inclure les deux dossiers, car server/app.js sert le frontend statique
 # depuis ../public (chemin relatif à server/, voir express.static(PUBLIC_DIR) dans app.js).
 #
-# Basée sur node:20-bookworm-slim (pas "alpine") : Puppeteer a besoin de Chromium et de
+# Basée sur node:24-bookworm-slim (pas "alpine") : Puppeteer a besoin de Chromium et de
 # ses bibliothèques système (libnss3, libatk, etc.), disponibles en paquets .deb standards
 # mais pas toujours compatibles/simples à installer sous Alpine (musl) — c'est le choix
 # recommandé par la documentation officielle de Puppeteer pour un déploiement Docker fiable.
 # ---------------------------------------------------------------------------
-FROM node:20-bookworm-slim
+FROM node:24-bookworm-slim
 
 # Dépendances système requises par Chromium (Puppeteer, génération PDF — voir
 # server/utils/pdf.js) + mysqldump (sauvegarde automatique quotidienne — voir
@@ -35,12 +35,10 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /app
 
-# Manifestes npm copiés seuls d'abord, pour profiter du cache Docker. Si un lockfile est
-# fourni, npm ci garantit des installations reproductibles ; sinon npm install permet au projet
-# de rester buildable (le dépôt actuel ne contient pas encore de package-lock.json).
-COPY server/package*.json ./server/
-ARG REQUIRE_LOCKFILE=false
-RUN cd server && if [ -f package-lock.json ]; then npm ci --omit=dev; elif [ "$REQUIRE_LOCKFILE" = "true" ]; then echo "ERREUR: server/package-lock.json requis pour ce build" >&2; exit 1; else npm install --omit=dev --no-audit --no-fund; fi
+# Le lockfile est obligatoire en production : npm ci garantit que chaque image est
+# construite avec exactement les versions validées par le dépôt.
+COPY server/package.json server/package-lock.json ./server/
+RUN cd server && npm ci --omit=dev --no-audit --no-fund
 
 # Code serveur, puis frontend statique (servi par Express depuis ../public — voir app.js).
 COPY server ./server
