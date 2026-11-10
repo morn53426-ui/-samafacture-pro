@@ -2,6 +2,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { pipeline } = require('node:stream/promises');
 const { pool } = require('./db');
 const { captureException } = require('./monitoring');
 
@@ -42,49 +43,64 @@ async function reclamerSauvegardeDuJour() {
   }
 }
 
-/** Lance mysqldump et compresse directement le résultat en .sql.gz, sans fichier intermédiaire. */
-function runMysqldump(outputPath) {
-  return new Promise((resolve, reject) => {
-    const bin = process.env.MYSQLDUMP_PATH || 'mysqldump';
-    const args = [
-      `--host=${process.env.DB_HOST || 'localhost'}`,
-      `--port=${process.env.DB_PORT || 3306}`,
-      `--user=${process.env.DB_USER || 'root'}`,
-      '--single-transaction', // évite de verrouper les tables pendant la sauvegarde
-      '--routines',
-      '--events',
-      process.env.DB_NAME || 'samafacture'
-    ];
-    // Le mot de passe passe par une variable d'environnement plutôt qu'en argument de
-    // ligne de commande, pour ne pas apparaître dans la liste des processus système.
-    const env = { ...process.env, MYSQL_PWD: process.env.DB_PASSWORD || '' };
+/** Lance mysqldump et attend à la fois sa sortie et son code de terminaison. */
+async function runMysqldump(outputPath, spawnCommand = spawn) {
+  const bin = process.env.MYSQLDUMP_PATH || 'mysqldump';
+  const args = [
+    `--host=${process.env.DB_HOST || 'localhost'}`,
+    `--port=${process.env.DB_PORT || 3306}`,
+    `--user=${process.env.DB_USER || 'root'}`,
+    '--single-transaction',
+    '--routines',
+    '--events',
+    process.env.DB_NAME || 'samafacture'
+  ];
+  // Le mot de passe passe par une variable d'environnement plutôt qu'en argument de
+  // ligne de commande, pour ne pas apparaître dans la liste des processus système.
+  const env = { ...process.env, MYSQL_PWD: process.env.DB_PASSWORD || '' };
 
-    let dump;
-    try {
-      dump = spawn(bin, args, { env });
-    } catch (err) {
-      return reject(new Error(`Impossible de lancer mysqldump (${bin}) : ${err.message}`));
-    }
+  let dump;
+  try {
+    dump = spawnCommand(bin, args, { env });
+  } catch (err) {
+    throw new Error(`Impossible de lancer mysqldump ("${bin}") : ${err.message}`);
+  }
 
-    const gzip = zlib.createGzip();
-    const out = fs.createWriteStream(outputPath);
-    let stderr = '';
+  let stderr = '';
+  dump.stderr.on('data', (chunk) => {
+    stderr += chunk.toString();
+    if (stderr.length > 5000) stderr = stderr.slice(-5000);
+  });
 
-    dump.on('error', (err) => {
+  // Le flux peut se terminer avant l'événement "close" du processus. Attendre les deux
+  // évite de déclarer la sauvegarde réussie si mysqldump termine finalement avec un code != 0.
+  const processClosed = new Promise((resolve, reject) => {
+    dump.once('error', (err) => {
       reject(new Error(
-        `Impossible de lancer mysqldump ("${bin}"). Vérifiez MYSQLDUMP_PATH dans .env — ` +
-        `sous WAMPserver, il se trouve généralement dans wamp64\\bin\\mysql\\mysqlX.X.X\\bin\\mysqldump.exe. (${err.message})`
+        `Impossible de lancer mysqldump ("${bin}"). Vérifiez MYSQLDUMP_PATH dans .env. (${err.message})`
       ));
     });
-    dump.stderr.on('data', (d) => { stderr += d.toString(); });
-    dump.stdout.pipe(gzip).pipe(out);
-
-    out.on('finish', resolve);
-    out.on('error', reject);
-    dump.on('close', (code) => {
-      if (code !== 0) reject(new Error(`mysqldump a échoué (code ${code}) : ${stderr.slice(0, 500)}`));
+    dump.once('close', (code, signal) => {
+      if (code === 0) return resolve();
+      reject(new Error(
+        `mysqldump a échoué (code ${code}${signal ? `, signal ${signal}` : ''}) : ${stderr.slice(-500)}`
+      ));
     });
   });
+
+  const outputFinished = pipeline(
+    dump.stdout,
+    zlib.createGzip(),
+    fs.createWriteStream(outputPath, { flags: 'wx' })
+  );
+
+  try {
+    await Promise.all([processClosed, outputFinished]);
+  } catch (err) {
+    if (typeof dump.kill === 'function' && !dump.killed) dump.kill();
+    await Promise.allSettled([processClosed, outputFinished]);
+    throw err;
+  }
 }
 
 /** Supprime les sauvegardes plus anciennes que BACKUP_RETENTION_DAYS (14 jours par défaut). */
@@ -104,32 +120,82 @@ async function nettoyerAnciennesSauvegardes() {
   }
 }
 
-/** Effectue une sauvegarde immédiatement (utilisé par le planificateur et par le CLI manuel). */
+/** Effectue une sauvegarde et renvoie un booléen exploitable par le planificateur/CLI. */
 async function effectuerSauvegarde() {
   await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
   const horodatage = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const fichier = path.join(BACKUP_DIR, `samafacture-${horodatage}.sql.gz`);
+  const fichierTemporaire = `${fichier}.tmp`;
 
   try {
-    await runMysqldump(fichier);
+    // Le nom définitif n'apparaît qu'après un dump complet et un renommage atomique.
+    await runMysqldump(fichierTemporaire);
+    await fs.promises.rename(fichierTemporaire, fichier);
     const { size } = await fs.promises.stat(fichier);
     console.log(`💾 Sauvegarde de la base effectuée : ${fichier} (${(size / 1024).toFixed(0)} Ko)`);
-    await nettoyerAnciennesSauvegardes();
+
+    // Un échec du nettoyage ne doit pas invalider ni supprimer une sauvegarde déjà complète.
+    try {
+      await nettoyerAnciennesSauvegardes();
+    } catch (cleanupError) {
+      console.error('⚠️ Sauvegarde réussie, mais le nettoyage des anciennes archives a échoué :', cleanupError.message);
+      captureException(cleanupError);
+    }
+    return true;
   } catch (err) {
     console.error('⚠️  Échec de la sauvegarde automatique :', err.message);
-    // Remonté à Sentry (si configuré) : un échec de sauvegarde qui passe inaperçu pendant
-    // plusieurs jours est le genre de problème silencieux qu'une simple ligne de log ne
-    // suffit pas à signaler en production.
     captureException(err);
-    await fs.promises.unlink(fichier).catch(() => {}); // retire un fichier vide/partiel
+    await fs.promises.unlink(fichierTemporaire).catch(() => {});
+    return false;
   }
 }
 
 /**
- * Vérifie une fois par heure s'il faut lancer la sauvegarde du jour. Sûr en mode cluster
- * (voir reclamerSauvegardeDuJour) et tolérant aux redémarrages : si le serveur était
- * éteint à l'heure cible, la sauvegarde se déclenche dès la prochaine vérification tant
- * qu'elle n'a pas encore eu lieu ce jour-là.
+ * Exécute la sauvegarde quotidienne sous verrou MySQL partagé entre les processus et
+ * conteneurs. La date n'est enregistrée QU'APRÈS une archive réussie ; une panne ou un
+ * redémarrage libère le verrou et permet un nouvel essai à la vérification suivante.
+ */
+async function executerSauvegardeQuotidienne() {
+  const conn = await pool.getConnection();
+  let lockAcquired = false;
+  try {
+    const [[lockRow]] = await conn.query(
+      "SELECT GET_LOCK('samafacture_backup_daily', 0) AS acquired"
+    );
+    if (Number(lockRow?.acquired) !== 1) return false;
+    lockAcquired = true;
+
+    const [[row]] = await conn.query(
+      'SELECT derniere_sauvegarde FROM backup_meta WHERE id = 1'
+    );
+    const dateDuJour = new Date().toISOString().slice(0, 10);
+    if (String(row?.derniere_sauvegarde ?? '').slice(0, 10) === dateDuJour) {
+      return false;
+    }
+
+    const sauvegardeReussie = await effectuerSauvegarde();
+    if (!sauvegardeReussie) return false;
+
+    await conn.query(
+      'UPDATE backup_meta SET derniere_sauvegarde = ? WHERE id = 1',
+      [dateDuJour]
+    );
+    return true;
+  } finally {
+    if (lockAcquired) {
+      try {
+        await conn.query("SELECT RELEASE_LOCK('samafacture_backup_daily')");
+      } catch (releaseError) {
+        console.error('Impossible de libérer le verrou de sauvegarde :', releaseError.message);
+      }
+    }
+    conn.release();
+  }
+}
+
+/**
+ * Vérifie une fois par heure s'il faut lancer la sauvegarde du jour. En cas d'échec,
+ * la date n'est pas marquée : l'exécution suivante réessaie automatiquement.
  */
 function startBackupScheduler() {
   if (!isBackupEnabled()) {
@@ -137,23 +203,23 @@ function startBackupScheduler() {
     return;
   }
 
-  const heureCible = Number(process.env.BACKUP_HOUR ?? 2); // 2h du matin par défaut (faible activité)
+  const heureCible = Number(process.env.BACKUP_HOUR ?? 2); // 2h du matin par défaut
 
-  async function verifier() {
-    if (new Date().getHours() < heureCible) return;
+  async function verifier(immediate = false) {
+    if (!immediate && new Date().getHours() < heureCible) return;
     try {
-      const doitSauvegarder = await reclamerSauvegardeDuJour();
-      if (doitSauvegarder) await effectuerSauvegarde();
+      await executerSauvegardeQuotidienne();
     } catch (err) {
       console.error('⚠️  Erreur lors de la vérification de sauvegarde :', err.message);
       captureException(err);
     }
   }
 
-  if (process.env.BACKUP_ON_STARTUP === 'true') effectuerSauvegarde();
-  verifier();
-  const timer = setInterval(verifier, 60 * 60 * 1000); // vérifie toutes les heures
-  timer.unref(); // ne bloque pas l'arrêt propre du serveur
+  // BACKUP_ON_STARTUP lance une vérification immédiate, sans créer un doublon si
+  // une sauvegarde valide a déjà été faite aujourd'hui sur une autre instance.
+  verifier(process.env.BACKUP_ON_STARTUP === 'true');
+  const timer = setInterval(() => verifier(false), 60 * 60 * 1000);
+  timer.unref();
 }
 
-module.exports = { startBackupScheduler, effectuerSauvegarde, BACKUP_DIR };
+module.exports = { startBackupScheduler, effectuerSauvegarde, executerSauvegardeQuotidienne, runMysqldump, BACKUP_DIR };
