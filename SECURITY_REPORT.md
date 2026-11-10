@@ -38,9 +38,15 @@ la dépendance `cookie-parser` : le besoin est limité à la lecture du cookie `
 projet dispose maintenant d'un `server/package-lock.json` utilisé pour les installations
 reproductibles.
 
-Une route `POST /auth/logout` a été ajoutée pour effacer ce cookie ; `Api.clearSession()`
-(`public/js/api.js`) l'appelle désormais en tâche de fond (best-effort, non bloquant — la
-déconnexion locale immédiate, elle, ne dépend jamais du réseau).
+La déconnexion `POST /auth/logout` exige maintenant une session valide et incrémente
+`users.token_version`. Le middleware compare cette version à celle inscrite dans chaque JWT :
+les jetons Bearer et cookie émis avant la déconnexion deviennent donc invalides à la prochaine
+requête. `Api.clearSession()` capture et transmet le jeton avant de vider `localStorage`, puis
+termine immédiatement la déconnexion locale, même si le réseau est indisponible.
+
+La réinitialisation de mot de passe incrémente aussi `token_version` et consomme le lien de
+réinitialisation dans une mise à jour conditionnelle atomique. Les autres sessions sont ainsi
+révoquées et un même lien ne peut pas être utilisé deux fois.
 
 ### Protection CSRF ajoutée en même temps, pas après
 Un cookie envoyé automatiquement par le navigateur sur toute requête — y compris déclenchée depuis
@@ -91,8 +97,9 @@ La branche d'audit en cours ajoute des tests de sauvegarde supplémentaires qui 
 
 ## 5. Ce qui n'a pas été touché dans cette phase
 
-- Le stockage `localStorage` côté frontend reste la méthode active aujourd'hui — c'est
-  volontairement une migration *progressive* : rien n'oblige encore à en dépendre.
+- Le stockage `localStorage` côté frontend reste la méthode active aujourd'hui — la version
+  de session est vérifiée côté serveur pour qu'un jeton volé ne reste pas accepté après
+  déconnexion ou réinitialisation du mot de passe.
 - Les réponses API qui retournent des objets complets (`SELECT *`) doivent continuer à être
 revues pour limiter les champs exposés ; `sanitizeUser()` retire déjà les champs internes du
 compte, dont `reset_token_hash`.
