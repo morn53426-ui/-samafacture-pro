@@ -927,18 +927,40 @@ router.post('/:id/relancer', async (req, res, next) => {
  *     responses:
  *       200: { description: "Supprimé." }
  *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Une facture avec règlement ou marquée payée ne peut pas être supprimée." }
  */
 router.delete('/:id', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
-    const existing = existingRows[0];
-    if (!existing) { conn.release(); return res.status(404).json({ error: 'Facture introuvable.' }); }
-
     await conn.beginTransaction();
+    // Verrouille la facture avant de vérifier ses paiements : une suppression et un
+    // encaissement concurrents ne peuvent ainsi pas se valider tous les deux.
+    const [existingRows] = await conn.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
+    const existing = existingRows[0];
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture introuvable.' });
+    }
+
+    const [paymentRows] = await conn.query(
+      'SELECT id FROM paiements WHERE facture_id = ? AND user_id = ? LIMIT 1 FOR UPDATE',
+      [existing.id, req.tenantId]
+    );
+    // Une suppression en cascade ne doit jamais effacer un règlement, même partiel.
+    // Le statut "payee" est aussi protégé si une ancienne installation n'a pas de ligne
+    // paiements correspondante. Utiliser un avoir/une annulation conserve la piste comptable.
+    if (paymentRows.length || Number(existing.montant_paye) > 0 || existing.statut === 'payee') {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Cette facture possède un règlement ou est marquée comme payée. Conservez sa trace comptable et utilisez un avoir ou une annulation plutôt que de la supprimer.'
+      });
+    }
+
     // Restitue le stock déjà décompté avant de supprimer, sauf si la facture était déjà
-    // annulée (son stock avait alors déjà été restitué par PUT /:id/statut — le restituer
-    // une seconde fois créerait un stock fantôme supérieur à la réalité).
+    // annulée (son stock avait alors déjà été restitué par PUT /:id/statut).
     if (existing.type === 'facture' && existing.statut !== 'annulee') {
       await ajusterStockFacture(conn, existing.id, req.tenantId, +1);
     }
@@ -946,14 +968,14 @@ router.delete('/:id', async (req, res, next) => {
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    try { await conn.rollback(); } catch (_) {}
     next(err);
   } finally {
     conn.release();
   }
 });
 
-// --- Paiements liés à une facture ---
+//// --- Paiements liés à une facture ---
 /**
  * @openapi
  * /factures/{id}/paiements:
