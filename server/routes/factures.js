@@ -352,18 +352,28 @@ router.post('/', async (req, res, next) => {
     const referenceDocument = optionalText(reference_externe, 100);
     const conditionsDocument = optionalText(conditions_reglement, 5000);
 
-    // Quota du plan gratuit : 10 factures par mois (les devis restent illimités sur tous les
-    // plans). On relit le plan depuis la base plutôt que le jeton JWT, pour qu'un changement
-    // de plan prenne effet immédiatement sans attendre l'expiration de la session.
+    const { computedLignes, sous_total, total_tva, total, remise: remiseAppliquee } = computeTotals(lignes, remise, frais_livraison);
+    // Code court utilisé pour la vérification publique de la facture (via QR code) : évite
+    // qu'un tiers puisse deviner l'URL de vérification d'une autre facture en changeant l'id.
+    const verificationCode = crypto.randomBytes(5).toString('hex');
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // Verrouille le compte pendant le contrôle du quota : deux créations simultanées
+    // ne peuvent plus lire le même compteur et dépasser la limite du plan Gratuit.
     if (docType === 'facture') {
-      const [[userRow]] = await pool.query('SELECT plan FROM users WHERE id = ?', [req.tenantId]);
+      const [[userRow]] = await conn.query('SELECT plan FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
       if (!isPaidPlan(userRow?.plan)) {
-        const [[{ n: countThisMonth }]] = await pool.query(
-          `SELECT COUNT(*) as n FROM factures
-           WHERE user_id = ? AND type = 'facture' AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')`,
+        const [[{ n: countThisMonth }]] = await conn.query(
+          `SELECT COUNT(*) AS n FROM factures
+           WHERE user_id = ? AND type = 'facture'
+             AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')
+             AND created_at < DATE_ADD(DATE_FORMAT(NOW(), '%Y-%m-01'), INTERVAL 1 MONTH)`,
           [req.tenantId]
         );
-        if (countThisMonth >= FREE_MONTHLY_INVOICE_LIMIT) {
+        if (Number(countThisMonth) >= FREE_MONTHLY_INVOICE_LIMIT) {
+          await conn.rollback();
           notifierUtilisateur(req.tenantId, 'alerte_quota', {
             message: `Vous avez atteint la limite de ${FREE_MONTHLY_INVOICE_LIMIT} factures du plan Gratuit ce mois-ci.`
           });
@@ -375,13 +385,6 @@ router.post('/', async (req, res, next) => {
       }
     }
 
-    const { computedLignes, sous_total, total_tva, total, remise: remiseAppliquee } = computeTotals(lignes, remise, frais_livraison);
-    // Code court utilisé pour la vérification publique de la facture (via QR code) : évite
-    // qu'un tiers puisse deviner l'URL de vérification d'une autre facture en changeant l'id.
-    const verificationCode = crypto.randomBytes(5).toString('hex');
-
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
     const numero = await nextNumero(conn, req.tenantId, docType);
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
