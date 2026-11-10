@@ -129,6 +129,15 @@ describe('Authentification', () => {
     assert.equal(savedAgain.body.user.entreprise_rib, payload.entreprise_rib);
   });
 
+  test('la route de déconnexion efface aussi le cookie si le jeton présenté est invalide', async () => {
+    const response = await request(app)
+      .post('/api/auth/logout')
+      .set('Authorization', 'Bearer jeton-expire-ou-invalide');
+    assert.equal(response.status, 401);
+    const cookies = response.headers['set-cookie'] || [];
+    assert.ok(cookies.some(value => value.startsWith('sf_token=;')), 'le cookie doit être effacé même si le JWT est invalide');
+  });
+
   test('la déconnexion révoque le JWT Bearer utilisé, pas seulement le cookie', async () => {
     const login = await request(app).post('/api/auth/login').send({ email, password });
     assert.equal(login.status, 200);
