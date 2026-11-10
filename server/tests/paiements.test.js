@@ -204,7 +204,7 @@ describe("Paiements d'abonnement", () => {
 });
 
 describe("Paiements de facture : idempotence HTTP", () => {
-  let userId, token, clientId, factureId;
+  let userId, token, clientId, factureId, devisId, factureAnnuleeId;
 
   before(async () => {
     await setupTestDatabase();
@@ -229,9 +229,51 @@ describe("Paiements de facture : idempotence HTTP", () => {
       .set('Authorization', `Bearer ${token}`);
     assert.ok([200, 201].includes(converted.status));
     factureId = converted.body.facture.id;
+
+    const devis = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'devis', lignes: [{ designation: 'Devis non encaissable', quantite: 1, prix_unitaire: 2500, tva: 0 }] });
+    assert.equal(devis.status, 201, devis.text);
+    devisId = devis.body.facture.id;
+
+    const annulee = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Facture annulée', quantite: 1, prix_unitaire: 3000, tva: 0 }] });
+    assert.equal(annulee.status, 201, annulee.text);
+    factureAnnuleeId = annulee.body.facture.id;
+
+    const cancellation = await request(app)
+      .put(`/api/factures/${factureAnnuleeId}/statut`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ statut: 'annulee' });
+    assert.equal(cancellation.status, 200, cancellation.text);
   });
 
   after(async () => { await nettoyerUtilisateur(userId); });
+
+  test('un devis et une facture annulée refusent tout nouveau paiement', async () => {
+    const quotePayment = await request(app)
+      .post(`/api/factures/${devisId}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 1000, methode: 'espèces' });
+    assert.equal(quotePayment.status, 409, quotePayment.text);
+    assert.match(quotePayment.body.error, /devis/i);
+
+    const cancelledPayment = await request(app)
+      .post(`/api/factures/${factureAnnuleeId}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 1000, methode: 'espèces' });
+    assert.equal(cancelledPayment.status, 409, cancelledPayment.text);
+    assert.match(cancelledPayment.body.error, /annulée/i);
+
+    const [[counts]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM paiements WHERE user_id = ? AND facture_id IN (?, ?)',
+      [userId, devisId, factureAnnuleeId]
+    );
+    assert.equal(Number(counts.total), 0, 'aucun paiement ne doit être écrit pour le devis ou la facture annulée');
+  });
 
   test('deux requêtes concurrentes avec la même Idempotency-Key n enregistrent qu un paiement', async () => {
     const key = `idem-${Date.now()}-payment`;
