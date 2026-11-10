@@ -73,30 +73,30 @@ async function insererLignesFacture(conn, factureId, lignes) {
 }
 
 function computeTotals(lignes, remise, frais_livraison) {
-  // 1) HT brut de chaque ligne (avant remise globale)
+  // MySQL stocke quantité, prix unitaire et TVA avec deux décimales. Normaliser AVANT
+  // les calculs garantit que le total correspond aux valeurs qui seront réellement stockées.
   const brutLignes = lignes.map((l) => {
-    const qte = positiveNumber(l.quantite, 0);
-    const pu = positiveNumber(l.prix_unitaire, 0);
-    const tvaRate = percentage(l.tva, 0);
-    return { ...l, quantite: qte, prix_unitaire: pu, tva: tvaRate, ligneHT: qte * pu };
+    const qte = round2(positiveNumber(l.quantite, 0));
+    const pu = round2(positiveNumber(l.prix_unitaire, 0));
+    const tvaRate = round2(percentage(l.tva, 0));
+    return { ...l, quantite: qte, prix_unitaire: pu, tva: tvaRate, ligneHT: round2(qte * pu) };
   });
 
-  const sous_total = brutLignes.reduce((s, l) => s + l.ligneHT, 0);
-  const livraisonVal = positiveNumber(frais_livraison, 0);
-  // La remise ne peut pas dépasser le sous-total (évite une base imposable négative)
-  const remiseVal = Math.min(positiveNumber(remise, 0), sous_total);
+  // Le sous-total persisté est DECIMAL(14,2) : il est arrondi avant remise et total TTC.
+  const sous_total = round2(brutLignes.reduce((s, l) => s + l.ligneHT, 0));
+  const livraisonVal = round2(positiveNumber(frais_livraison, 0));
+  // La remise ne peut pas dépasser le sous-total (évite une base imposable négative).
+  const remiseVal = round2(Math.min(positiveNumber(remise, 0), sous_total));
 
-  // 2) La remise réduit la base imposable AVANT calcul de la TVA, répartie au prorata de chaque ligne.
-  //    C'est cette base nette qui sert à calculer la TVA réellement due — sinon la TVA affichée
-  //    resterait calculée sur un montant que le client ne paie plus.
+  // La remise réduit la base imposable AVANT calcul de la TVA, répartie au prorata de chaque ligne.
   let total_tva = 0;
   const computedLignes = brutLignes.map((l) => {
     const ratio = sous_total > 0 ? l.ligneHT / sous_total : 0;
     const ligneHT_net = l.ligneHT - remiseVal * ratio;
     const ligneTVA = ligneHT_net * (l.tva / 100);
     total_tva += ligneTVA;
-    // Le total affiché par ligne reste le montant brut (qté × prix × (1+TVA%)) : la remise globale
-    // et son effet sur la TVA sont reflétés séparément dans le récapitulatif de la facture.
+    // Le total affiché par ligne reste le montant brut (qté × prix × (1+TVA%)).
+    // La remise globale et son effet sur la TVA figurent séparément dans le récapitulatif.
     const total_ligne = round2(l.ligneHT + l.ligneHT * (l.tva / 100));
     return { ...l, total_ligne };
   });
