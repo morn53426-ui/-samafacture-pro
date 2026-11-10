@@ -324,6 +324,27 @@ describe("Paiements de facture : idempotence HTTP", () => {
     assert.equal(Number(n), 1);
     const [[facture]] = await pool.query('SELECT montant_paye FROM factures WHERE id = ? AND user_id = ?', [factureId, userId]);
     assert.equal(Number(facture.montant_paye), 1000);
+
+    const otherInvoiceResponse = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Autre facture', quantite: 1, prix_unitaire: 3000, tva: 0 }] });
+    assert.equal(otherInvoiceResponse.status, 201, otherInvoiceResponse.text);
+    const otherInvoiceId = otherInvoiceResponse.body.facture.id;
+
+    const reusedOnAnotherInvoice = await request(app)
+      .post(`/api/factures/${otherInvoiceId}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', key)
+      .send(payload);
+    assert.equal(reusedOnAnotherInvoice.status, 409, reusedOnAnotherInvoice.text);
+    assert.equal(reusedOnAnotherInvoice.body.code, 'IDEMPOTENCY_KEY_REUTILISEE');
+
+    const [[otherInvoice]] = await pool.query(
+      'SELECT montant_paye FROM factures WHERE id = ? AND user_id = ?',
+      [otherInvoiceId, userId]
+    );
+    assert.equal(Number(otherInvoice.montant_paye), 0, 'la seconde facture ne doit recevoir aucun paiement');
   });
 });
 
