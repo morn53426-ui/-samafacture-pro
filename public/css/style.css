@@ -2545,3 +2545,118 @@ textarea { line-height: 1.55; }
   .subscription-plan-card,
   .billing-icon-action { transition: none; }
 }
+
+
+/* Création de facture / devis — espace de saisie et récapitulatif */
+.invoice-builder-header {
+  align-items: center;
+}
+.invoice-type-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+.invoice-type-switch label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  margin: 0;
+  padding: 7px 13px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 750;
+  transition: color var(--dur-fast), background var(--dur-fast), box-shadow var(--dur-fast);
+}
+.invoice-type-switch label:has(input:checked) {
+  border-color: var(--line);
+  background: var(--paper);
+  color: var(--emerald);
+  box-shadow: var(--shadow-xs);
+}
+.invoice-type-switch input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+.invoice-type-switch .ic { display: inline-flex; font-size: 1rem; }
+.invoice-builder-grid { align-items: start; }
+.invoice-editor-card { padding: 24px; }
+.invoice-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 18px;
+}
+.invoice-section-heading > .ic {
+  display: grid;
+  flex: 0 0 auto;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--emerald-light);
+  color: var(--emerald);
+  font-size: 1.05rem;
+}
+.invoice-section-heading h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: -0.025em;
+}
+.invoice-section-heading p {
+  margin: 3px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+.invoice-lines-heading {
+  margin-top: 22px;
+  margin-bottom: 12px;
+}
+.invoice-lines-table {
+  min-width: 600px;
+}
+.invoice-lines-table thead th { background: var(--surface-muted); }
+.invoice-summary-card {
+  position: sticky;
+  top: 22px;
+  padding: 22px;
+  border-color: color-mix(in srgb, var(--emerald) 20%, var(--line));
+}
+.invoice-summary-card .invoice-section-heading { margin-bottom: 18px; }
+.invoice-summary-card > div[style*="justify-content:space-between"] {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+.invoice-summary-card #rec-total {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+.invoice-submit-button {
+  min-height: 48px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+}
+@media (max-width: 900px) {
+  .invoice-summary-card { position: static; }
+}
+@media (max-width: 640px) {
+  .invoice-editor-card { padding: 17px; }
+  .invoice-type-switch {
+    display: flex;
+    width: 100%;
+  }
+  .invoice-type-switch label { flex: 1; justify-content: center; }
+  .invoice-summary-card { padding: 18px; }
+  .invoice-lines-table { min-width: 560px; }
+}
