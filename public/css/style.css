@@ -1707,16 +1707,9 @@ textarea { line-height: 1.55; }
 .auth-form-card .auth-form-badge span { color: var(--ink); letter-spacing: 0.045em; }
 
 /* Contraste adapté au thème sombre. */
-:root[data-theme="dark"] .icon-navy,
-:root:not([data-theme="light"]) .icon-navy { background: #26334D; color: #B9C8E8; }
-:root[data-theme="dark"] .lp-feature-card,
-:root:not([data-theme="light"]) .lp-feature-card {
-  background: var(--paper);
-  border-color: var(--line);
-}
-:root[data-theme="dark"] .card:has(> table) thead th,
-:root:not([data-theme="light"]) .card:has(> table) thead th {
-  background: color-mix(in srgb, var(--paper) 84%, var(--ink));
+:root[data-theme="dark"] .icon-navy { background: #26334D; color: #B9C8E8; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .icon-navy { background: #26334D; color: #B9C8E8; }
 }
 
 @media (max-width: 900px) {
