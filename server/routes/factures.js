@@ -284,6 +284,10 @@ router.get('/:id', async (req, res, next) => {
  *               type: { type: string, enum: [facture, devis], default: facture }
  *               date_emission: { type: string, format: date }
  *               date_echeance: { type: string, format: date, nullable: true }
+ *               date_validite: { type: string, format: date, nullable: true, description: 'Date limite de validité, uniquement pour un devis.' }
+ *               objet: { type: string, maxLength: 190, description: 'Objet ou prestation.' }
+ *               reference_externe: { type: string, maxLength: 100, description: 'Référence client ou bon de commande.' }
+ *               conditions_reglement: { type: string, maxLength: 5000, description: 'Conditions spécifiques à ce document.' }
  *               remise: { type: number, default: 0 }
  *               frais_livraison: { type: number, default: 0 }
  *               mode_paiement: { type: string, nullable: true }
