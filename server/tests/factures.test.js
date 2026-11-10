@@ -143,6 +143,58 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(detail.body.facture.reference_externe, 'BC-CLIENT-014');
   });
 
+  test('la conversion d’un devis en facture conserve ses références et supprime la validité du devis', async () => {
+    const quote = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'devis',
+        date_validite: '2026-12-20',
+        objet: 'Déploiement réseau',
+        reference_externe: 'BC-CONVERSION-02',
+        conditions_reglement: 'Paiement à 15 jours.',
+        lignes: [{ designation: 'Installation', quantite: 1, prix_unitaire: 50000, tva: 18 }]
+      });
+    assert.equal(quote.status, 201, quote.text);
+
+    const converted = await request(app)
+      .post(`/api/factures/${quote.body.facture.id}/transformer-en-facture`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(converted.status, 200, converted.text);
+    assert.equal(converted.body.facture.type, 'facture');
+    assert.equal(converted.body.facture.date_validite, null);
+    assert.equal(converted.body.facture.objet, 'Déploiement réseau');
+    assert.equal(converted.body.facture.reference_externe, 'BC-CONVERSION-02');
+    assert.equal(converted.body.facture.conditions_reglement, 'Paiement à 15 jours.');
+  });
+
+  test('la duplication d’un devis copie toutes les références et conditions', async () => {
+    const quote = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'devis',
+        date_validite: '2026-12-22',
+        objet: 'Maintenance annuelle',
+        reference_externe: 'BC-DUP-03',
+        conditions_reglement: 'Offre valable après validation écrite.',
+        lignes: [{ designation: 'Maintenance', quantite: 1, prix_unitaire: 25000, tva: 18 }]
+      });
+    assert.equal(quote.status, 201, quote.text);
+
+    const duplicate = await request(app)
+      .post(`/api/factures/${quote.body.facture.id}/dupliquer`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(duplicate.status, 201, duplicate.text);
+    assert.equal(duplicate.body.facture.type, 'devis');
+    assert.equal(duplicate.body.facture.date_validite, '2026-12-22');
+    assert.equal(duplicate.body.facture.objet, 'Maintenance annuelle');
+    assert.equal(duplicate.body.facture.reference_externe, 'BC-DUP-03');
+    assert.equal(duplicate.body.facture.conditions_reglement, 'Offre valable après validation écrite.');
+  });
+
   test('une date de validité invalide est refusée pour un devis', async () => {
     const res = await request(app)
       .post('/api/factures')
