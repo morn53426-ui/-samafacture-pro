@@ -1,11 +1,12 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber } = require('../utils/validation');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, requirePermission);
 
 /**
  * @openapi
@@ -45,7 +46,7 @@ router.get('/', async (req, res, next) => {
     const { page, limite, offset } = getPagination(req.query, { defaultLimite: 200, maxLimite: 500 });
 
     let whereSql = ' WHERE user_id = ?';
-    const params = [req.user.id];
+    const params = [req.tenantId];
     if (from) { whereSql += ' AND date_depense >= ?'; params.push(from); }
     if (to) { whereSql += ' AND date_depense <= ?'; params.push(to); }
 
@@ -88,7 +89,7 @@ router.post('/', async (req, res, next) => {
 
     const [result] = await pool.query(
       `INSERT INTO depenses (user_id, libelle, montant, categorie, date_depense, notes) VALUES (?, ?, ?, ?, ?, ?)`,
-      [req.user.id, libelle, positiveNumber(montant, 0), categorie || null, date_depense || new Date().toISOString().slice(0, 10), notes || null]
+      [req.tenantId, libelle, positiveNumber(montant, 0), categorie || null, date_depense || new Date().toISOString().slice(0, 10), notes || null]
     );
 
     const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ?', [result.insertId]);
@@ -115,7 +116,7 @@ router.post('/', async (req, res, next) => {
  */
 router.put('/:id', async (req, res, next) => {
   try {
-    const [existingRows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     const existing = existingRows[0];
     if (!existing) return res.status(404).json({ error: 'Dépense introuvable.' });
 
@@ -157,7 +158,7 @@ router.put('/:id', async (req, res, next) => {
  */
 router.delete('/:id', async (req, res, next) => {
   try {
-    const [existingRows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    const [existingRows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
     if (!existingRows.length) return res.status(404).json({ error: 'Dépense introuvable.' });
     await pool.query('DELETE FROM depenses WHERE id = ?', [existingRows[0].id]);
     res.json({ success: true });
