@@ -727,29 +727,53 @@ router.put('/photo', requireAuth, async (req, res, next) => {
  * @openapi
  * /auth/donnees:
  *   delete:
- *     summary: Supprime définitivement le compte et toutes ses données (clients, factures, produits...)
- *     description: Action irréversible. Supprime en cascade tout ce qui est lié à l'utilisateur (contraintes ON DELETE CASCADE en base).
+ *     summary: Efface les données opérationnelles du compte sans supprimer le compte utilisateur.
+ *     description: "Action irréversible. Supprime les clients, produits, factures, devis, paiements, dépenses et les données opérationnelles des modules professionnels. Conserve l'identité de l'entreprise, le plan, les membres, les rôles, les clés API, les webhooks et les paramètres du compte."
  *     tags: [Auth]
  *     responses:
- *       200: { description: "Compte et données supprimés." }
+ *       200: { description: "Données opérationnelles supprimées ; compte et paramètres conservés." }
  */
 router.delete('/donnees', requireAuth, async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
+    conn = await pool.getConnection();
     await conn.beginTransaction();
-    // L'ordre respecte les dépendances : factures d'abord (les lignes et paiements
-    // sont supprimés automatiquement via ON DELETE CASCADE), puis clients, produits, dépenses.
-    await conn.query('DELETE FROM factures WHERE user_id = ?', [req.user.id]);
-    await conn.query('DELETE FROM clients WHERE user_id = ?', [req.user.id]);
-    await conn.query('DELETE FROM produits WHERE user_id = ?', [req.user.id]);
-    await conn.query('DELETE FROM depenses WHERE user_id = ?', [req.user.id]);
+    const uid = req.user.id;
+
+    // Nettoyer d'abord les tables qui imposent RESTRICT ou qui contiennent des ressources
+    // rattachées aux factures, paiements, clients et caisses. Les journaux d'audit, les
+    // équipes, les rôles, les intégrations et les clés API sont conservés comme configuration.
+    await conn.query('DELETE FROM pro_refund_requests WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_avoirs WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_acomptes WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_bons_livraison WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_commandes WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_payment_links WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_documents WHERE user_id = ?', [uid]);
+    // Ne pas laisser une ancienne file webhook envoyer après la remise à zéro des ventes.
+    await conn.query('DELETE FROM pro_webhook_deliveries WHERE user_id = ?', [uid]);
+
+    await conn.query('DELETE FROM pro_caisse_operations WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_caisses WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_etablissements WHERE user_id = ?', [uid]);
+
+    // Les modèles récurrents et compteurs appartiennent aux anciennes données commerciales.
+    await conn.query('DELETE FROM factures_recurrentes WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM factures WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM clients WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM produits WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM depenses WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM compteurs_numerotation WHERE user_id = ?', [uid]);
+
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    if (conn) {
+      try { await conn.rollback(); } catch (_) {}
+    }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
