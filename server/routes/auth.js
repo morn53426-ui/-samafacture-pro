@@ -650,7 +650,7 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  * @openapi
  * /auth/plan:
  *   put:
- *     summary: Change le plan d'abonnement (sélecteur manuel gratuit, utilisé quand aucune passerelle de paiement n'est configurée)
+ *     summary: Change manuellement le plan en développement/test uniquement ; désactivé en production
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -669,6 +669,15 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  */
 router.put('/plan', requireAuth, async (req, res, next) => {
   try {
+    // Le sélecteur manuel sert uniquement au développement et aux tests. En production,
+    // laisser cette route attribuer "pro" ou "entreprise" permettrait à n'importe quel
+    // utilisateur connecté de contourner les paiements d'abonnement.
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({
+        error: 'Le changement de formule doit passer par un paiement confirmé.',
+        code: 'PLAN_MANUAL_DISABLED'
+      });
+    }
     const { plan } = req.body;
     const plansValides = ['gratuit', 'starter', 'pro', 'entreprise'];
     if (!plansValides.includes(plan)) {
@@ -759,6 +768,7 @@ router.delete('/donnees', requireAuth, async (req, res, next) => {
 
     // Les modèles récurrents et compteurs appartiennent aux anciennes données commerciales.
     await conn.query('DELETE FROM factures_recurrentes WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM facture_usage_mensuelle WHERE user_id = ?', [uid]);
     await conn.query('DELETE FROM factures WHERE user_id = ?', [uid]);
     await conn.query('DELETE FROM clients WHERE user_id = ?', [uid]);
     await conn.query('DELETE FROM produits WHERE user_id = ?', [uid]);
