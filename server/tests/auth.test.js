@@ -166,20 +166,20 @@ describe('Authentification', () => {
     assert.equal(login.status, 200);
     const token = login.body.token;
     const suffix = String(Date.now());
-    const [[client]] = await pool.query(
+    const [client] = await pool.query(
       'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
       [userId, 'Client remise à zéro']
     );
-    const [[invoice]] = await pool.query(
+    const [invoice] = await pool.query(
       "INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, total) VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', 12500)",
       [userId, client.insertId, `RESET-${suffix}`]
     );
-    const [[payment]] = await pool.query(
+    const [payment] = await pool.query(
       "INSERT INTO paiements (user_id, facture_id, montant, methode) VALUES (?, ?, 2500, 'Espèces')",
       [userId, invoice.insertId]
     );
 
-    const [[order]] = await pool.query(
+    const [order] = await pool.query(
       "INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, total, lignes_json) VALUES (?, ?, ?, 'confirmee', CURDATE(), 12500, '[]')",
       [userId, client.insertId, `CMD-RESET-${suffix}`]
     );
@@ -207,11 +207,11 @@ describe('Authentification', () => {
       "INSERT INTO pro_documents (user_id, facture_id, client_id, nom_fichier, mime_type, taille_octets, contenu) VALUES (?, ?, ?, 'preuve.pdf', 'application/pdf', 5, ?)",
       [userId, invoice.insertId, client.insertId, Buffer.from('%PDF-')]
     );
-    const [[establishment]] = await pool.query(
+    const [establishment] = await pool.query(
       "INSERT INTO pro_etablissements (user_id, nom) VALUES (?, 'Établissement temporaire')",
       [userId]
     );
-    const [[cash]] = await pool.query(
+    const [cash] = await pool.query(
       "INSERT INTO pro_caisses (user_id, etablissement_id, nom) VALUES (?, ?, 'Caisse temporaire')",
       [userId, establishment.insertId]
     );
@@ -224,7 +224,7 @@ describe('Authentification', () => {
       [userId, client.insertId]
     );
 
-    const [[webhook]] = await pool.query(
+    const [webhook] = await pool.query(
       "INSERT INTO pro_webhooks (user_id, url, secret_enc, evenements_json) VALUES (?, 'https://example.test/hooks', 'secret-chiffre', '[]')",
       [userId]
     );
@@ -243,7 +243,7 @@ describe('Authentification', () => {
     assert.equal(reset.status, 200, reset.text);
 
     for (const table of [
-      'clients', 'factures', 'facture_lignes', 'paiements', 'depenses',
+      'clients', 'factures', 'paiements', 'depenses',
       'factures_recurrentes', 'compteurs_numerotation',
       'pro_commandes', 'pro_bons_livraison', 'pro_avoirs', 'pro_acomptes',
       'pro_refund_requests', 'pro_payment_links', 'pro_documents',
@@ -253,6 +253,12 @@ describe('Authentification', () => {
       const [[count]] = await pool.query(`SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`, [userId]);
       assert.equal(Number(count.n), 0, `la table ${table} doit avoir été vidée`);
     }
+    // facture_lignes n'a pas de user_id propre : son appartenance passe par facture_id.
+    const [[remainingLines]] = await pool.query(
+      'SELECT COUNT(*) AS n FROM facture_lignes WHERE facture_id = ?',
+      [invoice.insertId]
+    );
+    assert.equal(Number(remainingLines.n), 0, 'les lignes de la facture supprimée doivent être supprimées par cascade');
 
     // Les paramètres et l'identité du compte sont conservés ; les intégrations ne sont pas
     // supprimées silencieusement, mais leur ancienne file d'événements est vidée.
