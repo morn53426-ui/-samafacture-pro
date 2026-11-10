@@ -2,8 +2,6 @@
 -- Tables isolées par user_id : chaque ressource appartient au compte authentifié.
 -- Les données historiques des tables principales restent inchangées.
 
-ALTER TABLE produits ADD COLUMN prix_achat DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER prix_ht;
-
 CREATE TABLE IF NOT EXISTS pro_commandes (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
