@@ -161,6 +161,113 @@ describe('Authentification', () => {
     assert.equal(accepted.status, 200);
   });
 
+  test('la remise à zéro efface toutes les données opérationnelles professionnelles sans supprimer le compte ni ses paramètres', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password: 'nouveau-mot-de-passe-2026' });
+    assert.equal(login.status, 200);
+    const token = login.body.token;
+    const suffix = String(Date.now());
+    const [[client]] = await pool.query(
+      'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+      [userId, 'Client remise à zéro']
+    );
+    const [[invoice]] = await pool.query(
+      "INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, total) VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', 12500)",
+      [userId, client.insertId, `RESET-${suffix}`]
+    );
+    const [[payment]] = await pool.query(
+      "INSERT INTO paiements (user_id, facture_id, montant, methode) VALUES (?, ?, 2500, 'Espèces')",
+      [userId, invoice.insertId]
+    );
+
+    const [[order]] = await pool.query(
+      "INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, total, lignes_json) VALUES (?, ?, ?, 'confirmee', CURDATE(), 12500, '[]')",
+      [userId, client.insertId, `CMD-RESET-${suffix}`]
+    );
+    await pool.query(
+      "INSERT INTO pro_bons_livraison (user_id, commande_id, facture_id, numero, date_livraison, lignes_json) VALUES (?, ?, ?, ?, CURDATE(), '[]')",
+      [userId, order.insertId, invoice.insertId, `BL-RESET-${suffix}`]
+    );
+    await pool.query(
+      "INSERT INTO pro_avoirs (user_id, facture_id, numero, date_emission, montant, motif) VALUES (?, ?, ?, CURDATE(), 1000, 'Test remise à zéro')",
+      [userId, invoice.insertId, `AV-RESET-${suffix}`]
+    );
+    await pool.query(
+      "INSERT INTO pro_acomptes (user_id, facture_id, numero, date_emission, montant) VALUES (?, ?, ?, CURDATE(), 1000)",
+      [userId, invoice.insertId, `ACP-RESET-${suffix}`]
+    );
+    await pool.query(
+      "INSERT INTO pro_refund_requests (user_id, paiement_id, montant, motif) VALUES (?, ?, 500, 'Test remise à zéro')",
+      [userId, payment.insertId]
+    );
+    await pool.query(
+      "INSERT INTO pro_payment_links (user_id, facture_id, token_hash, montant) VALUES (?, ?, ?, 2500)",
+      [userId, invoice.insertId, require('crypto').createHash('sha256').update(suffix).digest('hex')]
+    );
+    await pool.query(
+      "INSERT INTO pro_documents (user_id, facture_id, client_id, nom_fichier, mime_type, taille_octets, contenu) VALUES (?, ?, ?, 'preuve.pdf', 'application/pdf', 5, ?)",
+      [userId, invoice.insertId, client.insertId, Buffer.from('%PDF-')]
+    );
+    const [[establishment]] = await pool.query(
+      "INSERT INTO pro_etablissements (user_id, nom) VALUES (?, 'Établissement temporaire')",
+      [userId]
+    );
+    const [[cash]] = await pool.query(
+      "INSERT INTO pro_caisses (user_id, etablissement_id, nom) VALUES (?, ?, 'Caisse temporaire')",
+      [userId, establishment.insertId]
+    );
+    await pool.query(
+      "INSERT INTO pro_caisse_operations (user_id, caisse_id, type, montant, motif) VALUES (?, ?, 'entree', 2500, 'Test remise à zéro')",
+      [userId, cash.insertId]
+    );
+    await pool.query(
+      "INSERT INTO factures_recurrentes (user_id, client_id, libelle, frequence, prochaine_date, lignes_json) VALUES (?, ?, 'Modèle temporaire', 'mensuelle', DATE_ADD(CURDATE(), INTERVAL 1 MONTH), '[]')",
+      [userId, client.insertId]
+    );
+
+    const [[webhook]] = await pool.query(
+      "INSERT INTO pro_webhooks (user_id, url, secret_enc, evenements_json) VALUES (?, 'https://example.test/hooks', 'secret-chiffre', '[]')",
+      [userId]
+    );
+    await pool.query(
+      "INSERT INTO pro_webhook_deliveries (user_id, webhook_id, evenement, payload_json) VALUES (?, ?, 'invoice.created', '{}')",
+      [userId, webhook.insertId]
+    );
+    await pool.query(
+      "INSERT INTO pro_api_keys (user_id, nom, token_hash, scopes_json) VALUES (?, 'Clé conservée', ?, '[\"invoices:read\"]')",
+      [userId, require('crypto').createHash('sha256').update('api-key-preserve-' + suffix).digest('hex')]
+    );
+
+    const reset = await request(app)
+      .delete('/api/auth/donnees')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(reset.status, 200, reset.text);
+
+    for (const table of [
+      'clients', 'factures', 'facture_lignes', 'paiements', 'depenses',
+      'factures_recurrentes', 'compteurs_numerotation',
+      'pro_commandes', 'pro_bons_livraison', 'pro_avoirs', 'pro_acomptes',
+      'pro_refund_requests', 'pro_payment_links', 'pro_documents',
+      'pro_etablissements', 'pro_caisses', 'pro_caisse_operations',
+      'pro_webhook_deliveries'
+    ]) {
+      const [[count]] = await pool.query(`SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`, [userId]);
+      assert.equal(Number(count.n), 0, `la table ${table} doit avoir été vidée`);
+    }
+
+    // Les paramètres et l'identité du compte sont conservés ; les intégrations ne sont pas
+    // supprimées silencieusement, mais leur ancienne file d'événements est vidée.
+    const [[user]] = await pool.query('SELECT entreprise_nom, plan FROM users WHERE id = ?', [userId]);
+    assert.equal(user.entreprise_nom, 'Boutique Test');
+    assert.equal(Number((await pool.query('SELECT COUNT(*) AS n FROM pro_webhooks WHERE user_id = ?', [userId]))[0][0].n), 1);
+    assert.equal(Number((await pool.query('SELECT COUNT(*) AS n FROM pro_api_keys WHERE user_id = ?', [userId]))[0][0].n), 1);
+
+    const stillAuthenticated = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(stillAuthenticated.status, 200);
+    assert.equal(stillAuthenticated.body.user.entreprise_nom, 'Boutique Test');
+  });
+
   test('la réinitialisation du mot de passe révoque les sessions et consomme le lien une seule fois', async () => {
     const login = await request(app).post('/api/auth/login').send({ email, password });
     assert.equal(login.status, 200);
