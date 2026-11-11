@@ -20,8 +20,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         default-mysql-client \
         ca-certificates \
         fonts-liberation \
-        dumb-init \
-    
+        dumb-init
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
