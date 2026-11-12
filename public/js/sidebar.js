@@ -5,9 +5,9 @@ function renderSidebar(activePage) {
       { id: 'dashboard', icon: 'home', label: 'Tableau de bord', href: 'dashboard.html' }
     ]},
     { group: 'Ventes', items: [
-      { id: 'clients', icon: 'users', label: 'Clients', href: 'clients.html' },
       { id: 'factures', icon: 'file-text', label: 'Factures', href: 'factures.html' },
       { id: 'devis', icon: 'file-stack', label: 'Devis', href: 'devis.html' },
+      { id: 'clients', icon: 'users', label: 'Clients', href: 'clients.html' },
       { id: 'nouvelle-facture', icon: 'plus', label: 'Nouvelle facture', href: 'nouvelle-facture.html' },
       { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
       { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' }
@@ -18,7 +18,7 @@ function renderSidebar(activePage) {
     { group: 'Comptabilité', items: [
       { id: 'depenses', icon: 'banknote', label: 'Dépenses', href: 'depenses.html' },
       { id: 'rapports', icon: 'bar-chart', label: 'Rapports', href: 'rapports.html' },
-      { id: 'finances', icon: 'landmark', label: 'Finances', href: 'finances.html' }
+      { id: 'finances', icon: 'credit-card', label: 'Paiements & finances', href: 'finances.html' }
     ]},
     { group: 'Intelligence artificielle', items: [
       { id: 'assistant-ia', icon: 'sparkles', label: 'Assistant IA', href: 'assistant-ia.html' },
@@ -52,12 +52,18 @@ function renderSidebar(activePage) {
       <div class="sidebar-brand">
         <div class="mark"><img src="images/icon-192.png" alt="SamaFacture Pro" /></div>
         <div>
-          <div class="name">SamaFacture</div>
-          <div class="sub">Pro</div>
+          <div class="name">SamaFacture <span class="brand-pro">Pro</span></div>
+          <div class="sub">Facturez • Gérez • Développez</div>
         </div>
         <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu" aria-controls="app-navigation" aria-expanded="false">${Icon('menu')}</button>
       </div>
       <nav class="sidebar-nav" id="app-navigation" aria-label="Navigation principale">${navHtml}</nav>
+      <section class="sidebar-promo" aria-label="Présentation de SamaFacture Pro">
+        <div class="promo-icon" aria-hidden="true">✦</div>
+        <strong>SamaFacture Pro</strong>
+        <p>Votre espace pour gérer clients, produits, factures et suivi commercial.</p>
+        <a href="aide.html">Découvrir l'aide ${Icon('arrow-up-right')}</a>
+      </section>
       <div class="sidebar-foot">
         <button type="button" class="install-app-btn" style="display:none;" onclick="installApp()"><span class="ic">${Icon('smartphone')}</span> Installer l'application</button>
         ${window.SamaTheme ? SamaTheme.boutonHtml() : ''}
@@ -69,6 +75,7 @@ function renderSidebar(activePage) {
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
   `;
   document.getElementById('sidebar-root').outerHTML = html;
+  ensureWorkspaceTopbar();
   initRealtime();
 }
 
@@ -95,17 +102,58 @@ function closeSidebar() {
   }
 }
 
+function ensureWorkspaceTopbar() {
+  const main = document.querySelector('.main-content');
+  if (!main || document.getElementById('topbar-root')) return;
+  const root = document.createElement('div');
+  root.id = 'topbar-root';
+  main.insertBefore(root, main.firstChild);
+  renderTopbar();
+}
+
 function renderTopbar(title, subtitle) {
   const el = document.getElementById('topbar-root');
   if (!el) return;
+  const user = Api.currentUser() || {};
+  const displayName = user.nom || user.email || user.entreprise_nom || 'Mon compte';
+  const roleLabel = user.role === 'admin' || user.role === 'owner'
+    ? 'Administrateur'
+    : 'Espace de travail';
+  const avatar = typeof initials === 'function' ? initials(displayName) : 'SF';
+
   el.outerHTML = `
-    <div class="topbar">
-      <div>
-        <h1 style="margin:0;">${title}</h1>
-        ${subtitle ? `<p style="color:var(--ink-soft); margin:2px 0 0;">${subtitle}</p>` : ''}
+    <header class="app-topbar" aria-label="Barre d'outils">
+      <form class="app-topbar-search" role="search" onsubmit="return submitWorkspaceSearch(event)">
+        <span class="ic" aria-hidden="true">${Icon('search')}</span>
+        <input id="workspace-search" type="search"
+          placeholder="Rechercher un client (nom, email, téléphone)..."
+          aria-label="Rechercher un client par nom, email ou téléphone" />
+        <button type="submit" aria-label="Lancer la recherche">${Icon('arrow-up-right')}</button>
+      </form>
+      <div class="app-topbar-account">
+        <div class="app-topbar-avatar" aria-hidden="true">${escapeHtml(avatar)}</div>
+        <div>
+          <strong>${escapeHtml(displayName)}</strong>
+          <small>${escapeHtml(roleLabel)}</small>
+        </div>
+        <button type="button" class="app-topbar-logout"
+          onclick="Api.clearSession(); location.href='login.html';"
+          aria-label="Se déconnecter" title="Se déconnecter">
+          ${Icon('log-out')} <span>Déconnexion</span>
+        </button>
       </div>
-    </div>
+    </header>
   `;
+}
+
+function submitWorkspaceSearch(event) {
+  event?.preventDefault();
+  const input = document.getElementById('workspace-search');
+  const query = input?.value?.trim() || '';
+  const params = new URLSearchParams();
+  if (query) params.set('q', query);
+  location.href = 'clients.html' + (params.toString() ? '?' + params.toString() : '');
+  return false;
 }
 
 // -----------------------------------------------------------------------------
