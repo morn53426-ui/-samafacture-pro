@@ -122,6 +122,11 @@ function createStaticServer() {
   return http.createServer((req, res) => {
     const requestUrl = new URL(req.url, 'http://127.0.0.1');
     let pathname = decodeURIComponent(requestUrl.pathname);
+    if (pathname === '/__visual_bootstrap.html') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end('<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>');
+      return;
+    }
     if (pathname === '/') pathname = '/index.html';
     const file = path.resolve(PUBLIC_DIR, '.' + pathname);
     if (!file.startsWith(PUBLIC_DIR + path.sep) && file !== PUBLIC_DIR) {
@@ -193,17 +198,6 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
   await page.emulateMediaFeatures([
     { name: 'prefers-reduced-motion', value: reduceMotion ? 'reduce' : 'no-preference' }
   ]);
-  await page.evaluateOnNewDocument((user) => {
-    localStorage.setItem('sf_token', 'visual-recette-token');
-    localStorage.setItem('sf_user', JSON.stringify(user));
-    localStorage.setItem('sf_theme', 'light');
-  }, {
-    id: 1,
-    nom: 'SamaFacture — Compte de recette',
-    entreprise_nom: 'SamaFacture — Société de test',
-    devise: 'FCFA',
-    plan: 'pro'
-  });
   await page.setRequestInterception(true);
   page.on('request', (request) => {
     const url = request.url();
@@ -232,6 +226,21 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
       return;
     }
     request.continue().catch(() => {});
+  });
+  // Poser les valeurs de session depuis une origine déjà chargée est plus fiable que
+  // les init scripts sur certains builds de Chromium ; l'application métier n'est chargée
+  // qu'après la création de cette session fictive.
+  await page.goto(baseUrl + '/__visual_bootstrap.html', { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => {
+    localStorage.setItem('sf_token', 'visual-recette-token');
+    localStorage.setItem('sf_user', JSON.stringify({
+      id: 1,
+      nom: 'SamaFacture — Compte de recette',
+      entreprise_nom: 'SamaFacture — Société de test',
+      devise: 'FCFA',
+      plan: 'pro'
+    }));
+    localStorage.setItem('sf_theme', 'light');
   });
   return page;
 }
