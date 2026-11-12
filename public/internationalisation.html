@@ -14,7 +14,7 @@
     <div class="field"><label for="format_date">Format de date</label><select id="format_date"></select></div>
     <div class="field"><label for="regime_fiscal">Régime fiscal (paramètre indicatif)</label><select id="regime_fiscal"></select></div>
   </div>
-  <div class="pro-note" style="margin:18px 0">La devise est enregistrée sur chaque nouvelle facture ou nouveau devis. Les documents existants conservent leur devise d’origine. Les paramètres fiscaux ne calculent ni ne certifient les taxes : les règles locales doivent être configurées et validées par un professionnel habilité.</div>
+  <div class="pro-note" style="margin:18px 0">La devise est verrouillée après le premier document ou mouvement financier afin d’éviter de mélanger des montants non convertis. Les anciens documents conservent leur devise d’origine. Le changement de devise nécessite un processus de migration comptable. Les paramètres fiscaux ne calculent ni ne certifient les taxes : les règles locales doivent être configurées et validées par un professionnel habilité.</div>
   <div style="display:flex;justify-content:flex-end"><button id="save-localization" class="btn btn-primary" type="button">Enregistrer les paramètres</button></div>
   <div id="localization-status" aria-live="polite" class="pro-list" style="margin-top:14px"></div>
 </section>
