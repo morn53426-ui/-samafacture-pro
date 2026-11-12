@@ -58,9 +58,9 @@ function render(data){
     '<section><div class="page-header"><div><h2>Mes documents</h2><p>Les informations sont mises à jour par votre entreprise.</p></div></div>'+
     (docs.length?docs.map(doc=>{
       const isQuote=doc.type==='devis', decision=doc.portail_decision;
-      const state=decision==='accepte'?'Devis accepté':decision==='refuse'?'Devis refusé':doc.statut==='payee'?'Payée':doc.statut==='annulee'?'Annulée':isQuote?'En attente de votre réponse':'En attente de règlement';
+      const state=decision==='accepte'?'Devis accepté':decision==='refuse'?'Devis refusé':doc.statut==='annulee'?'Annulée':doc.statut==='payee'?'Payée':isQuote?'En attente de votre réponse':'En attente de règlement';
       const lines=(doc.lignes||[]).map(line=>'<tr><td>'+safe(line.designation)+'</td><td>'+Number(line.quantite)+'</td><td>'+money(line.total_ligne,doc.devise,company.locale)+'</td></tr>').join('');
-      const actions=isQuote&&!decision?'<div class="portal-actions"><button class="btn btn-primary" type="button" data-decision="accepte" data-id="'+Number(doc.id)+'">Accepter le devis</button><button class="btn btn-outline" type="button" data-decision="refuse" data-id="'+Number(doc.id)+'">Refuser</button></div>':
+      const actions=isQuote&&!decision&&doc.statut==='en_attente'?'<div class="portal-actions"><button class="btn btn-primary" type="button" data-decision="accepte" data-id="'+Number(doc.id)+'">Accepter le devis</button><button class="btn btn-outline" type="button" data-decision="refuse" data-id="'+Number(doc.id)+'">Refuser</button></div>':
         (isQuote?'<p class="portal-meta">Votre décision : '+safe(state)+'</p>':'');
       return '<article class="portal-doc"><div class="portal-doc-head"><div><h3>'+safe(isQuote?'Devis ':'Facture ')+safe(doc.numero)+'</h3><div class="portal-meta">Émis le '+date(doc.date_emission)+(isQuote?' · Valide jusqu’au '+date(doc.date_validite):' · Échéance '+date(doc.date_echeance))+'</div></div><div><span class="portal-pill">'+safe(state)+'</span><h3 style="text-align:right;margin-top:8px">'+money(doc.total,doc.devise,company.locale)+'</h3></div></div>'+
         '<div class="portal-meta">Payé : '+money(doc.montant_paye,doc.devise,company.locale)+' · Solde : '+money(doc.solde,doc.devise,company.locale)+'</div>'+
