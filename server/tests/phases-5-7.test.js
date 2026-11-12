@@ -57,8 +57,8 @@ test('portail client : lien à jeton haché, documents limités au client et ré
     .set('Authorization', 'Bearer ' + tokenA).send({});
   assert.equal(invited.status, 201, invited.text);
   assert.equal(invited.body.sent, false, 'Sans SMTP, l’invitation ne doit pas être présentée comme envoyée.');
-  assert.match(invited.body.url, /portail-client\.html\?token=[a-f0-9]{64}$/);
-  const token = new URL(invited.body.url).searchParams.get('token');
+  assert.match(invited.body.url, /portail-client\.html#token=[a-f0-9]{64}$/);
+  const token = new URLSearchParams(new URL(invited.body.url).hash.slice(1)).get('token');
   const [[stored]] = await pool.query(
     'SELECT token_hash, expires_at, revoked_at FROM pro_customer_portal_access WHERE user_id = ? AND client_id = ?',
     [userA, clientA]
@@ -66,12 +66,12 @@ test('portail client : lien à jeton haché, documents limités au client et ré
   assert.equal(stored.token_hash, require('node:crypto').createHash('sha256').update(token).digest('hex'));
   assert.equal(stored.token_hash.includes(token), false);
 
-  const publicView = await request(app).get('/api/portal/' + token);
+  const publicView = await request(app).get('/api/portal/').set('X-SF-Portal-Token', token);
   assert.equal(publicView.status, 200, publicView.text);
   assert.equal(publicView.headers['cache-control'], 'no-store');
   assert.deepEqual(new Set(publicView.body.documents.map(d => Number(d.id))), new Set([Number(invoiceA.id), Number(quoteA.id)]));
 
-  const decision = await request(app).post('/api/portal/' + token + '/quotes/' + quoteA.id + '/decision')
+  const decision = await request(app).post('/api/portal/quotes/' + quoteA.id + '/decision').set('X-SF-Portal-Token', token)
     .send({ decision: 'accepte', commentaire: 'Bon pour accord.' });
   assert.equal(decision.status, 201, decision.text);
   const replay = await request(app).post('/api/portal/' + token + '/quotes/' + quoteA.id + '/decision')
@@ -179,7 +179,7 @@ test('automatisations : créer, lister, désactiver et supprimer les règles aut
 });
 
 test('API portail sans jeton ou jeton mal formé : aucun document n’est exposé', async () => {
-  const missing = await request(app).get('/api/portal/not-a-token');
+  const missing = await request(app).get('/api/portal/').set('X-SF-Portal-Token', 'not-a-token');
   assert.equal(missing.status, 404, missing.text);
 });
 
