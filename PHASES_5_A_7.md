@@ -26,10 +26,10 @@ Cette livraison est proposée sur une branche séparée. Elle n'est pas encore d
 ## Phase 6 — Internationalisation
 
 ### Paramètres configurables par entreprise
-- Pays, langue de l'interface (français/anglais), devise par défaut, fuseau horaire, format de date et régime fiscal indicatif.
+- Pays, langue de préférence de l'assistant et des formats (français/anglais), devise par défaut, fuseau horaire, format de date et régime fiscal indicatif.
 - Les réglages sont propres à chaque entreprise et validés par une liste de valeurs prises en charge.
 - Les nouveaux documents enregistrent leur devise ; les anciens documents conservent leur devise d'origine.
-- Les formats monétaires et dates partagés par le frontend tiennent compte des paramètres enregistrés.
+- Les formats monétaires et dates partagés par le frontend ainsi que la langue de réponse de l'assistant tiennent compte des paramètres enregistrés. Le reste de l'interface n'est pas encore intégralement traduit en anglais.
 
 ### Limites à connaître
 - Aucun taux de change ni conversion automatique n'est appliqué.
