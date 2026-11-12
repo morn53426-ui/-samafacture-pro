@@ -143,7 +143,7 @@ async function appliquerAjustementsStock(conn, userId, ajustements) {
     [userId, 'PRINCIPAL']
   );
   await conn.query(
-    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE((SELECT SUM(s.quantite) FROM pro_stocks_entrepots s WHERE s.user_id = p.user_id AND s.produit_id = p.id), 0)) FROM produits p WHERE p.user_id = ? AND p.id IN (' + ids.map(() => '?').join(',') + ')',
+    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0)) FROM produits p LEFT JOIN (SELECT user_id, produit_id, SUM(quantite) AS total FROM pro_stocks_entrepots GROUP BY user_id, produit_id) existing ON existing.user_id = p.user_id AND existing.produit_id = p.id WHERE p.user_id = ? AND p.id IN (' + ids.map(() => '?').join(',') + ')',
     [warehouse.id, userId, ...ids]
   );
 
