@@ -162,7 +162,7 @@ async function execClientsInactifs(userId, { jours_inactivite, limite }) {
   const days = [30, 60, 90, 180].includes(Number(jours_inactivite)) ? Number(jours_inactivite) : 60;
   const n = Math.min(Math.max(Number(limite) || 20, 1), 100);
   const [rows] = await pool.query(
-    'SELECT c.nom AS client, c.email, MAX(f.date_emission) AS derniere_facture, COALESCE(SUM(CASE WHEN f.type = 'facture' AND f.statut <> 'annulee' THEN f.total - f.montant_paye ELSE 0 END),0) AS solde_du, DATEDIFF(CURDATE(), COALESCE(MAX(f.date_emission), c.created_at)) AS jours_sans_activite FROM clients c LEFT JOIN factures f ON f.client_id = c.id AND f.user_id = c.user_id WHERE c.user_id = ? GROUP BY c.id, c.nom, c.email, c.created_at HAVING jours_sans_activite >= ? ORDER BY derniere_facture ASC LIMIT ?',
+    "SELECT c.nom AS client, c.email, MAX(f.date_emission) AS derniere_facture, COALESCE(SUM(CASE WHEN f.type = 'facture' AND f.statut <> 'annulee' THEN f.total - f.montant_paye ELSE 0 END),0) AS solde_du, DATEDIFF(CURDATE(), COALESCE(MAX(f.date_emission), c.created_at)) AS jours_sans_activite FROM clients c LEFT JOIN factures f ON f.client_id = c.id AND f.user_id = c.user_id WHERE c.user_id = ? GROUP BY c.id, c.nom, c.email, c.created_at HAVING jours_sans_activite >= ? ORDER BY derniere_facture ASC LIMIT ?",
     [userId, days, n]
   );
   return rows.map(row => ({ ...row, solde_du: Number(row.solde_du), jours_sans_activite: Number(row.jours_sans_activite) }));
