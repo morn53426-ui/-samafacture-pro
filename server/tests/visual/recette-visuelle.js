@@ -498,9 +498,14 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   }));
   assert.deepEqual(opened, { expanded: 'true', sidebarOpen: true, overlayVisible: true },
     'Le menu mobile doit s’ouvrir, afficher son voile et mettre à jour ARIA.');
-  await mobile.click('#sidebar-overlay');
-  const closed = await mobile.$eval('#mobile-toggle-btn', element => element.getAttribute('aria-expanded'));
-  assert.equal(closed, 'false', 'Le voile doit fermer le menu mobile.');
+  await mobile.click('#mobile-toggle-btn');
+  const closed = await mobile.evaluate(() => ({
+    expanded: document.getElementById('mobile-toggle-btn')?.getAttribute('aria-expanded'),
+    sidebarOpen: document.getElementById('app-sidebar')?.classList.contains('open'),
+    overlayVisible: document.getElementById('sidebar-overlay')?.classList.contains('show')
+  }));
+  assert.deepEqual(closed, { expanded: 'false', sidebarOpen: false, overlayVisible: false },
+    'Le bouton du menu doit refermer le panneau mobile et son voile.');
   await mobile.close();
 
   return { globalSearch: 'ok', mobileNavigation: 'ok' };
