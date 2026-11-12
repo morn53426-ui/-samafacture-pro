@@ -1816,7 +1816,7 @@ router.put('/localization', async (req, res, next) => {
       );
       if (Number(history.factures) + Number(history.depenses) + Number(history.paiements) + Number(history.achats) + Number(history.mouvements_stock) + Number(history.ecritures) + Number(history.produits) + Number(history.modeles_recurrents) > 0) {
         return res.status(409).json({
-          error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents ou de mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
+          error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents, produits tarifés, modèles récurrents ou mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
         });
       }
     }
