@@ -170,7 +170,7 @@ test('les achats et réceptions partielles mettent à jour le stock global et le
     .send({
       fournisseur_id: supplier.body.id,
       date_commande: '2026-11-12',
-      devise: 'XOF',
+      devise: 'FCFA',
       lignes: [{ produit_id: productId, designation: 'Produit recette multi-entrepôt', quantite: 5, prix_unitaire: 500, tva: 18 }]
     });
   assert.equal(order.status, 201, order.text);
