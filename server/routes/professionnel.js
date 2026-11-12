@@ -834,4 +834,673 @@ router.get('/audit', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+/* ---------------- PAIEMENTS EN LIGNE DES FACTURES ---------------------- */
+async function lireGateway(uid, provider) {
+  const [rows] = await pool.query(
+    'SELECT credentials_enc, mode, actif FROM pro_payment_gateways WHERE user_id = ? AND fournisseur = ? LIMIT 1',
+    [uid, provider]
+  );
+  if (!rows.length || !rows[0].actif) return null;
+  return { ...JSON.parse(decryptSecret(rows[0].credentials_enc)), PAYDUNYA_MODE: rows[0].mode || 'test' };
+}
+
+router.get('/payment-gateways', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT fournisseur, mode, actif, updated_at FROM pro_payment_gateways WHERE user_id = ? ORDER BY fournisseur',
+      [owner(req)]
+    );
+    res.json({
+      gateways: rows.map(row => ({ ...row, configured: true })),
+      encryption_ready: Boolean(process.env.DATA_ENCRYPTION_KEY),
+      warning: 'Chaque entreprise doit utiliser ses propres identifiants marchands. Les clés d’abonnement SamaFacture ne sont jamais réutilisées pour encaisser les factures clients.'
+    });
+  } catch (err) { next(err); }
+});
+
+router.put('/payment-gateways/:provider', async (req, res, next) => {
+  try {
+    const uid = owner(req), provider = String(req.params.provider || '').toLowerCase();
+    if (!['wave', 'paydunya'].includes(provider)) return res.status(400).json({ error: 'Prestataire non pris en charge.' });
+    if (!process.env.DATA_ENCRYPTION_KEY) return res.status(503).json({ error: 'DATA_ENCRYPTION_KEY doit être configurée avant d’enregistrer des clés marchandes.' });
+
+    const [existingRows] = await pool.query(
+      'SELECT credentials_enc, mode FROM pro_payment_gateways WHERE user_id = ? AND fournisseur = ? LIMIT 1',
+      [uid, provider]
+    );
+    let credentials = existingRows.length ? JSON.parse(decryptSecret(existingRows[0].credentials_enc)) : {};
+    if (provider === 'wave') {
+      const apiKey = String(req.body.api_key || '').trim();
+      const signingSecret = String(req.body.signing_secret || '').trim();
+      if (apiKey) credentials.WAVE_API_KEY = apiKey;
+      if (signingSecret) credentials.WAVE_SIGNING_SECRET = signingSecret;
+      if (!credentials.WAVE_API_KEY || !credentials.WAVE_SIGNING_SECRET) {
+        return res.status(400).json({ error: 'La clé API Wave et le secret de signature de webhook sont obligatoires.' });
+      }
+      if (credentials.WAVE_API_KEY.length < 12 || credentials.WAVE_SIGNING_SECRET.length < 12) {
+        return res.status(400).json({ error: 'Les identifiants Wave semblent incomplets.' });
+      }
+    } else {
+      const master = String(req.body.master_key || '').trim();
+      const privateKey = String(req.body.private_key || '').trim();
+      const token = String(req.body.token || '').trim();
+      if (master) credentials.PAYDUNYA_MASTER_KEY = master;
+      if (privateKey) credentials.PAYDUNYA_PRIVATE_KEY = privateKey;
+      if (token) credentials.PAYDUNYA_TOKEN = token;
+      if (!credentials.PAYDUNYA_MASTER_KEY || !credentials.PAYDUNYA_PRIVATE_KEY || !credentials.PAYDUNYA_TOKEN) {
+        return res.status(400).json({ error: 'Les trois clés PayDunya sont obligatoires.' });
+      }
+      if ([credentials.PAYDUNYA_MASTER_KEY, credentials.PAYDUNYA_PRIVATE_KEY, credentials.PAYDUNYA_TOKEN].some(value => String(value).length < 8)) {
+        return res.status(400).json({ error: 'Les identifiants PayDunya semblent incomplets.' });
+      }
+    }
+
+    const mode = provider === 'paydunya' ? String(req.body.mode || existingRows[0]?.mode || 'test') : 'live';
+    if (provider === 'paydunya' && !['test', 'live'].includes(mode)) return res.status(400).json({ error: 'Mode PayDunya invalide.' });
+    await pool.query(
+      'INSERT INTO pro_payment_gateways (user_id, fournisseur, credentials_enc, mode, actif) VALUES (?, ?, ?, ?, 1) ON DUPLICATE KEY UPDATE credentials_enc = VALUES(credentials_enc), mode = VALUES(mode), actif = 1',
+      [uid, provider, encryptSecret(JSON.stringify(credentials)), mode]
+    );
+    await audit(req, 'paiement.prestataire_configure', 'prestataire', provider, { mode });
+    res.json({ success: true, fournisseur: provider, mode, credentials_masked: true });
+  } catch (err) { next(err); }
+});
+
+router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
+  try {
+    const uid = owner(req), provider = String(req.body.fournisseur || '').toLowerCase();
+    if (!['wave', 'paydunya'].includes(provider)) return res.status(400).json({ error: 'Choisissez Wave ou PayDunya.' });
+    const credentials = await lireGateway(uid, provider);
+    if (!credentials || (provider === 'wave' ? !waveConfigured(credentials) : !paydunyaConfigured(credentials))) {
+      return res.status(409).json({ error: 'Ce prestataire n’est pas configuré pour cette entreprise. Renseignez d’abord ses clés marchandes.' });
+    }
+    const [rows] = await pool.query(
+      "SELECT f.id, f.numero, f.total, f.montant_paye, f.statut, f.type, u.entreprise_nom FROM factures f JOIN users u ON u.id = f.user_id WHERE f.id = ? AND f.user_id = ? LIMIT 1",
+      [req.params.invoiceId, uid]
+    );
+    const invoice = rows[0];
+    if (!invoice || invoice.type !== 'facture') return res.status(404).json({ error: 'Facture introuvable.' });
+    if (invoice.statut === 'annulee') return res.status(409).json({ error: 'Une facture annulée ne peut pas être payée.' });
+    const remaining = Math.round((Number(invoice.total) - Number(invoice.montant_paye)) * 100) / 100;
+    if (!Number.isFinite(remaining) || remaining <= 0) return res.status(409).json({ error: 'Cette facture est déjà soldée.' });
+
+    const base = String(process.env.APP_URL || '').replace(/\/$/, '');
+    if (!base || !base.startsWith('https://')) return res.status(503).json({ error: 'APP_URL doit être une URL publique HTTPS pour activer le paiement en ligne.' });
+    const reference = crypto.randomBytes(32).toString('hex');
+    const [inserted] = await pool.query(
+      "INSERT INTO pro_invoice_checkouts (user_id, facture_id, fournisseur, reference_interne, montant, devise, statut, expire_at) VALUES (?, ?, ?, ?, ?, 'XOF', 'creation', DATE_ADD(NOW(), INTERVAL 30 MINUTE))",
+      [uid, invoice.id, provider, reference, remaining]
+    );
+    const returnUrl = base + '/paiement-retour.html?reference=' + encodeURIComponent(reference);
+    try {
+      let checkoutUrl, providerRef;
+      if (provider === 'wave') {
+        const session = await creerSessionWave({
+          amount: remaining, reference, successUrl: returnUrl, errorUrl: returnUrl, credentials
+        });
+        checkoutUrl = session.checkoutUrl;
+        providerRef = session.sessionId;
+      } else {
+        const created = await creerFacturePaydunya({
+          amount: remaining,
+          description: 'Facture ' + invoice.numero,
+          reference,
+          storeName: invoice.entreprise_nom || 'SamaFacture Pro',
+          returnUrl,
+          cancelUrl: returnUrl,
+          callbackUrl: base + '/api/payment-webhooks/paydunya',
+          credentials
+        });
+        checkoutUrl = created.checkoutUrl;
+        providerRef = created.token;
+      }
+      if (!checkoutUrl || !providerRef) throw new Error('Le prestataire n’a pas retourné une session de paiement valide.');
+      await pool.query(
+        "UPDATE pro_invoice_checkouts SET reference_prestataire = ?, checkout_url = ?, statut = 'en_attente' WHERE id = ? AND user_id = ?",
+        [String(providerRef), checkoutUrl, inserted.insertId, uid]
+      );
+      await audit(req, 'paiement.checkout_cree', 'facture', invoice.id, { fournisseur: provider, montant: remaining, reference_interne: reference });
+      res.status(201).json({ checkout_url: checkoutUrl, reference, fournisseur: provider, montant: remaining, devise: 'XOF', expires_in_minutes: 30 });
+    } catch (providerError) {
+      await pool.query("UPDATE pro_invoice_checkouts SET statut = 'echec' WHERE id = ? AND user_id = ?", [inserted.insertId, uid]);
+      throw providerError;
+    }
+  } catch (err) {
+    if (/Impossible|prestataire|Wave|PayDunya|session/i.test(err.message || '')) return res.status(502).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.get('/checkouts/:reference/status', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT c.statut, c.montant, c.devise, c.fournisseur, c.created_at, c.paid_at, f.numero AS facture_numero FROM pro_invoice_checkouts c JOIN factures f ON f.id = c.facture_id WHERE c.reference_interne = ? AND c.user_id = ? LIMIT 1',
+      [req.params.reference, owner(req)]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Session de paiement introuvable.' });
+    res.json({ checkout: rows[0] });
+  } catch (err) { next(err); }
+});
+
+/* ------------------------- FOURNISSEURS & ACHATS ------------------------ */
+async function ensureDefaultWarehouse(uid) {
+  await pool.query(
+    "INSERT IGNORE INTO pro_entrepots (user_id, code, nom, par_defaut) VALUES (?, 'PRINCIPAL', 'Magasin principal', 1)",
+    [uid]
+  );
+  const [[warehouse]] = await pool.query('SELECT id FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1', [uid, 'PRINCIPAL']);
+  await pool.query(
+    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT ?, ?, id, stock FROM produits WHERE user_id = ?',
+    [uid, warehouse.id, uid]
+  );
+  return Number(warehouse.id);
+}
+
+router.get('/suppliers', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query('SELECT id, nom, email, telephone, adresse, ninea, notes, actif, created_at FROM pro_fournisseurs WHERE user_id = ? ORDER BY nom LIMIT 500', [owner(req)]);
+    res.json({ fournisseurs: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/suppliers', async (req, res, next) => {
+  try {
+    const nom = String(req.body.nom || '').trim().slice(0, 190);
+    if (!nom) return res.status(400).json({ error: 'Le nom du fournisseur est obligatoire.' });
+    const [result] = await pool.query(
+      'INSERT INTO pro_fournisseurs (user_id, nom, email, telephone, adresse, ninea, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [owner(req), nom, optionalText(req.body.email, 190), optionalText(req.body.telephone, 40), optionalText(req.body.adresse, 255), optionalText(req.body.ninea, 60), optionalText(req.body.notes, 5000)]
+    );
+    await audit(req, 'achat.fournisseur_cree', 'fournisseur', result.insertId, { nom });
+    res.status(201).json({ id: result.insertId, nom });
+  } catch (err) { next(err); }
+});
+
+router.put('/suppliers/:id', async (req, res, next) => {
+  try {
+    const nom = String(req.body.nom || '').trim().slice(0, 190);
+    if (!nom) return res.status(400).json({ error: 'Le nom du fournisseur est obligatoire.' });
+    const [result] = await pool.query(
+      'UPDATE pro_fournisseurs SET nom = ?, email = ?, telephone = ?, adresse = ?, ninea = ?, notes = ?, actif = ? WHERE id = ? AND user_id = ?',
+      [nom, optionalText(req.body.email, 190), optionalText(req.body.telephone, 40), optionalText(req.body.adresse, 255), optionalText(req.body.ninea, 60), optionalText(req.body.notes, 5000), req.body.actif === false ? 0 : 1, req.params.id, owner(req)]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'Fournisseur introuvable.' });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.get('/warehouses', async (req, res, next) => {
+  try {
+    await ensureDefaultWarehouse(owner(req));
+    const [rows] = await pool.query('SELECT id, code, nom, adresse, par_defaut, actif FROM pro_entrepots WHERE user_id = ? ORDER BY par_defaut DESC, nom', [owner(req)]);
+    res.json({ entrepots: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/warehouses', async (req, res, next) => {
+  try {
+    const code = String(req.body.code || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 30);
+    const nom = String(req.body.nom || '').trim().slice(0, 120);
+    if (!code || !nom) return res.status(400).json({ error: 'Code et nom de l’entrepôt obligatoires.' });
+    const [result] = await pool.query(
+      'INSERT INTO pro_entrepots (user_id, code, nom, adresse, par_defaut) VALUES (?, ?, ?, ?, 0)',
+      [owner(req), code, nom, optionalText(req.body.adresse, 255)]
+    );
+    res.status(201).json({ id: result.insertId, code, nom });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ce code d’entrepôt existe déjà.' });
+    next(err);
+  }
+});
+
+router.get('/purchase-orders', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id WHERE o.user_id = ? ORDER BY o.date_commande DESC, o.id DESC LIMIT 250',
+      [owner(req)]
+    );
+    res.json({ commandes: rows });
+  } catch (err) { next(err); }
+});
+
+router.get('/purchase-orders/:id', async (req, res, next) => {
+  try {
+    const [orders] = await pool.query(
+      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id WHERE o.id = ? AND o.user_id = ?',
+      [req.params.id, owner(req)]
+    );
+    if (!orders.length) return res.status(404).json({ error: 'Commande fournisseur introuvable.' });
+    const [lines] = await pool.query('SELECT * FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? ORDER BY id', [req.params.id, owner(req)]);
+    res.json({ commande: orders[0], lignes: lines });
+  } catch (err) { next(err); }
+});
+
+router.post('/purchase-orders', async (req, res, next) => {
+  let conn;
+  try {
+    const uid = owner(req), supplierId = Number(req.body.fournisseur_id), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
+    if (!idOk(supplierId) || !lines.length || lines.length > 100) return res.status(400).json({ error: 'Fournisseur et 1 à 100 lignes obligatoires.' });
+    const [[supplier]] = await pool.query('SELECT id FROM pro_fournisseurs WHERE id = ? AND user_id = ? AND actif = 1', [supplierId, uid]);
+    if (!supplier) return res.status(400).json({ error: 'Fournisseur inconnu ou inactif.' });
+    let totalHt = 0, totalTax = 0;
+    const normalized = [];
+    const productIds = [...new Set(lines.map(line => Number(line.produit_id)).filter(Boolean))];
+    if (productIds.length) {
+      const [owned] = await pool.query(`SELECT id FROM produits WHERE user_id = ? AND id IN (${productIds.map(() => '?').join(',')})`, [uid, ...productIds]);
+      const set = new Set(owned.map(row => Number(row.id)));
+      if (productIds.some(id => !set.has(id))) return res.status(400).json({ error: 'Un produit référencé ne appartient pas à cette entreprise.' });
+    }
+    for (const line of lines) {
+      const designation = String(line.designation || '').trim().slice(0, 255);
+      const qty = Number(line.quantite), price = Number(line.prix_unitaire), tax = Number(line.tva || 0);
+      if (!designation || !Number.isFinite(qty) || qty <= 0 || qty > 10000000 || !Number.isFinite(price) || price < 0 || !Number.isFinite(tax) || tax < 0 || tax > 100) {
+        return res.status(400).json({ error: 'Chaque ligne doit avoir une désignation, une quantité, un prix et une TVA valides.' });
+      }
+      const ht = Math.round(qty * price * 100) / 100;
+      const vat = Math.round(ht * tax) / 100;
+      totalHt += ht; totalTax += vat;
+      normalized.push({ produit_id: Number(line.produit_id) || null, designation, qty, price, tax, total: ht + vat });
+    }
+    totalHt = Math.round(totalHt * 100) / 100;
+    totalTax = Math.round(totalTax * 100) / 100;
+    const numero = randomRef('ACH');
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [created] = await conn.query(
+      "INSERT INTO pro_commandes_fournisseurs (user_id, fournisseur_id, numero, statut, date_commande, date_livraison_prevue, devise, total_ht, total_tva, total_ttc, notes) VALUES (?, ?, ?, 'confirmee', ?, ?, ?, ?, ?, ?, ?)",
+      [uid, supplierId, numero, safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, String(req.body.devise || 'XOF').slice(0, 10), totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
+    );
+    for (const line of normalized) {
+      await conn.query(
+        'INSERT INTO pro_commandes_fournisseurs_lignes (user_id, commande_id, produit_id, designation, quantite, prix_unitaire, tva, total_ligne) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [uid, created.insertId, line.produit_id, line.designation, line.qty, line.price, line.tax, line.total]
+      );
+    }
+    await conn.commit();
+    await audit(req, 'achat.commande_creee', 'commande_fournisseur', created.insertId, { numero, montant: totalHt + totalTax });
+    res.status(201).json({ id: created.insertId, numero, total_ht: totalHt, total_tva: totalTax, total_ttc: totalHt + totalTax, statut: 'confirmee' });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    next(err);
+  } finally { if (conn) conn.release(); }
+});
+
+router.post('/purchase-orders/:id/receive', async (req, res, next) => {
+  let conn;
+  try {
+    const uid = owner(req), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
+    const warehouseId = Number(req.body.entrepot_id) || await ensureDefaultWarehouse(uid);
+    if (!lines.length || lines.length > 100) return res.status(400).json({ error: 'Indiquez au moins une ligne à réceptionner.' });
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [orderRows] = await conn.query('SELECT * FROM pro_commandes_fournisseurs WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
+    const order = orderRows[0];
+    if (!order || order.statut === 'annulee' || order.statut === 'recue') { await conn.rollback(); return res.status(409).json({ error: 'Commande absente, annulée ou déjà intégralement réceptionnée.' }); }
+    const [warehouseRows] = await conn.query('SELECT id FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1', [warehouseId, uid]);
+    if (!warehouseRows.length) { await conn.rollback(); return res.status(400).json({ error: 'Entrepôt invalide.' }); }
+    const reference = randomRef('REC');
+    const [receipt] = await conn.query(
+      'INSERT INTO pro_receptions_achats (user_id, commande_id, entrepot_id, reference, date_reception, acteur_user_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [uid, order.id, warehouseId, reference, safeDate(req.body.date_reception), actor(req)]
+    );
+    const [orderLines] = await conn.query('SELECT * FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? FOR UPDATE', [order.id, uid]);
+    for (const received of lines) {
+      const line = orderLines.find(item => Number(item.id) === Number(received.ligne_id));
+      const qty = Number(received.quantite);
+      if (!line || !Number.isFinite(qty) || qty <= 0 || qty > Number(line.quantite) - Number(line.quantite_recue) + 0.0001) {
+        throw new Error('Quantité reçue invalide ou supérieure au reliquat de commande.');
+      }
+      if (!line.produit_id) throw new Error('La ligne "' + line.designation + '" doit être associée à un produit du catalogue avant de mettre à jour le stock.');
+      const [productRows] = await conn.query('SELECT id FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [line.produit_id, uid]);
+      if (!productRows.length) throw new Error('Produit supprimé ou non autorisé.');
+      await conn.query(
+        'INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0) ON DUPLICATE KEY UPDATE id = id',
+        [uid, warehouseId, line.produit_id]
+      );
+      await conn.query('UPDATE pro_stocks_entrepots SET quantite = quantite + ? WHERE user_id = ? AND entrepot_id = ? AND produit_id = ?', [qty, uid, warehouseId, line.produit_id]);
+      await conn.query('UPDATE pro_commandes_fournisseurs_lignes SET quantite_recue = quantite_recue + ? WHERE id = ? AND user_id = ?', [qty, line.id, uid]);
+      await conn.query(
+        'INSERT INTO pro_receptions_achats_lignes (user_id, reception_id, commande_ligne_id, produit_id, quantite, prix_unitaire) VALUES (?, ?, ?, ?, ?, ?)',
+        [uid, receipt.insertId, line.id, line.produit_id, qty, line.prix_unitaire]
+      );
+      await conn.query(
+        "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, reference, motif, acteur_user_id) VALUES (?, ?, ?, 'reception_achat', ?, ?, ?, ?, ?)",
+        [uid, line.produit_id, warehouseId, qty, line.prix_unitaire, reference, 'Réception ' + order.numero, actor(req)]
+      );
+    }
+    const [[progress]] = await conn.query('SELECT SUM(quantite_recue) AS recu, SUM(quantite) AS commande FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ?', [order.id, uid]);
+    const status = Number(progress.recu) + 0.0001 >= Number(progress.commande) ? 'recue' : 'partiellement_recue';
+    await conn.query('UPDATE pro_commandes_fournisseurs SET statut = ? WHERE id = ? AND user_id = ?', [status, order.id, uid]);
+    await conn.query(
+      'UPDATE produits p SET p.stock = (SELECT COALESCE(SUM(s.quantite),0) FROM pro_stocks_entrepots s WHERE s.user_id = p.user_id AND s.produit_id = p.id) WHERE p.user_id = ? AND EXISTS (SELECT 1 FROM pro_stocks_entrepots s WHERE s.user_id = p.user_id AND s.produit_id = p.id)',
+      [uid]
+    );
+    await conn.commit();
+    await audit(req, 'achat.reception', 'commande_fournisseur', order.id, { reference, statut: status });
+    res.status(201).json({ reception_id: receipt.insertId, reference, statut: status });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    if (/Quantité reçue|associée à un produit|Produit supprimé/.test(err.message || '')) return res.status(400).json({ error: err.message });
+    next(err);
+  } finally { if (conn) conn.release(); }
+});
+
+router.get('/inventory/stock', async (req, res, next) => {
+  try {
+    await ensureDefaultWarehouse(owner(req));
+    const [rows] = await pool.query(
+      'SELECT p.id AS produit_id, p.nom, p.reference, p.prix_achat, p.prix_ht, COALESCE(SUM(s.quantite),0) AS quantite, COUNT(DISTINCT s.entrepot_id) AS nb_entrepots FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? GROUP BY p.id ORDER BY p.nom',
+      [owner(req)]
+    );
+    res.json({ stocks: rows });
+  } catch (err) { next(err); }
+});
+
+router.get('/inventory/movements', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT m.*, p.nom AS produit_nom, w.nom AS entrepot_nom FROM pro_mouvements_stock m JOIN produits p ON p.id = m.produit_id AND p.user_id = m.user_id JOIN pro_entrepots w ON w.id = m.entrepot_id WHERE m.user_id = ? ORDER BY m.created_at DESC, m.id DESC LIMIT 300',
+      [owner(req)]
+    );
+    res.json({ mouvements: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/inventory/adjustments', async (req, res, next) => {
+  let conn;
+  try {
+    const uid = owner(req), productId = Number(req.body.produit_id), warehouseId = Number(req.body.entrepot_id) || await ensureDefaultWarehouse(uid);
+    const delta = Number(req.body.quantite), reason = String(req.body.motif || '').trim().slice(0, 255);
+    if (!idOk(productId) || !Number.isFinite(delta) || !delta || Math.abs(delta) > 10000000 || !reason) return res.status(400).json({ error: 'Produit, quantité non nulle et motif obligatoires.' });
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [products] = await conn.query('SELECT id, prix_achat FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
+    const [warehouses] = await conn.query('SELECT id FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1', [warehouseId, uid]);
+    if (!products.length || !warehouses.length) { await conn.rollback(); return res.status(404).json({ error: 'Produit ou entrepôt introuvable.' }); }
+    await conn.query('INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0) ON DUPLICATE KEY UPDATE id = id', [uid, warehouseId, productId]);
+    const [[stock]] = await conn.query('SELECT quantite FROM pro_stocks_entrepots WHERE user_id = ? AND entrepot_id = ? AND produit_id = ? FOR UPDATE', [uid, warehouseId, productId]);
+    const next = Math.round((Number(stock.quantite) + delta) * 1000) / 1000;
+    if (next < 0) { await conn.rollback(); return res.status(409).json({ error: 'Le stock de cet entrepôt ne peut pas devenir négatif.' }); }
+    await conn.query('UPDATE pro_stocks_entrepots SET quantite = ? WHERE user_id = ? AND entrepot_id = ? AND produit_id = ?', [next, uid, warehouseId, productId]);
+    await conn.query(
+      "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, motif, acteur_user_id) VALUES (?, ?, ?, 'ajustement', ?, ?, ?, ?)",
+      [uid, productId, warehouseId, delta, products[0].prix_achat, reason, actor(req)]
+    );
+    await conn.query(
+      'UPDATE produits p SET p.stock = (SELECT COALESCE(SUM(s.quantite),0) FROM pro_stocks_entrepots s WHERE s.user_id = p.user_id AND s.produit_id = p.id) WHERE p.id = ? AND p.user_id = ?',
+      [productId, uid]
+    );
+    await conn.commit();
+    await audit(req, 'stock.ajustement', 'produit', productId, { entrepot_id: warehouseId, variation: delta, motif: reason });
+    res.json({ success: true, stock_entrepot: next });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    next(err);
+  } finally { if (conn) conn.release(); }
+});
+
+router.post('/inventory/transfers', async (req, res, next) => {
+  let conn;
+  try {
+    const uid = owner(req), productId = Number(req.body.produit_id), fromId = Number(req.body.entrepot_source_id), toId = Number(req.body.entrepot_destination_id), qty = Number(req.body.quantite);
+    if (!idOk(productId) || !idOk(fromId) || !idOk(toId) || fromId === toId || !Number.isFinite(qty) || qty <= 0 || qty > 10000000) return res.status(400).json({ error: 'Produit, deux entrepôts différents et quantité positive obligatoires.' });
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [productRows] = await conn.query('SELECT id, prix_achat FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
+    const [warehouseRows] = await conn.query('SELECT id FROM pro_entrepots WHERE id IN (?, ?) AND user_id = ? AND actif = 1', [fromId, toId, uid]);
+    if (!productRows.length || warehouseRows.length !== 2) { await conn.rollback(); return res.status(404).json({ error: 'Produit ou entrepôt introuvable.' }); }
+    await conn.query('INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0), (?, ?, ?, 0) ON DUPLICATE KEY UPDATE id = id', [uid, fromId, productId, uid, toId, productId]);
+    const [stocks] = await conn.query('SELECT entrepot_id, quantite FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ? AND entrepot_id IN (?, ?) FOR UPDATE', [uid, productId, fromId, toId]);
+    const source = stocks.find(row => Number(row.entrepot_id) === fromId);
+    if (!source || Number(source.quantite) < qty) { await conn.rollback(); return res.status(409).json({ error: 'Stock insuffisant dans l’entrepôt source.' }); }
+    const reference = randomRef('TRF');
+    await conn.query('UPDATE pro_stocks_entrepots SET quantite = quantite - ? WHERE user_id = ? AND entrepot_id = ? AND produit_id = ?', [qty, uid, fromId, productId]);
+    await conn.query('UPDATE pro_stocks_entrepots SET quantite = quantite + ? WHERE user_id = ? AND entrepot_id = ? AND produit_id = ?', [qty, uid, toId, productId]);
+    await conn.query(
+      "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, reference, motif, acteur_user_id) VALUES (?, ?, ?, 'transfert_sortant', ?, ?, ?, ?, ?), (?, ?, ?, 'transfert_entrant', ?, ?, ?, ?, ?)",
+      [uid, productId, fromId, -qty, productRows[0].prix_achat, reference, 'Transfert vers entrepôt #' + toId, actor(req),
+       uid, productId, toId, qty, productRows[0].prix_achat, reference, 'Transfert depuis entrepôt #' + fromId, actor(req)]
+    );
+    await conn.commit();
+    res.json({ success: true, reference });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    next(err);
+  } finally { if (conn) conn.release(); }
+});
+
+router.get('/inventory/valuation', async (req, res, next) => {
+  try {
+    await ensureDefaultWarehouse(owner(req));
+    const [rows] = await pool.query(
+      'SELECT p.id, p.nom, p.reference, p.prix_achat, COALESCE(SUM(s.quantite),0) AS quantite, COALESCE(SUM(s.quantite * p.prix_achat),0) AS valeur FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? GROUP BY p.id ORDER BY p.nom',
+      [owner(req)]
+    );
+    const total = rows.reduce((sum, row) => sum + Number(row.valeur), 0);
+    res.json({ valorisation: rows, valeur_totale: Math.round(total * 100) / 100, devise: 'XOF' });
+  } catch (err) { next(err); }
+});
+
+/* --------------------------- COMPTABILITE OHADA ------------------------- */
+const OHADA_STARTER_ACCOUNTS = [
+  ['101','Capital social',1,'credit',0],['12','Résultat net de l’exercice',1,'credit',0],
+  ['21','Immobilisations corporelles',2,'debit',0],['28','Amortissements',2,'credit',0],
+  ['31','Stocks de marchandises',3,'debit',0],['37','Stocks de produits',3,'debit',0],
+  ['401','Fournisseurs',4,'credit',1],['411','Clients',4,'debit',1],['421','Personnel, rémunérations dues',4,'credit',1],
+  ['443','État, TVA facturée',4,'credit',0],['445','État, TVA récupérable',4,'debit',0],
+  ['521','Banques',5,'debit',0],['571','Caisse',5,'debit',0],
+  ['601','Achats de marchandises',6,'debit',0],['604','Achats de matières et fournitures',6,'debit',0],
+  ['622','Transports',6,'debit',0],['625','Déplacements et missions',6,'debit',0],['641','Rémunérations du personnel',6,'debit',0],
+  ['661','Charges d’intérêts',6,'debit',0],['701','Ventes de marchandises',7,'credit',0],
+  ['706','Services vendus',7,'credit',0],['707','Produits accessoires',7,'credit',0],['758','Produits divers',7,'credit',0]
+];
+
+async function ensureAccountingDefaults(uid) {
+  for (const [code, label, classe, nature, lettrable] of OHADA_STARTER_ACCOUNTS) {
+    await pool.query(
+      'INSERT IGNORE INTO pro_compta_comptes (user_id, code, libelle, classe, nature, lettrable) VALUES (?, ?, ?, ?, ?, ?)',
+      [uid, code, label, classe, nature, lettrable]
+    );
+  }
+  const journals = [['VE','Ventes','vente'],['AC','Achats','achat'],['BQ','Banque','banque'],['CA','Caisse','caisse'],['OD','Opérations diverses','od']];
+  for (const [code, label, type] of journals) {
+    await pool.query('INSERT IGNORE INTO pro_compta_journaux (user_id, code, libelle, type) VALUES (?, ?, ?, ?)', [uid, code, label, type]);
+  }
+}
+
+async function accountId(uid, code, conn = pool) {
+  const [rows] = await conn.query('SELECT id FROM pro_compta_comptes WHERE user_id = ? AND code = ? AND actif = 1 LIMIT 1', [uid, code]);
+  if (!rows.length) throw new Error('Compte comptable ' + code + ' introuvable.');
+  return Number(rows[0].id);
+}
+
+async function journalId(uid, code, conn = pool) {
+  const [rows] = await conn.query('SELECT id FROM pro_compta_journaux WHERE user_id = ? AND code = ? AND actif = 1 LIMIT 1', [uid, code]);
+  if (!rows.length) throw new Error('Journal ' + code + ' introuvable.');
+  return Number(rows[0].id);
+}
+
+async function postSystemEntry(uid, actorId, sourceType, sourceId, date, label, journalCode, lines) {
+  await ensureAccountingDefaults(uid);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [existing] = await conn.query('SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = ? AND source_id = ? LIMIT 1 FOR UPDATE', [uid, sourceType, sourceId]);
+    if (existing.length) { await conn.commit(); return { id: existing[0].id, numero: existing[0].numero, duplicate: true }; }
+    const journal = await journalId(uid, journalCode, conn);
+    let debit = 0, credit = 0;
+    for (const line of lines) {
+      if (line.debit < 0 || line.credit < 0 || (line.debit > 0 && line.credit > 0) || (!line.debit && !line.credit)) throw new Error('Ligne comptable invalide.');
+      debit += line.debit; credit += line.credit;
+    }
+    debit = Math.round(debit * 100) / 100; credit = Math.round(credit * 100) / 100;
+    if (Math.abs(debit - credit) > 0.01) throw new Error('Écriture déséquilibrée.');
+    const numero = randomRef('ECR');
+    const [entry] = await conn.query(
+      "INSERT INTO pro_compta_ecritures (user_id, journal_id, numero, date_ecriture, reference, libelle, source_type, source_id, statut, total_debit, total_credit, acteur_user_id, validee_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'validee', ?, ?, ?, NOW())",
+      [uid, journal, numero, date, String(sourceId), label.slice(0,255), sourceType, sourceId, debit, credit, actorId]
+    );
+    for (const line of lines) {
+      const account = await accountId(uid, line.code, conn);
+      await conn.query(
+        'INSERT INTO pro_compta_lignes (user_id, ecriture_id, compte_id, libelle, debit, credit, tiers, facture_id, paiement_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [uid, entry.insertId, account, line.libelle || label, line.debit || 0, line.credit || 0, line.tiers || null, line.facture_id || null, line.paiement_id || null]
+      );
+    }
+    await conn.commit();
+    return { id: entry.insertId, numero, duplicate: false };
+  } catch (err) { await conn.rollback(); throw err; }
+  finally { conn.release(); }
+}
+
+router.get('/accounting/config', async (req, res, next) => {
+  try {
+    await ensureAccountingDefaults(owner(req));
+    const [[accounts], [journals]] = await Promise.all([
+      pool.query('SELECT id, code, libelle, classe, nature, lettrable, actif FROM pro_compta_comptes WHERE user_id = ? ORDER BY code', [owner(req)]),
+      pool.query('SELECT id, code, libelle, type, actif FROM pro_compta_journaux WHERE user_id = ? ORDER BY code', [owner(req)])
+    ]);
+    res.json({ comptes: accounts, journaux: journals, standard: 'SYSCOHADA — plan de démarrage à valider avec un expert-comptable local' });
+  } catch (err) { next(err); }
+});
+
+router.post('/accounting/accounts', async (req, res, next) => {
+  try {
+    const code = String(req.body.code || '').trim().slice(0,20), libelle = String(req.body.libelle || '').trim().slice(0,190);
+    const classe = Number(req.body.classe), nature = String(req.body.nature || 'debit');
+    if (!/^\d{1,8}$/.test(code) || !libelle || !Number.isInteger(classe) || classe < 1 || classe > 8 || !['debit','credit'].includes(nature)) return res.status(400).json({ error: 'Code, libellé, classe 1 à 8 et nature débit/crédit requis.' });
+    const [result] = await pool.query('INSERT INTO pro_compta_comptes (user_id, code, libelle, classe, nature, lettrable) VALUES (?, ?, ?, ?, ?, ?)', [owner(req), code, libelle, classe, nature, req.body.lettrable ? 1 : 0]);
+    res.status(201).json({ id: result.insertId, code, libelle });
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ce numéro de compte existe déjà.' });
+    next(err);
+  }
+});
+
+router.post('/accounting/entries', async (req, res, next) => {
+  let conn;
+  try {
+    const uid = owner(req), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
+    const label = String(req.body.libelle || '').trim().slice(0,255);
+    const date = optionalIsoDate(req.body.date_ecriture);
+    if (!idOk(req.body.journal_id) || !label || date === undefined || !date || lines.length < 2 || lines.length > 100) return res.status(400).json({ error: 'Journal, date, libellé et au moins deux lignes sont obligatoires.' });
+    let debit = 0, credit = 0;
+    const clean = [];
+    for (const line of lines) {
+      const account = Number(line.compte_id), d = Number(line.debit || 0), c = Number(line.credit || 0);
+      if (!idOk(account) || !Number.isFinite(d) || !Number.isFinite(c) || d < 0 || c < 0 || (d > 0 && c > 0) || (d === 0 && c === 0)) return res.status(400).json({ error: 'Chaque ligne doit avoir un compte et un seul montant débit ou crédit positif.' });
+      debit += d; credit += c;
+      clean.push({ account, d: Math.round(d * 100) / 100, c: Math.round(c * 100) / 100, label: String(line.libelle || label).slice(0,255), tiers: optionalText(line.tiers,190) });
+    }
+    debit = Math.round(debit * 100) / 100; credit = Math.round(credit * 100) / 100;
+    if (Math.abs(debit - credit) > 0.01) return res.status(400).json({ error: 'Écriture déséquilibrée : total débit et crédit doivent être identiques.' });
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [journalRows] = await conn.query('SELECT id FROM pro_compta_journaux WHERE id = ? AND user_id = ? AND actif = 1', [req.body.journal_id, uid]);
+    if (!journalRows.length) { await conn.rollback(); return res.status(400).json({ error: 'Journal invalide.' }); }
+    const ids = [...new Set(clean.map(line => line.account))];
+    const [accounts] = await conn.query(`SELECT id FROM pro_compta_comptes WHERE user_id = ? AND actif = 1 AND id IN (${ids.map(() => '?').join(',')})`, [uid, ...ids]);
+    if (accounts.length !== ids.length) { await conn.rollback(); return res.status(400).json({ error: 'Un compte comptable ne appartient pas à cette entreprise ou est inactif.' }); }
+    const numero = randomRef('ECR');
+    const [entry] = await conn.query(
+      "INSERT INTO pro_compta_ecritures (user_id, journal_id, numero, date_ecriture, reference, libelle, statut, total_debit, total_credit, acteur_user_id, validee_le) VALUES (?, ?, ?, ?, ?, ?, 'validee', ?, ?, ?, NOW())",
+      [uid, req.body.journal_id, numero, date, optionalText(req.body.reference,120), label, debit, credit, actor(req)]
+    );
+    for (const line of clean) {
+      await conn.query('INSERT INTO pro_compta_lignes (user_id, ecriture_id, compte_id, libelle, debit, credit, tiers) VALUES (?, ?, ?, ?, ?, ?, ?)', [uid, entry.insertId, line.account, line.label, line.d, line.c, line.tiers]);
+    }
+    await conn.commit();
+    await audit(req, 'comptabilite.ecriture_validee', 'ecriture', entry.insertId, { numero, debit, credit });
+    res.status(201).json({ id: entry.insertId, numero, statut: 'validee', total_debit: debit, total_credit: credit });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    next(err);
+  } finally { if (conn) conn.release(); }
+});
+
+router.get('/accounting/trial-balance', async (req, res, next) => {
+  try {
+    await ensureAccountingDefaults(owner(req));
+    const from = optionalIsoDate(req.query.from), to = optionalIsoDate(req.query.to);
+    if (from === undefined || to === undefined) return res.status(400).json({ error: 'Période invalide.' });
+    let filters = ' AND e.statut = ?'; const params = [owner(req), 'validee'];
+    if (from) { filters += ' AND e.date_ecriture >= ?'; params.push(from); }
+    if (to) { filters += ' AND e.date_ecriture <= ?'; params.push(to); }
+    const [rows] = await pool.query(
+      `SELECT c.id, c.code, c.libelle, c.classe, COALESCE(SUM(l.debit),0) AS total_debit, COALESCE(SUM(l.credit),0) AS total_credit, COALESCE(SUM(l.debit-l.credit),0) AS solde FROM pro_compta_comptes c LEFT JOIN pro_compta_lignes l ON l.compte_id = c.id AND l.user_id = c.user_id LEFT JOIN pro_compta_ecritures e ON e.id = l.ecriture_id AND e.user_id = c.user_id ${filters.replace(' AND e.statut = ?', ' AND e.statut = ?')} WHERE c.user_id = ? GROUP BY c.id ORDER BY c.code`,
+      [...params.slice(1), owner(req)]
+    );
+    const totalDebit = rows.reduce((sum,row)=>sum+Number(row.total_debit),0);
+    const totalCredit = rows.reduce((sum,row)=>sum+Number(row.total_credit),0);
+    res.json({ balance: rows, total_debit: totalDebit, total_credit: totalCredit, equilibree: Math.abs(totalDebit-totalCredit) <= 0.01, periode: { from: from || null, to: to || null } });
+  } catch (err) { next(err); }
+});
+
+router.get('/accounting/ledger', async (req, res, next) => {
+  try {
+    const accountIdValue = Number(req.query.compte_id);
+    if (!idOk(accountIdValue)) return res.status(400).json({ error: 'compte_id obligatoire.' });
+    const [accountRows] = await pool.query('SELECT id, code, libelle FROM pro_compta_comptes WHERE id = ? AND user_id = ?', [accountIdValue, owner(req)]);
+    if (!accountRows.length) return res.status(404).json({ error: 'Compte introuvable.' });
+    const from = optionalIsoDate(req.query.from), to = optionalIsoDate(req.query.to);
+    if (from === undefined || to === undefined) return res.status(400).json({ error: 'Période invalide.' });
+    const filters = [], params = [owner(req), accountIdValue];
+    if (from) { filters.push('e.date_ecriture >= ?'); params.push(from); }
+    if (to) { filters.push('e.date_ecriture <= ?'); params.push(to); }
+    const [rows] = await pool.query(
+      `SELECT e.date_ecriture, e.numero, e.reference, e.libelle AS ecriture_libelle, l.libelle, l.debit, l.credit, l.tiers FROM pro_compta_lignes l JOIN pro_compta_ecritures e ON e.id = l.ecriture_id AND e.user_id = l.user_id WHERE l.user_id = ? AND l.compte_id = ? AND e.statut = 'validee' ${filters.length ? 'AND '+filters.join(' AND ') : ''} ORDER BY e.date_ecriture, e.id, l.id`,
+      params
+    );
+    let running = 0;
+    const entries = rows.map(row => { running += Number(row.debit) - Number(row.credit); return { ...row, solde_progressif: Math.round(running*100)/100 }; });
+    res.json({ compte: accountRows[0], ecritures: entries, solde_periode: Math.round(running*100)/100 });
+  } catch (err) { next(err); }
+});
+
+router.post('/accounting/post-invoice/:id', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [rows] = await pool.query("SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'facture' AND statut <> 'annulee'", [req.params.id, uid]);
+    const invoice = rows[0];
+    if (!invoice) return res.status(404).json({ error: 'Facture non trouvée ou annulée.' });
+    const netSales = Math.round((Number(invoice.total) - Number(invoice.total_tva)) * 100) / 100;
+    const lines = [{ code: '411', libelle: 'Client ' + invoice.id, debit: Number(invoice.total), credit: 0, facture_id: invoice.id }];
+    if (netSales > 0) lines.push({ code: '706', libelle: 'Vente facture ' + invoice.numero, debit: 0, credit: netSales, facture_id: invoice.id });
+    if (Number(invoice.total_tva) > 0) lines.push({ code: '443', libelle: 'TVA facture ' + invoice.numero, debit: 0, credit: Number(invoice.total_tva), facture_id: invoice.id });
+    const result = await postSystemEntry(uid, actor(req), 'facture', invoice.id, invoice.date_emission, 'Comptabilisation facture ' + invoice.numero, 'VE', lines);
+    res.status(result.duplicate ? 200 : 201).json(result);
+  } catch (err) { next(err); }
+});
+
+router.post('/accounting/post-payment/:id', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [rows] = await pool.query('SELECT p.*, f.numero FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.id = ? AND p.user_id = ? AND f.user_id = ?', [req.params.id, uid, uid]);
+    const payment = rows[0];
+    if (!payment) return res.status(404).json({ error: 'Paiement introuvable.' });
+    const bank = /wave|paydunya|orange|carte|virement/i.test(payment.methode || '');
+    const result = await postSystemEntry(uid, actor(req), 'paiement', payment.id, String(payment.date_paiement).slice(0,10), 'Encaissement facture ' + payment.numero, bank ? 'BQ' : 'CA', [
+      { code: bank ? '521' : '571', libelle: 'Règlement ' + payment.numero, debit: Number(payment.montant), credit: 0, paiement_id: payment.id },
+      { code: '411', libelle: 'Lettrage client ' + payment.numero, debit: 0, credit: Number(payment.montant), paiement_id: payment.id }
+    ]);
+    res.status(result.duplicate ? 200 : 201).json(result);
+  } catch (err) { next(err); }
+});
+
+router.post('/accounting/post-expense/:id', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, uid]);
+    const expense = rows[0];
+    if (!expense) return res.status(404).json({ error: 'Dépense introuvable.' });
+    const amount = Number(expense.montant);
+    const result = await postSystemEntry(uid, actor(req), 'depense', expense.id, expense.date_depense, 'Dépense ' + expense.libelle, 'CA', [
+      { code: '622', libelle: expense.categorie || expense.libelle, debit: amount, credit: 0 },
+      { code: '571', libelle: 'Règlement dépense', debit: 0, credit: amount }
+    ]);
+    res.status(result.duplicate ? 200 : 201).json(result);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
