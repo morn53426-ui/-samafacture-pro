@@ -1003,8 +1003,8 @@ async function ensureDefaultWarehouse(uid) {
   );
   const [[warehouse]] = await pool.query('SELECT id FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1', [uid, 'PRINCIPAL']);
   await pool.query(
-    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT ?, ?, id, stock FROM produits WHERE user_id = ?',
-    [uid, warehouse.id, uid]
+    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE((SELECT SUM(s.quantite) FROM pro_stocks_entrepots s WHERE s.user_id = p.user_id AND s.produit_id = p.id), 0)) FROM produits p WHERE p.user_id = ?',
+    [warehouse.id, uid]
   );
   return Number(warehouse.id);
 }
@@ -1052,6 +1052,7 @@ router.get('/warehouses', async (req, res, next) => {
 
 router.post('/warehouses', async (req, res, next) => {
   try {
+    await ensureDefaultWarehouse(owner(req));
     const code = String(req.body.code || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 30);
     const nom = String(req.body.nom || '').trim().slice(0, 120);
     if (!code || !nom) return res.status(400).json({ error: 'Code et nom de l’entrepôt obligatoires.' });
@@ -1141,6 +1142,7 @@ router.post('/purchase-orders', async (req, res, next) => {
 router.post('/purchase-orders/:id/receive', async (req, res, next) => {
   let conn;
   try {
+    await ensureDefaultWarehouse(owner(req));
     const uid = owner(req), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
     const warehouseId = Number(req.body.entrepot_id) || await ensureDefaultWarehouse(uid);
     if (!lines.length || lines.length > 100) return res.status(400).json({ error: 'Indiquez au moins une ligne à réceptionner.' });
