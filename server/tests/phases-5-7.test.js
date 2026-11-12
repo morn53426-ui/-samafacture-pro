@@ -74,6 +74,12 @@ test('portail client : lien à jeton haché, documents limités au client et ré
   const decision = await request(app).post('/api/portal/quotes/' + quoteA.id + '/decision').set('X-SF-Portal-Token', token)
     .send({ decision: 'accepte', commentaire: 'Bon pour accord.' });
   assert.equal(decision.status, 201, decision.text);
+  const [[crmDecision]] = await pool.query(
+    "SELECT titre, description FROM pro_crm_activities WHERE user_id = ? AND client_id = ? AND titre = ? ORDER BY id DESC LIMIT 1",
+    [userA, clientA, 'Réponse client au devis ' + quoteA.numero]
+  );
+  assert.ok(crmDecision, 'la réponse au devis doit apparaître dans le CRM');
+  assert.match(crmDecision.description, /Devis accepté/);
   const replay = await request(app).post('/api/portal/quotes/' + quoteA.id + '/decision').set('X-SF-Portal-Token', token)
     .send({ decision: 'refuse' });
   assert.equal(replay.status, 409, replay.text);
@@ -133,6 +139,11 @@ test('internationalisation : devise, langue, fuseau et formats sont propres à c
   const invoice = await createDocument(tokenB, clientB, 'facture', 'USD');
   const [[stored]] = await pool.query('SELECT devise FROM factures WHERE id = ? AND user_id = ?', [invoice.id, userB]);
   assert.equal(stored.devise, 'USD');
+
+  const currencyChangeAfterHistory = await request(app).put('/api/pro/localization')
+    .set('Authorization', 'Bearer ' + tokenB)
+    .send({ pays_code: 'US', langue: 'en', devise: 'EUR', fuseau_horaire: 'America/New_York', format_date: 'MM/dd/yyyy', regime_fiscal: 'standard' });
+  assert.equal(currencyChangeAfterHistory.status, 409, currencyChangeAfterHistory.text);
 
   const getSettings = await request(app).get('/api/pro/localization').set('Authorization', 'Bearer ' + tokenB);
   assert.equal(getSettings.status, 200, getSettings.text);
