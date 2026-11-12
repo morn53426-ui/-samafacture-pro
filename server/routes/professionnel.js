@@ -1624,7 +1624,7 @@ router.post('/clients/:id/portal', async (req, res, next) => {
     const [[company]] = await conn.query('SELECT entreprise_nom FROM users WHERE id = ?', [uid]);
     await conn.commit();
 
-    const url = baseUrl + '/portail-client.html?token=' + token;
+    const url = baseUrl + '/portail-client.html#token=' + token;
     // Ne jamais écrire le lien secret dans les logs quand le SMTP est absent.
     // Le lien est remis à l'utilisateur uniquement dans la réponse HTTP (une seule fois).
     let mail = { sent: false };
