@@ -1,10 +1,10 @@
 const crypto = require('crypto');
 
-function waveConfigured() {
-  return !!(process.env.WAVE_API_KEY && process.env.WAVE_SIGNING_SECRET);
+function waveConfigured(credentials = process.env) {
+  return !!(credentials.WAVE_API_KEY && credentials.WAVE_SIGNING_SECRET);
 }
-function paydunyaConfigured() {
-  return !!(process.env.PAYDUNYA_MASTER_KEY && process.env.PAYDUNYA_PRIVATE_KEY && process.env.PAYDUNYA_TOKEN);
+function paydunyaConfigured(credentials = process.env) {
+  return !!(credentials.PAYDUNYA_MASTER_KEY && credentials.PAYDUNYA_PRIVATE_KEY && credentials.PAYDUNYA_TOKEN);
 }
 
 // ---------------------------------------------------------------------------
@@ -12,11 +12,11 @@ function paydunyaConfigured() {
 // ---------------------------------------------------------------------------
 
 /** Crée une session de paiement Wave et renvoie l'URL de paiement à ouvrir. */
-async function creerSessionWave({ amount, reference, successUrl, errorUrl }) {
+async function creerSessionWave({ amount, reference, successUrl, errorUrl, credentials = process.env }) {
   const res = await fetch('https://api.wave.com/v1/checkout/sessions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.WAVE_API_KEY}`,
+      Authorization: `Bearer ${credentials.WAVE_API_KEY}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -37,14 +37,14 @@ async function creerSessionWave({ amount, reference, successUrl, errorUrl }) {
 /** Vérifie la signature d'un webhook Wave (header Wave-Signature: t=...,v1=...). Rejette
  *  aussi une signature techniquement valide mais trop ancienne (> 5 min), pour limiter la
  *  fenêtre d'une éventuelle attaque par rejeu si une requête signée venait à être interceptée. */
-function verifierSignatureWave(rawBody, signatureHeader) {
+function verifierSignatureWave(rawBody, signatureHeader, signingSecret = process.env.WAVE_SIGNING_SECRET) {
   if (!signatureHeader) return false;
   const parts = Object.fromEntries(signatureHeader.split(',').map(p => p.split('=')));
   const { t: timestamp, v1: signature } = parts;
   if (!timestamp || !signature) return false;
 
   const expected = crypto
-    .createHmac('sha256', process.env.WAVE_SIGNING_SECRET)
+    .createHmac('sha256', signingSecret)
     .update(timestamp + rawBody)
     .digest('hex');
 
@@ -65,9 +65,9 @@ function verifierSignatureWave(rawBody, signatureHeader) {
 }
 
 /** Consulte l'état d'une session Wave directement auprès de Wave (vérification de secours). */
-async function consulterSessionWave(sessionId) {
+async function consulterSessionWave(sessionId, credentials = process.env) {
   const res = await fetch(`https://api.wave.com/v1/checkout/sessions/${sessionId}`, {
-    headers: { Authorization: `Bearer ${process.env.WAVE_API_KEY}` }
+    headers: { Authorization: `Bearer ${credentials.WAVE_API_KEY}` }
   });
   if (!res.ok) return null;
   return res.json();
@@ -77,26 +77,26 @@ async function consulterSessionWave(sessionId) {
 // PayDunya — https://developers.paydunya.com (Orange Money, carte bancaire, Wave agrégé)
 // ---------------------------------------------------------------------------
 
-function paydunyaBaseUrl() {
-  return process.env.PAYDUNYA_MODE === 'live'
+function paydunyaBaseUrl(credentials = process.env) {
+  return credentials.PAYDUNYA_MODE === 'live'
     ? 'https://app.paydunya.com/api/v1'
     : 'https://app.paydunya.com/sandbox-api/v1';
 }
 
-function paydunyaHeaders() {
+function paydunyaHeaders(credentials = process.env) {
   return {
     'Content-Type': 'application/json',
-    'PAYDUNYA-MASTER-KEY': process.env.PAYDUNYA_MASTER_KEY,
-    'PAYDUNYA-PRIVATE-KEY': process.env.PAYDUNYA_PRIVATE_KEY,
-    'PAYDUNYA-TOKEN': process.env.PAYDUNYA_TOKEN
+    'PAYDUNYA-MASTER-KEY': credentials.PAYDUNYA_MASTER_KEY,
+    'PAYDUNYA-PRIVATE-KEY': credentials.PAYDUNYA_PRIVATE_KEY,
+    'PAYDUNYA-TOKEN': credentials.PAYDUNYA_TOKEN
   };
 }
 
 /** Crée une facture de paiement PayDunya et renvoie l'URL de paiement hébergée. */
-async function creerFacturePaydunya({ amount, description, reference, storeName, returnUrl, cancelUrl, callbackUrl }) {
-  const res = await fetch(`${paydunyaBaseUrl()}/checkout-invoice/create`, {
+async function creerFacturePaydunya({ amount, description, reference, storeName, returnUrl, cancelUrl, callbackUrl, credentials = process.env }) {
+  const res = await fetch(`${paydunyaBaseUrl(credentials)}/checkout-invoice/create`, {
     method: 'POST',
-    headers: paydunyaHeaders(),
+    headers: paydunyaHeaders(credentials),
     body: JSON.stringify({
       invoice: {
         total_amount: Math.round(amount),
@@ -119,9 +119,9 @@ async function creerFacturePaydunya({ amount, description, reference, storeName,
 }
 
 /** Vérifie que la notification IPN vient bien de PayDunya (hash SHA-512 de la clé maître). */
-function verifierHashPaydunya(hash) {
-  if (!hash) return false;
-  const expected = crypto.createHash('sha512').update(process.env.PAYDUNYA_MASTER_KEY).digest('hex');
+function verifierHashPaydunya(hash, masterKey = process.env.PAYDUNYA_MASTER_KEY) {
+  if (!hash || !masterKey) return false;
+  const expected = crypto.createHash('sha512').update(masterKey).digest('hex');
   try {
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(hash));
   } catch {
@@ -142,9 +142,9 @@ function verifierHashPaydunya(hash) {
  * n'importe quelle référence/montant. On ne crédite donc jamais un paiement sur la seule
  * foi de l'IPN : on interroge PayDunya pour obtenir le statut authentique avant de confirmer.
  */
-async function confirmerFacturePaydunya(token) {
-  const res = await fetch(`${paydunyaBaseUrl()}/checkout-invoice/confirm/${token}`, {
-    headers: paydunyaHeaders()
+async function confirmerFacturePaydunya(token, credentials = process.env) {
+  const res = await fetch(`${paydunyaBaseUrl(credentials)}/checkout-invoice/confirm/${encodeURIComponent(token)}`, {
+    headers: paydunyaHeaders(credentials)
   });
   if (!res.ok) return null;
   return res.json();

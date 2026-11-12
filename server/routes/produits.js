@@ -2,10 +2,24 @@ const express = require('express');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
-const { positiveNumber, percentage, positiveInt } = require('../utils/validation');
+const { positiveNumber, percentage, nonNegativeQuantity } = require('../utils/validation');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 
 const router = express.Router();
+
+async function initialiserStockEntrepotPrincipal(conn, userId, productId, quantity) {
+  const [warehouses] = await conn.query(
+    "SELECT id FROM pro_entrepots WHERE user_id = ? AND code = 'PRINCIPAL' LIMIT 1",
+    [userId]
+  );
+  if (!warehouses.length) return;
+  await conn.query(
+    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, ?)',
+    [userId, warehouses[0].id, productId, quantity]
+  );
+}
+
+
 router.use(requireAuth, resolveTenant, requirePermission);
 
 /**
@@ -84,9 +98,10 @@ router.post('/', async (req, res, next) => {
     const [result] = await pool.query(
       `INSERT INTO produits (user_id, nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.tenantId, nom, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), positiveInt(stock), categorie || null, description || null, image || null]
+      [req.tenantId, nom, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), nonNegativeQuantity(stock), categorie || null, description || null, image || null]
     );
 
+    await initialiserStockEntrepotPrincipal(pool, req.tenantId, result.insertId, nonNegativeQuantity(stock));
     const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ produit: rows[0] });
   } catch (err) { next(err); }
@@ -110,33 +125,79 @@ router.post('/', async (req, res, next) => {
  *       404: { description: Produit introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.put('/:id', async (req, res, next) => {
+  let conn;
   try {
-    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [existingRows] = await conn.query('SELECT * FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, req.tenantId]);
     const existing = existingRows[0];
-    if (!existing) return res.status(404).json({ error: 'Produit introuvable.' });
+    if (!existing) { await conn.rollback(); return res.status(404).json({ error: 'Produit introuvable.' }); }
 
     const { nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image } = req.body;
-    // Même règle qu'à la création (POST /produits) : le nom est obligatoire. Sans ce
-    // contrôle, `{ nom: "" }` effaçait silencieusement le nom d'un produit existant.
     if (nom !== undefined && !nom) {
+      await conn.rollback();
       return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
     }
-    await pool.query(
-      `UPDATE produits SET nom=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, categorie=?, description=?, image=? WHERE id = ? AND user_id = ?`,
+
+    let nextStock = stock !== undefined ? nonNegativeQuantity(stock, Number(existing.stock)) : Number(existing.stock);
+    let stockMovement = null;
+    const [warehouses] = await conn.query(
+      "SELECT id, nom FROM pro_entrepots WHERE user_id = ? AND code = 'PRINCIPAL' LIMIT 1",
+      [req.tenantId]
+    );
+    if (stock !== undefined && warehouses.length) {
+      // Une fois les stocks multi-entrepôts activés, un changement du stock catalogue
+      // est traité comme un delta sur le dépôt principal afin de conserver le total.
+      const warehouseId = Number(warehouses[0].id);
+      await conn.query(
+        'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0)',
+        [req.tenantId, warehouseId, existing.id]
+      );
+      const [stockRows] = await conn.query(
+        'SELECT entrepot_id, quantite FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ? FOR UPDATE',
+        [req.tenantId, existing.id]
+      );
+      const main = stockRows.find(row => Number(row.entrepot_id) === warehouseId);
+      const currentTotal = stockRows.reduce((sum, row) => sum + Number(row.quantite), 0);
+      const delta = Math.round((nextStock - currentTotal) * 1000) / 1000;
+      stockMovement = { warehouseId, delta };
+      if (!main || Number(main.quantite) + delta < 0) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'La nouvelle quantité ne peut pas être obtenue en réduisant uniquement le dépôt principal. Utilisez Achats & stocks pour ajuster chaque entrepôt.' });
+      }
+      await conn.query(
+        'UPDATE pro_stocks_entrepots SET quantite = quantite + ? WHERE user_id = ? AND entrepot_id = ? AND produit_id = ?',
+        [delta, req.tenantId, warehouseId, existing.id]
+      );
+      const [totals] = await conn.query('SELECT COALESCE(SUM(quantite),0) AS total FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?', [req.tenantId, existing.id]);
+      nextStock = Number(totals[0].total);
+    }
+
+    await conn.query(
+      'UPDATE produits SET nom=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, categorie=?, description=?, image=? WHERE id = ? AND user_id = ?',
       [
         nom ?? existing.nom, reference ?? existing.reference,
         prix_ht !== undefined ? positiveNumber(prix_ht, existing.prix_ht) : existing.prix_ht,
         prix_achat !== undefined ? positiveNumber(prix_achat, existing.prix_achat) : existing.prix_achat,
         tva !== undefined ? percentage(tva, existing.tva) : existing.tva,
-        stock !== undefined ? positiveInt(stock, existing.stock) : existing.stock,
+        nextStock,
         categorie ?? existing.categorie, description ?? existing.description, image ?? existing.image,
         existing.id, req.tenantId
       ]
     );
-
-    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    if (stockMovement && stockMovement.delta !== 0) {
+      await conn.query(
+        "INSERT INTO pro_mouvements_stock (user_id, produit_id, produit_nom, entrepot_id, entrepot_nom, type, quantite, cout_unitaire, motif) VALUES (?, ?, ?, ?, ?, 'ajustement_catalogue', ?, ?, ?)",
+        [req.tenantId, existing.id, existing.nom, stockMovement.warehouseId, warehouses[0].nom, stockMovement.delta, Number(prix_achat !== undefined ? positiveNumber(prix_achat, existing.prix_achat) : existing.prix_achat), 'Modification de quantité depuis la fiche produit']
+      );
+    }
+    const [rows] = await conn.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    await conn.commit();
     res.json({ produit: rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback();
+    next(err);
+  } finally { if (conn) conn.release(); }
 });
 
 /**

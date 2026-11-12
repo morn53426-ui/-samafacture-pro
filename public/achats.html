@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <script src="js/theme.js"></script><script src="js/icons.js"></script><script src="js/tooltip.js"></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Achats & stocks — SamaFacture Pro</title><meta name="robots" content="noindex">
+  <link rel="stylesheet" href="css/style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0F1B33">
+</head>
+<body>
+<div class="app-shell"><div id="sidebar-root"></div><main class="main-content">
+  <div class="page-header"><div><div class="pro-eyebrow">APPROVISIONNEMENT & INVENTAIRE</div><h1>Achats & stocks</h1><p>Fournisseurs, commandes d’achat, réceptions partielles, entrepôts et mouvements de stock.</p></div><button class="btn btn-outline" id="refresh-buying">Actualiser</button></div>
+
+  <div class="grid grid-3" style="margin-bottom:18px">
+    <article class="card stat-card"><div class="stat-label">Fournisseurs actifs</div><div class="stat-value" id="kpi-suppliers">—</div></article>
+    <article class="card stat-card"><div class="stat-label">Commandes ouvertes</div><div class="stat-value" id="kpi-open-orders">—</div></article>
+    <article class="card stat-card"><div class="stat-label">Valeur du stock au coût d’achat</div><div class="stat-value mono" id="kpi-stock-value">—</div></article>
+  </div>
+
+  <section class="card" style="margin-bottom:20px">
+    <h2 style="margin-top:0">1. Fournisseurs</h2>
+    <form id="supplier-form" class="grid grid-3">
+      <div class="field"><label for="supplier-name">Nom du fournisseur *</label><input id="supplier-name" required maxlength="190"></div>
+      <div class="field"><label for="supplier-email">Email</label><input id="supplier-email" type="email" maxlength="190"></div>
+      <div class="field"><label for="supplier-phone">Téléphone</label><input id="supplier-phone" maxlength="40"></div>
+      <div class="field"><label for="supplier-address">Adresse</label><input id="supplier-address" maxlength="255"></div>
+      <div class="field"><label for="supplier-ninea">NINEA / identifiant fiscal</label><input id="supplier-ninea" maxlength="60"></div>
+      <div class="field"><label for="supplier-notes">Notes</label><input id="supplier-notes" maxlength="1000"></div>
+      <div><button class="btn btn-primary" type="submit">Ajouter le fournisseur</button></div>
+    </form>
+    <div id="suppliers-list" class="pro-list" style="margin-top:14px"></div>
+  </section>
+
+  <section class="card" style="margin-bottom:20px">
+    <h2 style="margin-top:0">2. Commande fournisseur</h2>
+    <form id="purchase-form">
+      <div class="grid grid-3">
+        <div class="field"><label for="purchase-supplier">Fournisseur *</label><select id="purchase-supplier" required></select></div>
+        <div class="field"><label for="purchase-date">Date de commande</label><input id="purchase-date" type="date" required></div>
+        <div class="field"><label for="purchase-due">Livraison prévue</label><input id="purchase-due" type="date"></div>
+      </div>
+      <div class="field"><label for="purchase-notes">Notes / conditions</label><input id="purchase-notes" maxlength="1000"></div>
+      <div style="overflow-x:auto"><table class="data-table" style="min-width:730px;width:100%"><thead><tr><th>Produit catalogue</th><th>Désignation</th><th>Quantité</th><th>Prix achat unitaire</th><th>TVA %</th><th>Total TTC</th><th></th></tr></thead><tbody id="purchase-lines"></tbody></table></div>
+      <div class="pro-actions" style="margin-top:12px;justify-content:space-between;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-outline" id="add-purchase-line" type="button">Ajouter une ligne</button>
+        <strong id="purchase-total">Total TTC : 0</strong>
+        <button class="btn btn-primary" type="submit">Créer la commande d’achat</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" style="margin-bottom:20px">
+    <h2 style="margin-top:0">3. Réception des marchandises</h2>
+    <div class="grid grid-3">
+      <div class="field"><label for="receipt-order">Commande fournisseur</label><select id="receipt-order"></select></div>
+      <div class="field"><label for="receipt-warehouse">Entrepôt de réception</label><select id="receipt-warehouse"></select></div>
+      <div class="field"><label for="receipt-date">Date de réception</label><input id="receipt-date" type="date"></div>
+    </div>
+    <button class="btn btn-outline" id="load-receipt-lines" type="button">Charger les quantités à réceptionner</button>
+    <div id="receipt-lines" style="margin-top:14px"></div>
+    <button class="btn btn-primary" id="submit-receipt" type="button" style="margin-top:12px" hidden>Valider cette réception</button>
+  </section>
+
+  <section class="card" style="margin-bottom:20px">
+    <h2 style="margin-top:0">4. Entrepôts</h2>
+    <form id="warehouse-form" class="grid grid-3">
+      <div class="field"><label for="warehouse-code">Code *</label><input id="warehouse-code" required maxlength="30" placeholder="DAKAR-01"></div>
+      <div class="field"><label for="warehouse-name">Nom *</label><input id="warehouse-name" required maxlength="120" placeholder="Dépôt principal"></div>
+      <div class="field"><label for="warehouse-address">Adresse</label><input id="warehouse-address" maxlength="255"></div>
+      <div><button class="btn btn-outline" type="submit">Créer un entrepôt</button></div>
+    </form>
+    <div id="warehouses-list" class="pro-list" style="margin-top:12px"></div>
+  </section>
+
+  <section class="card" style="margin-bottom:20px">
+    <h2 style="margin-top:0">5. Ajustement ou transfert de stock</h2>
+    <div class="grid grid-2">
+      <form id="adjustment-form" class="pro-form">
+        <h3>Ajustement d’inventaire</h3>
+        <div class="field"><label for="adjust-product">Produit</label><select id="adjust-product" required></select></div>
+        <div class="field"><label for="adjust-warehouse">Entrepôt</label><select id="adjust-warehouse" required></select></div>
+        <div class="field"><label for="adjust-qty">Variation (+/-)</label><input id="adjust-qty" type="number" step="0.001" required placeholder="Ex. 5 ou -2"></div>
+        <div class="field"><label for="adjust-reason">Motif</label><input id="adjust-reason" required maxlength="255"></div>
+        <button class="btn btn-primary" type="submit">Enregistrer l’ajustement</button>
+      </form>
+      <form id="transfer-form" class="pro-form">
+        <h3>Transfert entre entrepôts</h3>
+        <div class="field"><label for="transfer-product">Produit</label><select id="transfer-product" required></select></div>
+        <div class="field"><label for="transfer-from">Entrepôt source</label><select id="transfer-from" required></select></div>
+        <div class="field"><label for="transfer-to">Entrepôt destination</label><select id="transfer-to" required></select></div>
+        <div class="field"><label for="transfer-qty">Quantité</label><input id="transfer-qty" type="number" min="0.001" step="0.001" required></div>
+        <button class="btn btn-primary" type="submit">Transférer le stock</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:20px">
+    <h2 style="margin-top:0">6. État du stock par produit</h2>
+    <div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:680px"><thead><tr><th>Produit</th><th>Référence</th><th>Entrepôts</th><th>Quantité totale</th><th>Coût unitaire</th><th>Valeur au coût</th></tr></thead><tbody id="stock-list"><tr><td colspan="6">Chargement…</td></tr></tbody></table></div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">7. Derniers mouvements de stock</h2>
+    <div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:680px"><thead><tr><th>Date</th><th>Produit</th><th>Entrepôt</th><th>Type</th><th>Variation</th><th>Motif / référence</th></tr></thead><tbody id="movement-list"></tbody></table></div>
+    <div id="purchase-orders" class="pro-list" style="margin-top:18px"></div>
+  </section>
+  <p class="pro-note" style="margin-top:16px">Les quantités multi-entrepôts deviennent la source du stock total du catalogue après la première initialisation du module. Les ventes issues des factures continuent de mettre à jour le stock global historique ; le routage automatique des sorties de ventes vers un entrepôt spécifique reste une évolution à intégrer.</p>
+</main></div>
+<script src="js/api.js"></script><script src="js/pwa.js"></script><script src="js/sidebar.js"></script>
+<script>
+requireAuthPage(); renderSidebar('achats');
+const $=id=>document.getElementById(id);
+let suppliers=[],products=[],warehouses=[],purchaseLines=[],activeReceipt=null;
+const fmt=n=>formatMontant(Number(n)||0);
+const opt=(value,label)=>'<option value="'+value+'">'+escapeHtml(label)+'</option>';
+function productOptions(){return '<option value="">Saisie libre</option>'+products.map(p=>opt(p.id,p.nom+' · '+(p.reference||'sans réf.'))).join('');}
+function warehouseOptions(){return warehouses.map(w=>opt(w.id,w.code+' · '+w.nom)).join('');}
+function addPurchaseLine(initial={}){
+  const id=crypto.randomUUID();
+  purchaseLines.push({id,productId:initial.productId||'',designation:initial.designation||'',qty:initial.qty||1,price:initial.price||0,tax:initial.tax||0});
+  renderPurchaseLines();
+}
+function renderPurchaseLines(){
+  $('purchase-lines').innerHTML=purchaseLines.map(line=>'<tr data-line="'+line.id+'"><td><select class="purchase-product">'+productOptions()+'</select></td><td><input class="purchase-designation" maxlength="255" value="'+escapeHtml(line.designation)+'" placeholder="Désignation"></td><td><input class="purchase-qty" type="number" min="0.001" step="0.001" value="'+line.qty+'"></td><td><input class="purchase-price" type="number" min="0" step="0.01" value="'+line.price+'"></td><td><input class="purchase-tax" type="number" min="0" max="100" step="0.01" value="'+line.tax+'"></td><td class="purchase-row-total">'+fmt(Number(line.qty)*Number(line.price)*(1+Number(line.tax)/100))+'</td><td><button type="button" class="btn btn-sm btn-outline remove-purchase-line">×</button></td></tr>').join('');
+  purchaseLines.forEach(line=>{
+    const row=$('purchase-lines').querySelector('[data-line="'+line.id+'"]');
+    row.querySelector('.purchase-product').value=line.productId;
+    row.querySelector('.purchase-product').addEventListener('change',e=>{
+      const p=products.find(x=>Number(x.id)===Number(e.target.value));
+      line.productId=e.target.value;
+      if(p){line.designation=p.nom;line.price=Number(p.prix_achat||0);line.tax=Number(p.tva||0);}
+      renderPurchaseLines();
+    });
+    ['designation','qty','price','tax'].forEach(key=>{
+      const el=row.querySelector('.purchase-'+(key==='designation'?'designation':key==='qty'?'qty':key==='price'?'price':'tax'));
+      el.addEventListener('input',e=>{line[key]=key==='designation'?e.target.value:Number(e.target.value);updatePurchaseTotals();});
+    });
+    row.querySelector('.remove-purchase-line').addEventListener('click',()=>{purchaseLines=purchaseLines.filter(x=>x.id!==line.id);renderPurchaseLines();});
+  });
+  updatePurchaseTotals();
+}
+function updatePurchaseTotals(){
+  let total=0;
+  purchaseLines.forEach(line=>{const ht=Number(line.qty||0)*Number(line.price||0);total+=ht*(1+Number(line.tax||0)/100);});
+  $('purchase-total').textContent='Total TTC : '+fmt(total);
+  $('purchase-lines').querySelectorAll('tr').forEach(row=>{
+    const line=purchaseLines.find(x=>x.id===row.dataset.line);
+    if(line) row.querySelector('.purchase-row-total').textContent=fmt(Number(line.qty)*Number(line.price)*(1+Number(line.tax)/100));
+  });
+}
+async function loadAll(){
+  const results=await Promise.all([
+    Api.get('/pro/suppliers'),Api.get('/produits'),Api.get('/pro/warehouses'),
+    Api.get('/pro/purchase-orders'),Api.get('/pro/inventory/stock'),
+    Api.get('/pro/inventory/movements'),Api.get('/pro/inventory/valuation')
+  ]);
+  suppliers=results[0].fournisseurs||[];products=results[1].produits||[];warehouses=results[2].entrepots||[];
+  const orders=results[3].commandes||[],stocks=results[4].stocks||[],moves=results[5].mouvements||[],valuation=results[6].valorisation||[];
+  $('kpi-suppliers').textContent=suppliers.filter(s=>s.actif).length;
+  $('kpi-open-orders').textContent=orders.filter(o=>!['recue','annulee'].includes(o.statut)).length;
+  $('kpi-stock-value').textContent=fmt(results[6].valeur_totale);
+  $('supplier-form') && ($('suppliers-list').innerHTML=suppliers.map(s=>'<div class="pro-list-row"><div><strong>'+escapeHtml(s.nom)+'</strong><small>'+escapeHtml(s.email||'')+' · '+escapeHtml(s.telephone||'')+' · '+escapeHtml(s.ninea||'')+'</small></div><span>'+(s.actif?'Actif':'Inactif')+'</span></div>').join('')||'<p class="pro-muted">Aucun fournisseur.</p>');
+  $('purchase-supplier').innerHTML='<option value="">Sélectionner un fournisseur</option>'+suppliers.filter(s=>s.actif).map(s=>opt(s.id,s.nom)).join('');
+  const wh=warehouseOptions();
+  ['receipt-warehouse','adjust-warehouse','transfer-from','transfer-to'].forEach(id=>$(id).innerHTML=wh);
+  ['adjust-product','transfer-product'].forEach(id=>$(id).innerHTML=products.map(p=>opt(p.id,p.nom)).join(''));
+  $('receipt-order').innerHTML='<option value="">Sélectionner une commande</option>'+orders.filter(o=>!['recue','annulee'].includes(o.statut)).map(o=>opt(o.id,o.numero+' · '+o.fournisseur_nom+' · '+o.statut)).join('');
+  $('purchase-orders').innerHTML='<h3>Commandes récentes</h3>'+orders.map(o=>'<div class="pro-list-row"><div><strong>'+escapeHtml(o.numero)+'</strong><small>'+escapeHtml(o.fournisseur_nom)+' · '+escapeHtml(o.date_commande)+' · '+fmt(o.total_ttc)+'</small></div><span>'+escapeHtml(o.statut)+'</span></div>').join('')||'<p class="pro-muted">Aucune commande fournisseur.</p>';
+  $('warehouses-list').innerHTML=warehouses.map(w=>'<div class="pro-list-row"><strong>'+escapeHtml(w.code+' · '+w.nom)+'</strong><span>'+(w.par_defaut?'Principal':'Entrepôt')+'</span></div>').join('');
+  $('stock-list').innerHTML=stocks.map(s=>{const v=valuation.find(x=>Number(x.id)===Number(s.produit_id));return '<tr><td>'+escapeHtml(s.nom)+'</td><td>'+escapeHtml(s.reference||'—')+'</td><td>'+Number(s.nb_entrepots||0)+'</td><td>'+Number(s.quantite||0)+'</td><td>'+fmt(s.prix_achat)+'</td><td>'+fmt(v?.valeur||0)+'</td></tr>';}).join('')||'<tr><td colspan="6">Aucun produit.</td></tr>';
+  $('movement-list').innerHTML=moves.map(m=>'<tr><td>'+escapeHtml(String(m.created_at||'').slice(0,16))+'</td><td>'+escapeHtml(m.produit_nom)+'</td><td>'+escapeHtml(m.entrepot_nom)+'</td><td>'+escapeHtml(m.type)+'</td><td>'+Number(m.quantite)+'</td><td>'+escapeHtml(m.motif||m.reference||'')+'</td></tr>').join('')||'<tr><td colspan="6">Aucun mouvement enregistré.</td></tr>';
+  if(!purchaseLines.length)addPurchaseLine();
+}
+$('supplier-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  try{await Api.post('/pro/suppliers',{nom:$('supplier-name').value,email:$('supplier-email').value,telephone:$('supplier-phone').value,adresse:$('supplier-address').value,ninea:$('supplier-ninea').value,notes:$('supplier-notes').value});e.target.reset();await loadAll();showToast('Fournisseur ajouté.','success');}
+  catch(err){showToast(err.message,'error');}
+});
+$('add-purchase-line').addEventListener('click',()=>addPurchaseLine());
+$('purchase-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const lignes=purchaseLines.map(l=>({produit_id:l.productId?Number(l.productId):null,designation:l.designation,quantite:Number(l.qty),prix_unitaire:Number(l.price),tva:Number(l.tax)}));
+  try{const r=await Api.post('/pro/purchase-orders',{fournisseur_id:Number($('purchase-supplier').value),date_commande:$('purchase-date').value,date_livraison_prevue:$('purchase-due').value||null,notes:$('purchase-notes').value,lignes});showToast('Commande '+r.numero+' créée.','success');e.target.reset();purchaseLines=[];renderPurchaseLines();await loadAll();}
+  catch(err){showToast(err.message,'error');}
+});
+$('warehouse-form').addEventListener('submit',async e=>{
+  e.preventDefault();try{await Api.post('/pro/warehouses',{code:$('warehouse-code').value,nom:$('warehouse-name').value,adresse:$('warehouse-address').value});e.target.reset();await loadAll();showToast('Entrepôt créé.','success');}catch(err){showToast(err.message,'error');}
+});
+$('load-receipt-lines').addEventListener('click',async()=>{
+  const id=$('receipt-order').value;if(!id){showToast('Choisissez une commande.','error');return;}
+  try{
+    const data=await Api.get('/pro/purchase-orders/'+id);activeReceipt=data;
+    const lines=data.lignes||[];
+    $('receipt-lines').innerHTML='<div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:650px"><thead><tr><th>Produit / Désignation</th><th>Commandé</th><th>Déjà reçu</th><th>Reste</th><th>À réceptionner</th></tr></thead><tbody>'+lines.map(l=>'<tr data-line="'+l.id+'"><td>'+escapeHtml(l.designation)+(l.produit_id?'':' <span class="pro-note">— associez un produit avant réception</span>')+'</td><td>'+Number(l.quantite)+'</td><td>'+Number(l.quantite_recue)+'</td><td>'+Math.max(0,Number(l.quantite)-Number(l.quantite_recue))+'</td><td><input class="receive-qty" type="number" min="0" max="'+Math.max(0,Number(l.quantite)-Number(l.quantite_recue))+'" step="0.001" value="0" '+(l.produit_id?'':'disabled')+'></td></tr>').join('')+'</tbody></table></div>';
+    $('submit-receipt').hidden=false;
+  }catch(err){showToast(err.message,'error');}
+});
+$('submit-receipt').addEventListener('click',async()=>{
+  if(!activeReceipt)return;
+  const lignes=[...$('receipt-lines').querySelectorAll('tr[data-line]')].map(row=>({ligne_id:Number(row.dataset.line),quantite:Number(row.querySelector('.receive-qty').value)})).filter(l=>l.quantite>0);
+  if(!lignes.length){showToast('Saisissez au moins une quantité à réceptionner.','error');return;}
+  try{const r=await Api.post('/pro/purchase-orders/'+activeReceipt.commande.id+'/receive',{entrepot_id:Number($('receipt-warehouse').value),date_reception:$('receipt-date').value||undefined,lignes});showToast('Réception '+r.reference+' enregistrée.','success');activeReceipt=null;$('receipt-lines').innerHTML='';$('submit-receipt').hidden=true;await loadAll();}
+  catch(err){showToast(err.message,'error');}
+});
+$('adjustment-form').addEventListener('submit',async e=>{
+  e.preventDefault();try{await Api.post('/pro/inventory/adjustments',{produit_id:Number($('adjust-product').value),entrepot_id:Number($('adjust-warehouse').value),quantite:Number($('adjust-qty').value),motif:$('adjust-reason').value});e.target.reset();await loadAll();showToast('Ajustement enregistré.','success');}catch(err){showToast(err.message,'error');}
+});
+$('transfer-form').addEventListener('submit',async e=>{
+  e.preventDefault();try{const r=await Api.post('/pro/inventory/transfers',{produit_id:Number($('transfer-product').value),entrepot_source_id:Number($('transfer-from').value),entrepot_destination_id:Number($('transfer-to').value),quantite:Number($('transfer-qty').value)});e.target.reset();await loadAll();showToast('Transfert '+r.reference+' enregistré.','success');}catch(err){showToast(err.message,'error');}
+});
+$('refresh-buying').addEventListener('click',()=>loadAll().catch(err=>showFatalError(err.message)));
+const today=new Date().toISOString().slice(0,10);$('purchase-date').value=today;$('receipt-date').value=today;
+loadAll().catch(err=>showFatalError(err.message));
+</script></body></html>
