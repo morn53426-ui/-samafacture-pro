@@ -298,6 +298,15 @@ async function runMigrations(conn) {
     await conn.query(statement);
   }
 
+  // Le stock multi-entrepôts accepte les quantités fractionnaires (poids, mètres, litres).
+  const [stockTypeRows] = await conn.query(
+    `SELECT DATA_TYPE FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produits' AND COLUMN_NAME = 'stock'`
+  );
+  if (stockTypeRows.length && stockTypeRows[0].DATA_TYPE !== 'decimal') {
+    await conn.query('ALTER TABLE produits MODIFY COLUMN stock DECIMAL(14,3) NOT NULL DEFAULT 0');
+  }
+
   // Paiements de factures, comptabilité générale et achats/stocks (migration 004).
   const accountingPurchasingPath = path.join(__dirname, '..', 'database', 'migrations', '004_paiements_comptabilite_achats.sql');
   const accountingPurchasingSql = fs.readFileSync(accountingPurchasingPath, 'utf8');
