@@ -3732,3 +3732,28 @@ thead th { background: #F2F6FD; color: #52627D; }
   white-space:nowrap;
   letter-spacing:-.055em;
 }
+
+
+/* Palette de la référence appliquée aux cartes de la facturation. */
+.tone-blue { background:rgba(23,105,245,.12); color:#1769F5; }
+.tone-green { background:rgba(13,175,131,.13); color:#0DAF83; }
+.tone-purple { background:rgba(119,57,233,.12); color:#7739E9; }
+.tone-amber { background:rgba(245,166,35,.16); color:#B87509; }
+.billing-filter:hover { border-color:#1769F5; color:#1769F5; }
+.billing-filter.is-active {
+  border-color:#1769F5;
+  background:rgba(23,105,245,.1);
+  color:#1769F5;
+}
+.billing-list-hint .ic { color:#1769F5; }
+.billing-table-card .billing-table tbody tr:hover { background:rgba(23,105,245,.035); }
+.billing-icon-action.is-primary {
+  border-color:rgba(23,105,245,.28);
+  background:rgba(23,105,245,.09);
+  color:#1769F5;
+}
+.billing-icon-action:hover {
+  border-color:#1769F5;
+  background:rgba(23,105,245,.1);
+  color:#1769F5;
+}
