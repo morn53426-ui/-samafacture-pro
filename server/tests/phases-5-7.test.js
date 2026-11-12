@@ -74,11 +74,11 @@ test('portail client : lien à jeton haché, documents limités au client et ré
   const decision = await request(app).post('/api/portal/quotes/' + quoteA.id + '/decision').set('X-SF-Portal-Token', token)
     .send({ decision: 'accepte', commentaire: 'Bon pour accord.' });
   assert.equal(decision.status, 201, decision.text);
-  const replay = await request(app).post('/api/portal/' + token + '/quotes/' + quoteA.id + '/decision')
+  const replay = await request(app).post('/api/portal/quotes/' + quoteA.id + '/decision').set('X-SF-Portal-Token', token)
     .send({ decision: 'refuse' });
   assert.equal(replay.status, 409, replay.text);
 
-  const afterDecision = await request(app).get('/api/portal/' + token);
+  const afterDecision = await request(app).get('/api/portal/').set('X-SF-Portal-Token', token);
   assert.equal(afterDecision.status, 200, afterDecision.text);
   assert.equal(afterDecision.body.documents.find(d => Number(d.id) === Number(quoteA.id)).portail_decision, 'accepte');
 
