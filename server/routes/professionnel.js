@@ -1598,6 +1598,7 @@ router.post('/clients/:id/portal', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
     const uid = owner(req);
+    await conn.beginTransaction();
     const [clients] = await conn.query('SELECT id, nom, email FROM clients WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
     const client = clients[0];
     if (!client) { await conn.rollback(); return res.status(404).json({ error: 'Client introuvable.' }); }
@@ -1612,7 +1613,6 @@ router.post('/clients/:id/portal', async (req, res, next) => {
     const token = crypto.randomBytes(32).toString('hex');
     const hash = crypto.createHash('sha256').update(token).digest('hex');
     const expiresAt = new Date(Date.now() + 30 * 86400000);
-    await conn.beginTransaction();
     await conn.query(
       'UPDATE pro_customer_portal_access SET revoked_at = NOW() WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL',
       [uid, client.id]
