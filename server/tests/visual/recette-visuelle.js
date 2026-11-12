@@ -342,11 +342,15 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   const shell = await page.evaluate(() => ({
     toolbar: Boolean(document.querySelector('.app-topbar')),
     search: Boolean(document.querySelector('.app-topbar-search input#workspace-search')),
+    notificationBell: Boolean(document.querySelector('#workspace-notification-toggle .ic svg')),
+    notificationPanel: Boolean(document.querySelector('#workspace-notification-panel[hidden]')),
     sidebar: Boolean(document.querySelector('#app-sidebar')),
     activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active'))
   }));
   assert.equal(shell.toolbar, true, pageDefinition.name + ' doit afficher la barre supérieure commune.');
   assert.equal(shell.search, true, pageDefinition.name + ' doit afficher la recherche globale.');
+  assert.equal(shell.notificationBell, true, pageDefinition.name + ' doit afficher la cloche de notifications.');
+  assert.equal(shell.notificationPanel, true, pageDefinition.name + ' doit garder le panneau fermé au chargement.');
   assert.equal(shell.sidebar, true, pageDefinition.name + ' doit afficher la navigation latérale.');
   assert.equal(shell.activeNavigation, true, pageDefinition.name + ' doit signaler la page active.');
 
@@ -492,6 +496,34 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  const initialNotifications = await page.evaluate(() => ({
+    badgeHidden: document.getElementById('workspace-notification-badge')?.hidden,
+    expanded: document.getElementById('workspace-notification-toggle')?.getAttribute('aria-expanded'),
+    emptyMessage: document.getElementById('workspace-notification-list')?.textContent.trim()
+  }));
+  assert.deepEqual(initialNotifications, {
+    badgeHidden: true,
+    expanded: 'false',
+    emptyMessage: 'Aucune notification reçue pendant cette session.'
+  }, 'Aucun compteur fictif ne doit apparaître sans événement reçu.');
+  await page.click('#workspace-notification-toggle');
+  assert.equal(await page.$eval('#workspace-notification-panel', element => !element.hidden), true,
+    'La cloche doit ouvrir le panneau de notifications.');
+  await page.evaluate(() => pushWorkspaceNotification('Test de notification', 'Un nouvel événement a été reçu.', 'info'));
+  const unread = await page.evaluate(() => ({
+    badgeHidden: document.getElementById('workspace-notification-badge').hidden,
+    badge: document.getElementById('workspace-notification-badge').textContent,
+    message: document.getElementById('workspace-notification-list').textContent.includes('Un nouvel événement a été reçu.')
+  }));
+  assert.deepEqual(unread, { badgeHidden: false, badge: '1', message: true },
+    'Un événement reçu doit alimenter la liste et le compteur non lu.');
+  await page.click('#workspace-notification-toggle');
+  assert.equal(await page.$eval('#workspace-notification-badge', element => element.hidden), true,
+    'L’ouverture du panneau doit marquer les notifications consultées comme lues.');
+  await page.click('#workspace-notification-toggle');
+  await page.click('.app-notification-clear');
+  assert.equal(await page.$eval('#workspace-notification-list', element => element.textContent.trim()),
+    'Aucune notification reçue pendant cette session.', 'Le bouton Effacer doit vider la liste.');
   await page.type('#workspace-search', 'Coopérative Thiès');
   await page.click('.app-topbar-search button');
   await page.waitForFunction(() => location.pathname.endsWith('/clients.html'), { timeout: 15000 });
@@ -524,7 +556,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
     'Le bouton du menu doit refermer le panneau mobile et son voile.');
   await mobile.close();
 
-  return { globalSearch: 'ok', mobileNavigation: 'ok' };
+  return { globalSearch: 'ok', mobileNavigation: 'ok', notifications: 'ok' };
 }
 
 function contrastRatio(foreground, background) {
