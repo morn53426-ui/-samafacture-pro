@@ -564,7 +564,7 @@ router.get('/team', async (req, res, next) => {
 router.post('/team/roles', async (req, res, next) => {
   try {
     const nom = String(req.body.nom || '').trim().slice(0, 100);
-    const allowed = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','purchasing.read','purchasing.write','inventory.read','inventory.write','accounting.read','accounting.write','audit.read'];
+    const allowed = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','purchasing.read','purchasing.write','inventory.read','inventory.write','accounting.read','accounting.write','crm.read','crm.write','localization.read','localization.write','audit.read'];
     const permissions = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions.filter(p => allowed.includes(p)))] : [];
     if (!nom || !permissions.length) return res.status(400).json({ error: 'Nom et au moins une permission valide obligatoires.' });
     const [result] = await pool.query('INSERT INTO pro_team_roles (user_id, nom, permissions_json) VALUES (?, ?, ?)', [owner(req), nom, JSON.stringify(permissions)]);
@@ -580,7 +580,7 @@ router.post('/team/invitations', async (req, res, next) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const role = String(req.body.role || 'employe').trim();
     const allowedRoles = ['administrateur','manager','comptable','commercial','caissier','employe','lecture_seule'];
-    const allowedPermissions = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','purchasing.read','purchasing.write','inventory.read','inventory.write','accounting.read','accounting.write','audit.read'];
+    const allowedPermissions = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','purchasing.read','purchasing.write','inventory.read','inventory.write','accounting.read','accounting.write','crm.read','crm.write','localization.read','localization.write','audit.read'];
     let permissions = ROLE_PERMISSIONS[role];
     if (role === 'personnalise') permissions = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions.filter(p => allowedPermissions.includes(p)))] : [];
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (!allowedRoles.includes(role) && role !== 'personnalise')) return res.status(400).json({ error: 'Adresse email ou rôle invalide.' });
@@ -733,15 +733,36 @@ router.get('/automations', async (req, res, next) => {
 router.post('/automations', async (req, res, next) => {
   try {
     const type = String(req.body.type || '');
-    const allowed = ['relance_impayes_email','relance_impayes_whatsapp'];
+    const allowed = ['relance_impayes_email','relance_impayes_whatsapp','relance_devis_email','alerte_stock_email'];
     const nom = String(req.body.nom || '').trim().slice(0, 150);
     const config = req.body.configuration && typeof req.body.configuration === 'object' ? req.body.configuration : {};
     if (!allowed.includes(type) || !nom) return res.status(400).json({ error: 'Type ou nom d’automatisation invalide.' });
-    if (type === 'relance_impayes_whatsapp') return res.status(501).json({ error: 'L’envoi WhatsApp automatique exige un fournisseur WhatsApp Business configuré. Le lien de relance manuelle reste disponible.' });
-    const jours = Math.min(120, Math.max(1, Number(config.jours_retard || 7)));
-    const frequence = Math.min(90, Math.max(1, Number(config.frequence_jours || 7)));
-    const normalized = { jours_retard: jours, frequence_jours: frequence, canal: 'email' };
-    const [result] = await pool.query('INSERT INTO pro_automations (user_id, type, nom, configuration_json, prochaine_execution) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))', [owner(req), type, nom, JSON.stringify(normalized)]);
+    if (type === 'relance_impayes_whatsapp') return res.status(501).json({ error: 'L’envoi WhatsApp automatique exige un fournisseur WhatsApp Business configuré. Le canal email reste disponible.' });
+
+    let normalized;
+    if (type === 'relance_impayes_email') {
+      normalized = {
+        jours_retard: Math.min(120, Math.max(1, Number(config.jours_retard) || 7)),
+        frequence_jours: Math.min(90, Math.max(1, Number(config.frequence_jours) || 7)),
+        canal: 'email'
+      };
+    } else if (type === 'relance_devis_email') {
+      normalized = {
+        jours_avant_expiration: Math.min(30, Math.max(0, Number(config.jours_avant_expiration ?? 5))),
+        frequence_jours: Math.min(90, Math.max(1, Number(config.frequence_jours) || 3)),
+        canal: 'email'
+      };
+    } else {
+      normalized = {
+        frequence_jours: Math.min(30, Math.max(1, Number(config.frequence_jours) || 1)),
+        canal: 'email',
+        utiliser_seuils_produits: true
+      };
+    }
+    const [result] = await pool.query(
+      'INSERT INTO pro_automations (user_id, type, nom, configuration_json, prochaine_execution) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))',
+      [owner(req), type, nom, JSON.stringify(normalized)]
+    );
     await audit(req, 'automatisation.creee', 'automatisation', result.insertId, { type, configuration: normalized });
     res.status(201).json({ id: result.insertId, type, prochaine_execution: 'dans environ une heure' });
   } catch (err) { next(err); }
