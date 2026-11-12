@@ -199,7 +199,7 @@
     renderKpis(stats);
     renderRecentPayments(stats.derniers_paiements || []);
     renderRecentClients(stats.derniers_clients || []);
-    renderStatusChart(stats);
+    await renderStatusChart(stats);
     await loadChart(periode);
   }
 
@@ -215,7 +215,13 @@
     const titleByPeriod = { day: 'Évolution quotidienne', week: 'Évolution hebdomadaire', month: 'Évolution mensuelle' };
     const { rows } = await Api.get('/rapports/ventes?group_by=' + encodeURIComponent(period));
     const canvas = document.getElementById('chart-evolution');
-    await window.chartReady;
+    try {
+      await window.chartReady;
+    } catch (error) {
+      const wrap = document.getElementById('chart-wrap');
+      if (wrap) wrap.innerHTML = '<div class="dashboard-empty">Le graphique est indisponible sans accès au service de graphiques. Consultez les rapports pour les données.</div>';
+      return;
+    }
 
     if (chart) chart.destroy();
     const ctx = canvas.getContext('2d');
@@ -265,7 +271,7 @@
     canvas.setAttribute('aria-label', titleByPeriod[period] + '. Les montants détaillés sont disponibles dans les rapports.');
   }
 
-  function renderStatusChart(stats) {
+  async function renderStatusChart(stats) {
     const rows = [
       { label: 'Payées', value: Number(stats.factures_payees?.n || 0), color: '#1769F5' },
       { label: 'En attente', value: Number(stats.factures_en_attente?.n || 0), color: '#0DAF83' },
@@ -279,6 +285,13 @@
         <div>${row.label}<strong>${row.value.toLocaleString('fr-FR')}</strong></div>
       </div>`).join('');
     const canvas = document.getElementById('chart-repartition');
+    try {
+      await window.chartReady;
+    } catch (error) {
+      const graphic = canvas.closest('.dashboard-donut-graphic');
+      if (graphic) graphic.innerHTML = '<div class="dashboard-empty">Le graphique est indisponible sans accès au service de graphiques.</div>';
+      return;
+    }
     if (statusChart) statusChart.destroy();
     statusChart = new Chart(canvas, {
       type: 'doughnut',
