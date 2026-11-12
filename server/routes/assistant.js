@@ -44,6 +44,21 @@ const TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: 'prevision_tresorerie',
+    description: "Analyse les créances clients attendues à court terme à partir des dates d’échéance. Ces montants ne sont pas des paiements garantis.",
+    input_schema: { type: 'object', properties: { horizon_jours: { type: 'integer', enum: [7, 30, 60, 90] } }, required: ['horizon_jours'] }
+  },
+  {
+    name: 'alertes_stock',
+    description: "Liste les produits dont le stock atteint ou passe sous le seuil minimum défini par l’entreprise.",
+    input_schema: { type: 'object', properties: { limite: { type: 'integer' } }, required: [] }
+  },
+  {
+    name: 'clients_inactifs',
+    description: "Identifie les clients sans facture récente et leur dernière activité commerciale pour aider au suivi CRM.",
+    input_schema: { type: 'object', properties: { jours_inactivite: { type: 'integer', enum: [30, 60, 90, 180] }, limite: { type: 'integer' } }, required: ['jours_inactivite'] }
   }
 ];
 
