@@ -333,9 +333,9 @@ async function runMigrations(conn) {
   const phaseFiveToSevenPath = path.join(__dirname, '..', 'database', 'migrations', '005_portail_crm_international_ia.sql');
   const phaseFiveToSevenSql = fs.readFileSync(phaseFiveToSevenPath, 'utf8');
   const phaseFiveToSevenStatements = phaseFiveToSevenSql
-    .split(/\\r?\\n/)
+    .split(/\r?\n/)
     .filter(line => !line.trim().startsWith('--'))
-    .join('\\n')
+    .join('\n')
     .split(';')
     .map(statement => statement.trim())
     .filter(Boolean);
