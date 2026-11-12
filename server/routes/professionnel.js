@@ -1160,7 +1160,7 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
     const [orderRows] = await conn.query('SELECT * FROM pro_commandes_fournisseurs WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
     const order = orderRows[0];
     if (!order || order.statut === 'annulee' || order.statut === 'recue') { await conn.rollback(); return res.status(409).json({ error: 'Commande absente, annulée ou déjà intégralement réceptionnée.' }); }
-    const [warehouseRows] = await conn.query('SELECT id FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1', [warehouseId, uid]);
+    const [warehouseRows] = await conn.query('SELECT id, nom FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1', [warehouseId, uid]);
     if (!warehouseRows.length) { await conn.rollback(); return res.status(400).json({ error: 'Entrepôt invalide.' }); }
     const reference = randomRef('REC');
     const [receipt] = await conn.query(
@@ -1188,8 +1188,8 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
         [uid, receipt.insertId, line.id, line.produit_id, qty, line.prix_unitaire]
       );
       await conn.query(
-        "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, reference, motif, acteur_user_id) VALUES (?, ?, ?, 'reception_achat', ?, ?, ?, ?, ?)",
-        [uid, line.produit_id, warehouseId, qty, line.prix_unitaire, reference, 'Réception ' + order.numero, actor(req)]
+        "INSERT INTO pro_mouvements_stock (user_id, produit_id, produit_nom, entrepot_id, entrepot_nom, type, quantite, cout_unitaire, reference, motif, acteur_user_id) VALUES (?, ?, ?, ?, ?, 'reception_achat', ?, ?, ?, ?, ?)",
+        [uid, line.produit_id, line.designation, warehouseId, warehouseRows[0].nom, qty, line.prix_unitaire, reference, 'Réception ' + order.numero, actor(req)]
       );
     }
     const [[progress]] = await conn.query('SELECT SUM(quantite_recue) AS recu, SUM(quantite) AS commande FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ?', [order.id, uid]);
@@ -1223,7 +1223,7 @@ router.get('/inventory/stock', async (req, res, next) => {
 router.get('/inventory/movements', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT m.*, p.nom AS produit_nom, w.nom AS entrepot_nom FROM pro_mouvements_stock m JOIN produits p ON p.id = m.produit_id AND p.user_id = m.user_id JOIN pro_entrepots w ON w.id = m.entrepot_id WHERE m.user_id = ? ORDER BY m.created_at DESC, m.id DESC LIMIT 300',
+      'SELECT m.*, COALESCE(m.produit_nom, p.nom) AS produit_nom, COALESCE(m.entrepot_nom, w.nom) AS entrepot_nom FROM pro_mouvements_stock m LEFT JOIN produits p ON p.id = m.produit_id AND p.user_id = m.user_id LEFT JOIN pro_entrepots w ON w.id = m.entrepot_id AND w.user_id = m.user_id WHERE m.user_id = ? ORDER BY m.created_at DESC, m.id DESC LIMIT 300',
       [owner(req)]
     );
     res.json({ mouvements: rows });
@@ -1238,8 +1238,8 @@ router.post('/inventory/adjustments', async (req, res, next) => {
     if (!idOk(productId) || !Number.isFinite(delta) || !delta || Math.abs(delta) > 10000000 || !reason) return res.status(400).json({ error: 'Produit, quantité non nulle et motif obligatoires.' });
     conn = await pool.getConnection();
     await conn.beginTransaction();
-    const [products] = await conn.query('SELECT id, prix_achat FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
-    const [warehouses] = await conn.query('SELECT id FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1', [warehouseId, uid]);
+    const [products] = await conn.query('SELECT id, nom, prix_achat FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
+    const [warehouses] = await conn.query('SELECT id, nom FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1', [warehouseId, uid]);
     if (!products.length || !warehouses.length) { await conn.rollback(); return res.status(404).json({ error: 'Produit ou entrepôt introuvable.' }); }
     await conn.query('INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0) ON DUPLICATE KEY UPDATE id = id', [uid, warehouseId, productId]);
     const [[stock]] = await conn.query('SELECT quantite FROM pro_stocks_entrepots WHERE user_id = ? AND entrepot_id = ? AND produit_id = ? FOR UPDATE', [uid, warehouseId, productId]);
@@ -1247,8 +1247,8 @@ router.post('/inventory/adjustments', async (req, res, next) => {
     if (next < 0) { await conn.rollback(); return res.status(409).json({ error: 'Le stock de cet entrepôt ne peut pas devenir négatif.' }); }
     await conn.query('UPDATE pro_stocks_entrepots SET quantite = ? WHERE user_id = ? AND entrepot_id = ? AND produit_id = ?', [next, uid, warehouseId, productId]);
     await conn.query(
-      "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, motif, acteur_user_id) VALUES (?, ?, ?, 'ajustement', ?, ?, ?, ?)",
-      [uid, productId, warehouseId, delta, products[0].prix_achat, reason, actor(req)]
+      "INSERT INTO pro_mouvements_stock (user_id, produit_id, produit_nom, entrepot_id, entrepot_nom, type, quantite, cout_unitaire, motif, acteur_user_id) VALUES (?, ?, ?, ?, ?, 'ajustement', ?, ?, ?, ?)",
+      [uid, productId, products[0].nom, warehouseId, warehouses[0].nom, delta, products[0].prix_achat, reason, actor(req)]
     );
     await conn.query(
       'UPDATE produits p SET p.stock = (SELECT COALESCE(SUM(s.quantite),0) FROM pro_stocks_entrepots s WHERE s.user_id = p.user_id AND s.produit_id = p.id) WHERE p.id = ? AND p.user_id = ?',
@@ -1271,8 +1271,8 @@ router.post('/inventory/transfers', async (req, res, next) => {
     if (!idOk(productId) || !idOk(fromId) || !idOk(toId) || fromId === toId || !Number.isFinite(qty) || qty <= 0 || qty > 10000000) return res.status(400).json({ error: 'Produit, deux entrepôts différents et quantité positive obligatoires.' });
     conn = await pool.getConnection();
     await conn.beginTransaction();
-    const [productRows] = await conn.query('SELECT id, prix_achat FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
-    const [warehouseRows] = await conn.query('SELECT id FROM pro_entrepots WHERE id IN (?, ?) AND user_id = ? AND actif = 1', [fromId, toId, uid]);
+    const [productRows] = await conn.query('SELECT id, nom, prix_achat FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
+    const [warehouseRows] = await conn.query('SELECT id, nom FROM pro_entrepots WHERE id IN (?, ?) AND user_id = ? AND actif = 1', [fromId, toId, uid]);
     if (!productRows.length || warehouseRows.length !== 2) { await conn.rollback(); return res.status(404).json({ error: 'Produit ou entrepôt introuvable.' }); }
     await conn.query('INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0), (?, ?, ?, 0) ON DUPLICATE KEY UPDATE id = id', [uid, fromId, productId, uid, toId, productId]);
     const [stocks] = await conn.query('SELECT entrepot_id, quantite FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ? AND entrepot_id IN (?, ?) FOR UPDATE', [uid, productId, fromId, toId]);
@@ -1282,9 +1282,9 @@ router.post('/inventory/transfers', async (req, res, next) => {
     await conn.query('UPDATE pro_stocks_entrepots SET quantite = quantite - ? WHERE user_id = ? AND entrepot_id = ? AND produit_id = ?', [qty, uid, fromId, productId]);
     await conn.query('UPDATE pro_stocks_entrepots SET quantite = quantite + ? WHERE user_id = ? AND entrepot_id = ? AND produit_id = ?', [qty, uid, toId, productId]);
     await conn.query(
-      "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, reference, motif, acteur_user_id) VALUES (?, ?, ?, 'transfert_sortant', ?, ?, ?, ?, ?), (?, ?, ?, 'transfert_entrant', ?, ?, ?, ?, ?)",
-      [uid, productId, fromId, -qty, productRows[0].prix_achat, reference, 'Transfert vers entrepôt #' + toId, actor(req),
-       uid, productId, toId, qty, productRows[0].prix_achat, reference, 'Transfert depuis entrepôt #' + fromId, actor(req)]
+      "INSERT INTO pro_mouvements_stock (user_id, produit_id, produit_nom, entrepot_id, entrepot_nom, type, quantite, cout_unitaire, reference, motif, acteur_user_id) VALUES (?, ?, ?, ?, ?, 'transfert_sortant', ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, 'transfert_entrant', ?, ?, ?, ?, ?)",
+      [uid, productId, productRows[0].nom, fromId, warehouseRows.find(w => Number(w.id) === fromId).nom, -qty, productRows[0].prix_achat, reference, 'Transfert vers entrepôt #' + toId, actor(req),
+       uid, productId, productRows[0].nom, toId, warehouseRows.find(w => Number(w.id) === toId).nom, qty, productRows[0].prix_achat, reference, 'Transfert depuis entrepôt #' + fromId, actor(req)]
     );
     await conn.commit();
     res.json({ success: true, reference });
