@@ -30,7 +30,8 @@ async function resolveTenant(req, res, next) {
     req.permissions = ROLE_PERMISSIONS.proprietaire;
 
     const isInviteAcceptance = (req.baseUrl || '').endsWith('/pro') && (req.path || '').startsWith('/team/invitations/accept');
-    const requestedOwner = isInviteAcceptance ? null : req.get('X-SF-Company-Owner');
+    const supportsCompanyHeader = (req.baseUrl || '').endsWith('/pro') || (req.baseUrl || '').endsWith('/assistant');
+    const requestedOwner = isInviteAcceptance || !supportsCompanyHeader ? null : req.get('X-SF-Company-Owner');
     if (requestedOwner) {
       if (!/^\d+$/.test(requestedOwner)) return res.status(400).json({ error: 'Sélection d’entreprise invalide.' });
       const selectedOwner = Number(requestedOwner);
