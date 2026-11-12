@@ -1809,10 +1809,10 @@ router.put('/localization', async (req, res, next) => {
     const currentCurrency = String(company?.devise || 'FCFA').toUpperCase();
     if (currency !== currentCurrency) {
       const [[history]] = await pool.query(
-        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures',
-        [owner(req), owner(req), owner(req), owner(req), owner(req), owner(req)]
+        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
+        [owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req)]
       );
-      if (Number(history.factures) + Number(history.depenses) + Number(history.paiements) + Number(history.achats) + Number(history.mouvements_stock) + Number(history.ecritures) > 0) {
+      if (Number(history.factures) + Number(history.depenses) + Number(history.paiements) + Number(history.achats) + Number(history.mouvements_stock) + Number(history.ecritures) + Number(history.produits) + Number(history.modeles_recurrents) > 0) {
         return res.status(409).json({
           error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents ou de mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
         });
