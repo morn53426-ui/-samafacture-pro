@@ -529,7 +529,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
 
 function contrastRatio(foreground, background) {
   function luminance(color) {
-    const channels = color.match(/[\\d.]+/g).slice(0, 3).map(Number).map(value => {
+    const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => {
       const normalized = value / 255;
       return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
     });
@@ -622,7 +622,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       element.value = '1500';
       element.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    const total = await page.$eval('#rec-total', element => element.textContent.replace(/\\s+/g, ' ').trim());
+    const total = await page.$eval('#rec-total', element => element.textContent.replace(/\s+/g, ' ').trim());
     assert.equal(total, '20 380 FCFA', 'Le total doit inclure la remise, la TVA sur le net et les frais de livraison.');
     if (type === 'devis') {
       const fields = await page.evaluate(() => ({
