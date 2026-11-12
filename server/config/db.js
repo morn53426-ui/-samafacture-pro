@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 6;
+const CURRENT_SCHEMA_VERSION = 7;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -167,6 +167,14 @@ async function runMigrations(conn) {
     { table: 'users', column: 'reset_token_hash', definition: 'VARCHAR(64)' },
     { table: 'users', column: 'reset_token_expires', definition: 'DATETIME' },
     { table: 'users', column: 'signature_default', definition: 'MEDIUMTEXT' },
+    { table: 'users', column: 'pays_code', definition: "VARCHAR(2) NOT NULL DEFAULT 'SN'" },
+    { table: 'users', column: 'langue', definition: "VARCHAR(5) NOT NULL DEFAULT 'fr'" },
+    { table: 'users', column: 'locale', definition: "VARCHAR(12) NOT NULL DEFAULT 'fr-SN'" },
+    { table: 'users', column: 'fuseau_horaire', definition: "VARCHAR(64) NOT NULL DEFAULT 'Africa/Dakar'" },
+    { table: 'users', column: 'format_date', definition: "VARCHAR(20) NOT NULL DEFAULT 'dd/MM/yyyy'" },
+    { table: 'users', column: 'regime_fiscal', definition: "VARCHAR(30) NOT NULL DEFAULT 'standard'" },
+    { table: 'factures', column: 'devise', definition: "VARCHAR(10) NOT NULL DEFAULT 'FCFA'" },
+    { table: 'produits', column: 'stock_minimum', definition: 'DECIMAL(14,3) NOT NULL DEFAULT 0' },
     { table: 'users', column: 'facture_personnalisation', definition: 'TEXT' },
     { table: 'users', column: 'entreprise_rccm', definition: 'VARCHAR(80)' },
     { table: 'users', column: 'entreprise_site_web', definition: 'VARCHAR(190)' },
@@ -318,6 +326,20 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of accountingPurchasingStatements) {
+    await conn.query(statement);
+  }
+
+  // Portail client, CRM, paramètres internationaux et exécutions idempotentes des automations.
+  const phaseFiveToSevenPath = path.join(__dirname, '..', 'database', 'migrations', '005_portail_crm_international_ia.sql');
+  const phaseFiveToSevenSql = fs.readFileSync(phaseFiveToSevenPath, 'utf8');
+  const phaseFiveToSevenStatements = phaseFiveToSevenSql
+    .split(/\\r?\\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of phaseFiveToSevenStatements) {
     await conn.query(statement);
   }
 
