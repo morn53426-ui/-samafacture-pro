@@ -154,8 +154,8 @@ function formatDate(iso) {
     const [year, month, day] = source.split('-').map(Number);
     // Noon UTC preserves the intended calendar date across all supported timezones.
     date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  } else {
-    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(source) ? source.replace(' ', 'T') : source;
+    // MySQL DATETIME values are written in UTC; apply the company's chosen timezone only when formatting.
+    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(source) ? source.replace(' ', 'T') + 'Z' : source;
     date = new Date(normalized);
   }
   if (Number.isNaN(date.getTime())) return iso;
