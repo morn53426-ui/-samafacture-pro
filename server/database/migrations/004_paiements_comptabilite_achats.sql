@@ -1,6 +1,19 @@
 -- Migration 004 : paiements de factures, comptabilité générale et achats/stocks.
 -- Toutes les tables sont cloisonnées par user_id et créées de façon idempotente.
 
+CREATE TABLE IF NOT EXISTS pro_payment_gateways (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  fournisseur VARCHAR(20) NOT NULL,
+  credentials_enc MEDIUMTEXT NOT NULL,
+  mode VARCHAR(12) NOT NULL DEFAULT 'test',
+  actif TINYINT(1) NOT NULL DEFAULT 1,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_pro_payment_gateway (user_id, fournisseur),
+  CONSTRAINT fk_pro_payment_gateway_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS pro_invoice_checkouts (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
