@@ -134,22 +134,39 @@ function requireAuthPage() {
 }
 
 function formatMontant(n, devise) {
-  const d = devise || (Api.currentUser() && Api.currentUser().devise) || 'FCFA';
-  const val = Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  return `${val} ${d}`;
+  const user = Api.currentUser() || {};
+  const currency = devise || user.devise || 'FCFA';
+  const locale = user.locale || (user.langue === 'en' ? 'en' : 'fr-FR');
+  const val = Number(n || 0).toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return currency === 'FCFA' || currency === 'XOF' ? `${val} ${currency}` : `${val} ${currency}`;
 }
 
 function formatDate(iso) {
   if (!iso) return '—';
-  // MySQL renvoie parfois les DATETIME sous la forme "YYYY-MM-DD HH:mm:ss".
-  // Le séparateur espace n'est pas interprété uniformément par Safari iOS ;
-  // on le convertit en forme ISO locale sans ajouter de décalage artificiel.
-  const normalized = typeof iso === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(iso)
-    ? iso.replace(' ', 'T')
-    : iso;
-  const d = new Date(normalized);
-  if (isNaN(d)) return iso;
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+  const user = Api.currentUser() || {};
+  const locale = user.locale || 'fr-FR';
+  const timeZone = user.fuseau_horaire || undefined;
+  const format = user.format_date || 'dd/MM/yyyy';
+  const source = String(iso);
+  let date;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(source)) {
+    const [year, month, day] = source.split('-').map(Number);
+    date = new Date(year, month - 1, day);
+  } else {
+    // MySQL DATETIME lacks an offset. Interpret it as a local wall-clock value,
+    // avoiding Safari iOS parsing differences for the space separator.
+    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(source) ? source.replace(' ', 'T') : source;
+    date = new Date(normalized);
+  }
+  if (Number.isNaN(date.getTime())) return iso;
+  const parts = format.split('/');
+  if (format === 'yyyy-MM-dd') {
+    return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).format(date);
+  }
+  if (format === 'MM/dd/yyyy') {
+    return new Intl.DateTimeFormat('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', timeZone }).format(date);
+  }
+  return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone }).format(date);
 }
 
 function statutBadge(statut) {
