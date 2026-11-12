@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -295,6 +295,29 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of professionalStatements) {
+    await conn.query(statement);
+  }
+
+  // Le stock multi-entrepôts accepte les quantités fractionnaires (poids, mètres, litres).
+  const [stockTypeRows] = await conn.query(
+    `SELECT DATA_TYPE FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'produits' AND COLUMN_NAME = 'stock'`
+  );
+  if (stockTypeRows.length && stockTypeRows[0].DATA_TYPE !== 'decimal') {
+    await conn.query('ALTER TABLE produits MODIFY COLUMN stock DECIMAL(14,3) NOT NULL DEFAULT 0');
+  }
+
+  // Paiements de factures, comptabilité générale et achats/stocks (migration 004).
+  const accountingPurchasingPath = path.join(__dirname, '..', 'database', 'migrations', '004_paiements_comptabilite_achats.sql');
+  const accountingPurchasingSql = fs.readFileSync(accountingPurchasingPath, 'utf8');
+  const accountingPurchasingStatements = accountingPurchasingSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of accountingPurchasingStatements) {
     await conn.query(statement);
   }
 

@@ -125,16 +125,50 @@ async function appliquerAjustementsStock(conn, userId, ajustements) {
   const parProduit = new Map();
   for (const { produit_id, delta } of ajustements) {
     if (!produit_id) continue;
-    parProduit.set(produit_id, (parProduit.get(produit_id) || 0) + delta);
+    parProduit.set(Number(produit_id), (parProduit.get(Number(produit_id)) || 0) + Number(delta));
   }
   const ids = [...parProduit.keys()];
   if (!ids.length) return;
-  const whenClauses = ids.map(() => 'WHEN ? THEN stock + ?').join(' ');
-  const caseParams = ids.flatMap((id) => [id, parProduit.get(id)]);
+
+  // Le stock historique du catalogue reste le total agrégé. Le dépôt principal est
+  // initialisé une seule fois à partir du stock existant pour assurer une migration
+  // douce des anciennes entreprises. Chaque vente/annulation alimente ensuite le
+  // journal multi-entrepôts dans la même transaction SQL que la facture.
   await conn.query(
-    `UPDATE produits SET stock = CASE id ${whenClauses} END WHERE id IN (${ids.map(() => '?').join(',')}) AND user_id = ?`,
-    [...caseParams, ...ids, userId]
+    "INSERT IGNORE INTO pro_entrepots (user_id, code, nom, par_defaut) VALUES (?, 'PRINCIPAL', 'Magasin principal', 1)",
+    [userId]
   );
+  const [[warehouse]] = await conn.query(
+    'SELECT id FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1',
+    [userId, 'PRINCIPAL']
+  );
+  await conn.query(
+    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT ?, ?, id, stock FROM produits WHERE user_id = ? AND id IN (' + ids.map(() => '?').join(',') + ')',
+    [userId, warehouse.id, userId, ...ids]
+  );
+
+  for (const [productId, delta] of parProduit) {
+    const [rows] = await conn.query(
+      'SELECT quantite FROM pro_stocks_entrepots WHERE user_id = ? AND entrepot_id = ? AND produit_id = ? FOR UPDATE',
+      [userId, warehouse.id, productId]
+    );
+    if (!rows.length) continue;
+    await conn.query(
+      'UPDATE pro_stocks_entrepots SET quantite = quantite + ? WHERE user_id = ? AND entrepot_id = ? AND produit_id = ?',
+      [delta, userId, warehouse.id, productId]
+    );
+    await conn.query(
+      'UPDATE produits p SET p.stock = (SELECT COALESCE(SUM(s.quantite),0) FROM pro_stocks_entrepots s WHERE s.user_id = p.user_id AND s.produit_id = p.id) WHERE p.id = ? AND p.user_id = ?',
+      [productId, userId]
+    );
+    await conn.query(
+      "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, reference, motif) SELECT ?, p.id, ?, ?, ?, p.prix_achat, CONCAT('FACT-', ?), ? FROM produits p WHERE p.id = ? AND p.user_id = ?",
+      [userId, warehouse.id, delta < 0 ? 'vente' : 'annulation_vente', delta, productId, delta < 0 ? 'Sortie liée à une facture client' : 'Restitution liée à une annulation de facture', productId, userId]
+    );
+  }
+
+  // Rattrapage du total en cas de produit sans ligne d'entrepôt (ex. stock nul ou
+  // ancienne donnée importée) — les ajustements non représentés restent sans effet.
 }
 
 /**

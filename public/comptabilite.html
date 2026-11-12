@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <script src="js/theme.js"></script><script src="js/icons.js"></script><script src="js/tooltip.js"></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Comptabilité OHADA — SamaFacture Pro</title><meta name="robots" content="noindex">
+  <link rel="stylesheet" href="css/style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0F1B33">
+</head>
+<body><div class="app-shell"><div id="sidebar-root"></div><main class="main-content">
+  <div class="page-header"><div><div class="pro-eyebrow">PILOTAGE FINANCIER</div><h1>Comptabilité OHADA</h1><p>Journaux, écritures en partie double, balance générale et grand livre.</p></div></div>
+  <div class="grid grid-3" style="margin-bottom:18px">
+    <article class="card stat-card"><div class="stat-label">Total débit</div><div class="stat-value mono" id="kpi-debit">—</div></article>
+    <article class="card stat-card"><div class="stat-label">Total crédit</div><div class="stat-value mono" id="kpi-credit">—</div></article>
+    <article class="card stat-card"><div class="stat-label">Équilibre de la balance</div><div class="stat-value" id="kpi-balance">—</div></article>
+  </div>
+  <section class="card" style="margin-bottom:20px">
+    <h2 style="margin-top:0">Saisir une écriture</h2>
+    <p class="pro-note">Chaque écriture est enregistrée comme validée et devient non modifiable. Vérifiez les montants avant validation. Toute correction doit être passée par une écriture de contrepassation.</p>
+    <form id="entry-form">
+      <div class="grid grid-3">
+        <div class="field"><label for="entry-journal">Journal</label><select id="entry-journal" required></select></div>
+        <div class="field"><label for="entry-date">Date</label><input id="entry-date" type="date" required></div>
+        <div class="field"><label for="entry-reference">Référence</label><input id="entry-reference" maxlength="120" placeholder="Pièce / justificatif"></div>
+      </div>
+      <div class="field"><label for="entry-label">Libellé *</label><input id="entry-label" required maxlength="255" placeholder="Description de l'opération"></div>
+      <div style="overflow-x:auto"><table class="data-table" style="min-width:650px;width:100%"><thead><tr><th>Compte</th><th>Libellé ligne</th><th>Débit</th><th>Crédit</th><th></th></tr></thead><tbody id="entry-lines"></tbody></table></div>
+      <div class="pro-actions" style="margin-top:12px;align-items:center;justify-content:space-between">
+        <button class="btn btn-outline" type="button" id="add-line">Ajouter une ligne</button>
+        <strong id="entry-total">Débit 0 · Crédit 0</strong>
+        <button class="btn btn-primary" type="submit">Valider l’écriture équilibrée</button>
+      </div>
+    </form>
+  </section>
+  <section class="card" style="margin-bottom:20px">
+    <h2 style="margin-top:0">Comptabilisation guidée</h2>
+    <p class="pro-note">Ces actions génèrent une écriture équilibrée à partir des montants déjà présents. Elles sont idempotentes : une même facture, un même paiement ou une même dépense ne peut pas être comptabilisé deux fois.</p>
+    <div class="grid grid-3">
+      <div class="field"><label for="post-invoice">Facture client</label><select id="post-invoice"></select><button class="btn btn-outline" id="post-invoice-btn" type="button">Comptabiliser la facture</button></div>
+      <div class="field"><label for="post-payment">Paiement enregistré</label><select id="post-payment"></select><button class="btn btn-outline" id="post-payment-btn" type="button">Comptabiliser le règlement</button></div>
+      <div class="field"><label for="post-expense">Dépense enregistrée</label><select id="post-expense"></select><button class="btn btn-outline" id="post-expense-btn" type="button">Comptabiliser la dépense</button></div>
+    </div>
+  </section>
+  <section class="card" style="margin-bottom:20px">
+    <div class="page-header" style="margin-bottom:12px"><div><h2 style="margin:0">Balance générale</h2><p class="pro-note">Soldes cumulés des écritures validées.</p></div><button class="btn btn-outline" type="button" id="refresh-accounting">Actualiser</button></div>
+    <div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:650px"><thead><tr><th>Compte</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Solde D/C</th></tr></thead><tbody id="trial-balance"><tr><td colspan="5">Chargement…</td></tr></tbody></table></div>
+  </section>
+  <section class="card">
+    <h2 style="margin-top:0">Grand livre</h2>
+    <div class="grid grid-2"><div class="field"><label for="ledger-account">Compte</label><select id="ledger-account"></select></div><div class="field" style="align-self:end"><button class="btn btn-outline" type="button" id="load-ledger">Afficher le grand livre</button></div></div>
+    <div id="ledger-result" class="pro-list"><p class="pro-muted">Sélectionnez un compte.</p></div>
+    <h3>Dernières écritures</h3>
+    <div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:650px"><thead><tr><th>Date</th><th>N°</th><th>Journal</th><th>Libellé</th><th>Débit</th><th>Crédit</th></tr></thead><tbody id="entries-list"></tbody></table></div>
+  </section>
+  <p class="pro-note" style="margin-top:16px">Important : le plan de comptes fourni est un plan de démarrage simplifié inspiré du SYSCOHADA. Les règles de TVA, comptes de contrepartie, clôtures, états financiers et obligations fiscales doivent être paramétrés et validés par un expert-comptable habilité dans le pays concerné. Cet écran ne constitue pas à lui seul une certification de conformité.</p>
+</main></div>
+<script src="js/api.js"></script><script src="js/pwa.js"></script><script src="js/sidebar.js"></script>
+<script>
+requireAuthPage(); renderSidebar('comptabilite');
+const $ = id => document.getElementById(id);
+let accounts=[], journals=[];
+function fmt(v){return formatMontant(Number(v)||0);}
+function addLine(line={}) {
+  const row=document.createElement('tr');
+  row.innerHTML='<td><select class="line-account" required></select></td><td><input class="line-label" maxlength="255" placeholder="Libellé" value="'+escapeHtml(line.libelle||'')+'"></td><td><input class="line-debit" type="number" min="0" step="0.01" value="'+(line.debit||'')+'"></td><td><input class="line-credit" type="number" min="0" step="0.01" value="'+(line.credit||'')+'"></td><td><button class="btn btn-sm btn-outline line-remove" type="button" aria-label="Supprimer la ligne">×</button></td>';
+  const select=row.querySelector('.line-account');
+  select.innerHTML='<option value="">Compte…</option>'+accounts.map(a=>'<option value="'+a.id+'">'+escapeHtml(a.code+' · '+a.libelle)+'</option>').join('');
+  if(line.compte_id) select.value=String(line.compte_id);
+  row.querySelectorAll('input').forEach(input=>input.addEventListener('input',updateTotals));
+  row.querySelector('.line-remove').addEventListener('click',()=>{row.remove();updateTotals();});
+  $('entry-lines').appendChild(row); updateTotals();
+}
+function updateTotals(){
+  const rows=[...$('entry-lines').querySelectorAll('tr')];
+  const debit=rows.reduce((s,r)=>s+(Number(r.querySelector('.line-debit').value)||0),0);
+  const credit=rows.reduce((s,r)=>s+(Number(r.querySelector('.line-credit').value)||0),0);
+  $('entry-total').textContent='Débit '+fmt(debit)+' · Crédit '+fmt(credit)+' · Écart '+fmt(Math.abs(debit-credit));
+}
+async function loadAccounting(){
+  const [cfg,balance,entries,invoices,payments,expenses]=await Promise.all([
+    Api.get('/pro/accounting/config'),Api.get('/pro/accounting/trial-balance'),
+    Api.get('/pro/accounting/entries'),Api.get('/factures?type=facture'),
+    Api.get('/pro/payments'),Api.get('/depenses')
+  ]);
+  accounts=cfg.comptes||[]; journals=cfg.journaux||[];
+  $('entry-journal').innerHTML=journals.map(j=>'<option value="'+j.id+'">'+escapeHtml(j.code+' · '+j.libelle)+'</option>').join('');
+  $('ledger-account').innerHTML=accounts.map(a=>'<option value="'+a.id+'">'+escapeHtml(a.code+' · '+a.libelle)+'</option>').join('');
+  if(!$('entry-lines').children.length){addLine();addLine();}
+  $('kpi-debit').textContent=fmt(balance.total_debit);$('kpi-credit').textContent=fmt(balance.total_credit);
+  $('kpi-balance').textContent=balance.equilibree?'Équilibrée':'À contrôler';
+  $('trial-balance').innerHTML=(balance.balance||[]).map(a=>'<tr><td>'+escapeHtml(a.code)+'</td><td>'+escapeHtml(a.libelle)+'</td><td>'+fmt(a.total_debit)+'</td><td>'+fmt(a.total_credit)+'</td><td>'+fmt(a.solde)+'</td></tr>').join('')||'<tr><td colspan="5">Aucun compte.</td></tr>';
+  $('entries-list').innerHTML=(entries.ecritures||[]).map(e=>'<tr><td>'+escapeHtml(e.date_ecriture)+'</td><td>'+escapeHtml(e.numero)+'</td><td>'+escapeHtml(e.journal_code)+'</td><td>'+escapeHtml(e.libelle)+'</td><td>'+fmt(e.total_debit)+'</td><td>'+fmt(e.total_credit)+'</td></tr>').join('')||'<tr><td colspan="6">Aucune écriture.</td></tr>';
+  $('post-invoice').innerHTML='<option value="">Sélectionner</option>'+(invoices.factures||[]).filter(f=>f.statut!=='annulee').map(f=>'<option value="'+f.id+'">'+escapeHtml(f.numero+' · '+f.client_nom)+'</option>').join('');
+  $('post-payment').innerHTML='<option value="">Sélectionner</option>'+(payments.paiements||[]).map(p=>'<option value="'+p.id+'">'+escapeHtml(p.numero+' · '+p.client_nom+' · '+p.montant)+'</option>').join('');
+  $('post-expense').innerHTML='<option value="">Sélectionner</option>'+(expenses.depenses||[]).map(e=>'<option value="'+e.id+'">'+escapeHtml(e.libelle+' · '+e.montant)+'</option>').join('');
+}
+$('add-line').addEventListener('click',()=>addLine());
+$('entry-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const lignes=[...$('entry-lines').querySelectorAll('tr')].map(r=>({compte_id:Number(r.querySelector('.line-account').value),libelle:r.querySelector('.line-label').value,debit:Number(r.querySelector('.line-debit').value)||0,credit:Number(r.querySelector('.line-credit').value)||0}));
+  try{
+    const result=await Api.post('/pro/accounting/entries',{journal_id:Number($('entry-journal').value),date_ecriture:$('entry-date').value,reference:$('entry-reference').value,libelle:$('entry-label').value,lignes});
+    showToast('Écriture '+result.numero+' validée.','success');$('entry-label').value='';$('entry-reference').value='';$('entry-lines').innerHTML='';addLine();addLine();await loadAccounting();
+  }catch(err){showToast(err.message,'error');}
+});
+async function post(path,id){if(!id)throw new Error('Sélectionnez un élément.');const r=await Api.post('/pro/accounting/'+path+'/'+id,{});showToast(r.duplicate?'Écriture déjà existante.':'Écriture comptable créée.','success');await loadAccounting();}
+$('post-invoice-btn').addEventListener('click',()=>post('post-invoice',$('post-invoice').value).catch(e=>showToast(e.message,'error')));
+$('post-payment-btn').addEventListener('click',()=>post('post-payment',$('post-payment').value).catch(e=>showToast(e.message,'error')));
+$('post-expense-btn').addEventListener('click',()=>post('post-expense',$('post-expense').value).catch(e=>showToast(e.message,'error')));
+$('refresh-accounting').addEventListener('click',()=>loadAccounting().catch(e=>showFatalError(e.message)));
+$('load-ledger').addEventListener('click',async()=>{
+  try{const r=await Api.get('/pro/accounting/ledger?compte_id='+$('ledger-account').value);
+  $('ledger-result').innerHTML='<p><strong>'+escapeHtml(r.compte.code+' · '+r.compte.libelle)+'</strong> — Solde de période : '+fmt(r.solde_periode)+'</p><div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:600px"><thead><tr><th>Date</th><th>Écriture</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Solde</th></tr></thead><tbody>'+(r.ecritures||[]).map(x=>'<tr><td>'+escapeHtml(x.date_ecriture)+'</td><td>'+escapeHtml(x.numero)+'</td><td>'+escapeHtml(x.libelle)+'</td><td>'+fmt(x.debit)+'</td><td>'+fmt(x.credit)+'</td><td>'+fmt(x.solde_progressif)+'</td></tr>').join('')+'</tbody></table></div>';}
+  catch(err){showToast(err.message,'error');}
+});
+$('entry-date').value=new Date().toISOString().slice(0,10);
+loadAccounting().catch(err=>showFatalError(err.message));
+</script></body></html>
