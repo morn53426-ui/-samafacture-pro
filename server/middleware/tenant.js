@@ -74,6 +74,8 @@ function permissionForRequest(req) {
   if (base.endsWith('/pro')) {
     if (path.startsWith('/team/invitations/accept') || path.startsWith('/team/companies')) return null;
     if (path.startsWith('/team')) return method === 'GET' ? 'team.read' : 'team.manage';
+    if (/^\\/invoices\\/\\d+\\/checkout(?:\\/|$)/.test(path)) return 'payments.write';
+    if (path.startsWith('/payment-gateways')) return method === 'GET' ? 'integrations.read' : 'integrations.manage';
     if (path.startsWith('/payments') || path.startsWith('/payment-links') || path.startsWith('/refunds') || path.startsWith('/deposits')) {
       return method === 'GET' ? 'payments.read' : 'payments.write';
     }
