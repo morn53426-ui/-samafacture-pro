@@ -148,23 +148,19 @@
     const value = (v) => Number(v || 0);
     document.getElementById('stats-grid').innerHTML = `
       <article class="dashboard-kpi blue">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('banknote')}</span><span class="dashboard-kpi-label">Chiffre d'affaires</span></div>
-        <strong class="dashboard-kpi-value">${formatMontant(value(stats.chiffre_affaires))}</strong>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('banknote')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.chiffre_affaires))}</strong><span class="dashboard-kpi-label">Chiffre d'affaires</span></div></div>
         <span class="dashboard-kpi-note">Encaissements cumulés enregistrés</span>
       </article>
       <article class="dashboard-kpi green">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('check-circle')}</span><span class="dashboard-kpi-label">Factures payées</span></div>
-        <strong class="dashboard-kpi-value">${value(stats.factures_payees?.n).toLocaleString('fr-FR')}</strong>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('check-circle')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${value(stats.factures_payees?.n).toLocaleString('fr-FR')}</strong><span class="dashboard-kpi-label">Factures payées</span></div></div>
         <span class="dashboard-kpi-note">${formatMontant(value(stats.factures_payees?.total))} réglés</span>
       </article>
       <article class="dashboard-kpi purple">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('clock')}</span><span class="dashboard-kpi-label">Factures en attente</span></div>
-        <strong class="dashboard-kpi-value">${value(stats.factures_en_attente?.n).toLocaleString('fr-FR')}</strong>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('clock')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${value(stats.factures_en_attente?.n).toLocaleString('fr-FR')}</strong><span class="dashboard-kpi-label">Factures en attente</span></div></div>
         <span class="dashboard-kpi-note">${formatMontant(value(stats.factures_en_attente?.total))} à recevoir</span>
       </article>
       <article class="dashboard-kpi amber">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('wallet')}</span><span class="dashboard-kpi-label">Solde net estimé</span></div>
-        <strong class="dashboard-kpi-value">${formatMontant(value(stats.tresorerie))}</strong>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('wallet')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.tresorerie))}</strong><span class="dashboard-kpi-label">Solde net estimé</span></div></div>
         <span class="dashboard-kpi-note">Encaissements moins dépenses</span>
       </article>
     `;
@@ -174,11 +170,11 @@
     const body = document.getElementById('paiements-body');
     body.innerHTML = rows?.length ? rows.map(p => `
       <tr>
-        <td class="mono">${escapeHtml(p.numero || '—')}</td>
-        <td>${escapeHtml(p.client_nom || '—')}</td>
-        <td>${escapeHtml(p.methode || '—')}</td>
-        <td>${p.date_paiement ? formatDate(p.date_paiement) : '—'}</td>
-        <td class="mono">${formatMontant(p.montant)}</td>
+        <td data-label="Référence" class="mono">${escapeHtml(p.numero || '—')}</td>
+        <td data-label="Client">${escapeHtml(p.client_nom || '—')}</td>
+        <td data-label="Méthode">${escapeHtml(p.methode || '—')}</td>
+        <td data-label="Date">${p.date_paiement ? formatDate(p.date_paiement) : '—'}</td>
+        <td data-label="Montant" class="mono">${formatMontant(p.montant)}</td>
       </tr>`).join('') : `<tr><td colspan="5"><div class="dashboard-empty"><i class="ic">${Icon('wallet')}</i><br>Aucun paiement enregistré pour l'instant.</div></td></tr>`;
   }
 
