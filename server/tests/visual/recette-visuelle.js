@@ -259,7 +259,7 @@ async function verifyPage(browser, baseUrl, pageDefinition, viewport, fixtures, 
   await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
   await page.evaluate(() => document.fonts && document.fonts.ready);
-  await page.waitForTimeout(120);
+  await new Promise((resolve) => setTimeout(resolve, 120));
 
   const metrics = await page.evaluate(() => ({
     viewport: window.innerWidth,
