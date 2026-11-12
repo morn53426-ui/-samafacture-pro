@@ -3218,3 +3218,34 @@ textarea { line-height: 1.55; }
   .pro-permissions { grid-template-columns: minmax(0, 1fr); }
   .pro-actions .btn { flex: 1 1 100%; }
 }
+
+
+/* Tables catalogue : cartes lisibles sur mobile, sans masquer les intitulés longs. */
+.client-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.clients-table .avatar { flex: 0 0 32px; }
+.clients-table .client-name {
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.products-table .product-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+@media (max-width: 640px) {
+  .clients-table,
+  .products-table { min-width: 0 !important; }
+  .clients-table .client-cell { align-items: flex-start; }
+  .clients-table .client-name,
+  .products-table .product-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
