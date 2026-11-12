@@ -3795,3 +3795,21 @@ thead th { background: #F2F6FD; color: #52627D; }
 .reports-kpi-green .stat-icon,
 .reports-kpi-purple .stat-icon,
 .reports-kpi-amber .stat-icon { background:rgba(255,255,255,.17); color:#fff; }
+
+
+/* Tableau d'encaissements : les montants restent sur une ligne, même avec de gros totaux. */
+.dashboard-table {
+  min-width:620px !important;
+  table-layout:fixed;
+}
+.dashboard-table th:nth-child(1) { width:18%; }
+.dashboard-table th:nth-child(2) { width:25%; }
+.dashboard-table th:nth-child(3) { width:16%; }
+.dashboard-table th:nth-child(4) { width:15%; }
+.dashboard-table th:nth-child(5) { width:26%; }
+.dashboard-table td:nth-child(5) {
+  white-space:nowrap !important;
+  overflow-wrap:normal;
+  word-break:normal;
+  font-size:.69rem;
+}
