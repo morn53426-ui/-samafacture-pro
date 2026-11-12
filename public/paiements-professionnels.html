@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <script src="js/theme.js"></script><script src="js/icons.js"></script><script src="js/tooltip.js"></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paiements en ligne — SamaFacture Pro</title><meta name="robots" content="noindex">
+  <link rel="stylesheet" href="css/style.css"><link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0F1B33"><link rel="icon" type="image/png" href="images/icon-192.png">
+</head>
+<body>
+<div class="app-shell"><div id="sidebar-root"></div><main class="main-content">
+  <div class="page-header"><div><div class="pro-eyebrow">ENCAISSEMENTS PROFESSIONNELS</div><h1>Paiements en ligne</h1><p>Connectez les comptes marchands de votre entreprise et envoyez un lien de règlement sécurisé avec chaque facture.</p></div></div>
+  <section class="card" style="margin-bottom:20px">
+    <h2 style="margin-top:0">1. Connecter votre compte marchand</h2>
+    <p class="pro-note">Les clés sont chiffrées avant stockage. Chaque entreprise doit renseigner ses propres identifiants Wave ou PayDunya. Les clés d’abonnement SamaFacture ne sont jamais utilisées pour encaisser vos clients.</p>
+    <form id="gateway-form" class="form-grid">
+      <div class="field"><label for="gateway-provider">Prestataire</label><select id="gateway-provider"><option value="wave">Wave Business</option><option value="paydunya">PayDunya (Orange Money, Wave et cartes selon votre compte)</option></select></div>
+      <div id="wave-fields" class="field"><label for="wave-key">Clé API Wave</label><input id="wave-key" type="password" autocomplete="new-password" placeholder="Clé API marchande"></div>
+      <div id="wave-secret-field" class="field"><label for="wave-secret">Secret de signature du webhook Wave</label><input id="wave-secret" type="password" autocomplete="new-password" placeholder="Secret Wave webhook"></div>
+      <div id="paydunya-fields" hidden>
+        <div class="field"><label for="pd-master">PayDunya Master Key</label><input id="pd-master" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="pd-private">PayDunya Private Key</label><input id="pd-private" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="pd-token">PayDunya Token</label><input id="pd-token" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="pd-mode">Mode</label><select id="pd-mode"><option value="test">Test / Sandbox</option><option value="live">Production</option></select></div>
+      </div>
+      <div><button class="btn btn-primary" type="submit">Enregistrer les identifiants</button></div>
+    </form>
+    <div id="gateway-status" class="pro-list" aria-live="polite"></div>
+  </section>
+  <section class="card">
+    <h2 style="margin-top:0">2. Créer un lien de paiement pour une facture</h2>
+    <p class="pro-note">Le client est redirigé vers le prestataire marchand de votre entreprise. La facture n’est déclarée payée qu’après confirmation serveur-à-serveur du prestataire.</p>
+    <form id="checkout-form" class="form-grid">
+      <div class="field"><label for="checkout-invoice">Facture à régler</label><select id="checkout-invoice" required><option value="">Chargement des factures…</option></select></div>
+      <div class="field"><label for="checkout-provider">Prestataire</label><select id="checkout-provider"><option value="wave">Wave</option><option value="paydunya">PayDunya</option></select></div>
+      <div><button class="btn btn-primary" type="submit">Créer le lien de paiement</button></div>
+    </form>
+    <div id="checkout-result" class="pro-list" aria-live="polite"></div>
+  </section>
+</main></div>
+<script src="js/api.js"></script><script src="js/pwa.js"></script><script src="js/sidebar.js"></script>
+<script>
+requireAuthPage();
+renderSidebar('paiements-pro');
+const $ = id => document.getElementById(id);
+let gatewayData = [];
+function showGatewayFields() {
+  const wave = $('gateway-provider').value === 'wave';
+  $('wave-fields').hidden = !wave;
+  $('wave-secret-field').hidden = !wave;
+  $('paydunya-fields').hidden = wave;
+}
+$('gateway-provider').addEventListener('change', showGatewayFields);
+showGatewayFields();
+async function loadGateways() {
+  const data = await Api.get('/pro/payment-gateways');
+  gatewayData = data.gateways || [];
+  $('gateway-status').innerHTML = gatewayData.length
+    ? gatewayData.map(g => '<div class="pro-list-row"><strong>' + escapeHtml(g.fournisseur.toUpperCase()) + '</strong><span>' + (g.actif ? 'Configuré' : 'Désactivé') + ' · ' + escapeHtml(g.mode || 'live') + ' · secrets masqués</span></div>').join('')
+    : '<p class="pro-muted">Aucun compte marchand configuré.</p>';
+  if (!data.encryption_ready) $('gateway-status').innerHTML += '<p class="pro-note" style="color:var(--danger)">DATA_ENCRYPTION_KEY est absente sur le serveur : ajoutez-la avant de stocker des identifiants.</p>';
+}
+$('gateway-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const provider = $('gateway-provider').value;
+  const payload = provider === 'wave'
+    ? { api_key: $('wave-key').value, signing_secret: $('wave-secret').value }
+    : { master_key: $('pd-master').value, private_key: $('pd-private').value, token: $('pd-token').value, mode: $('pd-mode').value };
+  try {
+    await Api.put('/pro/payment-gateways/' + provider, payload);
+    $('gateway-form').reset(); showGatewayFields(); await loadGateways();
+    showToast('Compte marchand enregistré de manière chiffrée.', 'success');
+  } catch (err) { showToast(err.message, 'error'); }
+});
+async function loadInvoices() {
+  const data = await Api.get('/factures?type=facture');
+  const invoices = (data.factures || []).filter(f => f.statut !== 'annulee' && Number(f.total) > Number(f.montant_paye));
+  $('checkout-invoice').innerHTML = '<option value="">Sélectionner une facture</option>' + invoices.map(f =>
+    '<option value="' + Number(f.id) + '">' + escapeHtml(f.numero) + ' · ' + escapeHtml(f.client_nom || '') + ' · Solde ' + formatMontant(Number(f.total)-Number(f.montant_paye)) + '</option>'
+  ).join('');
+}
+$('checkout-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const invoiceId = Number($('checkout-invoice').value);
+  if (!invoiceId) return;
+  try {
+    const result = await Api.post('/pro/invoices/' + invoiceId + '/checkout', { fournisseur: $('checkout-provider').value });
+    $('checkout-result').innerHTML = '<div class="pro-list-row"><div><strong>Lien de paiement créé</strong><small>' + escapeHtml(result.fournisseur.toUpperCase()) + ' · ' + formatMontant(result.montant, result.devise) + ' · expire après ' + Number(result.expires_in_minutes) + ' min</small></div><a class="btn btn-primary" href="' + escapeHtml(result.checkout_url) + '" target="_blank" rel="noopener noreferrer">Ouvrir le paiement</a></div><p class="pro-note">La redirection de retour ne confirme pas le paiement. Le statut est mis à jour uniquement après webhook signé et vérification auprès du prestataire.</p>';
+  } catch (err) { showToast(err.message, 'error'); }
+});
+Promise.all([loadGateways(),loadInvoices()]).catch(err => showFatalError(err.message));
+</script>
+</body></html>
