@@ -3623,3 +3623,17 @@ thead th { background: #F2F6FD; color: #52627D; }
 @media (prefers-reduced-motion: reduce) {
   .dashboard-action, .dashboard-action:hover { transition:none; transform:none; }
 }
+
+
+/* Finition du bandeau de marque et du comportement mobile du menu */
+.sidebar-brand .brand-pro {
+  display:inline-block; margin-left:2px; padding:1px 6px 2px;
+  border-radius:6px; background:#1769F5; color:#fff;
+  font-size:.72rem; font-weight:800; vertical-align:2px;
+}
+@media (max-width: 900px) {
+  .sidebar {
+    left:0; right:0; top:0; bottom:auto;
+    width:100%; height:auto; max-height:100vh;
+  }
+}
