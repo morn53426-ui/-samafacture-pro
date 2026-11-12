@@ -7,20 +7,19 @@ function renderSidebar(activePage) {
     { group: 'Ventes', items: [
       { id: 'factures', icon: 'file-text', label: 'Factures', href: 'factures.html' },
       { id: 'devis', icon: 'file-stack', label: 'Devis', href: 'devis.html' },
-      { id: 'clients', icon: 'users', label: 'Clients', href: 'clients.html' },
-      { id: 'nouvelle-facture', icon: 'plus', label: 'Nouvelle facture', href: 'nouvelle-facture.html' },
-      { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
-      { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' }
+      { id: 'clients', icon: 'users', label: 'Clients', href: 'clients.html' }
     ]},
     { group: 'Catalogue', items: [
-      { id: 'produits', icon: 'package', label: 'Produits', href: 'produits.html' }
+      { id: 'produits', icon: 'package', label: 'Produits & services', href: 'produits.html' }
     ]},
     { group: 'Comptabilité', items: [
+      { id: 'finances', icon: 'credit-card', label: 'Paiements', href: 'finances.html' },
       { id: 'depenses', icon: 'banknote', label: 'Dépenses', href: 'depenses.html' },
-      { id: 'rapports', icon: 'bar-chart', label: 'Rapports', href: 'rapports.html' },
-      { id: 'finances', icon: 'credit-card', label: 'Paiements & finances', href: 'finances.html' }
+      { id: 'rapports', icon: 'bar-chart', label: 'Rapports', href: 'rapports.html' }
     ]},
-    { group: 'Intelligence artificielle', items: [
+    { group: 'Outils professionnels', items: [
+      { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
+      { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' },
       { id: 'assistant-ia', icon: 'sparkles', label: 'Assistant IA', href: 'assistant-ia.html' },
       { id: 'facture-ia', icon: 'wand', label: 'Facture par IA', href: 'facture-ia.html' }
     ]},
@@ -28,8 +27,8 @@ function renderSidebar(activePage) {
       { id: 'abonnement', icon: 'gem', label: 'Abonnement', href: 'abonnement.html' },
       { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' }
     ]},
-    { group: 'Ressources', items: [
-      { id: 'aide', icon: 'help-circle', label: 'Centre d\'aide', href: 'aide.html' },
+    { group: 'Aide et ressources', items: [
+      { id: 'aide', icon: 'help-circle', label: 'Centre d’aide', href: 'aide.html' },
       { id: 'support', icon: 'phone', label: 'Support technique', href: 'support.html' },
       { id: 'confidentialite', icon: 'lock', label: 'Confidentialité', href: 'confidentialite.html' },
       { id: 'conditions', icon: 'file-stack', label: "Conditions d'utilisation", href: 'conditions.html' }
@@ -41,7 +40,7 @@ function renderSidebar(activePage) {
   const navHtml = nav.map(section => `
     ${section.group ? `<div class="nav-group-label">${section.group}</div>` : ''}
     ${section.items.map(item => `
-      <a href="${item.href}" class="nav-item ${activePage === item.id ? 'active' : ''}" onclick="closeSidebar()">
+      <a href="${item.href}" class="nav-item ${(activePage === item.id || (activePage === 'nouvelle-facture' && item.id === 'factures')) ? 'active' : ''}" onclick="closeSidebar()">
         <span class="ic">${Icon(item.icon)}</span><span>${item.label}</span>
       </a>
     `).join('')}
