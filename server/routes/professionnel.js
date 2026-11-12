@@ -1627,8 +1627,10 @@ router.post('/clients/:id/portal', async (req, res, next) => {
     const url = baseUrl + '/portail-client.html#token=' + token;
     // Ne jamais écrire le lien secret dans les logs quand le SMTP est absent.
     // Le lien est remis à l'utilisateur uniquement dans la réponse HTTP (une seule fois).
+    const smtpReady = isSmtpConfigured();
     let mail = { sent: false };
-    if (isSmtpConfigured()) {
+    let mailFailure = false;
+    if (smtpReady) {
       try {
         mail = await sendMail({
           to: client.email,
@@ -1640,6 +1642,7 @@ router.post('/clients/:id/portal', async (req, res, next) => {
             htmlEscape(url) + '">Consulter mes factures et devis</a></p><p>Ce lien est personnel, valable 30 jours et révocable.</p>'
         });
       } catch (mailError) {
+        mailFailure = true;
         console.warn('Invitation portail client non envoyée :', mailError.message);
       }
     }
@@ -1647,7 +1650,7 @@ router.post('/clients/:id/portal', async (req, res, next) => {
     res.status(201).json({
       success: true, email: client.email, sent: !!mail.sent, url,
       expires_at: expiresAt.toISOString(),
-      warning: mail.sent ? 'Invitation envoyée. Le lien ne sera plus réaffiché.' : 'SMTP non configuré : lien affiché une seule fois pour copie manuelle.'
+      warning: mail.sent ? 'Invitation envoyée. Le lien ne sera plus réaffiché.' : (mailFailure ? 'L’envoi email a échoué. Le lien est affiché une seule fois pour copie manuelle.' : (!smtpReady ? 'SMTP non configuré : lien affiché une seule fois pour copie manuelle.' : 'L’envoi email n’a pas été confirmé. Le lien est affiché une seule fois pour copie manuelle.'))
     });
   } catch (err) {
     try { await conn.rollback(); } catch (_) {}
