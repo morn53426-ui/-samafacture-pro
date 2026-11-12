@@ -27,9 +27,9 @@ async function accessForToken(token) {
   return access;
 }
 
-router.get('/:token', async (req, res, next) => {
+router.get('/', async (req, res, next) => {
   try {
-    const access = await accessForToken(req.params.token);
+    const access = await accessForToken(req.get('X-SF-Portal-Token'));
     if (!access) return res.status(404).json({ error: 'Ce lien client est invalide, expiré ou révoqué.' });
     await pool.query('UPDATE pro_customer_portal_access SET last_access_at = NOW() WHERE id = ?', [access.access_id]);
 
@@ -106,9 +106,9 @@ router.get('/:token', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/:token/quotes/:invoiceId/decision', async (req, res, next) => {
+router.post('/quotes/:invoiceId/decision', async (req, res, next) => {
   try {
-    const access = await accessForToken(req.params.token);
+    const access = await accessForToken(req.get('X-SF-Portal-Token'));
     if (!access) return res.status(404).json({ error: 'Ce lien client est invalide, expiré ou révoqué.' });
     const decision = String(req.body.decision || '');
     const commentaire = String(req.body.commentaire || '').trim().slice(0, 1000);
