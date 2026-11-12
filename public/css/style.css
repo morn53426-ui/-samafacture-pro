@@ -3637,3 +3637,19 @@ thead th { background: #F2F6FD; color: #52627D; }
     width:100%; height:auto; max-height:100vh;
   }
 }
+
+
+.dashboard-donut-graphic { position:relative; min-width:0; display:grid; place-items:center; }
+.dashboard-donut-graphic canvas { display:block; }
+.dashboard-donut-center {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  flex-direction:column; pointer-events:none; transform:translateY(-1px);
+}
+.dashboard-donut-center strong {
+  color:var(--navy-950); font:800 clamp(1.15rem,1.7vw,1.55rem) var(--font-display);
+  line-height:1.15; letter-spacing:-.04em;
+}
+.dashboard-donut-center span { color:var(--ink-soft); font-size:.7rem; font-weight:650; }
+@media (max-width:640px) {
+  .dashboard-donut-center strong { font-size:1.35rem; }
+}
