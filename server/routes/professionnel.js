@@ -1552,4 +1552,226 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+/* ----------------------- PORTAIL CLIENT & CRM -------------------------- */
+function htmlEscape(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+router.get('/clients/:id/portal', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [clients] = await pool.query('SELECT id, nom, email FROM clients WHERE id = ? AND user_id = ?', [req.params.id, uid]);
+    if (!clients.length) return res.status(404).json({ error: 'Client introuvable.' });
+    const [rows] = await pool.query(
+      'SELECT id, expires_at, last_access_at, created_at FROM pro_customer_portal_access WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+      [uid, req.params.id]
+    );
+    res.json({ client: clients[0], portail_actif: !!rows.length, acces: rows[0] || null });
+  } catch (err) { next(err); }
+});
+
+router.post('/clients/:id/portal', async (req, res, next) => {
+  const conn = await pool.getConnection();
+  try {
+    const uid = owner(req);
+    const [clients] = await conn.query('SELECT id, nom, email FROM clients WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
+    const client = clients[0];
+    if (!client) { await conn.rollback(); return res.status(404).json({ error: 'Client introuvable.' }); }
+    if (!client.email) { await conn.rollback(); return res.status(400).json({ error: 'Ajoutez une adresse email au client avant de lui envoyer son portail.' }); }
+    const baseUrl = String(process.env.APP_URL || '').replace(/\/$/, '');
+    if (!baseUrl || !/^https:\/\//i.test(baseUrl)) {
+      if (process.env.NODE_ENV === 'production') {
+        await conn.rollback();
+        return res.status(503).json({ error: 'APP_URL doit être une URL HTTPS publique avant de partager un portail client.' });
+      }
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 30 * 86400000);
+    await conn.beginTransaction();
+    await conn.query(
+      'UPDATE pro_customer_portal_access SET revoked_at = NOW() WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL',
+      [uid, client.id]
+    );
+    const [created] = await conn.query(
+      'INSERT INTO pro_customer_portal_access (user_id, client_id, token_hash, expires_at) VALUES (?, ?, ?, ?)',
+      [uid, client.id, hash, expiresAt]
+    );
+    const [[company]] = await conn.query('SELECT entreprise_nom FROM users WHERE id = ?', [uid]);
+    await conn.commit();
+
+    const url = baseUrl + '/portail-client.html?token=' + token;
+    const mail = await sendMail({
+      to: client.email,
+      subject: 'Votre espace client sécurisé — ' + (company.entreprise_nom || 'SamaFacture Pro'),
+      text: 'Bonjour ' + client.nom + ',\n\nVotre entreprise ' + (company.entreprise_nom || '') +
+        ' vous donne accès à un espace sécurisé pour consulter vos factures, devis et paiements :\n' +
+        url + '\n\nCe lien est personnel, valable 30 jours et peut être révoqué par l’entreprise. Ne le transférez pas.\n',
+      html: '<p>Bonjour ' + htmlEscape(client.nom) + ',</p><p>Votre espace client sécurisé est prêt.</p><p><a href="' +
+        htmlEscape(url) + '">Consulter mes factures et devis</a></p><p>Ce lien est personnel, valable 30 jours et révocable.</p>'
+    });
+    await audit(req, 'portail.client_invite', 'client', client.id, { access_id: created.insertId, email: client.email });
+    res.status(201).json({
+      success: true, email: client.email, sent: !!mail.sent, url,
+      expires_at: expiresAt.toISOString(),
+      warning: mail.sent ? 'Invitation envoyée. Le lien ne sera plus réaffiché.' : 'SMTP non configuré : lien affiché une seule fois pour copie manuelle.'
+    });
+  } catch (err) {
+    try { await conn.rollback(); } catch (_) {}
+    next(err);
+  } finally { conn.release(); }
+});
+
+router.delete('/clients/:id/portal', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [result] = await pool.query(
+      'UPDATE pro_customer_portal_access SET revoked_at = NOW() WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL',
+      [uid, req.params.id]
+    );
+    await audit(req, 'portail.client_revoque', 'client', req.params.id, { acces_revoques: result.affectedRows });
+    res.json({ success: true, acces_revoques: result.affectedRows });
+  } catch (err) { next(err); }
+});
+
+router.get('/crm/overview', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [[stats]] = await pool.query(
+      `SELECT COUNT(*) AS total_activites,
+        SUM(CASE WHEN statut = 'a_faire' THEN 1 ELSE 0 END) AS taches_ouvertes,
+        SUM(CASE WHEN statut = 'a_faire' AND due_at IS NOT NULL AND due_at < NOW() THEN 1 ELSE 0 END) AS taches_en_retard
+       FROM pro_crm_activities WHERE user_id = ?`,
+      [uid]
+    );
+    const [upcoming] = await pool.query(
+      `SELECT a.id, a.client_id, c.nom AS client_nom, a.type, a.titre, a.due_at, a.statut
+       FROM pro_crm_activities a JOIN clients c ON c.id = a.client_id AND c.user_id = a.user_id
+       WHERE a.user_id = ? AND a.statut = 'a_faire'
+       ORDER BY a.due_at IS NULL, a.due_at ASC, a.id DESC LIMIT 20`,
+      [uid]
+    );
+    res.json({ statistiques: stats, prochaines_taches: upcoming });
+  } catch (err) { next(err); }
+});
+
+router.get('/crm/activities', async (req, res, next) => {
+  try {
+    const uid = owner(req), params = [uid];
+    let where = 'a.user_id = ?';
+    if (req.query.client_id) { where += ' AND a.client_id = ?'; params.push(Number(req.query.client_id)); }
+    if (req.query.statut && ['a_faire','terminee','annulee'].includes(req.query.statut)) { where += ' AND a.statut = ?'; params.push(req.query.statut); }
+    const limit = Math.min(300, Math.max(1, Number(req.query.limite) || 100));
+    const [rows] = await pool.query(
+      `SELECT a.id, a.client_id, c.nom AS client_nom, a.acteur_user_id, a.type, a.titre,
+              a.description, a.statut, a.due_at, a.completed_at, a.created_at, a.updated_at
+       FROM pro_crm_activities a JOIN clients c ON c.id = a.client_id AND c.user_id = a.user_id
+       WHERE ${where} ORDER BY COALESCE(a.due_at, a.created_at) DESC, a.id DESC LIMIT ?`,
+      [...params, limit]
+    );
+    res.json({ activites: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/crm/activities', async (req, res, next) => {
+  try {
+    const uid = owner(req), clientId = Number(req.body.client_id);
+    const types = ['note','appel','reunion','email','tache','relance'];
+    const type = String(req.body.type || 'note');
+    const titre = String(req.body.titre || '').trim().slice(0, 190);
+    const description = optionalText(req.body.description, 10000);
+    const dueAt = req.body.due_at ? new Date(req.body.due_at) : null;
+    if (!idOk(clientId) || !types.includes(type) || !titre || (dueAt && Number.isNaN(dueAt.getTime()))) {
+      return res.status(400).json({ error: 'Client, type, titre et date de rappel valide sont requis.' });
+    }
+    const [clients] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [clientId, uid]);
+    if (!clients.length) return res.status(404).json({ error: 'Client introuvable dans cette entreprise.' });
+    const statut = type === 'tache' || dueAt ? 'a_faire' : 'terminee';
+    const [result] = await pool.query(
+      'INSERT INTO pro_crm_activities (user_id, client_id, acteur_user_id, type, titre, description, statut, due_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [uid, clientId, actor(req), type, titre, description, statut, dueAt, statut === 'terminee' ? new Date() : null]
+    );
+    await audit(req, 'crm.activite_creee', 'client', clientId, { activite_id: result.insertId, type });
+    res.status(201).json({ id: result.insertId, client_id: clientId, type, titre, statut });
+  } catch (err) { next(err); }
+});
+
+router.put('/crm/activities/:id', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [rows] = await pool.query('SELECT id, statut FROM pro_crm_activities WHERE id = ? AND user_id = ?', [req.params.id, uid]);
+    if (!rows.length) return res.status(404).json({ error: 'Activité CRM introuvable.' });
+    const current = rows[0], status = req.body.statut;
+    if (status !== undefined && !['a_faire','terminee','annulee'].includes(status)) return res.status(400).json({ error: 'Statut CRM invalide.' });
+    const title = req.body.titre === undefined ? null : String(req.body.titre).trim().slice(0, 190);
+    if (title !== null && !title) return res.status(400).json({ error: 'Le titre ne peut pas être vide.' });
+    await pool.query(
+      `UPDATE pro_crm_activities SET
+       titre = COALESCE(?, titre),
+       description = CASE WHEN ? = 1 THEN ? ELSE description END,
+       statut = COALESCE(?, statut),
+       completed_at = CASE WHEN COALESCE(?, statut) = 'terminee' THEN COALESCE(completed_at, NOW()) WHEN COALESCE(?, statut) <> 'terminee' THEN NULL ELSE completed_at END,
+       due_at = CASE WHEN ? = 1 THEN ? ELSE due_at END
+       WHERE id = ? AND user_id = ?`,
+      [title, req.body.description !== undefined ? 1 : 0, optionalText(req.body.description,10000),
+       status || null, status || null, status || null,
+       req.body.due_at !== undefined ? 1 : 0, req.body.due_at ? new Date(req.body.due_at) : null,
+       req.params.id, uid]
+    );
+    await audit(req, 'crm.activite_modifiee', 'activite', req.params.id, { statut: status || current.statut });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+/* ---------------------- PARAMÈTRES INTERNATIONAUX ---------------------- */
+const SUPPORTED_CURRENCIES = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
+const SUPPORTED_COUNTRIES = ['SN','CI','ML','BF','BJ','TG','NE','GN','CM','GA','TD','CG','CD','FR','BE','CH','US','GB','CA','MA'];
+const SUPPORTED_TIMEZONES = [
+  'Africa/Dakar','Africa/Abidjan','Africa/Bamako','Africa/Ouagadougou','Africa/Porto-Novo',
+  'Africa/Lome','Africa/Niamey','Africa/Conakry','Africa/Douala','Africa/Libreville',
+  'Africa/Ndjamena','Africa/Brazzaville','Africa/Kinshasa','Europe/Paris','Europe/Brussels',
+  'Europe/Zurich','Europe/London','America/New_York','America/Toronto','UTC'
+];
+
+router.get('/localization', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT pays_code, langue, locale, devise, fuseau_horaire, format_date, regime_fiscal FROM users WHERE id = ?',
+      [owner(req)]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Entreprise introuvable.' });
+    res.json({
+      parametres: rows[0],
+      options: { pays: SUPPORTED_COUNTRIES, langues: ['fr','en'], devises: SUPPORTED_CURRENCIES, fuseaux: SUPPORTED_TIMEZONES, formats_date: ['dd/MM/yyyy','yyyy-MM-dd','MM/dd/yyyy'], regimes_fiscaux: ['standard','simplifie','franchise','autre'] }
+    });
+  } catch (err) { next(err); }
+});
+
+router.put('/localization', async (req, res, next) => {
+  try {
+    const country = String(req.body.pays_code || 'SN').toUpperCase();
+    const language = String(req.body.langue || 'fr').toLowerCase();
+    const currency = String(req.body.devise || 'FCFA').toUpperCase();
+    const timezone = String(req.body.fuseau_horaire || 'Africa/Dakar');
+    const dateFormat = String(req.body.format_date || 'dd/MM/yyyy');
+    const taxRegime = String(req.body.regime_fiscal || 'standard');
+    if (!SUPPORTED_COUNTRIES.includes(country) || !['fr','en'].includes(language) ||
+        !SUPPORTED_CURRENCIES.includes(currency) || !SUPPORTED_TIMEZONES.includes(timezone) ||
+        !['dd/MM/yyyy','yyyy-MM-dd','MM/dd/yyyy'].includes(dateFormat) ||
+        !['standard','simplifie','franchise','autre'].includes(taxRegime)) {
+      return res.status(400).json({ error: 'Un paramètre pays, langue, devise, fuseau horaire ou fiscalité est invalide.' });
+    }
+    const locale = language + '-' + country;
+    await pool.query(
+      'UPDATE users SET pays_code = ?, langue = ?, locale = ?, devise = ?, fuseau_horaire = ?, format_date = ?, regime_fiscal = ? WHERE id = ?',
+      [country, language, locale, currency, timezone, dateFormat, taxRegime, owner(req)]
+    );
+    await audit(req, 'entreprise.localisation_modifiee', 'entreprise', owner(req), { country, language, currency, timezone, dateFormat, taxRegime });
+    res.json({ success: true, parametres: { pays_code: country, langue: language, locale, devise: currency, fuseau_horaire: timezone, format_date: dateFormat, regime_fiscal: taxRegime } });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
