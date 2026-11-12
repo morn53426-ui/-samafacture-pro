@@ -20,9 +20,9 @@ const PAGES = [
   { name: 'clients', file: 'clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
   { name: 'produits', file: 'produits.html', ready: '#produits-body tr:not(.row-skeleton)' },
   { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
-  { name: 'devis', file: 'devis.html', ready: '#devis-body tr' },
-  { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr' },
-  { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'] },
+  { name: 'devis', file: 'devis.html', ready: '#devis-body tr', responsiveTable: '#devis-body' },
+  { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
+  { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'], responsiveTable: '#table-body' },
   { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
   { name: 'parametres', file: 'parametres.html', ready: '#entreprise_nom' },
   { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' }
@@ -104,6 +104,8 @@ function makeFixtures() {
     },
     ventes: Array.from({ length: 14 }, (_, index) => ({
       label: '2026-' + String(index + 1).padStart(2, '0'),
+      nb_factures: normal ? index + 2 : 999999 + index,
+      quantite: normal ? (index + 1) * 3 : 999999999 + index,
       total: normal ? (index + 1) * 85000 : (index + 1) * 71234567890.12
     })),
     clients,
@@ -399,6 +401,15 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
         pageDefinition.name + ' : le texte extrême doit passer sur plusieurs lignes : ' +
         JSON.stringify(responsiveContent));
     }
+  }
+
+  if (viewport.width <= 640 && pageDefinition.responsiveTable && DATASET !== 'empty') {
+    const labels = await page.evaluate((selector) => Array.from(
+      document.querySelectorAll(selector + ' tr:not(.row-skeleton) td:not([colspan])')
+    ).map(cell => cell.dataset.label || ''), pageDefinition.responsiveTable);
+    assert.ok(labels.length > 0 && labels.every(Boolean),
+      pageDefinition.name + ' : toutes les cellules du tableau mobile doivent avoir un libellé. Labels : ' +
+      JSON.stringify(labels));
   }
 
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
