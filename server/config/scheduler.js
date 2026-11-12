@@ -96,8 +96,6 @@ async function executerRelancesAutomatiques() {
       for (const automation of automations) {
         try {
           const config = typeof automation.configuration_json === 'string'
-            ? JSON.parse(automation.configuration_json || '{}')
-            : (automation.configuration_json || {});
 
           if (automation.type === 'relance_devis_email') {
             const horizon = Math.min(30, Math.max(0, Number(config.jours_avant_expiration) || 5));
