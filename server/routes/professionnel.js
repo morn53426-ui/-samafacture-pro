@@ -1106,7 +1106,7 @@ router.post('/purchase-orders', async (req, res, next) => {
     }
     for (const line of lines) {
       const designation = String(line.designation || '').trim().slice(0, 255);
-      const qty = Number(line.quantite), price = Number(line.prix_unitaire), tax = Number(line.tva || 0);
+      const qty = Math.round(Number(line.quantite) * 1000) / 1000, price = Math.round(Number(line.prix_unitaire) * 100) / 100, tax = Math.round(Number(line.tva || 0) * 100) / 100;
       if (!designation || !Number.isFinite(qty) || qty <= 0 || qty > 10000000 || !Number.isFinite(price) || price < 0 || !Number.isFinite(tax) || tax < 0 || tax > 100) {
         return res.status(400).json({ error: 'Chaque ligne doit avoir une désignation, une quantité, un prix et une TVA valides.' });
       }
@@ -1162,7 +1162,7 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
     const [orderLines] = await conn.query('SELECT * FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? FOR UPDATE', [order.id, uid]);
     for (const received of lines) {
       const line = orderLines.find(item => Number(item.id) === Number(received.ligne_id));
-      const qty = Number(received.quantite);
+      const qty = Math.round(Number(received.quantite) * 1000) / 1000;
       if (!line || !Number.isFinite(qty) || qty <= 0 || qty > Number(line.quantite) - Number(line.quantite_recue) + 0.0001) {
         throw new Error('Quantité reçue invalide ou supérieure au reliquat de commande.');
       }
@@ -1226,7 +1226,7 @@ router.post('/inventory/adjustments', async (req, res, next) => {
   let conn;
   try {
     const uid = owner(req), productId = Number(req.body.produit_id), warehouseId = Number(req.body.entrepot_id) || await ensureDefaultWarehouse(uid);
-    const delta = Number(req.body.quantite), reason = String(req.body.motif || '').trim().slice(0, 255);
+    const delta = Math.round(Number(req.body.quantite) * 1000) / 1000, reason = String(req.body.motif || '').trim().slice(0, 255);
     if (!idOk(productId) || !Number.isFinite(delta) || !delta || Math.abs(delta) > 10000000 || !reason) return res.status(400).json({ error: 'Produit, quantité non nulle et motif obligatoires.' });
     conn = await pool.getConnection();
     await conn.beginTransaction();
@@ -1259,7 +1259,7 @@ router.post('/inventory/transfers', async (req, res, next) => {
   let conn;
   try {
     await ensureDefaultWarehouse(owner(req));
-    const uid = owner(req), productId = Number(req.body.produit_id), fromId = Number(req.body.entrepot_source_id), toId = Number(req.body.entrepot_destination_id), qty = Number(req.body.quantite);
+    const uid = owner(req), productId = Number(req.body.produit_id), fromId = Number(req.body.entrepot_source_id), toId = Number(req.body.entrepot_destination_id), qty = Math.round(Number(req.body.quantite) * 1000) / 1000;
     if (!idOk(productId) || !idOk(fromId) || !idOk(toId) || fromId === toId || !Number.isFinite(qty) || qty <= 0 || qty > 10000000) return res.status(400).json({ error: 'Produit, deux entrepôts différents et quantité positive obligatoires.' });
     conn = await pool.getConnection();
     await conn.beginTransaction();
@@ -1410,10 +1410,12 @@ router.post('/accounting/entries', async (req, res, next) => {
     let debit = 0, credit = 0;
     const clean = [];
     for (const line of lines) {
-      const account = Number(line.compte_id), d = Number(line.debit || 0), c = Number(line.credit || 0);
-      if (!idOk(account) || !Number.isFinite(d) || !Number.isFinite(c) || d < 0 || c < 0 || (d > 0 && c > 0) || (d === 0 && c === 0)) return res.status(400).json({ error: 'Chaque ligne doit avoir un compte et un seul montant débit ou crédit positif.' });
+      const account = Number(line.compte_id);
+      const d = Math.round(Number(line.debit || 0) * 100) / 100;
+      const c = Math.round(Number(line.credit || 0) * 100) / 100;
+      if (!idOk(account) || !Number.isFinite(d) || !Number.isFinite(c) || d < 0 || c < 0 || (d > 0 && c > 0) || (d === 0 && c === 0)) return res.status(400).json({ error: 'Chaque ligne doit avoir un compte et un seul montant débit ou crédit positif (au centime).' });
       debit += d; credit += c;
-      clean.push({ account, d: Math.round(d * 100) / 100, c: Math.round(c * 100) / 100, label: String(line.libelle || label).slice(0,255), tiers: optionalText(line.tiers,190) });
+      clean.push({ account, d, c, label: String(line.libelle || label).slice(0,255), tiers: optionalText(line.tiers,190) });
     }
     debit = Math.round(debit * 100) / 100; credit = Math.round(credit * 100) / 100;
     if (Math.abs(debit - credit) > 0.01) return res.status(400).json({ error: 'Écriture déséquilibrée : total débit et crédit doivent être identiques.' });
