@@ -75,7 +75,8 @@
 
   let clients = [];
   let currentPage = 1;
-  let currentQuery = '';
+  let currentQuery = new URLSearchParams(location.search).get('q') || '';
+  document.getElementById('search').value = currentQuery;
 
   async function load(q, page) {
     if (q !== undefined) currentQuery = q;
