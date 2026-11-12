@@ -69,7 +69,7 @@
 
     <div class="card" style="margin-bottom:18px;">
       <h3 id="chart-title">Ventes par mois</h3>
-      <canvas id="chart-ventes" height="110"></canvas>
+      <canvas id="chart-ventes" height="110" role="img" aria-label="Graphique des ventes selon les filtres sélectionnés."></canvas>
     </div>
 
     <div class="card" style="padding:0;">
@@ -128,7 +128,18 @@
         labels: rows.length ? rows.map(r => r.label) : ['—'],
         datasets: [{ label: 'Total', data: rows.length ? rows.map(r => r.total) : [0], backgroundColor: '#0FA980', borderRadius: 6, maxBarThickness: 44 }]
       },
-      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#EDEAE2' } }, x: { grid: { display: false } } } }
+      options: {
+        responsive: true,
+        animation: false,
+        transitions: {
+          active: { animation: { duration: 0 } },
+          resize: { animation: { duration: 0 } },
+          show: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } },
+          hide: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } }
+        },
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, grid: { color: '#EDEAE2' } }, x: { grid: { display: false } } }
+      }
     });
 
     const isProduit = group_by === 'produit';
