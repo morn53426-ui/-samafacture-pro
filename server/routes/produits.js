@@ -142,7 +142,7 @@ router.put('/:id', async (req, res, next) => {
     let nextStock = stock !== undefined ? nonNegativeQuantity(stock, Number(existing.stock)) : Number(existing.stock);
     let stockMovement = null;
     const [warehouses] = await conn.query(
-      "SELECT id FROM pro_entrepots WHERE user_id = ? AND code = 'PRINCIPAL' LIMIT 1",
+      "SELECT id, nom FROM pro_entrepots WHERE user_id = ? AND code = 'PRINCIPAL' LIMIT 1",
       [req.tenantId]
     );
     if (stock !== undefined && warehouses.length) {
@@ -187,8 +187,8 @@ router.put('/:id', async (req, res, next) => {
     );
     if (stockMovement && stockMovement.delta !== 0) {
       await conn.query(
-        "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, motif) VALUES (?, ?, ?, 'ajustement_catalogue', ?, ?, ?)",
-        [req.tenantId, existing.id, stockMovement.warehouseId, stockMovement.delta, Number(prix_achat !== undefined ? positiveNumber(prix_achat, existing.prix_achat) : existing.prix_achat), 'Modification de quantité depuis la fiche produit']
+        "INSERT INTO pro_mouvements_stock (user_id, produit_id, produit_nom, entrepot_id, entrepot_nom, type, quantite, cout_unitaire, motif) VALUES (?, ?, ?, ?, ?, 'ajustement_catalogue', ?, ?, ?)",
+        [req.tenantId, existing.id, existing.nom, stockMovement.warehouseId, warehouses[0].nom, stockMovement.delta, Number(prix_achat !== undefined ? positiveNumber(prix_achat, existing.prix_achat) : existing.prix_achat), 'Modification de quantité depuis la fiche produit']
       );
     }
     const [rows] = await conn.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
