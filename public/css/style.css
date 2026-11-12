@@ -3653,3 +3653,66 @@ thead th { background: #F2F6FD; color: #52627D; }
 @media (max-width:640px) {
   .dashboard-donut-center strong { font-size:1.35rem; }
 }
+
+
+/* Cartes de statistiques : icône + chiffre fort + intitulé, comme la référence visuelle. */
+.dashboard-kpi-top { justify-content:flex-start; align-items:center; gap:13px; }
+.dashboard-kpi-copy { display:flex; flex-direction:column; min-width:0; gap:2px; }
+.dashboard-kpi-copy .dashboard-kpi-value { margin:0; }
+.dashboard-kpi-copy .dashboard-kpi-label { line-height:1.3; }
+
+/* Le tableau d'encaissements reste entièrement lisible sur grand écran. */
+.dashboard-table {
+  width:100%;
+  min-width:0 !important;
+  table-layout:fixed;
+}
+.dashboard-table th,
+.dashboard-table td {
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.dashboard-table th:nth-child(1) { width:18%; }
+.dashboard-table th:nth-child(2) { width:24%; }
+.dashboard-table th:nth-child(3) { width:17%; }
+.dashboard-table th:nth-child(4) { width:17%; }
+.dashboard-table th:nth-child(5) { width:24%; text-align:right; }
+.dashboard-table td:nth-child(5) { text-align:right; font-weight:700; }
+@media (max-width:640px) {
+  .dashboard-table-wrap { overflow:visible; }
+  .dashboard-table { display:block; min-width:0 !important; table-layout:auto; }
+  .dashboard-table thead { display:none; }
+  .dashboard-table tbody { display:grid; gap:9px; }
+  .dashboard-table tbody tr {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:9px 12px;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:11px;
+    background:var(--paper);
+  }
+  .dashboard-table tbody td {
+    display:flex;
+    min-width:0;
+    flex-direction:column;
+    gap:3px;
+    padding:0;
+    border:0;
+    text-align:left !important;
+    font-size:.76rem;
+    overflow-wrap:anywhere;
+  }
+  .dashboard-table tbody td::before {
+    content:attr(data-label);
+    color:var(--ink-soft);
+    font-size:.61rem;
+    font-weight:800;
+    letter-spacing:.055em;
+    text-transform:uppercase;
+  }
+  .dashboard-table tbody td:nth-child(1),
+  .dashboard-table tbody td:nth-child(2) { grid-column:1 / -1; }
+  .dashboard-table tbody td[colspan] { display:block; }
+  .dashboard-table tbody td[colspan]::before { content:none; }
+}
