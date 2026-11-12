@@ -936,6 +936,14 @@ router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
     if (invoice.statut === 'annulee') return res.status(409).json({ error: 'Une facture annulée ne peut pas être payée.' });
     const remaining = Math.round((Number(invoice.total) - Number(invoice.montant_paye)) * 100) / 100;
     if (!Number.isFinite(remaining) || remaining <= 0) return res.status(409).json({ error: 'Cette facture est déjà soldée.' });
+    // Wave et PayDunya règlent ici en XOF, devise sans sous-unité. Refuser un solde
+    // fractionnaire plutôt que de créer un lien arrondi qui pourrait encaisser un autre montant.
+    if (invoice.devise && invoice.devise !== 'FCFA' && invoice.devise !== 'XOF') {
+      return res.status(409).json({ error: 'Les paiements en ligne ne sont activés que pour les factures en XOF/FCFA.' });
+    }
+    if (Math.abs(remaining - Math.round(remaining)) > 0.001) {
+      return res.status(409).json({ error: 'Le solde XOF doit être un montant entier avant de créer un lien Wave ou PayDunya.' });
+    }
 
     const base = String(process.env.APP_URL || '').replace(/\/$/, '');
     if (!base || !base.startsWith('https://')) return res.status(503).json({ error: 'APP_URL doit être une URL publique HTTPS pour activer le paiement en ligne.' });
