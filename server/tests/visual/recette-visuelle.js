@@ -529,11 +529,23 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
 
 function contrastRatio(foreground, background) {
   function luminance(color) {
-    const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => {
+    let channels;
+    const rgb = color.match(/[\d.]+/g);
+    if (rgb && rgb.length >= 3) {
+      channels = rgb.slice(0, 3).map(Number);
+    } else {
+      const hex = color.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+      if (!hex) throw new Error('Format de couleur non pris en charge pour le contraste : ' + color);
+      const value = hex[1].length === 3
+        ? hex[1].split('').map(character => parseInt(character + character, 16))
+        : hex[1].match(/.{2}/g).map(channel => parseInt(channel, 16));
+      channels = value;
+    }
+    const linear = channels.map(value => {
       const normalized = value / 255;
       return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
     });
-    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
   }
   const a = luminance(foreground);
   const b = luminance(background);
