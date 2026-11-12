@@ -1,0 +1,154 @@
+name: Construire le ZIP de test local Docker
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/local-docker-test-bundle.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer la version fusionnée
+        uses: actions/checkout@v4
+      - name: Construire l’archive avec .env local provisoire
+        shell: bash
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/SamaFacture-Pro-Docker"
+          mkdir -p "$STAGE"
+          git archive HEAD | tar -x -C "$STAGE"
+          rm -f "$STAGE/.github/workflows/local-docker-test-bundle.yml"
+
+          DB_ROOT_PASSWORD="$(openssl rand -hex 18)"
+          DB_PASSWORD="$(openssl rand -hex 18)"
+          JWT_SECRET="$(openssl rand -hex 48)"
+          DATA_ENCRYPTION_KEY="$(openssl rand -hex 32)"
+
+          cat > "$STAGE/.env" <<EOF
+          # Identifiants provisoires générés pour les tests Docker locaux uniquement.
+          DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD
+          DB_USER=samafacture_app
+          DB_PASSWORD=$DB_PASSWORD
+          DB_NAME=samafacture
+          HTTP_PORT=4000
+          WEB_CONCURRENCY=2
+          DB_POOL_SIZE=10
+          DB_QUEUE_LIMIT=500
+          ALLOWED_ORIGINS=http://localhost:4000,http://127.0.0.1:4000
+          APP_URL=http://localhost:4000
+          JWT_SECRET=$JWT_SECRET
+          DATA_ENCRYPTION_KEY=$DATA_ENCRYPTION_KEY
+          WEBHOOK_DELIVERY_INTERVAL_MS=30000
+          JWT_EXPIRES_IN=7d
+          NODE_ENV=production
+          TRUST_PROXY=1
+          REDIS_URL=redis://redis:6379
+          BACKUP_ENABLED=true
+          BACKUP_HOUR=2
+          BACKUP_RETENTION_DAYS=14
+          BACKUP_DIR=./backups
+          MYSQLDUMP_PATH=mysqldump
+          BACKUP_ON_STARTUP=false
+          ENABLE_API_DOCS=false
+          PDF_JOBS_DIR=/app/server/pdf-jobs
+          PDF_QUEUE_KEY=samafacture:pdf:queue
+          PDF_JOB_TTL_SECONDS=3600
+          HEALTH_TIMEOUT_MS=3000
+          SHUTDOWN_TIMEOUT_MS=10000
+          PAIEMENT_EXPIRATION_HEURES=24
+          PAYDUNYA_MODE=test
+          EOF
+
+          cat > "$STAGE/server/.env" <<EOF
+          # Identifiants provisoires Docker locaux — générés pour cette archive.
+          PORT=4000
+          NODE_ENV=production
+          JWT_SECRET=$JWT_SECRET
+          JWT_EXPIRES_IN=7d
+          DATA_ENCRYPTION_KEY=$DATA_ENCRYPTION_KEY
+          DB_HOST=mysql
+          DB_PORT=3306
+          DB_USER=samafacture_app
+          DB_PASSWORD=$DB_PASSWORD
+          DB_NAME=samafacture
+          DB_ROOT_PASSWORD=$DB_ROOT_PASSWORD
+          APP_URL=http://localhost:4000
+          ALLOWED_ORIGINS=http://localhost:4000,http://127.0.0.1:4000
+          TRUST_PROXY=1
+          REDIS_URL=redis://redis:6379
+          DB_POOL_SIZE=10
+          DB_QUEUE_LIMIT=500
+          SMTP_HOST=
+          SMTP_PORT=587
+          SMTP_USER=
+          SMTP_PASSWORD=
+          SMTP_FROM=SamaFacture Pro <no-reply@localhost>
+          GOOGLE_CLIENT_ID=
+          WAVE_API_KEY=
+          WAVE_SIGNING_SECRET=
+          PAYDUNYA_MASTER_KEY=
+          PAYDUNYA_PRIVATE_KEY=
+          PAYDUNYA_PUBLIC_KEY=
+          PAYDUNYA_TOKEN=
+          PAYDUNYA_MODE=test
+          ANTHROPIC_API_KEY=
+          ANTHROPIC_MODEL=claude-haiku-4-5-20251001
+          SENTRY_DSN=
+          ENABLE_API_DOCS=false
+          WEBHOOK_DELIVERY_INTERVAL_MS=30000
+          PAIEMENT_EXPIRATION_HEURES=24
+          BACKUP_ENABLED=true
+          BACKUP_HOUR=2
+          BACKUP_RETENTION_DAYS=14
+          BACKUP_DIR=/app/server/backups
+          MYSQLDUMP_PATH=mysqldump
+          BACKUP_ON_STARTUP=false
+          PDF_JOBS_DIR=/app/server/pdf-jobs
+          PDF_QUEUE_KEY=samafacture:pdf:queue
+          PDF_JOB_TTL_SECONDS=3600
+          HEALTH_TIMEOUT_MS=3000
+          SHUTDOWN_TIMEOUT_MS=10000
+          EOF
+
+          cat > "$STAGE/DEMARRAGE-LOCAL.txt" <<EOF
+          SAMAFACTURE PRO — TEST DOCKER LOCAL
+          Version main : 204f96d8b8a169383f5c3042fd26cbf1aa596896
+
+          MOTS DE PASSE PROVISOIRES (uniquement pour cette archive locale)
+          MySQL root : $DB_ROOT_PASSWORD
+          MySQL application : $DB_PASSWORD
+          Utilisateur MySQL application : samafacture_app
+          JWT_SECRET : $JWT_SECRET
+          DATA_ENCRYPTION_KEY : $DATA_ENCRYPTION_KEY
+
+          DEMARRAGE
+          1. Décompresser cette archive.
+          2. Ouvrir un terminal à la racine du dossier SamaFacture-Pro-Docker.
+          3. Exécuter : docker compose up -d --build
+          4. Voir les logs : docker compose logs -f app
+          5. Ouvrir : http://localhost:4000
+          6. État des services : docker compose ps
+
+          ARRÊT : docker compose down
+          RÉINITIALISATION COMPLÈTE (EFFACE LA BASE LOCALE) : docker compose down -v
+
+          Les fichiers .env et server/.env contiennent ces mêmes identifiants.
+          Ne pas réutiliser ces mots de passe en production, ni publier cette archive.
+          Les identifiants Wave, PayDunya, SMTP et Anthropic sont volontairement vides.
+          PayDunya reste en mode test. Aucun moyen de paiement réel ni email/IA ne sera activé sans clés.
+          EOF
+
+          cd "$RUNNER_TEMP"
+          zip -qr SamaFacture-Pro-Docker-Local.zip SamaFacture-Pro-Docker
+      - name: Publier l’archive ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: SamaFacture-Pro-Docker-Local
+          path: ${{ runner.temp }}/SamaFacture-Pro-Docker-Local.zip
+          if-no-files-found: error
+          retention-days: 3
