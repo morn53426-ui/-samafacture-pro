@@ -4,7 +4,7 @@ const QRCode = require('qrcode');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission, ROLE_PERMISSIONS } = require('../middleware/tenant');
-const { sendMail } = require('../config/mailer');
+const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { encryptSecret, decryptSecret } = require('../utils/pro-webhooks');
 const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydunya } = require('../config/payments');
 const net = require('net');
@@ -1625,15 +1625,24 @@ router.post('/clients/:id/portal', async (req, res, next) => {
     await conn.commit();
 
     const url = baseUrl + '/portail-client.html?token=' + token;
-    const mail = await sendMail({
-      to: client.email,
-      subject: 'Votre espace client sécurisé — ' + (company.entreprise_nom || 'SamaFacture Pro'),
-      text: 'Bonjour ' + client.nom + ',\n\nVotre entreprise ' + (company.entreprise_nom || '') +
-        ' vous donne accès à un espace sécurisé pour consulter vos factures, devis et paiements :\n' +
-        url + '\n\nCe lien est personnel, valable 30 jours et peut être révoqué par l’entreprise. Ne le transférez pas.\n',
-      html: '<p>Bonjour ' + htmlEscape(client.nom) + ',</p><p>Votre espace client sécurisé est prêt.</p><p><a href="' +
-        htmlEscape(url) + '">Consulter mes factures et devis</a></p><p>Ce lien est personnel, valable 30 jours et révocable.</p>'
-    });
+    // Ne jamais écrire le lien secret dans les logs quand le SMTP est absent.
+    // Le lien est remis à l'utilisateur uniquement dans la réponse HTTP (une seule fois).
+    let mail = { sent: false };
+    if (isSmtpConfigured()) {
+      try {
+        mail = await sendMail({
+          to: client.email,
+          subject: 'Votre espace client sécurisé — ' + (company.entreprise_nom || 'SamaFacture Pro'),
+          text: 'Bonjour ' + client.nom + ',\\n\\nVotre entreprise ' + (company.entreprise_nom || '') +
+            ' vous donne accès à un espace sécurisé pour consulter vos factures, devis et paiements :\\n' +
+            url + '\\n\\nCe lien est personnel, valable 30 jours et peut être révoqué par l’entreprise. Ne le transférez pas.\\n',
+          html: '<p>Bonjour ' + htmlEscape(client.nom) + ',</p><p>Votre espace client sécurisé est prêt.</p><p><a href="' +
+            htmlEscape(url) + '">Consulter mes factures et devis</a></p><p>Ce lien est personnel, valable 30 jours et révocable.</p>'
+        });
+      } catch (mailError) {
+        console.warn('Invitation portail client non envoyée :', mailError.message);
+      }
+    }
     await audit(req, 'portail.client_invite', 'client', client.id, { access_id: created.insertId, email: client.email });
     res.status(201).json({
       success: true, email: client.email, sent: !!mail.sent, url,
