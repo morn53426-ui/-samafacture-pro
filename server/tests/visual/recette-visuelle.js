@@ -72,7 +72,7 @@ function makeFixtures() {
 
   const produits = [
     { id: 1, nom: makeLong('Matériel informatique professionnel — lot complet avec installation et maintenance ', 188), reference: 'REF-2026-ULTRA-LONGUE-REFERENCE-001', prix_ht: 999999999999.99, prix_achat: 600000000000, tva: 18, stock: 999999999 },
-    { id: 2, nom: 'A', reference: '', prix_ht: 0, prix_achat: 0, tva: 0, stock: 0 },
+    { id: 2, nom: 'Prestation de démonstration', reference: 'PRESTA-TEST-002', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 12 },
     { id: 3, nom: 'Bougie parfumée ambre et bois de santal', reference: 'BOUGIE-AMB-001', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 54 },
     { id: 4, nom: 'Service de maintenance annuelle', reference: 'SERV-MAINT-2026', prix_ht: 1250000, prix_achat: 300000, tva: 18, stock: 0 },
     { id: 5, nom: 'Produit avec stock faible', reference: 'STOCK-LOW-1', prix_ht: 1000, prix_achat: 500, tva: 0, stock: 1 }
@@ -271,7 +271,12 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
     if (url.includes('/api/')) {
       let response = {};
       try {
-        response = fixtureFor(new URL(url).pathname, fixtures);
+        const requestUrl = new URL(url);
+        if (request.method() === 'POST' && requestUrl.pathname === '/api/factures') {
+          response = { facture: { id: 987, numero: 'FAC-VISUAL-0987' } };
+        } else {
+          response = fixtureFor(requestUrl.pathname, fixtures);
+        }
       } catch (error) {
         response = {};
       }
@@ -522,6 +527,141 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   return { globalSearch: 'ok', mobileNavigation: 'ok' };
 }
 
+function contrastRatio(foreground, background) {
+  function luminance(color) {
+    const channels = color.match(/[\\d.]+/g).slice(0, 3).map(Number).map(value => {
+      const normalized = value / 255;
+      return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  }
+  const a = luminance(foreground);
+  const b = luminance(background);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
+  const darkPage = await preparePage(browser, baseUrl, fixtures, false);
+  await darkPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await darkPage.evaluate(() => localStorage.setItem('sf_theme', 'dark'));
+  await darkPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
+  await darkPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await darkPage.waitForFunction(() =>
+    document.getElementById('chart-repartition')?.dataset.sfChartType === 'doughnut'
+  );
+  const darkMetrics = await darkPage.evaluate(() => ({
+    theme: document.documentElement.getAttribute('data-theme'),
+    background: getComputedStyle(document.querySelector('.main-content')).backgroundColor,
+    card: getComputedStyle(document.querySelector('.dashboard-panel')).backgroundColor,
+    text: getComputedStyle(document.querySelector('.dashboard-welcome h1')).color,
+    horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth
+  }));
+  assert.equal(darkMetrics.theme, 'dark', 'Le thème sombre doit être appliqué avant le rendu du tableau de bord.');
+  assert.notEqual(darkMetrics.card, 'rgb(255, 255, 255)', 'Les cartes ne doivent pas rester blanches en thème sombre.');
+  assert.equal(darkMetrics.horizontalOverflow, false, 'Le thème sombre ne doit pas créer de débordement.');
+  const darkContrast = contrastRatio(darkMetrics.text, darkMetrics.background);
+  assert.ok(darkContrast >= 4.5, 'Le contraste du titre doit atteindre 4,5:1 en thème sombre. Valeur : ' + darkContrast.toFixed(2));
+  await darkPage.screenshot({ path: path.join(OUTPUT_DIR, 'dashboard-theme-sombre-1440.png'), fullPage: true });
+  await darkPage.close();
+
+  // 200 % est simulé par la largeur CSS effective d'un écran 1440 px avec un zoom navigateur
+  // à 200 % : la page ne dispose alors que d'environ 720 pixels CSS.
+  const zoomPage = await preparePage(browser, baseUrl, fixtures, false);
+  await zoomPage.setViewport({ width: 720, height: 900, deviceScaleFactor: 1 });
+  await zoomPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
+  await zoomPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  const zoomMetrics = await zoomPage.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth,
+    body: document.body.scrollWidth,
+    kpis: document.querySelectorAll('.dashboard-kpi').length,
+    menuToggleVisible: getComputedStyle(document.getElementById('mobile-toggle-btn')).display !== 'none'
+  }));
+  assert.equal(zoomMetrics.viewport, 720, 'La largeur CSS simulée pour le zoom 200 % doit être de 720 px.');
+  assert.ok(zoomMetrics.document <= zoomMetrics.viewport + 1 && zoomMetrics.body <= zoomMetrics.viewport + 1,
+    'Le tableau de bord doit rester dans la largeur utile au zoom 200 % : ' + JSON.stringify(zoomMetrics));
+  assert.equal(zoomMetrics.kpis, 4, 'Les quatre indicateurs doivent rester présents au zoom 200 %.');
+  assert.equal(zoomMetrics.menuToggleVisible, true, 'La navigation mobile doit rester accessible au zoom 200 %.');
+  await zoomPage.screenshot({ path: path.join(OUTPUT_DIR, 'dashboard-zoom-200-effectif-720.png'), fullPage: true });
+  await zoomPage.close();
+
+  return { darkTheme: { ...darkMetrics, contrastRatio: Number(darkContrast.toFixed(2)) }, zoom200EffectiveViewport: zoomMetrics };
+}
+
+async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
+  if (DATASET === 'empty') return { skipped: 'jeu de données vide' };
+  const page = await preparePage(browser, baseUrl, fixtures, false);
+  await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  const submitted = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/factures') && request.method() === 'POST') {
+      try { submitted.push(JSON.parse(request.postData() || '{}')); } catch (error) { submitted.push(null); }
+    }
+  });
+
+  async function prepareDocument(type) {
+    await page.goto(baseUrl + '/nouvelle-facture.html', { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#l1 .ligne-produit', { timeout: 15000 });
+    await page.select('#client_id', '1');
+    if (type === 'devis') {
+      await page.$eval('input[name="doc_type"][value="devis"]', element => {
+        element.checked = true;
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+    await page.select('#l1 .ligne-produit', '2');
+    await page.$eval('#l1 .ligne-qte', element => {
+      element.value = '2';
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.$eval('#remise', element => {
+      element.value = '1000';
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.$eval('#frais_livraison', element => {
+      element.value = '1500';
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const total = await page.$eval('#rec-total', element => element.textContent.replace(/\\s+/g, ' ').trim());
+    assert.equal(total, '20 380 FCFA', 'Le total doit inclure la remise, la TVA sur le net et les frais de livraison.');
+    if (type === 'devis') {
+      const fields = await page.evaluate(() => ({
+        dueHidden: document.getElementById('invoice-due-field').hidden,
+        validityHidden: document.getElementById('quote-validity-field').hidden,
+        title: document.getElementById('page-title').textContent
+      }));
+      assert.deepEqual(fields, { dueHidden: true, validityHidden: false, title: 'Nouveau devis' },
+        'Le mode devis doit masquer l’échéance et afficher la validité.');
+      await page.$eval('#date_validite', element => { element.value = '2026-12-15'; });
+    }
+    await page.click('#submit-facture-btn');
+    await page.waitForFunction(() =>
+      location.pathname.endsWith('/factures.html') && location.search.includes('highlight=987'),
+      { timeout: 15000 }
+    );
+    const payload = submitted[submitted.length - 1];
+    assert.ok(payload, 'La création doit envoyer un payload JSON au serveur.');
+    assert.equal(payload.type, type, 'Le type de document envoyé au serveur doit correspondre au formulaire.');
+    assert.equal(String(payload.client_id), '1', 'Le client sélectionné doit figurer dans le payload.');
+    assert.equal(payload.lignes.length, 1, 'Une ligne produit doit figurer dans le document.');
+    assert.equal(payload.lignes[0].designation, 'Prestation de démonstration');
+    assert.equal(payload.lignes[0].quantite, 2);
+    assert.equal(payload.remise, 1000);
+    assert.equal(payload.frais_livraison, 1500);
+    if (type === 'devis') {
+      assert.equal(payload.date_validite, '2026-12-15');
+      assert.equal(payload.date_echeance, null);
+    } else {
+      assert.equal(payload.date_validite, null);
+    }
+  }
+
+  await prepareDocument('facture');
+  await prepareDocument('devis');
+  await page.close();
+  return { invoiceCreation: 'ok', quoteCreation: 'ok', totalWithDiscountVatAndDelivery: 20380 };
+}
+
 async function main() {
   if (!['worst', 'normal', 'empty'].includes(DATASET)) {
     throw new Error('VISUAL_DATASET doit valoir worst, normal ou empty.');
@@ -558,13 +698,17 @@ async function main() {
     }
     const shell = await verifyWorkspaceShell(browser, baseUrl, fixtures);
     const motion = await verifyMotion(browser, baseUrl, fixtures);
+    const themeAndZoom = await verifyThemeAndZoom(browser, baseUrl, fixtures);
+    const documentFlows = await verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures);
     const report = {
       dataset: DATASET,
       generatedAt: new Date().toISOString(),
       pages: results,
       motion,
       workspaceShell: shell,
-      screenshots: results.length,
+      themeAndZoom,
+      documentFlows,
+      screenshots: results.length + 2,
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
