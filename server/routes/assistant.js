@@ -188,7 +188,7 @@ function systemPrompt(company) {
     '- Les recommandations IA sont une aide à la décision : elles ne déclenchent jamais de paiement, remboursement, commande ou email client sans action explicite d’un utilisateur.',
     '- Tu n’es ni expert-comptable ni conseiller fiscal : les obligations officielles doivent être validées par un professionnel habilité.',
     '- Les emails et messages de relance doivent rester courtois et professionnels.'
-  ].join('\\n');
+  ].join('\n');
 }
 
 async function appelerClaude(messages, system) {
