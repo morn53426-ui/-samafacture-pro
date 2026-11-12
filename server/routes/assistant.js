@@ -120,11 +120,55 @@ async function execTopClients(userId, { limite }) {
   return rows;
 }
 
+async function execPrevisionTresorerie(userId, { horizon_jours }) {
+  const horizon = [7, 30, 60, 90].includes(Number(horizon_jours)) ? Number(horizon_jours) : 30;
+  const [[summary]] = await pool.query(
+    "SELECT COALESCE(SUM(CASE WHEN date_echeance < CURDATE() THEN total - montant_paye ELSE 0 END),0) AS deja_en_retard, COALESCE(SUM(CASE WHEN date_echeance >= CURDATE() AND date_echeance <= DATE_ADD(CURDATE(), INTERVAL ? DAY) THEN total - montant_paye ELSE 0 END),0) AS attendu_horizon, COUNT(CASE WHEN date_echeance BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY) THEN 1 END) AS nb_echeances FROM factures WHERE user_id = ? AND type = 'facture' AND statut IN ('en_attente','en_retard') AND total > montant_paye AND date_echeance IS NOT NULL",
+    [horizon, horizon, userId]
+  );
+  return {
+    horizon_jours: horizon,
+    creances_en_retard: Number(summary.deja_en_retard),
+    creances_a_echeance: Number(summary.attendu_horizon),
+    nombre_echeances: Number(summary.nb_echeances),
+    avertissement: 'Créances attendues uniquement : elles ne constituent pas une prévision de trésorerie garantie et ne tiennent pas compte des décaissements futurs.'
+  };
+}
+
+async function execAlertesStock(userId, { limite }) {
+  const n = Math.min(Math.max(Number(limite) || 20, 1), 100);
+  const [rows] = await pool.query(
+    'SELECT nom, reference, stock, stock_minimum, prix_achat FROM produits WHERE user_id = ? AND stock_minimum > 0 AND stock <= stock_minimum ORDER BY (stock_minimum-stock) DESC, nom ASC LIMIT ?',
+    [userId, n]
+  );
+  return rows.map(row => ({
+    produit: row.nom,
+    reference: row.reference,
+    stock_actuel: Number(row.stock),
+    seuil_minimum: Number(row.stock_minimum),
+    quantite_a_reapprovisionner: Math.max(0, Number(row.stock_minimum) - Number(row.stock)),
+    prix_achat: Number(row.prix_achat)
+  }));
+}
+
+async function execClientsInactifs(userId, { jours_inactivite, limite }) {
+  const days = [30, 60, 90, 180].includes(Number(jours_inactivite)) ? Number(jours_inactivite) : 60;
+  const n = Math.min(Math.max(Number(limite) || 20, 1), 100);
+  const [rows] = await pool.query(
+    'SELECT c.nom AS client, c.email, MAX(f.date_emission) AS derniere_facture, COALESCE(SUM(CASE WHEN f.type = "facture" THEN f.total - f.montant_paye ELSE 0 END),0) AS solde_du, DATEDIFF(CURDATE(), COALESCE(MAX(f.date_emission), c.created_at)) AS jours_sans_activite FROM clients c LEFT JOIN factures f ON f.client_id = c.id AND f.user_id = c.user_id WHERE c.user_id = ? GROUP BY c.id, c.nom, c.email, c.created_at HAVING jours_sans_activite >= ? ORDER BY derniere_facture ASC LIMIT ?',
+    [userId, days, n]
+  );
+  return rows.map(row => ({ ...row, solde_du: Number(row.solde_du), jours_sans_activite: Number(row.jours_sans_activite) }));
+}
+
 async function executerOutil(name, input, userId) {
   switch (name) {
     case 'factures_en_retard': return execFacturesEnRetard(userId);
     case 'resume_ventes': return execResumeVentes(userId, input || {});
     case 'top_clients': return execTopClients(userId, input || {});
+    case 'prevision_tresorerie': return execPrevisionTresorerie(userId, input || {});
+    case 'alertes_stock': return execAlertesStock(userId, input || {});
+    case 'clients_inactifs': return execClientsInactifs(userId, input || {});
     default: return { error: `Outil inconnu : ${name}` };
   }
 }
