@@ -342,7 +342,7 @@ router.post('/', async (req, res, next) => {
     if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 100)) {
       return res.status(400).json({ error: 'Idempotency-Key invalide (8 à 100 caractères).' });
     }
-    const { client_id, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, remise, frais_livraison, mode_paiement, commentaires, lignes } = req.body;
+    const { client_id, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, remise, frais_livraison, mode_paiement, commentaires, lignes } = req.body;
 
     // Une nouvelle tentative avec la même clé doit retourner le document déjà créé plutôt
     // que créer une seconde facture. La clé est facultative afin de préserver exactement le
@@ -377,6 +377,10 @@ router.post('/', async (req, res, next) => {
       }
     }
 
+    const [companyRows] = await pool.query('SELECT devise FROM users WHERE id = ?', [req.tenantId]);
+    const documentCurrency = String(devise || companyRows[0]?.devise || 'FCFA').toUpperCase();
+    const supportedCurrencies = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
+    if (!supportedCurrencies.includes(documentCurrency)) return res.status(400).json({ error: 'Devise de document non prise en charge.' });
     const docType = type === 'devis' ? 'devis' : 'facture';
     const dateValidite = docType === 'devis' ? optionalIsoDate(date_validite) : null;
     if (dateValidite === undefined) {
@@ -418,12 +422,12 @@ router.post('/', async (req, res, next) => {
     await conn.beginTransaction();
     const numero = await nextNumero(conn, req.tenantId, docType);
     const [result] = await conn.query(
-      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
         date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
-        remiseAppliquee, Number(frais_livraison) || 0, mode_paiement || null,
+        documentCurrency, remiseAppliquee, Number(frais_livraison) || 0, mode_paiement || null,
         commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
       ]
     );
