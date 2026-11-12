@@ -16,10 +16,16 @@ const VIEWPORTS = [
   { name: 'desktop-1440', width: 1440, height: 1000 }
 ];
 const PAGES = [
-  { name: 'dashboard', file: 'dashboard.html', ready: '#paiements-body tr:not(.row-skeleton)' },
+  { name: 'dashboard', file: 'dashboard.html', ready: '#paiements-body tr:not(.row-skeleton)', charts: ['chart-evolution', 'chart-repartition'] },
   { name: 'clients', file: 'clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
   { name: 'produits', file: 'produits.html', ready: '#produits-body tr:not(.row-skeleton)' },
-  { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' }
+  { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
+  { name: 'devis', file: 'devis.html', ready: '#devis-body tr' },
+  { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr' },
+  { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'] },
+  { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
+  { name: 'parametres', file: 'parametres.html', ready: '#entreprise_nom' },
+  { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' }
 ];
 
 function makeLong(prefix, length) {
@@ -44,7 +50,8 @@ function makeFixtures() {
       ventes: [],
       clients: [],
       produits: [],
-      factures: []
+      factures: [],
+      depenses: []
     };
   }
 
@@ -101,7 +108,25 @@ function makeFixtures() {
     })),
     clients,
     produits,
-    factures
+    factures,
+    depenses: [
+      {
+        id: 1,
+        libelle: normal ? 'Achat de fournitures de bureau' : makeLong('Renouvellement du parc informatique, équipements réseau et maintenance du site principal ', 188),
+        categorie: 'Équipement',
+        montant: normal ? 185000 : 999999999999.99,
+        date_depense: '2026-11-11',
+        notes: makeLong('Dépense de contrôle visuel ', 260)
+      },
+      {
+        id: 2,
+        libelle: 'Transport et livraison',
+        categorie: 'Logistique',
+        montant: normal ? 45000 : 888888888888.88,
+        date_depense: '2026-11-10',
+        notes: ''
+      }
+    ]
   };
 }
 
@@ -214,6 +239,21 @@ function fixtureFor(pathname, fixtures) {
     factures: fixtures.factures,
     pagination: { page: 1, limite: 20, total: fixtures.factures.length, total_pages: fixtures.factures.length ? 1 : 0 }
   };
+  if (pathname === '/api/depenses') return { depenses: fixtures.depenses || [] };
+  if (pathname === '/api/rapports/comptabilite') {
+    return {
+      recettes: fixtures.dashboard.chiffre_affaires || 0,
+      depenses: DATASET === 'empty' ? 0 : (DATASET === 'normal' ? 230000 : 999999999999.99),
+      benefice: DATASET === 'empty' ? 0 : (DATASET === 'normal' ? 1020000 : 888888888888.88),
+      tva_collectee: DATASET === 'empty' ? 0 : (DATASET === 'normal' ? 36000 : 777777777777.77)
+    };
+  }
+  if (pathname === '/api/auth/me') return {
+    user: {
+      id: 1, nom: 'Compte de recette SamaFacture', entreprise_nom: 'SamaFacture — Société de test',
+      entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro'
+    }
+  };
   return {};
 }
 
@@ -283,15 +323,25 @@ async function verifyPage(browser, baseUrl, pageDefinition, viewport, fixtures, 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
-  if (pageDefinition.name === 'dashboard') {
-    await page.waitForFunction(() =>
-      document.getElementById('chart-evolution')?.dataset.sfChartType === 'line' &&
-      document.getElementById('chart-repartition')?.dataset.sfChartType === 'doughnut',
-      { timeout: 15000 }
-    );
+  if (pageDefinition.charts?.length) {
+    await page.waitForFunction((chartIds) => chartIds.every((id) => {
+      const canvas = document.getElementById(id);
+      return canvas?.dataset.sfChartType && canvas.dataset.sfChartAnimation === 'disabled';
+    }), { timeout: 15000 }, pageDefinition.charts);
   }
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await new Promise((resolve) => setTimeout(resolve, 120));
+
+  const shell = await page.evaluate(() => ({
+    toolbar: Boolean(document.querySelector('.app-topbar')),
+    search: Boolean(document.querySelector('.app-topbar-search input#workspace-search')),
+    sidebar: Boolean(document.querySelector('#app-sidebar')),
+    activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active'))
+  }));
+  assert.equal(shell.toolbar, true, pageDefinition.name + ' doit afficher la barre supérieure commune.');
+  assert.equal(shell.search, true, pageDefinition.name + ' doit afficher la recherche globale.');
+  assert.equal(shell.sidebar, true, pageDefinition.name + ' doit afficher la navigation latérale.');
+  assert.equal(shell.activeNavigation, true, pageDefinition.name + ' doit signaler la page active.');
 
   const metrics = await page.evaluate(() => ({
     viewport: window.innerWidth,
@@ -417,6 +467,45 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   return { chartAnimation, buttonTransform: buttonState.transform, reducedMotionToast: reduced, reducedMotionTooltip: tooltipMetrics };
 }
 
+async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
+  const page = await preparePage(browser, baseUrl, fixtures, false);
+  const clientRequests = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/clients')) clientRequests.push(request.url());
+  });
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await page.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await page.type('#workspace-search', 'Coopérative Thiès');
+  await page.click('.app-topbar-search button');
+  await page.waitForFunction(() => location.pathname.endsWith('/clients.html'), { timeout: 15000 });
+  await page.waitForSelector('#clients-body tr:not(.row-skeleton)', { timeout: 15000 });
+  const query = await page.$eval('#search', element => element.value);
+  assert.equal(query, 'Coopérative Thiès', 'La recherche globale doit transmettre le texte à la page Clients.');
+  assert.ok(clientRequests.some(url => new URL(url).searchParams.get('q') === 'Coopérative Thiès'),
+    'La page Clients doit lancer la requête API avec le terme reçu depuis la barre supérieure.');
+  await page.close();
+
+  const mobile = await preparePage(browser, baseUrl, fixtures, false);
+  await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await mobile.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
+  await mobile.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await mobile.click('#mobile-toggle-btn');
+  const opened = await mobile.evaluate(() => ({
+    expanded: document.getElementById('mobile-toggle-btn')?.getAttribute('aria-expanded'),
+    sidebarOpen: document.getElementById('app-sidebar')?.classList.contains('open'),
+    overlayVisible: document.getElementById('sidebar-overlay')?.classList.contains('show')
+  }));
+  assert.deepEqual(opened, { expanded: 'true', sidebarOpen: true, overlayVisible: true },
+    'Le menu mobile doit s’ouvrir, afficher son voile et mettre à jour ARIA.');
+  await mobile.click('#sidebar-overlay');
+  const closed = await mobile.$eval('#mobile-toggle-btn', element => element.getAttribute('aria-expanded'));
+  assert.equal(closed, 'false', 'Le voile doit fermer le menu mobile.');
+  await mobile.close();
+
+  return { globalSearch: 'ok', mobileNavigation: 'ok' };
+}
+
 async function main() {
   if (!['worst', 'normal', 'empty'].includes(DATASET)) {
     throw new Error('VISUAL_DATASET doit valoir worst, normal ou empty.');
@@ -443,12 +532,14 @@ async function main() {
         results.push(await verifyPage(browser, baseUrl, pageDefinition, viewport, fixtures, OUTPUT_DIR));
       }
     }
+    const shell = await verifyWorkspaceShell(browser, baseUrl, fixtures);
     const motion = await verifyMotion(browser, baseUrl, fixtures);
     const report = {
       dataset: DATASET,
       generatedAt: new Date().toISOString(),
       pages: results,
       motion,
+      workspaceShell: shell,
       screenshots: results.length,
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
