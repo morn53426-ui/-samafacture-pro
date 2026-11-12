@@ -237,6 +237,9 @@ async function genererFactureDepuisModele(id, userId) {
       return null;
     }
 
+    const [[company]] = await conn.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [userId]);
+    const documentCurrency = String(company?.devise || 'FCFA').toUpperCase();
+
     const lignes = JSON.parse(modele.lignes_json);
     // Même règle de calcul qu'une facture créée manuellement (voir routes/factures.js) :
     // la remise est répartie au prorata de chaque ligne avant le calcul de la TVA. Avant
@@ -258,9 +261,9 @@ async function genererFactureDepuisModele(id, userId) {
     const numero = `${prefix}-${year}-${String(n).padStart(4, '0')}`;
 
     const [result] = await conn.query(
-      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
-       VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, modele.client_id, numero, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
+      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
+       VALUES (?, ?, ?, 'facture', CURDATE(), ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, modele.client_id, numero, documentCurrency, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
     );
     const factureId = result.insertId;
 
