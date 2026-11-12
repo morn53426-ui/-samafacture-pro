@@ -31,7 +31,7 @@
     </div>
 
     <div class="card" style="padding:0;">
-      <table>
+      <table class="table-stack clients-table">
         <thead><tr><th>Client</th><th>Contact</th><th>Montant dû</th><th>Total facturé</th><th></th></tr></thead>
         <tbody id="clients-body">
           <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
@@ -92,16 +92,16 @@
     document.getElementById('clients-body').innerHTML = clients.length ? clients.map(c => `
       <tr class="row-clickable" tabindex="0" role="button" aria-label="Modifier ${escapeHtml(c.nom)}"
           onclick="editClient(${c.id})" onkeydown="if(event.key==='Enter') editClient(${c.id})">
-        <td>
-          <div style="display:flex; align-items:center; gap:10px;">
+        <td data-label="Client">
+          <div class="client-cell">
             <div class="avatar" style="width:32px;height:32px;font-size:0.72rem;">${initials(c.nom)}</div>
-            <div style="font-weight:600;">${escapeHtml(c.nom)}</div>
+            <div class="client-name">${escapeHtml(c.nom)}</div>
           </div>
         </td>
-        <td>${escapeHtml(c.telephone || c.email) || '—'}</td>
-        <td class="mono" style="color:${c.total_du > 0 ? 'var(--clay)' : 'var(--ink-soft)'};">${formatMontant(c.total_du)}</td>
-        <td class="mono">${formatMontant(c.total_facture)}</td>
-        <td style="text-align:right;" onclick="event.stopPropagation();">
+        <td data-label="Contact">${escapeHtml(c.telephone || c.email) || '—'}</td>
+        <td data-label="Montant dû" class="mono" style="color:${c.total_du > 0 ? 'var(--clay)' : 'var(--ink-soft)'};">${formatMontant(c.total_du)}</td>
+        <td data-label="Total facturé" class="mono">${formatMontant(c.total_facture)}</td>
+        <td data-label="Actions" style="text-align:right;" onclick="event.stopPropagation();">
           <button class="btn btn-sm btn-outline" onclick='editClient(${c.id})'>${Icon('edit-3')} Modifier</button>
           <button class="btn btn-sm btn-danger" onclick="deleteClient(${c.id})">${Icon('trash-2')} Supprimer</button>
         </td>
