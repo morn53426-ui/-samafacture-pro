@@ -107,8 +107,10 @@ test('CRM : activités, tâches et isolation stricte des clients entre entrepris
   const list = await request(app).get('/api/pro/crm/activities?client_id=' + clientA)
     .set('Authorization', 'Bearer ' + tokenA);
   assert.equal(list.status, 200, list.text);
-  assert.equal(list.body.activites.length, 1);
-  assert.equal(list.body.activites[0].statut, 'a_faire');
+  assert.ok(list.body.activites.length >= 2, 'l’historique doit inclure la tâche et la décision de devis déjà reçue');
+  const createdTask = list.body.activites.find(row => Number(row.id) === Number(activity.body.id));
+  assert.ok(createdTask);
+  assert.equal(createdTask.statut, 'a_faire');
 
   const foreign = await request(app).post('/api/pro/crm/activities')
     .set('Authorization', 'Bearer ' + tokenA)
