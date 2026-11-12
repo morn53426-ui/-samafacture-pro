@@ -7,7 +7,8 @@ function renderSidebar(activePage) {
     { group: 'Ventes', items: [
       { id: 'factures', icon: 'file-text', label: 'Factures', href: 'factures.html' },
       { id: 'devis', icon: 'file-stack', label: 'Devis', href: 'devis.html' },
-      { id: 'clients', icon: 'users', label: 'Clients', href: 'clients.html' }
+      { id: 'clients', icon: 'users', label: 'Clients', href: 'clients.html' },
+      { id: 'crm', icon: 'contact-round', label: 'CRM & suivi client', href: 'crm.html' }
     ]},
     { group: 'Catalogue', items: [
       { id: 'produits', icon: 'package', label: 'Produits & services', href: 'produits.html' }
@@ -24,11 +25,13 @@ function renderSidebar(activePage) {
       { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' },
       { id: 'achats', icon: 'truck', label: 'Achats & stocks', href: 'achats.html' },
       { id: 'assistant-ia', icon: 'sparkles', label: 'Assistant IA', href: 'assistant-ia.html' },
+      { id: 'automatisations', icon: 'workflow', label: 'Automatisations', href: 'automatisations.html' },
       { id: 'facture-ia', icon: 'wand', label: 'Facture par IA', href: 'facture-ia.html' }
     ]},
     { group: 'Compte', items: [
       { id: 'abonnement', icon: 'gem', label: 'Abonnement', href: 'abonnement.html' },
-      { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' }
+      { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' },
+      { id: 'internationalisation', icon: 'globe', label: 'Pays, langue & devise', href: 'internationalisation.html' }
     ]},
     { group: 'Aide et ressources', items: [
       { id: 'aide', icon: 'help-circle', label: 'Centre d’aide', href: 'aide.html' },
