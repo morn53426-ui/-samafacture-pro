@@ -135,6 +135,24 @@ function renderTopbar(title, subtitle) {
           <strong>${escapeHtml(displayName)}</strong>
           <small>${escapeHtml(roleLabel)}</small>
         </div>
+        <div class="app-notification">
+          <button type="button" class="app-notification-toggle" id="workspace-notification-toggle"
+            onclick="toggleWorkspaceNotifications(event)" aria-label="Notifications" aria-controls="workspace-notification-panel"
+            aria-expanded="false" title="Notifications">
+            <span class="ic" aria-hidden="true">${Icon('bell')}</span>
+            <span class="app-notification-badge" id="workspace-notification-badge" hidden></span>
+          </button>
+          <section class="app-notification-panel" id="workspace-notification-panel"
+            aria-label="Centre de notifications" hidden>
+            <header class="app-notification-panel-head">
+              <div><strong>Notifications</strong><small id="workspace-notification-summary">Aucune nouvelle notification</small></div>
+              <button type="button" class="app-notification-clear" onclick="clearWorkspaceNotifications()">Effacer</button>
+            </header>
+            <div class="app-notification-list" id="workspace-notification-list" aria-live="polite">
+              <div class="app-notification-empty">Aucune notification reçue pendant cette session.</div>
+            </div>
+          </section>
+        </div>
         <button type="button" class="app-topbar-logout"
           onclick="Api.clearSession(); location.href='login.html';"
           aria-label="Se déconnecter" title="Se déconnecter">
@@ -143,6 +161,95 @@ function renderTopbar(title, subtitle) {
       </div>
     </header>
   `;
+  renderWorkspaceNotifications();
+  bindWorkspaceNotificationDismiss();
+}
+
+let workspaceNotifications = [];
+let workspaceNotificationSequence = 0;
+
+function pushWorkspaceNotification(title, message, tone) {
+  workspaceNotificationSequence += 1;
+  workspaceNotifications.unshift({
+    id: workspaceNotificationSequence,
+    title: String(title || 'Notification'),
+    message: String(message || ''),
+    tone: ['success', 'warning', 'error'].includes(tone) ? tone : 'info',
+    createdAt: new Date(),
+    read: false
+  });
+  workspaceNotifications = workspaceNotifications.slice(0, 20);
+  renderWorkspaceNotifications();
+}
+
+function renderWorkspaceNotifications() {
+  const badge = document.getElementById('workspace-notification-badge');
+  const list = document.getElementById('workspace-notification-list');
+  const summary = document.getElementById('workspace-notification-summary');
+  const clearButton = document.querySelector('.app-notification-clear');
+  const toggle = document.getElementById('workspace-notification-toggle');
+  if (!badge || !list || !summary || !toggle) return;
+
+  const unread = workspaceNotifications.filter(item => !item.read).length;
+  badge.hidden = unread === 0;
+  badge.textContent = unread > 99 ? '99+' : String(unread);
+  toggle.setAttribute('aria-label', unread
+    ? 'Notifications, ' + unread + ' non lue' + (unread > 1 ? 's' : '')
+    : 'Notifications');
+  toggle.title = unread ? unread + ' notification' + (unread > 1 ? 's' : '') + ' non lue' + (unread > 1 ? 's' : '') : 'Notifications';
+  summary.textContent = unread ? unread + ' non lue' + (unread > 1 ? 's' : '') : workspaceNotifications.length + ' notification' + (workspaceNotifications.length > 1 ? 's' : '');
+
+  if (clearButton) clearButton.disabled = workspaceNotifications.length === 0;
+  list.innerHTML = workspaceNotifications.length ? workspaceNotifications.map(item => `
+    <article class="app-notification-item ${item.read ? '' : 'is-unread'} tone-${escapeHtml(item.tone)}">
+      <span class="app-notification-item-dot" aria-hidden="true"></span>
+      <div class="app-notification-item-content">
+        <strong>${escapeHtml(item.title)}</strong>
+        <p>${escapeHtml(item.message)}</p>
+        <time datetime="${item.createdAt.toISOString()}">${item.createdAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</time>
+      </div>
+    </article>
+  `).join('') : '<div class="app-notification-empty">Aucune notification reçue pendant cette session.</div>';
+}
+
+function toggleWorkspaceNotifications(event) {
+  event?.stopPropagation();
+  const panel = document.getElementById('workspace-notification-panel');
+  const toggle = document.getElementById('workspace-notification-toggle');
+  if (!panel || !toggle) return;
+  const shouldOpen = panel.hidden;
+  panel.hidden = !shouldOpen;
+  toggle.setAttribute('aria-expanded', String(shouldOpen));
+  if (shouldOpen) {
+    workspaceNotifications.forEach(item => { item.read = true; });
+    renderWorkspaceNotifications();
+  }
+}
+
+function closeWorkspaceNotifications() {
+  const panel = document.getElementById('workspace-notification-panel');
+  const toggle = document.getElementById('workspace-notification-toggle');
+  if (panel && !panel.hidden) panel.hidden = true;
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+function clearWorkspaceNotifications() {
+  workspaceNotifications = [];
+  renderWorkspaceNotifications();
+}
+
+function bindWorkspaceNotificationDismiss() {
+  if (window.__sfNotificationDismissBound) return;
+  window.__sfNotificationDismissBound = true;
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.app-notification')) closeWorkspaceNotifications();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      closeWorkspaceNotifications();
+      document.getElementById('workspace-notification-toggle')?.focus();
+    }
+  });
 }
 
 function submitWorkspaceSearch(event) {
@@ -178,13 +285,19 @@ function initRealtime() {
     const socket = io({ auth: { token } });
 
     socket.on('facture_payee', (data) => {
-      showToast(`Facture ${data.facture?.numero || ''} marquée payée ✓`, 'success');
+      const numero = data.facture?.numero || '';
+      pushWorkspaceNotification('Paiement reçu', numero ? 'La facture ' + numero + ' a été marquée payée.' : 'Une facture a été marquée payée.', 'success');
+      showToast(`Facture ${numero} marquée payée ✓`, 'success');
     });
     socket.on('nouveau_client', (data) => {
-      showToast(`Nouveau client ajouté : ${data.client?.nom || ''}`, 'success');
+      const nom = data.client?.nom || 'Nouveau client';
+      pushWorkspaceNotification('Nouveau client', nom + ' a été ajouté à votre portefeuille clients.', 'info');
+      showToast(`Nouveau client ajouté : ${nom}`, 'success');
     });
     socket.on('alerte_quota', (data) => {
-      showToast(data.message, 'error');
+      const message = data.message || 'Une limite de votre abonnement approche.';
+      pushWorkspaceNotification('Alerte de quota', message, 'warning');
+      showToast(message, 'error');
     });
     socket.on('connect_error', (err) => {
       // Ne bloque jamais l'utilisation de l'application si les notifications temps réel
