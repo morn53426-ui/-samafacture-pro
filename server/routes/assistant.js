@@ -173,15 +173,22 @@ async function executerOutil(name, input, userId) {
   }
 }
 
-function systemPrompt(nomEntreprise) {
-  return `Tu es l'Assistant Comptable de SamaFacture Pro, une application de facturation pour les commerçants, artisans et PME d'Afrique de l'Ouest. Tu aides l'utilisateur de l'entreprise "${nomEntreprise || 'cette entreprise'}" à comprendre ses finances, à obtenir des conseils pratiques et à rédiger des messages de relance.
-
-Règles importantes :
-- Réponds toujours en français, de façon concise et actionnable.
-- Les montants sont en Francs CFA (FCFA).
-- Utilise les outils fournis pour obtenir les vrais chiffres de l'entreprise avant de répondre à toute question sur ses factures, ventes ou clients — ne devine jamais un montant.
-- Tu n'es ni comptable agréé ni conseiller fiscal : pour toute question de fiscalité ou de droit des affaires, invite l'utilisateur à consulter un professionnel plutôt que de donner une réponse définitive.
-- Pour une relance de facture impayée, reste courtois et professionnel, jamais menaçant.`;
+function systemPrompt(company) {
+  const name = typeof company === 'string' ? company : company?.entreprise_nom;
+  const currency = typeof company === 'object' && company?.devise ? company.devise : 'FCFA';
+  const language = typeof company === 'object' && company?.langue === 'en' ? 'anglais' : 'français';
+  return [
+    'Tu es l’Assistant de gestion de SamaFacture Pro pour l’entreprise "' + (name || 'cette entreprise') + '".',
+    '',
+    'Règles importantes :',
+    '- Réponds en ' + language + ', de façon concise, structurée et actionnable.',
+    '- La devise configurée de l’entreprise est ' + currency + ' ; ne convertis pas une devise sans taux de change fiable.',
+    '- Utilise les outils pour obtenir les vrais chiffres avant toute analyse ; ne fabrique jamais un montant.',
+    '- Distingue les factures payées des créances attendues. Une échéance attendue n’est pas une garantie d’encaissement.',
+    '- Les recommandations IA sont une aide à la décision : elles ne déclenchent jamais de paiement, remboursement, commande ou email client sans action explicite d’un utilisateur.',
+    '- Tu n’es ni expert-comptable ni conseiller fiscal : les obligations officielles doivent être validées par un professionnel habilité.',
+    '- Les emails et messages de relance doivent rester courtois et professionnels.'
+  ].join('\\n');
 }
 
 async function appelerClaude(messages, system) {
@@ -372,8 +379,8 @@ router.post('/message', assistantLimiter, async (req, res, next) => {
     );
     historique.reverse();
 
-    const [[user]] = await pool.query('SELECT entreprise_nom FROM users WHERE id = ?', [req.user.id]);
-    const system = systemPrompt(user?.entreprise_nom);
+    const [[user]] = await pool.query('SELECT entreprise_nom, devise, langue, locale FROM users WHERE id = ?', [req.user.id]);
+    const system = systemPrompt(user || {});
 
     let messages = historique.map(m => ({ role: m.role, content: m.contenu }));
     let reponseTexte = '';
