@@ -27,7 +27,7 @@
     </div>
 
     <div class="card" style="padding:0;">
-      <table>
+      <table class="table-stack depenses-table">
         <thead><tr><th>Libellé</th><th>Catégorie</th><th>Date</th><th>Montant</th><th></th></tr></thead>
         <tbody id="depenses-body"></tbody>
       </table>
@@ -69,11 +69,11 @@
     depenses = rows;
     document.getElementById('depenses-body').innerHTML = depenses.length ? depenses.map(d => `
       <tr>
-        <td style="font-weight:600;">${escapeHtml(d.libelle)}</td>
-        <td>${escapeHtml(d.categorie) || '—'}</td>
-        <td>${formatDate(d.date_depense)}</td>
-        <td class="mono" style="color:var(--clay);">${formatMontant(d.montant)}</td>
-        <td style="text-align:right;">
+        <td data-label="Libellé" class="depense-libelle">${escapeHtml(d.libelle)}</td>
+        <td data-label="Catégorie">${escapeHtml(d.categorie) || '—'}</td>
+        <td data-label="Date">${formatDate(d.date_depense)}</td>
+        <td data-label="Montant" class="mono" style="color:var(--clay);">${formatMontant(d.montant)}</td>
+        <td data-label="Actions" class="depense-actions-cell">
           <button class="btn btn-sm btn-outline" onclick='editDepense(${d.id})'>${Icon('edit-3')} Modifier</button>
           <button class="btn btn-sm btn-danger" onclick="deleteDepense(${d.id})">${Icon('trash-2')} Supprimer</button>
         </td>
