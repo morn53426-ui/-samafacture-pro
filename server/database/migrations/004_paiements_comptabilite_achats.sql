@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS pro_invoice_checkouts (
   UNIQUE KEY uk_pro_checkout_provider_ref (fournisseur, reference_prestataire),
   KEY idx_pro_checkout_invoice (user_id, facture_id, statut, created_at),
   CONSTRAINT fk_pro_checkout_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pro_checkout_invoice FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pro_checkout_invoice FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_checkout_payment FOREIGN KEY (paiement_id) REFERENCES paiements(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS pro_compta_ecritures (
   UNIQUE KEY uk_pro_compta_source (user_id, source_type, source_id),
   KEY idx_pro_compta_ecriture_date (user_id, date_ecriture, journal_id),
   CONSTRAINT fk_pro_compta_ecritures_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pro_compta_ecritures_journal FOREIGN KEY (journal_id) REFERENCES pro_compta_journaux(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pro_compta_ecritures_journal FOREIGN KEY (journal_id) REFERENCES pro_compta_journaux(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_compta_ecritures_actor FOREIGN KEY (acteur_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS pro_compta_lignes (
   KEY idx_pro_compta_lignes_invoice (user_id, facture_id),
   CONSTRAINT fk_pro_compta_lignes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_compta_lignes_entry FOREIGN KEY (ecriture_id) REFERENCES pro_compta_ecritures(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pro_compta_lignes_account FOREIGN KEY (compte_id) REFERENCES pro_compta_comptes(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pro_compta_lignes_account FOREIGN KEY (compte_id) REFERENCES pro_compta_comptes(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_compta_lignes_invoice FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE SET NULL,
   CONSTRAINT fk_pro_compta_lignes_payment FOREIGN KEY (paiement_id) REFERENCES paiements(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS pro_commandes_fournisseurs (
   KEY idx_pro_purchase_order_supplier (user_id, fournisseur_id, date_commande),
   KEY idx_pro_purchase_order_status (user_id, statut, date_commande),
   CONSTRAINT fk_pro_purchase_order_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pro_purchase_order_supplier FOREIGN KEY (fournisseur_id) REFERENCES pro_fournisseurs(id) ON DELETE RESTRICT
+  CONSTRAINT fk_pro_purchase_order_supplier FOREIGN KEY (fournisseur_id) REFERENCES pro_fournisseurs(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS pro_commandes_fournisseurs_lignes (
@@ -217,8 +217,8 @@ CREATE TABLE IF NOT EXISTS pro_receptions_achats (
   UNIQUE KEY uk_pro_receipt_reference (user_id, reference),
   KEY idx_pro_receipt_order (user_id, commande_id, date_reception),
   CONSTRAINT fk_pro_receipt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pro_receipt_order FOREIGN KEY (commande_id) REFERENCES pro_commandes_fournisseurs(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_pro_receipt_warehouse FOREIGN KEY (entrepot_id) REFERENCES pro_entrepots(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pro_receipt_order FOREIGN KEY (commande_id) REFERENCES pro_commandes_fournisseurs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pro_receipt_warehouse FOREIGN KEY (entrepot_id) REFERENCES pro_entrepots(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_receipt_actor FOREIGN KEY (acteur_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -233,15 +233,17 @@ CREATE TABLE IF NOT EXISTS pro_receptions_achats_lignes (
   KEY idx_pro_receipt_lines (user_id, reception_id),
   CONSTRAINT fk_pro_receipt_line_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_receipt_line_receipt FOREIGN KEY (reception_id) REFERENCES pro_receptions_achats(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pro_receipt_line_order_line FOREIGN KEY (commande_ligne_id) REFERENCES pro_commandes_fournisseurs_lignes(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pro_receipt_line_order_line FOREIGN KEY (commande_ligne_id) REFERENCES pro_commandes_fournisseurs_lignes(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_receipt_line_product FOREIGN KEY (produit_id) REFERENCES produits(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS pro_mouvements_stock (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
-  produit_id INT UNSIGNED NOT NULL,
-  entrepot_id INT UNSIGNED NOT NULL,
+  produit_id INT UNSIGNED NULL,
+  produit_nom VARCHAR(190) NOT NULL,
+  entrepot_id INT UNSIGNED NULL,
+  entrepot_nom VARCHAR(120) NOT NULL,
   type VARCHAR(24) NOT NULL,
   quantite DECIMAL(14,3) NOT NULL,
   cout_unitaire DECIMAL(14,2) NOT NULL DEFAULT 0,
@@ -252,7 +254,7 @@ CREATE TABLE IF NOT EXISTS pro_mouvements_stock (
   KEY idx_pro_stock_movement_product (user_id, produit_id, created_at),
   KEY idx_pro_stock_movement_warehouse (user_id, entrepot_id, created_at),
   CONSTRAINT fk_pro_stock_movement_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pro_stock_movement_product FOREIGN KEY (produit_id) REFERENCES produits(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_pro_stock_movement_warehouse FOREIGN KEY (entrepot_id) REFERENCES pro_entrepots(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_pro_stock_movement_product FOREIGN KEY (produit_id) REFERENCES produits(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pro_stock_movement_warehouse FOREIGN KEY (entrepot_id) REFERENCES pro_entrepots(id) ON DELETE SET NULL,
   CONSTRAINT fk_pro_stock_movement_actor FOREIGN KEY (acteur_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
