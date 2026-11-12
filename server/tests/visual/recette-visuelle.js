@@ -34,6 +34,7 @@ function makeFixtures() {
     return {
       dashboard: {
         chiffre_affaires: 0,
+        tresorerie: 0,
         factures_payees: { n: 0, total: 0 },
         factures_en_attente: { n: 0, total: 0 },
         factures_en_retard: { n: 0, total: 0 },
@@ -81,6 +82,7 @@ function makeFixtures() {
   return {
     dashboard: {
       chiffre_affaires: normal ? 1250000 : 999999999999.99,
+      tresorerie: normal ? 475000 : 999999999999.99,
       factures_payees: { n: normal ? 12 : 999999, total: normal ? 850000 : 999999999999.99 },
       factures_en_attente: { n: normal ? 4 : 999999, total: normal ? 350000 : 888888888888.88 },
       factures_en_retard: { n: normal ? 1 : 999999, total: normal ? 50000 : 777777777777.77 },
@@ -296,13 +298,20 @@ async function verifyPage(browser, baseUrl, pageDefinition, viewport, fixtures, 
     document: document.documentElement.scrollWidth,
     body: document.body.scrollWidth,
     page: location.pathname,
-    xssMarker: window.__visualXss || false
+    xssMarker: window.__visualXss || false,
+    paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
+      ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
+      : null
   }));
   assert.ok(metrics.document <= metrics.viewport + 1,
     pageDefinition.name + ' déborde horizontalement à ' + viewport.width + 'px: ' + JSON.stringify(metrics));
   assert.ok(metrics.body <= metrics.viewport + 1,
     pageDefinition.name + ' élargit le body à ' + viewport.width + 'px: ' + JSON.stringify(metrics));
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
+  if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
+    assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
+      'Chaque information d’un encaissement doit rester nommée et visible sur mobile.');
+  }
   assert.deepEqual(pageErrors, [],
     pageDefinition.name + ' a généré des erreurs JavaScript: ' + pageErrors.join(' | '));
 
