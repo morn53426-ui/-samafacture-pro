@@ -123,12 +123,16 @@ async function executerRelancesAutomatiques() {
             );
             let sent = 0, failed = false;
             for (const quote of quotes) {
-              const runKey = 'devis:' + quote.id;
+              // La fréquence est calculée depuis le dernier envoi réussi pour ce devis,
+              // pas depuis une période calendaire arbitraire (sinon un rappel pouvait repartir
+              // quelques jours seulement après le précédent lorsque la règle était créée près
+              // d'une frontière de période).
               const [prior] = await pool.query(
-                'SELECT id FROM pro_automation_runs WHERE automation_id = ? AND run_key = ? LIMIT 1',
-                [automation.id, runKey]
+                "SELECT id FROM pro_automation_runs WHERE automation_id = ? AND entity_type = 'devis' AND entity_id = ? AND result = 'succes' AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT 1",
+                [automation.id, quote.id, frequency]
               );
               if (prior.length) continue;
+              const runKey = 'devis:' + quote.id + ':' + Date.now();
               const result = await sendMail({
                 to: quote.email,
                 subject: 'Votre devis ' + quote.numero + ' arrive à expiration',
@@ -228,14 +232,15 @@ async function executerRelancesAutomatiques() {
               [automation.user_id, jours]
             );
             let sent = 0, failed = false;
-            const frequencyBucket = Math.floor(Date.now() / (frequence * 86400000));
             for (const client of clients) {
-              const runKey = 'impaye:' + client.id + ':' + frequencyBucket;
+              // Le délai de répétition démarre à la date du dernier email envoyé à ce client.
+              // Évite les rappels trop rapprochés lorsque la règle est créée en milieu de période.
               const [prior] = await pool.query(
-                'SELECT id FROM pro_automation_runs WHERE automation_id = ? AND run_key = ? LIMIT 1',
-                [automation.id, runKey]
+                "SELECT id FROM pro_automation_runs WHERE automation_id = ? AND entity_type = 'client' AND entity_id = ? AND result = 'succes' AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT 1",
+                [automation.id, client.id, frequence]
               );
               if (prior.length) continue;
+              const runKey = 'impaye:' + client.id + ':' + Date.now();
               const result = await sendMail({
                 to: client.email,
                 subject: 'Rappel automatique de factures en attente',
