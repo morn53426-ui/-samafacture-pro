@@ -1439,6 +1439,16 @@ router.post('/accounting/entries', async (req, res, next) => {
   } finally { if (conn) conn.release(); }
 });
 
+router.get('/accounting/entries', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT e.id, e.numero, e.date_ecriture, e.reference, e.libelle, e.total_debit, e.total_credit, j.code AS journal_code, j.libelle AS journal_libelle FROM pro_compta_ecritures e JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id WHERE e.user_id = ? AND e.statut = \'validee\' ORDER BY e.date_ecriture DESC, e.id DESC LIMIT 200',
+      [owner(req)]
+    );
+    res.json({ ecritures: rows });
+  } catch (err) { next(err); }
+});
+
 router.get('/accounting/trial-balance', async (req, res, next) => {
   try {
     await ensureAccountingDefaults(owner(req));
