@@ -109,6 +109,16 @@ test('un checkout Wave est confirmé par serveur-à-serveur, idempotent et inscr
     const reference = checkout.body.reference;
     assert.equal(clientReference, reference);
 
+    const invalidEvent = { type: 'checkout.session.completed', data: { id: providerSessionId, client_reference: reference } };
+    const invalidRawBody = JSON.stringify(invalidEvent);
+    const invalidTimestamp = String(Math.floor(Date.now() / 1000));
+    const invalid = await request(app)
+      .post('/api/payment-webhooks/wave')
+      .set('Content-Type', 'application/json')
+      .set('Wave-Signature', 't=' + invalidTimestamp + ',v1=' + '0'.repeat(64))
+      .send(invalidRawBody);
+    assert.equal(invalid.status, 401, 'une signature falsifiée ne doit pas créditer une facture');
+
     const event = {
       id: 'evt_sama_test_24001',
       type: 'checkout.session.completed',
@@ -188,7 +198,7 @@ test('les achats et réceptions partielles mettent à jour le stock global et le
   assert.equal(Number(stock.body.stocks.find(row => Number(row.produit_id) === Number(productId)).quantite), 11);
 
   const transfer = await request(app).post('/api/pro/inventory/transfers').set('Authorization', 'Bearer ' + token)
-    .send({ produit_id: productId, entrepot_source_id: warehouse.body.id, entrepot_destination_id: Number(warehouse.body.id) + 1, quantite: 1 });
+    .send({ produit_id: productId, entrepot_source_id: warehouse.body.id, entrepot_destination_id: 99999999, quantite: 1 });
   assert.notEqual(transfer.status, 201, 'un entrepôt de destination qui appartient pas à l’entreprise doit être refusé');
 
   const [[movementCount]] = await pool.query('SELECT COUNT(*) AS total FROM pro_mouvements_stock WHERE user_id = ? AND produit_id = ?', [userId, productId]);
