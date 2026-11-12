@@ -310,6 +310,12 @@ function fixtureFor(pathname, fixtures) {
 
 async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
   const page = await browser.newPage();
+  page.__visualApiRequests = [];
+  page.on('requestfailed', request => {
+    if (request.url().includes('/api/')) page.__visualApiRequests.push({
+      method: request.method(), url: request.url(), failed: request.failure()?.errorText || 'request failed'
+    });
+  });
   await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
   await page.emulateMediaFeatures([
     { name: 'prefers-reduced-motion', value: reduceMotion ? 'reduce' : 'no-preference' }
@@ -318,6 +324,7 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
   page.on('request', (request) => {
     const url = request.url();
     if (url.includes('/api/')) {
+      page.__visualApiRequests.push({ method: request.method(), url });
       let response = {};
       try {
         const requestUrl = new URL(url);
@@ -378,7 +385,21 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+  try {
+    await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+  } catch (error) {
+    const diagnostic = await page.evaluate(() => ({
+      title: document.title,
+      url: location.href,
+      apiBase: window.SAMAFACTURE_API_URL || null,
+      hasToken: Boolean(localStorage.getItem('sf_token')),
+      bodyText: (document.body?.innerText || '').slice(0, 900),
+      loadingRows: document.querySelectorAll('.row-skeleton').length
+    })).catch(e => ({ evaluateError: e.message }));
+    throw new Error(pageDefinition.name + ' indisponible; diagnostic=' +
+      JSON.stringify({ ...diagnostic, apiRequests: page.__visualApiRequests, pageErrors }) +
+      '; cause=' + error.message);
+  }
   if (pageDefinition.charts?.length) {
     await page.waitForFunction((chartIds) => chartIds.every((id) => {
       const canvas = document.getElementById(id);
