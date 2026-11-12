@@ -44,23 +44,23 @@
       </div>
     </div>
 
-    <div class="grid grid-4" style="margin-bottom:18px;">
-      <div class="card stat-card">
+    <div class="grid grid-4 reports-kpi-grid" style="margin-bottom:18px;">
+      <div class="card stat-card reports-kpi-blue">
         <div class="stat-icon icon-emerald"><i class="ic" data-icon="banknote"></i></div>
         <div class="stat-label">Recettes</div>
         <div class="stat-value mono" id="rec-recettes">0</div>
       </div>
-      <div class="card stat-card">
+      <div class="card stat-card reports-kpi-green">
         <div class="stat-icon icon-clay"><i class="ic" data-icon="wallet"></i></div>
         <div class="stat-label">Dépenses</div>
         <div class="stat-value mono" id="rec-depenses">0</div>
       </div>
-      <div class="card stat-card">
+      <div class="card stat-card reports-kpi-purple">
         <div class="stat-icon icon-navy"><i class="ic" data-icon="trending-up"></i></div>
         <div class="stat-label">Bénéfice net</div>
         <div class="stat-value mono" id="rec-benefice">0</div>
       </div>
-      <div class="card stat-card">
+      <div class="card stat-card reports-kpi-amber">
         <div class="stat-icon icon-gold"><i class="ic" data-icon="receipt"></i></div>
         <div class="stat-label">TVA collectée</div>
         <div class="stat-value mono" id="rec-tva">0</div>
@@ -73,7 +73,7 @@
     </div>
 
     <div class="card" style="padding:0;">
-      <table>
+      <table class="table-stack reports-data-table">
         <thead id="table-head"></thead>
         <tbody id="table-body"></tbody>
       </table>
@@ -143,13 +143,16 @@
     });
 
     const isProduit = group_by === 'produit';
-    document.getElementById('table-head').innerHTML = isProduit
-      ? `<tr><th>Produit</th><th>Quantité vendue</th><th>Total</th></tr>`
-      : `<tr><th>${labels[group_by].charAt(0).toUpperCase() + labels[group_by].slice(1)}</th><th>Factures</th><th>Total</th></tr>`;
+    const firstColumnLabel = isProduit
+      ? 'Produit'
+      : labels[group_by].charAt(0).toUpperCase() + labels[group_by].slice(1);
+    const secondColumnLabel = isProduit ? 'Quantité vendue' : 'Factures';
+    document.getElementById('table-head').innerHTML =
+      `<tr><th>${firstColumnLabel}</th><th>${secondColumnLabel}</th><th>Total</th></tr>`;
 
     document.getElementById('table-body').innerHTML = rows.length ? rows.map(r => isProduit
-      ? `<tr><td>${escapeHtml(r.label)}</td><td class="mono">${r.quantite}</td><td class="mono">${formatMontant(r.total)}</td></tr>`
-      : `<tr><td>${escapeHtml(r.label)}</td><td class="mono">${r.nb_factures}</td><td class="mono">${formatMontant(r.total)}</td></tr>`
+      ? `<tr><td data-label="${firstColumnLabel}">${escapeHtml(r.label)}</td><td data-label="${secondColumnLabel}" class="mono">${r.quantite}</td><td data-label="Total" class="mono">${formatMontant(r.total)}</td></tr>`
+      : `<tr><td data-label="${firstColumnLabel}">${escapeHtml(r.label)}</td><td data-label="${secondColumnLabel}" class="mono">${r.nb_factures}</td><td data-label="Total" class="mono">${formatMontant(r.total)}</td></tr>`
     ).join('') : `<tr><td colspan="3"><div class="empty-state"><div class="ic">${Icon('bar-chart')}</div>Aucune donnée pour cette période</div></td></tr>`;
 
     loadComptabilite().catch(err => alert(err.message));
