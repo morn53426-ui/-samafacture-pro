@@ -62,7 +62,10 @@
           </div>
         </header>
         <div class="dashboard-donut-wrap">
-          <canvas id="chart-repartition" role="img" aria-label="Graphique de répartition des factures payées, en attente et en retard."></canvas>
+          <div class="dashboard-donut-graphic">
+            <canvas id="chart-repartition" role="img" aria-label="Graphique de répartition des factures payées, en attente et en retard."></canvas>
+            <div class="dashboard-donut-center" aria-hidden="true"><strong id="invoice-total">0</strong><span>Factures</span></div>
+          </div>
           <div class="dashboard-legend" id="invoice-legend" aria-live="polite">
             <div class="dashboard-empty">Chargement des données…</div>
           </div>
@@ -269,6 +272,7 @@
       { label: 'En retard', value: Number(stats.factures_en_retard?.n || 0), color: '#F5A623' }
     ];
     const total = rows.reduce((sum, row) => sum + row.value, 0);
+    document.getElementById('invoice-total').textContent = total.toLocaleString('fr-FR');
     document.getElementById('invoice-legend').innerHTML = rows.map(row => `
       <div class="dashboard-legend-item">
         <span class="dashboard-legend-dot" style="background:${row.color};"></span>
