@@ -311,9 +311,9 @@ async function runMigrations(conn) {
   const accountingPurchasingPath = path.join(__dirname, '..', 'database', 'migrations', '004_paiements_comptabilite_achats.sql');
   const accountingPurchasingSql = fs.readFileSync(accountingPurchasingPath, 'utf8');
   const accountingPurchasingStatements = accountingPurchasingSql
-    .split(/\\r?\\n/)
+    .split(/\r?\n/)
     .filter(line => !line.trim().startsWith('--'))
-    .join('\\n')
+    .join('\n')
     .split(';')
     .map(statement => statement.trim())
     .filter(Boolean);
