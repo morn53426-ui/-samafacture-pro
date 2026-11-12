@@ -1748,6 +1748,8 @@ router.put('/crm/activities/:id', async (req, res, next) => {
     if (status !== undefined && !['a_faire','terminee','annulee'].includes(status)) return res.status(400).json({ error: 'Statut CRM invalide.' });
     const title = req.body.titre === undefined ? null : String(req.body.titre).trim().slice(0, 190);
     if (title !== null && !title) return res.status(400).json({ error: 'Le titre ne peut pas être vide.' });
+    const dueAt = req.body.due_at === undefined ? null : (req.body.due_at ? new Date(req.body.due_at) : null);
+    if (dueAt && Number.isNaN(dueAt.getTime())) return res.status(400).json({ error: 'Date de rappel invalide.' });
     await pool.query(
       `UPDATE pro_crm_activities SET
        titre = COALESCE(?, titre),
@@ -1758,7 +1760,7 @@ router.put('/crm/activities/:id', async (req, res, next) => {
        WHERE id = ? AND user_id = ?`,
       [title, req.body.description !== undefined ? 1 : 0, optionalText(req.body.description,10000),
        status || null, status || null, status || null,
-       req.body.due_at !== undefined ? 1 : 0, req.body.due_at ? new Date(req.body.due_at) : null,
+       req.body.due_at !== undefined ? 1 : 0, dueAt,
        req.params.id, uid]
     );
     await audit(req, 'crm.activite_modifiee', 'activite', req.params.id, { statut: status || current.statut });
