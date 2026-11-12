@@ -21,6 +21,18 @@ const money = (value) => {
   return Math.round((amount + Number.EPSILON) * 100) / 100;
 };
 const safeDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? value : new Date().toISOString().slice(0, 10);
+function optionalText(value, maxLength) {
+  if (value === undefined || value === null) return null;
+  return String(value).trim().slice(0, maxLength) || null;
+}
+function optionalIsoDate(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const text = String(value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
+  const date = new Date(text + 'T00:00:00.000Z');
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text ? undefined : text;
+}
+
 const randomRef = (prefix) => prefix + '-' + new Date().getFullYear() + '-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 const parseJson = (value, fallback) => {
   if (value && typeof value === 'object') return value;
@@ -1132,6 +1144,7 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
     const uid = owner(req), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
     const warehouseId = Number(req.body.entrepot_id) || await ensureDefaultWarehouse(uid);
     if (!lines.length || lines.length > 100) return res.status(400).json({ error: 'Indiquez au moins une ligne à réceptionner.' });
+    if (new Set(lines.map(line => String(line.ligne_id))).size !== lines.length) return res.status(400).json({ error: 'Une même ligne de commande ne peut être réceptionnée qu’une fois par opération.' });
     conn = await pool.getConnection();
     await conn.beginTransaction();
     const [orderRows] = await conn.query('SELECT * FROM pro_commandes_fournisseurs WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
@@ -1243,6 +1256,7 @@ router.post('/inventory/adjustments', async (req, res, next) => {
 router.post('/inventory/transfers', async (req, res, next) => {
   let conn;
   try {
+    await ensureDefaultWarehouse(owner(req));
     const uid = owner(req), productId = Number(req.body.produit_id), fromId = Number(req.body.entrepot_source_id), toId = Number(req.body.entrepot_destination_id), qty = Number(req.body.quantite);
     if (!idOk(productId) || !idOk(fromId) || !idOk(toId) || fromId === toId || !Number.isFinite(qty) || qty <= 0 || qty > 10000000) return res.status(400).json({ error: 'Produit, deux entrepôts différents et quantité positive obligatoires.' });
     conn = await pool.getConnection();
