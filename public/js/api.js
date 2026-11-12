@@ -145,21 +145,20 @@ function formatDate(iso) {
   if (!iso) return '—';
   const user = Api.currentUser() || {};
   const locale = user.locale || 'fr-FR';
-  const timeZone = user.fuseau_horaire || undefined;
+  const timeZone = user.fuseau_horaire || 'UTC';
   const format = user.format_date || 'dd/MM/yyyy';
   const source = String(iso);
   let date;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(source)) {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(source);
+  if (dateOnly) {
     const [year, month, day] = source.split('-').map(Number);
-    date = new Date(year, month - 1, day);
+    // Noon UTC preserves the intended calendar date across all supported timezones.
+    date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
   } else {
-    // MySQL DATETIME lacks an offset. Interpret it as a local wall-clock value,
-    // avoiding Safari iOS parsing differences for the space separator.
     const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(source) ? source.replace(' ', 'T') : source;
     date = new Date(normalized);
   }
   if (Number.isNaN(date.getTime())) return iso;
-  const parts = format.split('/');
   if (format === 'yyyy-MM-dd') {
     return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).format(date);
   }
@@ -168,7 +167,6 @@ function formatDate(iso) {
   }
   return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone }).format(date);
 }
-
 function statutBadge(statut) {
   const map = {
     payee: ['badge-payee', 'Payée'],
