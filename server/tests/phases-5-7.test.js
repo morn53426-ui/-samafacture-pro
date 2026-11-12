@@ -48,10 +48,10 @@ before(async () => {
 });
 
 test('portail client : lien à jeton haché, documents limités au client et révocation immédiate', async () => {
-  const invoiceA = await createDocument(tokenA, clientA, 'facture', 'XOF');
-  const quoteA = await createDocument(tokenA, clientA, 'devis', 'XOF');
+  const invoiceA = await createDocument(tokenA, clientA, 'facture', 'FCFA');
+  const quoteA = await createDocument(tokenA, clientA, 'devis', 'FCFA');
   const foreignClient = await createClient(tokenA, 'Autre client A', 'autre-a@example.test');
-  await createDocument(tokenA, foreignClient, 'facture', 'XOF');
+  await createDocument(tokenA, foreignClient, 'facture', 'FCFA');
 
   const invited = await request(app).post('/api/pro/clients/' + clientA + '/portal')
     .set('Authorization', 'Bearer ' + tokenA).send({});
@@ -114,9 +114,9 @@ test('CRM : activités, tâches et isolation stricte des clients entre entrepris
   assert.equal(complete.status, 200, complete.text);
 });
 
-test('internationalisation : devises, langue, fuseau et format de date sont validés et conservés par document', async () => {
+test('internationalisation : devise, langue, fuseau et formats sont propres à chaque entreprise', async () => {
   const settings = await request(app).put('/api/pro/localization')
-    .set('Authorization', 'Bearer ' + tokenA)
+    .set('Authorization', 'Bearer ' + tokenB)
     .send({
       pays_code: 'US', langue: 'en', devise: 'USD',
       fuseau_horaire: 'America/New_York', format_date: 'MM/dd/yyyy',
@@ -126,22 +126,22 @@ test('internationalisation : devises, langue, fuseau et format de date sont vali
   assert.equal(settings.body.parametres.locale, 'en-US');
 
   const invalid = await request(app).put('/api/pro/localization')
-    .set('Authorization', 'Bearer ' + tokenA)
+    .set('Authorization', 'Bearer ' + tokenB)
     .send({ pays_code: 'US', langue: 'xx', devise: 'BTC', fuseau_horaire: 'Mars/Phobos' });
   assert.equal(invalid.status, 400, invalid.text);
 
-  const invoice = await createDocument(tokenA, clientA, 'facture', 'USD');
-  const [[stored]] = await pool.query('SELECT devise FROM factures WHERE id = ? AND user_id = ?', [invoice.id, userA]);
+  const invoice = await createDocument(tokenB, clientB, 'facture', 'USD');
+  const [[stored]] = await pool.query('SELECT devise FROM factures WHERE id = ? AND user_id = ?', [invoice.id, userB]);
   assert.equal(stored.devise, 'USD');
 
-  const getSettings = await request(app).get('/api/pro/localization').set('Authorization', 'Bearer ' + tokenA);
+  const getSettings = await request(app).get('/api/pro/localization').set('Authorization', 'Bearer ' + tokenB);
   assert.equal(getSettings.status, 200, getSettings.text);
   assert.equal(getSettings.body.parametres.devise, 'USD');
   assert.equal(getSettings.body.parametres.fuseau_horaire, 'America/New_York');
 
-  const secondTenant = await request(app).get('/api/pro/localization').set('Authorization', 'Bearer ' + tokenB);
+  const secondTenant = await request(app).get('/api/pro/localization').set('Authorization', 'Bearer ' + tokenA);
   assert.equal(secondTenant.status, 200, secondTenant.text);
-  assert.notEqual(secondTenant.body.parametres.devise, 'USD', 'les paramètres d’entreprise ne doivent pas fuiter');
+  assert.equal(secondTenant.body.parametres.devise, 'FCFA', 'les paramètres d’entreprise ne doivent pas fuiter');
 });
 
 test('seuil minimum de stock : la fiche produit conserve le seuil utilisable par les alertes', async () => {
