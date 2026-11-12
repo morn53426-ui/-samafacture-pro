@@ -6,11 +6,11 @@
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
 <title>Tableau de bord — SamaFacture Pro</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0F1B33" />
+<meta name="theme-color" content="#101D3A" />
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 <script src="js/chart-loader.js"></script>
@@ -21,53 +21,110 @@
   <main class="main-content">
     <div id="topbar-root"></div>
 
-    <div class="grid grid-4" id="stats-grid" style="margin-bottom:22px;">
-      <div class="card stat-card card-skeleton"><div class="stat-top"><div class="stat-icon icon-emerald"><i class="ic" data-icon="banknote"></i></div></div><div class="stat-label">Chiffre d'affaires</div><div class="stat-value mono">···</div></div>
-      <div class="card stat-card card-skeleton"><div class="stat-top"><div class="stat-icon icon-emerald"><i class="ic" data-icon="check-circle"></i></div></div><div class="stat-label">Factures payées</div><div class="stat-value mono">···</div></div>
-      <div class="card stat-card card-skeleton"><div class="stat-top"><div class="stat-icon icon-gold"><i class="ic" data-icon="clock"></i></div></div><div class="stat-label">Factures en attente</div><div class="stat-value mono">···</div></div>
-      <div class="card stat-card card-skeleton"><div class="stat-top"><div class="stat-icon icon-clay"><i class="ic" data-icon="alert-triangle"></i></div></div><div class="stat-label">Factures en retard</div><div class="stat-value mono">···</div></div>
-    </div>
+    <section class="dashboard-welcome">
+      <div>
+        <h1 id="dashboard-greeting">Bonjour !</h1>
+        <p>Voici un aperçu de votre activité et de vos indicateurs de gestion.</p>
+      </div>
+      <div class="dashboard-context"><i class="ic" data-icon="calendar"></i><span id="dashboard-period-label">Vue d'ensemble de votre activité</span></div>
+    </section>
 
-    <div class="grid grid-2">
-      <div class="card">
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-          <h3 id="chart-title" style="margin:0;">Évolution des ventes</h3>
-          <div style="display:flex; gap:6px;">
+    <section class="dashboard-kpis" id="stats-grid" aria-label="Indicateurs clés">
+      <article class="dashboard-kpi blue card-skeleton"><div class="dashboard-kpi-label">Chiffre d'affaires</div><strong class="dashboard-kpi-value">···</strong></article>
+      <article class="dashboard-kpi green card-skeleton"><div class="dashboard-kpi-label">Factures payées</div><strong class="dashboard-kpi-value">···</strong></article>
+      <article class="dashboard-kpi purple card-skeleton"><div class="dashboard-kpi-label">Factures en attente</div><strong class="dashboard-kpi-value">···</strong></article>
+      <article class="dashboard-kpi amber card-skeleton"><div class="dashboard-kpi-label">Solde net estimé</div><strong class="dashboard-kpi-value">···</strong></article>
+    </section>
+
+    <section class="dashboard-grid" aria-label="Analyses de l'activité">
+      <article class="card dashboard-panel">
+        <header class="dashboard-panel-head">
+          <div class="dashboard-panel-title">
+            <i class="ic" data-icon="bar-chart"></i>
+            <div><h2>Évolution des ventes</h2><p class="dashboard-panel-subtitle">Montant des factures par période</p></div>
+          </div>
+          <div class="dashboard-periods" role="group" aria-label="Période du graphique">
             <button type="button" class="btn btn-sm btn-outline" data-periode="day" onclick="setPeriode('day')">Jour</button>
-            <button type="button" class="btn btn-sm btn-outline" data-periode="week" onclick="setPeriode('week')">Semaine</button>
+            <button type="button" class="btn btn-sm btn-primary" data-periode="week" onclick="setPeriode('week')">Semaine</button>
             <button type="button" class="btn btn-sm btn-outline" data-periode="month" onclick="setPeriode('month')">Mois</button>
           </div>
+        </header>
+        <div class="dashboard-chart-wrap" id="chart-wrap">
+          <canvas id="chart-evolution" role="img" aria-label="Graphique de l'évolution des ventes. Les données détaillées sont disponibles dans les rapports."></canvas>
         </div>
-        <div id="chart-wrap" style="margin-top:14px;">
-          <canvas id="chart-evolution" height="130"></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Derniers clients</h3>
-        <div id="derniers-clients">
-          <div class="card-skeleton" style="display:flex; align-items:center; gap:12px; padding:10px 0;">
-            <div class="avatar" style="width:34px;height:34px;"></div>
-            <div style="flex:1;"><div style="font-weight:600;">Chargement</div><div style="font-size:0.78rem;">···</div></div>
-          </div>
-          <div class="card-skeleton" style="display:flex; align-items:center; gap:12px; padding:10px 0;">
-            <div class="avatar" style="width:34px;height:34px;"></div>
-            <div style="flex:1;"><div style="font-weight:600;">Chargement</div><div style="font-size:0.78rem;">···</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </article>
 
-    <div class="card" style="margin-top:18px;">
-      <h3>Derniers paiements</h3>
-      <table>
-        <thead><tr><th>Facture</th><th>Client</th><th>Méthode</th><th>Date</th><th>Montant</th></tr></thead>
-        <tbody id="paiements-body">
-          <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-        </tbody>
-      </table>
-    </div>
+      <article class="card dashboard-panel">
+        <header class="dashboard-panel-head">
+          <div class="dashboard-panel-title">
+            <i class="ic" data-icon="bar-chart"></i>
+            <div><h2>Factures par statut</h2><p class="dashboard-panel-subtitle">Répartition du nombre de factures</p></div>
+          </div>
+        </header>
+        <div class="dashboard-donut-wrap">
+          <div class="dashboard-donut-graphic">
+            <canvas id="chart-repartition" role="img" aria-label="Graphique de répartition des factures payées, en attente et en retard."></canvas>
+            <div class="dashboard-donut-center" aria-hidden="true"><strong id="invoice-total">0</strong><span>Factures</span></div>
+          </div>
+          <div class="dashboard-legend" id="invoice-legend" aria-live="polite">
+            <div class="dashboard-empty">Chargement des données…</div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="dashboard-grid dashboard-bottom-grid" aria-label="Activité récente et raccourcis">
+      <article class="card dashboard-panel">
+        <header class="dashboard-panel-head">
+          <div class="dashboard-panel-title">
+            <i class="ic" data-icon="file-text"></i>
+            <div><h2>Encaissements récents</h2><p class="dashboard-panel-subtitle">Derniers paiements enregistrés</p></div>
+          </div>
+          <a href="factures.html" class="dashboard-chip">Voir les factures <i class="ic" data-icon="arrow-up-right"></i></a>
+        </header>
+        <div class="dashboard-table-wrap">
+          <table class="dashboard-table">
+            <thead><tr><th>Référence</th><th>Client</th><th>Méthode</th><th>Date</th><th>Montant</th></tr></thead>
+            <tbody id="paiements-body">
+              <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+              <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card dashboard-panel">
+        <header class="dashboard-panel-head">
+          <div class="dashboard-panel-title">
+            <i class="ic" data-icon="activity"></i>
+            <div><h2>Actions rapides</h2><p class="dashboard-panel-subtitle">Accédez aux outils courants</p></div>
+          </div>
+        </header>
+        <div class="dashboard-actions">
+          <a class="dashboard-action blue" href="nouvelle-facture.html"><i class="ic" data-icon="file-plus"></i><span>Nouvelle facture</span></a>
+          <a class="dashboard-action green" href="devis.html"><i class="ic" data-icon="file-stack"></i><span>Nouveau devis</span></a>
+          <a class="dashboard-action purple" href="clients.html"><i class="ic" data-icon="users"></i><span>Ajouter un client</span></a>
+          <a class="dashboard-action amber" href="produits.html"><i class="ic" data-icon="package"></i><span>Ajouter un produit</span></a>
+          <a class="dashboard-action navy" href="rapports.html"><i class="ic" data-icon="bar-chart"></i><span>Rapports</span></a>
+          <a class="dashboard-action cyan" href="parametres.html"><i class="ic" data-icon="settings"></i><span>Paramètres</span></a>
+        </div>
+      </article>
+    </section>
+
+    <section class="dashboard-section">
+      <header class="dashboard-panel-head">
+        <div class="dashboard-panel-title">
+          <i class="ic" data-icon="users"></i>
+          <div><h2>Clients récents</h2><p class="dashboard-panel-subtitle">Les derniers clients ajoutés à votre espace</p></div>
+        </div>
+        <a href="clients.html" class="dashboard-chip">Tous les clients <i class="ic" data-icon="arrow-up-right"></i></a>
+      </header>
+      <div class="dashboard-clients" id="derniers-clients">
+        <div class="dashboard-empty">Chargement des clients…</div>
+      </div>
+    </section>
+
+    <div class="dashboard-chip"><i class="ic" data-icon="refresh-cw"></i> Indicateurs calculés à partir des données enregistrées dans votre compte.</div>
   </main>
 </div>
 
@@ -80,110 +137,188 @@
   renderTopbar('Tableau de bord', "Vue d'ensemble de votre activité");
 
   let chart;
-  let periode = 'day';
+  let statusChart;
+  let periode = 'week';
+
+  const user = Api.currentUser() || {};
+  const firstName = (user.nom || user.entreprise_nom || 'vous').trim().split(/\s+/)[0];
+  document.getElementById('dashboard-greeting').textContent = 'Bonjour, ' + firstName + ' !';
+
+  function renderKpis(stats) {
+    const value = (v) => Number(v || 0);
+    document.getElementById('stats-grid').innerHTML = `
+      <article class="dashboard-kpi blue">
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('banknote')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.chiffre_affaires))}</strong><span class="dashboard-kpi-label">Chiffre d'affaires</span></div></div>
+        <span class="dashboard-kpi-note">Encaissements cumulés enregistrés</span>
+      </article>
+      <article class="dashboard-kpi green">
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('check-circle')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${value(stats.factures_payees?.n).toLocaleString('fr-FR')}</strong><span class="dashboard-kpi-label">Factures payées</span></div></div>
+        <span class="dashboard-kpi-note">${formatMontant(value(stats.factures_payees?.total))} réglés</span>
+      </article>
+      <article class="dashboard-kpi purple">
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('clock')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${value(stats.factures_en_attente?.n).toLocaleString('fr-FR')}</strong><span class="dashboard-kpi-label">Factures en attente</span></div></div>
+        <span class="dashboard-kpi-note">${formatMontant(value(stats.factures_en_attente?.total))} à recevoir</span>
+      </article>
+      <article class="dashboard-kpi amber">
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('wallet')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.tresorerie))}</strong><span class="dashboard-kpi-label">Solde net estimé</span></div></div>
+        <span class="dashboard-kpi-note">Encaissements moins dépenses</span>
+      </article>
+    `;
+  }
+
+  function renderRecentPayments(rows) {
+    const body = document.getElementById('paiements-body');
+    body.innerHTML = rows?.length ? rows.map(p => `
+      <tr>
+        <td data-label="Référence" class="mono">${escapeHtml(p.numero || '—')}</td>
+        <td data-label="Client">${escapeHtml(p.client_nom || '—')}</td>
+        <td data-label="Méthode">${escapeHtml(p.methode || '—')}</td>
+        <td data-label="Date">${p.date_paiement ? formatDate(p.date_paiement) : '—'}</td>
+        <td data-label="Montant" class="mono">${formatMontant(p.montant)}</td>
+      </tr>`).join('') : `<tr><td colspan="5"><div class="dashboard-empty"><i class="ic">${Icon('wallet')}</i><br>Aucun paiement enregistré pour l'instant.</div></td></tr>`;
+  }
+
+  function renderRecentClients(rows) {
+    const target = document.getElementById('derniers-clients');
+    target.innerHTML = rows?.length ? rows.map(c => `
+      <article class="dashboard-client">
+        <div class="avatar">${escapeHtml(initials(c.nom || '?'))}</div>
+        <div style="min-width:0;">
+          <div class="dashboard-client-name">${escapeHtml(c.nom || 'Client sans nom')}</div>
+          <div class="dashboard-client-contact">${escapeHtml(c.telephone || c.email || 'Contact non renseigné')}</div>
+        </div>
+      </article>`).join('') : '<div class="dashboard-empty">Aucun client enregistré pour l\'instant.</div>';
+  }
 
   async function load() {
     const stats = await Api.get('/dashboard');
-
-    document.getElementById('stats-grid').innerHTML = `
-      <div class="card stat-card">
-        <div class="stat-top"><div class="stat-icon icon-emerald">${Icon('banknote')}</div></div>
-        <div class="stat-label">Chiffre d'affaires</div>
-        <div class="stat-value mono">${formatMontant(stats.chiffre_affaires)}</div>
-      </div>
-      <div class="card stat-card">
-        <div class="stat-top"><div class="stat-icon icon-emerald">${Icon('check-circle')}</div></div>
-        <div class="stat-label">Factures payées</div>
-        <div class="stat-value mono">${stats.factures_payees.n}</div>
-        <div class="stat-delta" style="color:var(--ink-soft);">${formatMontant(stats.factures_payees.total)}</div>
-      </div>
-      <div class="card stat-card">
-        <div class="stat-top"><div class="stat-icon icon-gold">${Icon('clock')}</div></div>
-        <div class="stat-label">Factures en attente</div>
-        <div class="stat-value mono">${stats.factures_en_attente.n}</div>
-        <div class="stat-delta" style="color:var(--ink-soft);">${formatMontant(stats.factures_en_attente.total)}</div>
-      </div>
-      <div class="card stat-card">
-        <div class="stat-top"><div class="stat-icon icon-clay">${Icon('alert-triangle')}</div></div>
-        <div class="stat-label">Factures en retard</div>
-        <div class="stat-value mono">${stats.factures_en_retard.n}</div>
-        <div class="stat-delta" style="color:var(--ink-soft);">${formatMontant(stats.factures_en_retard.total)}</div>
-      </div>
-    `;
-
-    const clientsHtml = stats.derniers_clients.length
-      ? stats.derniers_clients.map(c => `
-        <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line);">
-          <div class="avatar" style="width:34px;height:34px;font-size:0.78rem;">${initials(c.nom)}</div>
-          <div style="flex:1;">
-            <div style="font-weight:600;">${escapeHtml(c.nom)}</div>
-            <div style="font-size:0.78rem; color:var(--ink-soft);">${escapeHtml(c.telephone || c.email)}</div>
-          </div>
-        </div>`).join('')
-      : `<div class="empty-state"><div class="ic">${Icon('users')}</div>Aucun client pour l'instant</div>`;
-    document.getElementById('derniers-clients').innerHTML = clientsHtml;
-
-    const paiementsHtml = stats.derniers_paiements.length
-      ? stats.derniers_paiements.map(p => `
-        <tr>
-          <td class="mono">${escapeHtml(p.numero)}</td>
-          <td>${escapeHtml(p.client_nom)}</td>
-          <td>${escapeHtml(p.methode)}</td>
-          <td>${formatDate(p.date_paiement)}</td>
-          <td class="mono">${formatMontant(p.montant)}</td>
-        </tr>`).join('')
-      : `<tr><td colspan="5"><div class="empty-state"><div class="ic">${Icon('wallet')}</div>Aucun paiement enregistré</div></td></tr>`;
-    document.getElementById('paiements-body').innerHTML = paiementsHtml;
-
+    renderKpis(stats);
+    renderRecentPayments(stats.derniers_paiements || []);
+    renderRecentClients(stats.derniers_clients || []);
+    await renderStatusChart(stats);
     await loadChart(periode);
   }
 
-  async function loadChart(p) {
-    periode = p;
-    document.querySelectorAll('[data-periode]').forEach(b => b.classList.toggle('btn-primary', b.dataset.periode === p));
-    document.querySelectorAll('[data-periode]').forEach(b => b.classList.toggle('btn-outline', b.dataset.periode !== p));
+  async function loadChart(period) {
+    periode = period;
+    document.querySelectorAll('[data-periode]').forEach(button => {
+      const active = button.dataset.periode === period;
+      button.classList.toggle('btn-primary', active);
+      button.classList.toggle('btn-outline', !active);
+      button.setAttribute('aria-pressed', String(active));
+    });
 
-    const labels = { day: 'Évolution des ventes (par jour)', week: 'Évolution des ventes (par semaine)', month: 'Évolution des ventes (par mois)' };
-    document.getElementById('chart-title').textContent = labels[p];
-
-    const { rows } = await Api.get(`/rapports/ventes?group_by=${p}`);
-    const chartLabels = rows.map(r => r.label);
-    const data = rows.map(r => r.total);
-
+    const titleByPeriod = { day: 'Évolution quotidienne', week: 'Évolution hebdomadaire', month: 'Évolution mensuelle' };
+    const { rows } = await Api.get('/rapports/ventes?group_by=' + encodeURIComponent(period));
     const canvas = document.getElementById('chart-evolution');
     try {
       await window.chartReady;
-    } catch (err) {
-      canvas.replaceWith(Object.assign(document.createElement('div'), {
-        className: 'empty-state',
-        innerHTML: `<div class="ic">${Icon('activity')}</div>Le graphique n'a pas pu se charger (pas d'accès internet).`
-      }));
+    } catch (error) {
+      const wrap = document.getElementById('chart-wrap');
+      if (wrap) wrap.innerHTML = '<div class="dashboard-empty">Le graphique est indisponible sans accès au service de graphiques. Consultez les rapports pour les données.</div>';
       return;
     }
 
     if (chart) chart.destroy();
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+    gradient.addColorStop(0, 'rgba(23,105,245,.24)');
+    gradient.addColorStop(1, 'rgba(23,105,245,0)');
     chart = new Chart(canvas, {
-      type: 'bar',
+      type: 'line',
       data: {
-        labels: chartLabels.length ? chartLabels : ['—'],
+        labels: rows?.length ? rows.map(row => row.label) : ['Aucune donnée'],
         datasets: [{
           label: 'Ventes',
-          data: data.length ? data : [0],
-          backgroundColor: '#0FA980',
-          borderRadius: 6,
-          maxBarThickness: 40
+          data: rows?.length ? rows.map(row => Number(row.total || 0)) : [0],
+          borderColor: '#1769F5',
+          backgroundColor: gradient,
+          borderWidth: 3,
+          fill: true,
+          tension: 0.35,
+          pointRadius: rows?.length ? 3 : 0,
+          pointHoverRadius: 5,
+          pointBackgroundColor: '#FFFFFF',
+          pointBorderColor: '#1769F5',
+          pointBorderWidth: 2
         }]
       },
       options: {
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, grid: { color: '#EDEAE2' } }, x: { grid: { display: false } } }
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        transitions: {
+          active: { animation: { duration: 0 } },
+          resize: { animation: { duration: 0 } },
+          show: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } },
+          hide: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } }
+        },
+        interaction: { intersect: false, mode: 'index' },
+        plugins: {
+          legend: { display: false },
+          tooltip: { displayColors: false, backgroundColor: '#142B53', padding: 11 }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: 'rgba(105,125,160,.14)' }, ticks: { color: '#8290A8', callback: value => Number(value).toLocaleString('fr-FR') } },
+          x: { grid: { display: false }, ticks: { color: '#8290A8', maxRotation: 0, autoSkip: true, maxTicksLimit: 7 } }
+        }
       }
     });
+    canvas.setAttribute('aria-label', titleByPeriod[period] + '. Les montants détaillés sont disponibles dans les rapports.');
   }
 
-  function setPeriode(p) { loadChart(p).catch(err => showFatalError(err.message)); }
+  async function renderStatusChart(stats) {
+    const rows = [
+      { label: 'Payées', value: Number(stats.factures_payees?.n || 0), color: '#1769F5' },
+      { label: 'En attente', value: Number(stats.factures_en_attente?.n || 0), color: '#0DAF83' },
+      { label: 'En retard', value: Number(stats.factures_en_retard?.n || 0), color: '#F5A623' }
+    ];
+    const total = rows.reduce((sum, row) => sum + row.value, 0);
+    document.getElementById('invoice-total').textContent = total.toLocaleString('fr-FR');
+    document.getElementById('invoice-legend').innerHTML = rows.map(row => `
+      <div class="dashboard-legend-item">
+        <span class="dashboard-legend-dot" style="background:${row.color};"></span>
+        <div>${row.label}<strong>${row.value.toLocaleString('fr-FR')}</strong></div>
+      </div>`).join('');
+    const canvas = document.getElementById('chart-repartition');
+    try {
+      await window.chartReady;
+    } catch (error) {
+      const graphic = canvas.closest('.dashboard-donut-graphic');
+      if (graphic) graphic.innerHTML = '<div class="dashboard-empty">Le graphique est indisponible sans accès au service de graphiques.</div>';
+      return;
+    }
+    if (statusChart) statusChart.destroy();
+    statusChart = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: rows.map(row => row.label),
+        datasets: [{
+          data: total ? rows.map(row => row.value) : [1],
+          backgroundColor: total ? rows.map(row => row.color) : ['#DCE3EF'],
+          borderWidth: 0,
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '69%',
+        animation: false,
+        transitions: { active: { animation: { duration: 0 } }, resize: { animation: { duration: 0 } } },
+        plugins: { legend: { display: false }, tooltip: { enabled: total > 0 } }
+      }
+    });
+    canvas.setAttribute('aria-label', total
+      ? 'Répartition de ' + total + ' factures : ' + rows.map(row => row.label + ' ' + row.value).join(', ')
+      : 'Aucune facture enregistrée.');
+  }
 
-  load().catch(err => showFatalError(err.message));
+  function setPeriode(period) {
+    loadChart(period).catch(error => showFatalError(error.message));
+  }
+
+  load().catch(error => showFatalError(error.message));
 </script>
 </body>
 </html>

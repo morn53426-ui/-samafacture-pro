@@ -49,7 +49,7 @@
     <div class="grid grid-2">
       <div class="card">
         <h3 style="margin-top:0;">Évolution &amp; prévision (6 derniers mois + 1 mois estimé)</h3>
-        <canvas id="chart-finances" height="130"></canvas>
+        <canvas id="chart-finances" height="130" role="img" aria-label="Évolution des recettes et estimation de la prochaine période."></canvas>
         <p style="margin:10px 0 0; font-size:0.78rem; color:var(--muted, #7A8296);">
           La prévision est une estimation simple basée sur la moyenne des 3 derniers mois de chiffre d'affaires. Ce n'est pas un engagement comptable.
         </p>
@@ -139,12 +139,20 @@
         datasets: [{
           label: 'Chiffre d\'affaires',
           data: values.length ? values : [0],
-          backgroundColor: labels.map(l => l === previsionLabel ? '#F2B84B' : '#0FA980'),
+          backgroundColor: labels.map(l => l === previsionLabel ? '#F5A623' : '#1769F5'),
           borderRadius: 6,
           maxBarThickness: 44
         }]
       },
       options: {
+        responsive: true,
+        animation: false,
+        transitions: {
+          active: { animation: { duration: 0 } },
+          resize: { animation: { duration: 0 } },
+          show: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } },
+          hide: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } }
+        },
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true, grid: { color: '#EDEAE2' } }, x: { grid: { display: false } } }
       }

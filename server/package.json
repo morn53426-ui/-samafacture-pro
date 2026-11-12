@@ -13,7 +13,8 @@
     "dev": "node app.js",
     "backup": "node backup-now.js",
     "test": "node --test \"tests/*.test.js\"",
-    "smoke:staging": "node scripts/staging-smoke.js"
+    "smoke:staging": "node scripts/staging-smoke.js",
+    "test:visual": "node tests/visual/recette-visuelle.js"
   },
   "devDependencies": {
     "supertest": "^7.0.0"

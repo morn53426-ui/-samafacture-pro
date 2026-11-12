@@ -6,7 +6,7 @@
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
 <title>Produits — SamaFacture Pro</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="manifest" href="manifest.json" />
@@ -27,13 +27,13 @@
     </div>
 
     <div class="card" style="padding:0;">
-      <table>
+      <table class="table-stack products-table">
         <thead><tr><th>Produit</th><th>Référence</th><th>Prix HT</th><th>Prix d'achat</th><th>TVA</th><th>Stock</th><th></th></tr></thead>
         <tbody id="produits-body">
           <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="6"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="6"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="6"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -81,17 +81,18 @@
     document.getElementById('produits-body').innerHTML = produits.length ? produits.map(p => `
       <tr class="row-clickable" tabindex="0" role="button" aria-label="Modifier ${escapeHtml(p.nom)}"
           onclick="editProduit(${p.id})" onkeydown="if(event.key==='Enter') editProduit(${p.id})">
-        <td style="font-weight:600;">${escapeHtml(p.nom)}</td>
-        <td class="mono">${escapeHtml(p.reference) || '—'}</td>
-        <td class="mono">${formatMontant(p.prix_ht)}</td>
-        <td class="mono">${p.tva}%</td>
-        <td class="mono">${p.stock}</td>
-        <td style="text-align:right;" onclick="event.stopPropagation();">
+        <td data-label="Produit" class="product-name">${escapeHtml(p.nom)}</td>
+        <td data-label="Référence" class="mono">${escapeHtml(p.reference) || '—'}</td>
+        <td data-label="Prix HT" class="mono">${formatMontant(p.prix_ht)}</td>
+        <td data-label="Prix d'achat" class="mono">${formatMontant(p.prix_achat || 0)}</td>
+        <td data-label="TVA" class="mono">${p.tva}%</td>
+        <td data-label="Stock" class="mono">${p.stock}</td>
+        <td data-label="Actions" style="text-align:right;" onclick="event.stopPropagation();">
           <button class="btn btn-sm btn-outline" onclick='editProduit(${p.id})'>${Icon('edit-3')} Modifier</button>
           <button class="btn btn-sm btn-danger" onclick="deleteProduit(${p.id})">${Icon('trash-2')} Supprimer</button>
         </td>
       </tr>
-    `).join('') : `<tr><td colspan="6"><div class="empty-state"><div class="ic">${Icon('package')}</div>Aucun produit. Ajoutez votre catalogue !</div></td></tr>`;
+    `).join('') : `<tr><td colspan="7"><div class="empty-state"><div class="ic">${Icon('package')}</div>Aucun produit. Ajoutez votre catalogue !</div></td></tr>`;
     renderPagination('pagination', pagination, (p) => load(p));
   }
 

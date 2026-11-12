@@ -27,7 +27,7 @@
     </div>
 
     <div class="card" style="padding:0;">
-      <table>
+      <table class="table-stack devis-table">
         <thead><tr><th>N°</th><th>Client</th><th>Émission</th><th>Total</th><th>Statut</th><th></th></tr></thead>
         <tbody id="devis-body"></tbody>
       </table>
@@ -64,12 +64,12 @@
     const { factures, pagination } = await Api.get(`/factures?type=devis&page=${currentPage}`);
     document.getElementById('devis-body').innerHTML = factures.length ? factures.map(f => `
       <tr>
-        <td class="mono">${escapeHtml(f.numero)}</td>
-        <td>${escapeHtml(f.client_nom)}</td>
-        <td>${formatDate(f.date_emission)}</td>
-        <td class="mono">${formatMontant(f.total)}</td>
-        <td>${statutBadge(f.statut)}</td>
-        <td style="text-align:right; white-space:nowrap;">
+        <td data-label="N°" class="mono">${escapeHtml(f.numero)}</td>
+        <td data-label="Client">${escapeHtml(f.client_nom)}</td>
+        <td data-label="Émission">${formatDate(f.date_emission)}</td>
+        <td data-label="Total" class="mono">${formatMontant(f.total)}</td>
+        <td data-label="Statut">${statutBadge(f.statut)}</td>
+        <td data-label="Actions" class="devis-actions-cell">
           <button class="btn btn-sm btn-outline" onclick="printFacture(${f.id})">${Icon('printer')} Imprimer</button>
           <button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))})'>${Icon('mail')} Envoyer</button>
           <button class="btn btn-sm btn-outline" onclick="dupliquerDevis(${f.id})">${Icon('copy')} Dupliquer</button>
