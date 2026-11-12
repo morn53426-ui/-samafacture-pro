@@ -299,10 +299,16 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   const bounds = await button.boundingBox();
   await normalPage.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await normalPage.mouse.down();
-  const buttonTransform = await button.evaluate((element) => getComputedStyle(element).transform);
+  // Laisser la transition de 130 ms atteindre son état final avant de lire la matrice.
+  await new Promise((resolve) => setTimeout(resolve, 180));
+  const buttonState = await button.evaluate((element) => ({
+    active: element.matches(':active'),
+    transform: getComputedStyle(element).transform
+  }));
   await normalPage.mouse.up();
-  assert.match(buttonTransform, /matrix\(0\.97,\s*0,\s*0,\s*0\.97/,
-    'Le bouton doit fournir un retour press scale(0.97).');
+  assert.equal(buttonState.active, true, 'Le pointeur doit maintenir le bouton pressé pendant la mesure.');
+  assert.match(buttonState.transform, /matrix\(0\.97,\s*0,\s*0,\s*0\.97/,
+    'Le bouton doit fournir un retour press scale(0.97). Valeur observée : ' + buttonState.transform);
   await normalPage.close();
 
   const reducedPage = await preparePage(browser, baseUrl, fixtures, true);
@@ -333,7 +339,7 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   assert.ok(tooltipMetrics.duration !== '', 'La feuille de style des info-bulles doit être chargée.');
   await reducedPage.close();
 
-  return { chartAnimation, buttonTransform, reducedMotionToast: reduced, reducedMotionTooltip: tooltipMetrics };
+  return { chartAnimation, buttonTransform: buttonState.transform, reducedMotionToast: reduced, reducedMotionTooltip: tooltipMetrics };
 }
 
 async function main() {
