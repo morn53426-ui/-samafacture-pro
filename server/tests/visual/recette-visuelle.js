@@ -241,8 +241,10 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
       plan: 'pro'
     }));
     localStorage.setItem('sf_theme', 'light');
-    // Garder les appels API sur l'origine du serveur de test : pas de préflight CORS,
-    // puisque le test remplace le backend en interceptant les requêtes navigateur.
+  });
+  // Le global est réinitialisé lorsque Puppeteer navigue vers chaque page métier.
+  // Le réinjecter sur chaque nouveau document évite une API cross-origin et son préflight CORS.
+  await page.evaluateOnNewDocument(() => {
     window.SAMAFACTURE_API_URL = location.origin + '/api';
   });
   return page;
