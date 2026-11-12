@@ -68,3 +68,19 @@ jobs:
           JWT_SECRET: ci-secret-ne-pas-utiliser-en-production
           APP_URL: http://127.0.0.1:4000
         run: npm test
+
+      - name: Recette visuelle responsive avec données extrêmes
+        working-directory: server
+        env:
+          VISUAL_DATASET: worst
+          VISUAL_ARTIFACTS_DIR: tests/visual/artifacts
+        run: npm run test:visual
+
+      - name: Publier les captures de la recette visuelle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: samafacture-recette-visuelle-${{ github.run_number }}
+          path: server/tests/visual/artifacts/
+          if-no-files-found: warn
+          retention-days: 14
