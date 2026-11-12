@@ -928,7 +928,7 @@ router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
       return res.status(409).json({ error: 'Ce prestataire n’est pas configuré pour cette entreprise. Renseignez d’abord ses clés marchandes.' });
     }
     const [rows] = await pool.query(
-      "SELECT f.id, f.numero, f.total, f.montant_paye, f.statut, f.type, u.entreprise_nom FROM factures f JOIN users u ON u.id = f.user_id WHERE f.id = ? AND f.user_id = ? LIMIT 1",
+      "SELECT f.id, f.numero, f.total, f.montant_paye, f.statut, f.type, u.entreprise_nom, u.devise FROM factures f JOIN users u ON u.id = f.user_id WHERE f.id = ? AND f.user_id = ? LIMIT 1",
       [req.params.invoiceId, uid]
     );
     const invoice = rows[0];
