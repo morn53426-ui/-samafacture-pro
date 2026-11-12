@@ -53,7 +53,7 @@ async function applySuccessfulCheckout(checkoutId, providerRef, amount, method, 
 
     const paymentKey = 'online-' + crypto.createHash('sha256')
       .update(checkout.fournisseur + ':' + providerRef).digest('hex').slice(0, 55);
-    await conn.query(
+    const [insertPayment] = await conn.query(
       'INSERT IGNORE INTO paiements (user_id, facture_id, montant, methode, reference, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)',
       [checkout.user_id, checkout.facture_id, paidAmount, method, providerRef, paymentKey]
     );
@@ -63,12 +63,14 @@ async function applySuccessfulCheckout(checkoutId, providerRef, amount, method, 
     );
     if (!paymentRows.length) throw new Error('Impossible de retrouver le paiement enregistré.');
 
-    const [[sum]] = await conn.query(
-      'SELECT COALESCE(SUM(montant),0) AS total FROM paiements WHERE user_id = ? AND facture_id = ?',
-      [checkout.user_id, checkout.facture_id]
-    );
-    const totalPaid = Math.round(Number(sum.total) * 100) / 100;
-    const newStatus = totalPaid + 0.001 >= Number(invoice.total) ? 'payee' : 'en_attente';
+    // Partir du solde comptabilisé sur la facture, et non d'une somme de la table
+    // paiements : les anciennes installations peuvent contenir un montant_paye historique
+    // sans ligne de paiement détaillée. Le verrou FOR UPDATE sur la facture sérialise les
+    // checkouts concurrents ; affectedRows=0 signifie que cette référence était déjà payée.
+    const totalPaid = Math.round((Number(invoice.montant_paye) + (insertPayment.affectedRows ? paidAmount : 0)) * 100) / 100;
+    const isFullyPaid = totalPaid + 0.001 >= Number(invoice.total);
+    const isOverdue = invoice.date_echeance && String(invoice.date_echeance).slice(0, 10) < new Date().toISOString().slice(0, 10);
+    const newStatus = isFullyPaid ? 'payee' : (isOverdue ? 'en_retard' : 'en_attente');
     await conn.query(
       'UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ? AND user_id = ?',
       [totalPaid, newStatus, checkout.facture_id, checkout.user_id]
