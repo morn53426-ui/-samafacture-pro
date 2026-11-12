@@ -30,8 +30,10 @@ async function resolveTenant(req, res, next) {
     req.permissions = ROLE_PERMISSIONS.proprietaire;
 
     const isInviteAcceptance = (req.baseUrl || '').endsWith('/pro') && (req.path || '').startsWith('/team/invitations/accept');
-    const supportsCompanyHeader = (req.baseUrl || '').endsWith('/pro') || (req.baseUrl || '').endsWith('/assistant');
-    const requestedOwner = isInviteAcceptance || !supportsCompanyHeader ? null : req.get('X-SF-Company-Owner');
+    // La sélection d’entreprise est transmise par toutes les routes API authentifiées,
+    // pas uniquement /pro : clients, factures, produits, rapports et assistant doivent
+    // tous lire le même espace lorsque le membre a sélectionné une entreprise.
+    const requestedOwner = isInviteAcceptance ? null : req.get('X-SF-Company-Owner');
     if (requestedOwner) {
       if (!/^\d+$/.test(requestedOwner)) return res.status(400).json({ error: 'Sélection d’entreprise invalide.' });
       const selectedOwner = Number(requestedOwner);
