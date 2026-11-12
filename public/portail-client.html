@@ -37,7 +37,7 @@
   <footer class="portal-meta" style="text-align:center;margin-top:28px">Lien personnel et temporaire · SamaFacture Pro</footer>
 </main>
 <script>
-const token = new URLSearchParams(location.search).get('token') || '';
+const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
 const root = document.getElementById('portal-content');
 const safe = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const money = (value,currency,locale) => {
@@ -74,8 +74,8 @@ async function decide(id,decision,button){
   if(!window.confirm(labels[decision])) return;
   button.disabled=true;
   try{
-    const response=await fetch('/api/portal/'+encodeURIComponent(token)+'/quotes/'+encodeURIComponent(id)+'/decision',{
-      method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+    const response=await fetch('/api/portal/quotes/'+encodeURIComponent(id)+'/decision',{
+      method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-SF-Portal-Token':token},
       body:JSON.stringify({decision})
     });
     const result=await response.json();
@@ -86,7 +86,7 @@ async function decide(id,decision,button){
 async function load(){
   if(!/^[a-f0-9]{64}$/i.test(token)){root.innerHTML='<section class="portal-error"><h2>Lien invalide</h2><p>Demandez à votre entreprise de vous envoyer un nouveau lien personnel.</p></section>';return;}
   try{
-    const response=await fetch('/api/portal/'+encodeURIComponent(token),{headers:{Accept:'application/json'},cache:'no-store'});
+    const response=await fetch('/api/portal/',{headers:{Accept:'application/json','X-SF-Portal-Token':token},cache:'no-store'});
     const data=await response.json();
     if(!response.ok) throw new Error(data.error||'Votre espace est indisponible.');
     render(data);
