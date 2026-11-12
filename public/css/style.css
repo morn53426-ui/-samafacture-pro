@@ -3716,3 +3716,19 @@ thead th { background: #F2F6FD; color: #52627D; }
   .dashboard-table tbody td[colspan] { display:block; }
   .dashboard-table tbody td[colspan]::before { content:none; }
 }
+
+
+/* Lisibilité des nombres exceptionnellement longs : on autorise le retour à la ligne
+   aux séparateurs de milliers, jamais au milieu des décimales ou de l'unité. */
+.dashboard-kpi-value {
+  font-size: clamp(.82rem, 1.02vw, 1.15rem);
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.dashboard-donut-center strong {
+  max-width:100%;
+  padding:0 4px;
+  font-size:clamp(.86rem, 1vw, 1.12rem);
+  white-space:nowrap;
+  letter-spacing:-.055em;
+}
