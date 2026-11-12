@@ -23,9 +23,16 @@ function positiveInt(value, fallback = 0) {
   return n;
 }
 
+/** Quantité de stock non négative, jusqu'à trois décimales (kg, litres, mètres, etc.). */
+function nonNegativeQuantity(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || n > 99999999999.999) return fallback;
+  return Math.round((n + Number.EPSILON) * 1000) / 1000;
+}
+
 /** Vérifie qu'une chaîne est bien une image encodée en base64 (data URL), pas un contenu arbitraire. */
 function isValidImageDataUrl(value) {
   return /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/]+=*$/.test(value);
 }
 
-module.exports = { positiveNumber, percentage, positiveInt, isValidImageDataUrl };
+module.exports = { positiveNumber, percentage, positiveInt, nonNegativeQuantity, isValidImageDataUrl };
