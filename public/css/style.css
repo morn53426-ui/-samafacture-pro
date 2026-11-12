@@ -3757,3 +3757,41 @@ thead th { background: #F2F6FD; color: #52627D; }
   background:rgba(23,105,245,.1);
   color:#1769F5;
 }
+
+
+/* Tableaux à peu de colonnes : en mobile, présenter toutes les données en fiches. */
+@media (max-width:640px) {
+  .devis-table,
+  .depenses-table,
+  .reports-data-table { min-width:0 !important; }
+  .devis-actions-cell,
+  .depense-actions-cell {
+    display:flex !important;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:7px;
+  }
+  .devis-actions-cell::before,
+  .depense-actions-cell::before { flex:0 0 100%; }
+  .devis-actions-cell .btn,
+  .depense-actions-cell .btn { min-width:0; }
+  .depense-libelle { overflow-wrap:anywhere; }
+}
+
+/* Résumé de rapports : quatre accents colorés cohérents avec le tableau de bord. */
+.reports-kpi-blue { background:linear-gradient(125deg,#1769F5,#287CF7); border:0; color:#fff; }
+.reports-kpi-green { background:linear-gradient(125deg,#0BAA7D,#10BF90); border:0; color:#fff; }
+.reports-kpi-purple { background:linear-gradient(125deg,#7138E8,#8B38F1); border:0; color:#fff; }
+.reports-kpi-amber { background:linear-gradient(125deg,#ED9508,#FFB322); border:0; color:#fff; }
+.reports-kpi-blue .stat-label,
+.reports-kpi-green .stat-label,
+.reports-kpi-purple .stat-label,
+.reports-kpi-amber .stat-label { color:rgba(255,255,255,.9); }
+.reports-kpi-blue .stat-value,
+.reports-kpi-green .stat-value,
+.reports-kpi-purple .stat-value,
+.reports-kpi-amber .stat-value { color:#fff; font-size:clamp(.95rem,1.15vw,1.3rem); overflow-wrap:anywhere; }
+.reports-kpi-blue .stat-icon,
+.reports-kpi-green .stat-icon,
+.reports-kpi-purple .stat-icon,
+.reports-kpi-amber .stat-icon { background:rgba(255,255,255,.17); color:#fff; }
