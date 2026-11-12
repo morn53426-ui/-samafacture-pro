@@ -17,3 +17,6 @@ server/pdf-jobs/
 Thumbs.db
 .vscode/
 .idea/
+
+# Captures générées par la recette visuelle navigateur
+server/tests/visual/artifacts/
