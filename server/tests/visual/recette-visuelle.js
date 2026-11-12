@@ -153,20 +153,43 @@ const CHART_STUB = [
   '    constructor(canvas, config) {',
   '      canvas.dataset.sfChartAnimation = config.options && config.options.animation === false ? "disabled" : "enabled";',
   '      canvas.dataset.sfChartResponsive = String(config.options && config.options.responsive === true);',
+  '      canvas.dataset.sfChartType = config.type || "unknown";',
   '      const context = canvas.getContext("2d");',
   '      const rect = canvas.getBoundingClientRect();',
   '      const width = Math.max(1, Math.floor(rect.width));',
-  '      const height = Math.max(1, Math.floor(rect.height || 130));',
-  '      canvas.width = width * (window.devicePixelRatio || 1);',
-  '      canvas.height = height * (window.devicePixelRatio || 1);',
-  '      context.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);',
+  '      const height = Math.max(1, Math.floor(rect.height || 180));',
+  '      const ratio = window.devicePixelRatio || 1;',
+  '      canvas.width = width * ratio;',
+  '      canvas.height = height * ratio;',
+  '      context.scale(ratio, ratio);',
   '      context.clearRect(0, 0, width, height);',
-  '      context.strokeStyle = "#E6EAF2"; context.lineWidth = 1;',
-  '      for (let row = 1; row < 5; row++) { context.beginPath(); context.moveTo(0, row * height / 5); context.lineTo(width, row * height / 5); context.stroke(); }',
-  '      context.strokeStyle = "#0EA980"; context.lineWidth = 3; context.beginPath();',
-  '      const points = [0.85, 0.72, 0.77, 0.55, 0.62, 0.39, 0.48, 0.28, 0.34, 0.12];',
-  '      points.forEach((point, index) => { const x = 10 + index * (width - 20) / (points.length - 1); const y = point * (height - 18) + 9; if (index === 0) context.moveTo(x, y); else context.lineTo(x, y); });',
-  '      context.stroke();',
+  '      if (config.type === "doughnut") {',
+  '        const dataset = config.data.datasets[0] || {};',
+  '        const values = (dataset.data || []).map(value => Math.max(0, Number(value) || 0));',
+  '        const colors = Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor : [dataset.backgroundColor || "#1769F5"];',
+  '        const total = values.reduce((sum, value) => sum + value, 0);',
+  '        const radius = Math.max(12, Math.min(width, height) * 0.32);',
+  '        const lineWidth = Math.max(16, Math.min(width, height) * 0.16);',
+  '        let angle = -Math.PI / 2;',
+  '        values.forEach((value, index) => {',
+  '          if (!value || !total) return;',
+  '          const nextAngle = angle + value / total * Math.PI * 2;',
+  '          context.beginPath();',
+  '          context.arc(width / 2, height / 2, radius, angle, nextAngle);',
+  '          context.strokeStyle = colors[index % colors.length];',
+  '          context.lineWidth = lineWidth;',
+  '          context.lineCap = "butt";',
+  '          context.stroke();',
+  '          angle = nextAngle;',
+  '        });',
+  '      } else {',
+  '        context.strokeStyle = "rgba(105,125,160,.16)"; context.lineWidth = 1;',
+  '        for (let row = 1; row < 5; row++) { context.beginPath(); context.moveTo(0, row * height / 5); context.lineTo(width, row * height / 5); context.stroke(); }',
+  '        context.strokeStyle = "#1769F5"; context.lineWidth = 3; context.beginPath();',
+  '        const points = [0.85, 0.72, 0.77, 0.55, 0.62, 0.39, 0.48, 0.28, 0.34, 0.12];',
+  '        points.forEach((point, index) => { const x = 10 + index * (width - 20) / (points.length - 1); const y = point * (height - 18) + 9; if (index === 0) context.moveTo(x, y); else context.lineTo(x, y); });',
+  '        context.stroke();',
+  '      }',
   '      this.destroy = function () {};',
   '    }',
   '  }',
@@ -258,6 +281,13 @@ async function verifyPage(browser, baseUrl, pageDefinition, viewport, fixtures, 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+  if (pageDefinition.name === 'dashboard') {
+    await page.waitForFunction(() =>
+      document.getElementById('chart-evolution')?.dataset.sfChartType === 'line' &&
+      document.getElementById('chart-repartition')?.dataset.sfChartType === 'doughnut',
+      { timeout: 15000 }
+    );
+  }
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await new Promise((resolve) => setTimeout(resolve, 120));
 
