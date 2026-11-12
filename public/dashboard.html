@@ -39,7 +39,7 @@
           </div>
         </div>
         <div id="chart-wrap" style="margin-top:14px;">
-          <canvas id="chart-evolution" height="130"></canvas>
+          <canvas id="chart-evolution" height="130" role="img" aria-label="Graphique des ventes. Les valeurs détaillées sont disponibles dans les rapports."></canvas>
         </div>
       </div>
       <div class="card">
@@ -175,6 +175,17 @@
         }]
       },
       options: {
+        responsive: true,
+        // Ce graphique est une donnée métier à lire, pas une décoration. Il ne s'anime
+        // jamais lors du chargement, du changement de période ou du redimensionnement :
+        // le résultat respecte ainsi prefers-reduced-motion et évite les mouvements inutiles.
+        animation: false,
+        transitions: {
+          active: { animation: { duration: 0 } },
+          resize: { animation: { duration: 0 } },
+          show: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } },
+          hide: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } }
+        },
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true, grid: { color: '#EDEAE2' } }, x: { grid: { display: false } } }
       }
