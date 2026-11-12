@@ -221,12 +221,20 @@ function showToast(message, type = 'success') {
   box.textContent = message;
   container.appendChild(box);
 
+  // La transition CSS peut être interrompue ou retargetée si plusieurs notifications
+  // apparaissent rapidement ; contrairement à animationend, elle ne redémarre pas du début.
+  const reveal = () => {
+    if (box.isConnected) box.classList.add('is-visible');
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(reveal);
+  else setTimeout(reveal, 0);
+
   setTimeout(() => {
+    if (!box.isConnected) return;
     box.classList.add('toast-leaving');
-    box.addEventListener('animationend', () => box.remove(), { once: true });
-    // Filet de sécurité si l'événement d'animation ne se déclenche pas (ex: onglet
-    // inactif, prefers-reduced-motion sans transition équivalente).
-    setTimeout(() => box.remove(), 400);
+    // Nettoyage indépendant de transitionend : fonctionne aussi en onglet inactif
+    // et avec prefers-reduced-motion.
+    setTimeout(() => box.remove(), 220);
   }, 4000);
 }
 
