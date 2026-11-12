@@ -41,6 +41,7 @@ const assistantRoutes = require('./routes/assistant');
 const professionnelRoutes = require('./routes/professionnel');
 const publicApiRoutes = require('./routes/public-api');
 const paymentWebhooksRoutes = require('./routes/payment-webhooks');
+const customerPortalRoutes = require('./routes/portal');
 const { startScheduler } = require('./config/scheduler');
 const { startBackupScheduler } = require('./config/backup');
 const { getRuntimeConfig, validateProductionConfig } = require('./config/runtime');
@@ -281,6 +282,7 @@ app.use('/api/pro', professionnelRoutes);
 app.use('/api/v1', publicApiRoutes);
 // Prestataire callbacks : signature/hash contrôlés dans chaque endpoint avant tout mouvement financier.
 app.use('/api/payment-webhooks', paymentWebhooksRoutes);
+app.use('/api/portal', customerPortalRoutes);
 
 // Documentation interactive de l'API (générée depuis les commentaires @openapi des
 // routes). Sécurisée par défaut en production : contrairement à avant (activée par défaut,
