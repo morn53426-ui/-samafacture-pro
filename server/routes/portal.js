@@ -121,6 +121,7 @@ router.post('/quotes/:invoiceId/decision', async (req, res, next) => {
     );
     const quote = quotes[0];
     if (!quote) return res.status(404).json({ error: 'Devis introuvable.' });
+    if (quote.statut !== 'en_attente') return res.status(409).json({ error: 'Ce devis n’est plus disponible pour une décision en ligne.' });
     if (quote.date_validite && new Date(quote.date_validite + 'T23:59:59Z').getTime() < Date.now()) {
       return res.status(409).json({ error: 'La validité de ce devis est expirée. Contactez l’entreprise.' });
     }
