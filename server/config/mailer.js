@@ -26,6 +26,15 @@ function getTransporter() {
 async function sendMail({ to, subject, html, text, attachments }) {
   const t = getTransporter();
   if (!t) {
+    // En production, ne jamais écrire le contenu d'un email dans les journaux : il peut
+    // contenir un lien de réinitialisation avec un jeton secret ou des données client.
+    if (process.env.NODE_ENV === 'production') {
+      const err = new Error('SMTP non configuré : aucun email ne peut être envoyé en production.');
+      err.code = 'SMTP_NOT_CONFIGURED';
+      throw err;
+    }
+
+    // Mode développement uniquement : pratique pour tester un flux sans service SMTP.
     console.log('\n📧 SMTP non configuré — email non envoyé, contenu affiché ci-dessous :');
     console.log(`   À : ${to}`);
     console.log(`   Sujet : ${subject}`);

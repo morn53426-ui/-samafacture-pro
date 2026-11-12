@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { captureException } = require('../config/monitoring');
+const { isManualPlanSelectionEnabled } = require('../config/runtime');
 const {
   waveConfigured, paydunyaConfigured,
   creerSessionWave, verifierSignatureWave, consulterSessionWave,
@@ -41,13 +42,15 @@ function baseUrl(req) {
  *               properties:
  *                 wave: { type: boolean }
  *                 paydunya: { type: boolean }
+ *                 manual_plan_selection: { type: boolean, description: 'Disponible uniquement lorsque NODE_ENV vaut development ou test.' }
  *                 tarifs: { type: object, properties: { starter: { type: integer }, pro: { type: integer }, entreprise: { type: integer } } }
  */
 router.get('/moyens-disponibles', requireAuth, (req, res) => {
   res.json({
     wave: waveConfigured(),
     paydunya: paydunyaConfigured(),
-    tarifs: TARIFS
+    tarifs: TARIFS,
+    manual_plan_selection: isManualPlanSelectionEnabled()
   });
 });
 
@@ -187,27 +190,72 @@ router.get('/statut/:reference', requireAuth, async (req, res, next) => {
  *  la clause `AND statut != 'payee'` : un seul appel effectue réellement la mise à jour,
  *  même si plusieurs arrivent en même temps pour la même référence. */
 async function confirmerPaiement(paiement, montantConfirme) {
-  if (paiement.statut === 'payee') return;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  // Vérifie que le montant confirmé par le fournisseur correspond à celui du plan facturé
-  // (défense en profondeur : le montant est déjà fixé côté serveur à la création, mais on
-  // ne fait jamais confiance uniquement à ce que renvoie un tiers). Si le fournisseur ne
-  // transmet pas de montant exploitable, on ne bloque pas (montantConfirme undefined).
-  if (montantConfirme !== undefined && Math.round(montantConfirme) !== Math.round(Number(paiement.montant))) {
-    console.error(`⚠️  Montant du webhook (${montantConfirme}) différent du montant attendu (${paiement.montant}) pour le paiement #${paiement.id} — traitement refusé.`);
-    // Signalé à Sentry : un montant qui ne correspond pas peut indiquer une tentative de
-    // fraude (webhook forgé) ou un changement d'API chez le fournisseur — dans les deux
-    // cas, ça mérite une alerte plutôt qu'une ligne de log qui passe inaperçue.
-    captureException(new Error(`Montant webhook incohérent pour le paiement #${paiement.id} (${paiement.fournisseur}) : reçu ${montantConfirme}, attendu ${paiement.montant}`));
-    return;
-  }
+    // Relit et verrouille l'enregistrement : plusieurs webhooks/retries peuvent arriver
+    // ensemble, mais une seule transaction peut confirmer ce paiement.
+    const [paymentRows] = await conn.query(
+      'SELECT * FROM abonnement_paiements WHERE id = ? FOR UPDATE',
+      [paiement.id]
+    );
+    const current = paymentRows[0];
+    if (!current || current.statut === 'payee') {
+      await conn.commit();
+      return;
+    }
 
-  const [result] = await pool.query(
-    `UPDATE abonnement_paiements SET statut = 'payee', paid_at = NOW() WHERE id = ? AND statut != 'payee'`,
-    [paiement.id]
-  );
-  if (result.affectedRows) {
-    await pool.query('UPDATE users SET plan = ? WHERE id = ?', [paiement.plan, paiement.user_id]);
+    // Vérifie le montant stocké côté serveur, pas seulement les données de la notification.
+    if (montantConfirme !== undefined &&
+        (!Number.isFinite(Number(montantConfirme)) ||
+         Math.round(Number(montantConfirme)) !== Math.round(Number(current.montant)))) {
+      await conn.rollback();
+      console.error(`⚠️  Montant du webhook (${montantConfirme}) différent du montant attendu (${current.montant}) pour le paiement #${current.id} — traitement refusé.`);
+      captureException(new Error(
+        `Montant webhook incohérent pour le paiement #${current.id} (${current.fournisseur}) : reçu ${montantConfirme}, attendu ${current.montant}`
+      ));
+      return;
+    }
+
+    // Les deux écritures métier sont atomiques : un échec de mise à jour du compte
+    // annule aussi le passage du paiement à "payee". Le webhook pourra alors être rejoué.
+    const [userRows] = await conn.query(
+      'SELECT id FROM users WHERE id = ? FOR UPDATE',
+      [current.user_id]
+    );
+    if (!userRows.length) {
+      throw new Error(`Compte ${current.user_id} introuvable pour le paiement d'abonnement #${current.id}.`);
+    }
+
+    // Si un paiement plus récent du même compte a déjà été confirmé, un ancien
+    // webhook arrivé en retard ne doit pas rétrograder le plan actuel.
+    const [newerPaidRows] = await conn.query(
+      `SELECT id FROM abonnement_paiements
+       WHERE user_id = ? AND statut = 'payee'
+         AND (created_at > ? OR (created_at = ? AND id > ?))
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`,
+      [current.user_id, current.created_at, current.created_at, current.id]
+    );
+
+    await conn.query(
+      "UPDATE abonnement_paiements SET statut = 'payee', paid_at = NOW() WHERE id = ? AND statut != 'payee'",
+      [current.id]
+    );
+    if (!newerPaidRows.length) {
+      await conn.query(
+        'UPDATE users SET plan = ? WHERE id = ?',
+        [current.plan, current.user_id]
+      );
+    }
+
+    await conn.commit();
+  } catch (err) {
+    try { await conn.rollback(); } catch (_) {}
+    throw err;
+  } finally {
+    conn.release();
   }
 }
 

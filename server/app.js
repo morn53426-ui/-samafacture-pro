@@ -100,7 +100,7 @@ app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
   res.setHeader('X-DNS-Prefetch-Control', 'off');
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
-  // Content-Security-Policy — voir AUDIT_PRODUCTION.md §2.4 et SECURITY_REPORT.md pour le détail
+  // Content-Security-Policy — voir SECURITY_REPORT.md pour le détail
   // des choix ci-dessous. Autorise explicitement les 3 origines externes réellement chargées par
   // le frontend (Google Identity, et les deux CDN de secours de public/js/chart-loader.js pour
   // Chart.js) — tout le reste est bloqué par défaut (default-src 'self').
@@ -183,11 +183,9 @@ app.use(express.json({ limit: '7mb', verify: (req, res, buf) => { req.rawBody = 
 // PayDunya envoie ses notifications IPN en application/x-www-form-urlencoded.
 app.use(express.urlencoded({ extended: true }));
 
-// Lecture du cookie de session HttpOnly (voir server/routes/auth.js, definirCookieSession) —
-// analyseur minimal volontairement écrit à la main plutôt que d'ajouter la dépendance
-// "cookie-parser" : server/package-lock.json est déjà signalé absent dans
-// AUDIT_PRODUCTION.md §1.1, ajouter une dépendance de plus qui n'y figure pas aggraverait ce
-// problème plutôt que de le régler. N'écrit rien (res.cookie()/res.clearCookie() sont fournis
+// Lecture du cookie de session HttpOnly (voir server/routes/auth.js, definirCookieSession).
+// Analyseur minimal : le serveur n'a besoin que de lire sf_token, et ce code n'a pas besoin
+// d'une dépendance externe. N'écrit rien (res.cookie()/res.clearCookie() sont fournis
 // nativement par Express) — uniquement la lecture de req.cookies.
 app.use((req, res, next) => {
   req.cookies = {};

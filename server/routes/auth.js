@@ -5,10 +5,12 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { OAuth2Client } = require('google-auth-library');
 const { pool } = require('../config/db');
+const { isRedisConfigured, getRedisClient } = require('../config/redis');
 const { requireAuth } = require('../middleware/auth');
 const { isValidImageDataUrl } = require('../utils/validation');
 const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = require('../utils/plans');
 const { sendMail } = require('../config/mailer');
+const { isManualPlanSelectionEnabled } = require('../config/runtime');
 
 const router = express.Router();
 const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
@@ -71,9 +73,32 @@ function validerPersonnalisation(personnalisation) {
   return { cleaned: Object.keys(cleaned).length ? cleaned : null };
 }
 
+// Les limiteurs d'authentification utilisent Redis en production multi-worker afin
+// que chaque instance applique le même quota. Sans REDIS_URL, le mode local reste autonome.
+function createAuthRateLimitStore(prefix) {
+  if (!isRedisConfigured()) return null;
+  try {
+    const { RedisStore } = require('rate-limit-redis');
+    const redisClient = getRedisClient();
+    if (!redisClient) return null;
+    return new RedisStore({
+      prefix: `samafacture:rate-limit:${prefix}:`,
+      sendCommand: (...args) => redisClient.sendCommand(args)
+    });
+  } catch (err) {
+    console.warn('⚠️ Stockage Redis des limiteurs auth indisponible, repli local :', err.message);
+    return null;
+  }
+}
+
+const loginRateLimitStore = createAuthRateLimitStore('login');
+const registerRateLimitStore = createAuthRateLimitStore('register');
+const resetRateLimitStore = createAuthRateLimitStore('password-reset');
+
 // Anti brute-force : limite les tentatives de connexion par adresse IP.
 // Les tentatives réussies ne comptent pas dans le quota, seuls les échecs.
 const loginLimiter = rateLimit({
+  ...(loginRateLimitStore ? { store: loginRateLimitStore } : {}),
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10,
   skipSuccessfulRequests: true,
@@ -84,6 +109,7 @@ const loginLimiter = rateLimit({
 
 // Limite aussi les créations de compte pour éviter la génération massive de comptes.
 const registerLimiter = rateLimit({
+  ...(registerRateLimitStore ? { store: registerRateLimitStore } : {}),
   windowMs: 60 * 60 * 1000, // 1 heure
   max: 20,
   standardHeaders: true,
@@ -93,6 +119,7 @@ const registerLimiter = rateLimit({
 
 // Limite les demandes de réinitialisation de mot de passe (évite le spam d'emails).
 const resetLimiter = rateLimit({
+  ...(resetRateLimitStore ? { store: resetRateLimitStore } : {}),
   windowMs: 15 * 60 * 1000,
   max: 5,
   standardHeaders: true,
@@ -102,7 +129,7 @@ const resetLimiter = rateLimit({
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, nom: user.nom },
+    { id: user.id, email: user.email, role: user.role, nom: user.nom, token_version: Number(user.token_version) || 0 },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -335,15 +362,27 @@ router.post('/google', async (req, res, next) => {
  * @openapi
  * /auth/logout:
  *   post:
- *     summary: Efface le cookie de session HttpOnly (voir SECURITY_REPORT.md)
- *     description: "N'invalide pas le jeton lui-même (JWT sans état, révocation non implémentée) — se contente de retirer le cookie posé lors de la connexion. Le frontend continue par ailleurs de vider son propre stockage local (voir Api.clearSession() dans public/js/api.js), ce qui suffisait déjà avant l'introduction du cookie ; cette route complète ce nettoyage côté cookie."
+ *     summary: Révoque les sessions actives puis efface le cookie HttpOnly.
+ *     description: "Incrémente la version de session du compte : tous les JWT émis avant cette déconnexion deviennent invalides, sur navigateur et mobile."
  *     tags: [Auth]
  *     responses:
  *       204: { description: "Cookie effacé." }
  */
-router.post('/logout', (req, res) => {
+router.post('/logout', (req, res, next) => {
+  // Efface le cookie même si le jeton Bearer présenté est expiré/invalide : le navigateur
+  // ne doit pas conserver une session cookie inutilisable après une tentative de déconnexion.
   res.clearCookie('sf_token', { httpOnly: true, sameSite: 'lax', path: '/' });
-  res.status(204).end();
+  next();
+}, requireAuth, async (req, res, next) => {
+  try {
+    // Révoque les sessions actives de ce compte, y compris les jetons Bearer conservés
+    // dans un ancien navigateur ou appareil. Le changement est pris en compte à la
+    // prochaine requête authentifiée.
+    await pool.query('UPDATE users SET token_version = token_version + 1 WHERE id = ?', [req.user.id]);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Mot de passe oublié ---
@@ -383,12 +422,18 @@ router.post('/mot-de-passe-oublie', resetLimiter, async (req, res, next) => {
       await pool.query('UPDATE users SET reset_token_hash = ?, reset_token_expires = ? WHERE id = ?', [tokenHash, expires, user.id]);
 
       const resetUrl = `${process.env.APP_URL || 'http://localhost:4000'}/reinitialiser-mot-de-passe.html?token=${rawToken}`;
-      await sendMail({
-        to: user.email,
-        subject: 'Réinitialisation de votre mot de passe SamaFacture Pro',
-        text: `Bonjour ${user.nom},\n\nVous avez demandé à réinitialiser votre mot de passe. Cliquez sur ce lien (valable 30 minutes) :\n${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
-        html: `<p>Bonjour ${user.nom},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
-      });
+      try {
+        await sendMail({
+          to: user.email,
+          subject: 'Réinitialisation de votre mot de passe SamaFacture Pro',
+          text: `Bonjour ${user.nom},\n\nVous avez demandé à réinitialiser votre mot de passe. Cliquez sur ce lien (valable 30 minutes) :\n${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
+          html: `<p>Bonjour ${user.nom},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
+        });
+      } catch (mailError) {
+        // La réponse reste identique que l'adresse existe ou non. Le jeton brut n'est
+        // jamais inclus dans ce journal, même en cas de panne SMTP ou de configuration absente.
+        console.error('Échec de l’envoi du message de réinitialisation :', mailError.code || mailError.message);
+      }
     }
 
     res.json(genericMessage);
@@ -431,7 +476,16 @@ router.post('/reinitialiser-mot-de-passe', async (req, res, next) => {
     if (!user) return res.status(400).json({ error: 'Ce lien de réinitialisation est invalide ou a expiré.' });
 
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE users SET password_hash = ?, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ?', [hash, user.id]);
+    // Mise à jour conditionnelle atomique : un lien de réinitialisation ne peut être utilisé
+    // qu'une seule fois, même si deux requêtes arrivent simultanément. Tous les JWT précédents
+    // sont aussi révoqués par l'incrément de token_version.
+    const [result] = await pool.query(
+      'UPDATE users SET password_hash = ?, token_version = token_version + 1, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ? AND reset_token_hash = ? AND reset_token_expires > NOW()',
+      [hash, user.id, tokenHash]
+    );
+    if (!result.affectedRows) {
+      return res.status(400).json({ error: 'Ce lien de réinitialisation est invalide ou a expiré.' });
+    }
 
     res.json({ message: 'Votre mot de passe a été réinitialisé. Vous pouvez maintenant vous connecter.' });
   } catch (err) { next(err); }
@@ -597,7 +651,7 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  * @openapi
  * /auth/plan:
  *   put:
- *     summary: Change le plan d'abonnement (sélecteur manuel gratuit, utilisé quand aucune passerelle de paiement n'est configurée)
+ *     summary: Change manuellement le plan en développement/test uniquement ; désactivé si l'environnement n'est pas explicitement development/test
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -609,13 +663,24 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  *             properties: { plan: { type: string, enum: [gratuit, starter, pro, entreprise] } }
  *     responses:
  *       200:
- *         description: Plan mis à jour.
+ *         description: Plan mis à jour en développement/test.
+ *       403:
+ *         description: Sélection manuelle réservée aux environnements development/test (code PLAN_MANUAL_DISABLED).
  *         content:
  *           application/json:
  *             schema: { type: object, properties: { user: { $ref: '#/components/schemas/Utilisateur' } } }
  */
 router.put('/plan', requireAuth, async (req, res, next) => {
   try {
+    // Le sélecteur manuel sert uniquement au développement et aux tests. En production,
+    // laisser cette route attribuer "pro" ou "entreprise" permettrait à n'importe quel
+    // utilisateur connecté de contourner les paiements d'abonnement.
+    if (!isManualPlanSelectionEnabled()) {
+      return res.status(403).json({
+        error: 'Le changement manuel de formule est réservé aux environnements de développement et de test.',
+        code: 'PLAN_MANUAL_DISABLED'
+      });
+    }
     const { plan } = req.body;
     const plansValides = ['gratuit', 'starter', 'pro', 'entreprise'];
     if (!plansValides.includes(plan)) {
@@ -674,39 +739,61 @@ router.put('/photo', requireAuth, async (req, res, next) => {
  * @openapi
  * /auth/donnees:
  *   delete:
- *     summary: Supprime définitivement le compte et toutes ses données (clients, factures, produits...)
- *     description: Action irréversible. Supprime en cascade tout ce qui est lié à l'utilisateur (contraintes ON DELETE CASCADE en base).
+ *     summary: Efface les données opérationnelles du compte sans supprimer le compte utilisateur.
+ *     description: "Action irréversible. Supprime les clients, produits, factures, devis, paiements, dépenses et les données opérationnelles des modules professionnels. Conserve l'identité de l'entreprise, le plan, les membres, les rôles, les clés API, les webhooks et les paramètres du compte."
  *     tags: [Auth]
  *     responses:
- *       200: { description: "Compte et données supprimés." }
+ *       200: { description: "Données opérationnelles supprimées ; compte et paramètres conservés." }
  */
 router.delete('/donnees', requireAuth, async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
+    conn = await pool.getConnection();
     await conn.beginTransaction();
-    // L'ordre respecte les dépendances : factures d'abord (les lignes et paiements
-    // sont supprimés automatiquement via ON DELETE CASCADE), puis clients, produits, dépenses.
-    await conn.query('DELETE FROM factures WHERE user_id = ?', [req.user.id]);
-    await conn.query('DELETE FROM clients WHERE user_id = ?', [req.user.id]);
-    await conn.query('DELETE FROM produits WHERE user_id = ?', [req.user.id]);
-    await conn.query('DELETE FROM depenses WHERE user_id = ?', [req.user.id]);
+    const uid = req.user.id;
+
+    // Nettoyer d'abord les tables qui imposent RESTRICT ou qui contiennent des ressources
+    // rattachées aux factures, paiements, clients et caisses. Les journaux d'audit, les
+    // équipes, les rôles, les intégrations et les clés API sont conservés comme configuration.
+    await conn.query('DELETE FROM pro_refund_requests WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_avoirs WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_acomptes WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_bons_livraison WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_commandes WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_payment_links WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_documents WHERE user_id = ?', [uid]);
+    // Ne pas laisser une ancienne file webhook envoyer après la remise à zéro des ventes.
+    await conn.query('DELETE FROM pro_webhook_deliveries WHERE user_id = ?', [uid]);
+
+    await conn.query('DELETE FROM pro_caisse_operations WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_caisses WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM pro_etablissements WHERE user_id = ?', [uid]);
+
+    // Les modèles récurrents et compteurs appartiennent aux anciennes données commerciales.
+    await conn.query('DELETE FROM factures_recurrentes WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM facture_usage_mensuelle WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM factures WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM clients WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM produits WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM depenses WHERE user_id = ?', [uid]);
+    await conn.query('DELETE FROM compteurs_numerotation WHERE user_id = ?', [uid]);
+
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    if (conn) {
+      try { await conn.rollback(); } catch (_) {}
+    }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
 function sanitizeUser(user) {
-  // Retire toutes les colonnes internes/secrètes avant de renvoyer l'utilisateur au frontend —
-  // pas seulement password_hash. reset_token_hash/reset_token_expires étaient jusqu'ici renvoyés
-  // tels quels sur /auth/me et toutes les routes qui passent par cette fonction (voir
-  // AUDIT_PRODUCTION.md §2.2) : même si seul le propriétaire du compte pouvait les lire, envoyer
-  // le hash d'un jeton de réinitialisation actif au JavaScript client n'a aucune raison d'être.
-  const { password_hash, reset_token_hash, reset_token_expires, ...rest } = user;
+  // Retire toutes les colonnes internes/secrètes avant de renvoyer l'utilisateur au frontend :
+  // mot de passe, jetons de réinitialisation et version interne de session.
+  const { password_hash, reset_token_hash, reset_token_expires, token_version, ...rest } = user;
   // La colonne est stockée en JSON texte (voir migration facture_personnalisation) ; on la renvoie
   // au client déjà parsée pour lui éviter un JSON.parse. Une valeur corrompue ne doit jamais faire
   // planter la réponse : on retombe alors sur "pas de personnalisation" (comportement par défaut).

@@ -16,6 +16,13 @@ function getRuntimeConfig() {
   };
 }
 
+// Le changement manuel de formule n'est permis que dans les environnements explicitement
+// destinés au développement ou aux tests. Une variable NODE_ENV absente/inconnue doit
+// échouer de façon sûre, afin qu'un déploiement mal configuré ne puisse pas attribuer Pro.
+function isManualPlanSelectionEnabled() {
+  return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+}
+
 function validateProductionConfig() {
   if (process.env.NODE_ENV !== 'production') return;
   const errors = [];
@@ -29,4 +36,4 @@ function validateProductionConfig() {
   if (errors.length) throw new Error(`Configuration production invalide :\n- ${errors.join('\n- ')}`);
 }
 
-module.exports = { getRuntimeConfig, validateProductionConfig, positiveInt };
+module.exports = { getRuntimeConfig, validateProductionConfig, positiveInt, isManualPlanSelectionEnabled };

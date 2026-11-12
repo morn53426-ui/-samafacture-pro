@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 7;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -160,8 +160,23 @@ async function initializeDatabaseOnce() {
  * Chaque ajout est protégé : une colonne déjà présente ne provoque pas d'erreur.
  */
 async function runMigrations(conn) {
+  // Registre de consommation mensuelle : le quota ne doit pas être réinitialisé par
+  // la suppression d'une facture, ni contourné par duplication/conversion/récurrence.
+  // L'initialisation des anciennes périodes est faite à la première réservation.
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
+      user_id INT UNSIGNED NOT NULL,
+      periode DATE NOT NULL,
+      nombre_factures INT UNSIGNED NOT NULL DEFAULT 0,
+      PRIMARY KEY (user_id, periode),
+      CONSTRAINT fk_facture_usage_mensuelle_user
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   const columnsToEnsure = [
     { table: 'users', column: 'photo', definition: 'MEDIUMTEXT' },
+    { table: 'users', column: 'token_version', definition: 'INT UNSIGNED NOT NULL DEFAULT 0' },
     { table: 'users', column: 'facture_template', definition: "VARCHAR(20) NOT NULL DEFAULT 'classique'" },
     { table: 'users', column: 'google_id', definition: 'VARCHAR(255)' },
     { table: 'users', column: 'reset_token_hash', definition: 'VARCHAR(64)' },
@@ -252,6 +267,7 @@ async function runMigrations(conn) {
     { table: 'users', name: 'idx_users_reset_token_hash', columns: '(reset_token_hash)' },
     { table: 'abonnement_paiements', name: 'idx_abonnement_paiements_internal_reference', columns: '(internal_reference)' },
     // Compteurs par statut (tableau de bord) + passage auto en "en_retard".
+    { table: 'factures', name: 'idx_factures_user_type_created_at', columns: '(user_id, type, created_at)' },
     { table: 'factures', name: 'idx_factures_user_type_statut', columns: '(user_id, type, statut)' },
     // Filtrage par plage de dates (rapports, évolution mensuelle du tableau de bord).
     { table: 'factures', name: 'idx_factures_user_type_date', columns: '(user_id, type, date_emission)' },

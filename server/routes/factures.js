@@ -5,7 +5,7 @@ const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
-const { FREE_MONTHLY_INVOICE_LIMIT, isPaidPlan } = require('../utils/plans');
+const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { sendMail } = require('../config/mailer');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 const { genererPdfFacture } = require('../utils/pdf');
@@ -73,30 +73,30 @@ async function insererLignesFacture(conn, factureId, lignes) {
 }
 
 function computeTotals(lignes, remise, frais_livraison) {
-  // 1) HT brut de chaque ligne (avant remise globale)
+  // MySQL stocke quantité, prix unitaire et TVA avec deux décimales. Normaliser AVANT
+  // les calculs garantit que le total correspond aux valeurs qui seront réellement stockées.
   const brutLignes = lignes.map((l) => {
-    const qte = positiveNumber(l.quantite, 0);
-    const pu = positiveNumber(l.prix_unitaire, 0);
-    const tvaRate = percentage(l.tva, 0);
-    return { ...l, quantite: qte, prix_unitaire: pu, tva: tvaRate, ligneHT: qte * pu };
+    const qte = round2(positiveNumber(l.quantite, 0));
+    const pu = round2(positiveNumber(l.prix_unitaire, 0));
+    const tvaRate = round2(percentage(l.tva, 0));
+    return { ...l, quantite: qte, prix_unitaire: pu, tva: tvaRate, ligneHT: round2(qte * pu) };
   });
 
-  const sous_total = brutLignes.reduce((s, l) => s + l.ligneHT, 0);
-  const livraisonVal = positiveNumber(frais_livraison, 0);
-  // La remise ne peut pas dépasser le sous-total (évite une base imposable négative)
-  const remiseVal = Math.min(positiveNumber(remise, 0), sous_total);
+  // Le sous-total persisté est DECIMAL(14,2) : il est arrondi avant remise et total TTC.
+  const sous_total = round2(brutLignes.reduce((s, l) => s + l.ligneHT, 0));
+  const livraisonVal = round2(positiveNumber(frais_livraison, 0));
+  // La remise ne peut pas dépasser le sous-total (évite une base imposable négative).
+  const remiseVal = round2(Math.min(positiveNumber(remise, 0), sous_total));
 
-  // 2) La remise réduit la base imposable AVANT calcul de la TVA, répartie au prorata de chaque ligne.
-  //    C'est cette base nette qui sert à calculer la TVA réellement due — sinon la TVA affichée
-  //    resterait calculée sur un montant que le client ne paie plus.
+  // La remise réduit la base imposable AVANT calcul de la TVA, répartie au prorata de chaque ligne.
   let total_tva = 0;
   const computedLignes = brutLignes.map((l) => {
     const ratio = sous_total > 0 ? l.ligneHT / sous_total : 0;
     const ligneHT_net = l.ligneHT - remiseVal * ratio;
     const ligneTVA = ligneHT_net * (l.tva / 100);
     total_tva += ligneTVA;
-    // Le total affiché par ligne reste le montant brut (qté × prix × (1+TVA%)) : la remise globale
-    // et son effet sur la TVA sont reflétés séparément dans le récapitulatif de la facture.
+    // Le total affiché par ligne reste le montant brut (qté × prix × (1+TVA%)).
+    // La remise globale et son effet sur la TVA figurent séparément dans le récapitulatif.
     const total_ligne = round2(l.ligneHT + l.ligneHT * (l.tva / 100));
     return { ...l, total_ligne };
   });
@@ -104,7 +104,14 @@ function computeTotals(lignes, remise, frais_livraison) {
   total_tva = round2(total_tva);
   const total = round2(sous_total - remiseVal + total_tva + livraisonVal);
 
-  return { computedLignes, sous_total: round2(sous_total), total_tva, total, remise: remiseVal };
+  return {
+    computedLignes,
+    sous_total: round2(sous_total),
+    total_tva,
+    total,
+    remise: remiseVal,
+    frais_livraison: round2(livraisonVal)
+  };
 }
 
 /**
@@ -352,62 +359,82 @@ router.post('/', async (req, res, next) => {
     const referenceDocument = optionalText(reference_externe, 100);
     const conditionsDocument = optionalText(conditions_reglement, 5000);
 
-    // Quota du plan gratuit : 10 factures par mois (les devis restent illimités sur tous les
-    // plans). On relit le plan depuis la base plutôt que le jeton JWT, pour qu'un changement
-    // de plan prenne effet immédiatement sans attendre l'expiration de la session.
-    if (docType === 'facture') {
-      const [[userRow]] = await pool.query('SELECT plan FROM users WHERE id = ?', [req.tenantId]);
-      if (!isPaidPlan(userRow?.plan)) {
-        const [[{ n: countThisMonth }]] = await pool.query(
-          `SELECT COUNT(*) as n FROM factures
-           WHERE user_id = ? AND type = 'facture' AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')`,
-          [req.tenantId]
-        );
-        if (countThisMonth >= FREE_MONTHLY_INVOICE_LIMIT) {
-          notifierUtilisateur(req.tenantId, 'alerte_quota', {
-            message: `Vous avez atteint la limite de ${FREE_MONTHLY_INVOICE_LIMIT} factures du plan Gratuit ce mois-ci.`
-          });
-          return res.status(403).json({
-            error: `Le plan Gratuit est limité à ${FREE_MONTHLY_INVOICE_LIMIT} factures par mois. Passez à un plan payant dans Paramètres pour continuer.`,
-            code: 'QUOTA_DEPASSE'
-          });
-        }
-      }
-    }
-
-    const { computedLignes, sous_total, total_tva, total, remise: remiseAppliquee } = computeTotals(lignes, remise, frais_livraison);
+    const {
+      computedLignes, sous_total, total_tva, total,
+      remise: remiseAppliquee, frais_livraison: livraisonAppliquee
+    } = computeTotals(lignes, remise, frais_livraison);
     // Code court utilisé pour la vérification publique de la facture (via QR code) : évite
     // qu'un tiers puisse deviner l'URL de vérification d'une autre facture en changeant l'id.
     const verificationCode = crypto.randomBytes(5).toString('hex');
 
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
-    const numero = await nextNumero(conn, req.tenantId, docType);
-    const [result] = await conn.query(
-      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
-        date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
-        remiseAppliquee, Number(frais_livraison) || 0, mode_paiement || null,
-        commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
-      ]
-    );
-    const factureId = result.insertId;
+    let factureId;
+    let numero;
+    const MAX_DEADLOCK_RETRIES = 3;
 
-    await insererLignesFacture(conn, factureId, computedLignes);
+    // MySQL peut choisir cette transaction comme victime d'un deadlock, notamment
+    // lorsque plusieurs modules écrivent simultanément dans les mêmes index. Une erreur
+    // ER_LOCK_DEADLOCK annule la transaction entière : on la rejoue donc sur une nouvelle
+    // connexion, sans conserver de numéro, quota ou stock partiellement réservé.
+    for (let attempt = 1; attempt <= MAX_DEADLOCK_RETRIES; attempt++) {
+      conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
 
-    // Décompte automatique du stock : uniquement pour une vraie facture (une vente
-    // effective), jamais pour un devis (simple proposition, pas encore de vente). Ne
-    // bloque jamais la création si le stock devient négatif — beaucoup de commerçants
-    // vendent volontairement en rupture temporaire (réassort à venir) ; c'est une
-    // indication, pas une contrainte dure. Restauré symétriquement si la facture est
-    // supprimée ou annulée (voir DELETE /:id et PUT /:id/statut plus bas).
-    if (docType === 'facture') {
-      await appliquerAjustementsStock(conn, req.tenantId, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
+        // Réserve une unité dans le compteur du mois, dans la même transaction que
+        // l'insertion : les autres parcours de création utilisent le même registre.
+        if (docType === 'facture') {
+          const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
+          if (!quota.allowed) {
+            await conn.rollback();
+            notifierUtilisateur(req.tenantId, 'alerte_quota', {
+              message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
+            });
+            return res.status(403).json({
+              error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant pour continuer.`,
+              code: 'QUOTA_DEPASSE'
+            });
+          }
+        }
+
+        numero = await nextNumero(conn, req.tenantId, docType);
+        const [result] = await conn.query(
+          `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
+            date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
+            remiseAppliquee, livraisonAppliquee, mode_paiement || null,
+            commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
+          ]
+        );
+        factureId = result.insertId;
+
+        await insererLignesFacture(conn, factureId, computedLignes);
+
+        // Décompte automatique du stock : uniquement pour une vraie facture (une vente
+        // effective), jamais pour un devis. Le stock est restauré symétriquement lors
+        // d'une annulation ou suppression.
+        if (docType === 'facture') {
+          await appliquerAjustementsStock(conn, req.tenantId, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
+        }
+
+        await conn.commit();
+        break;
+      } catch (transactionError) {
+        await conn.rollback().catch(() => {});
+        if (transactionError?.code !== 'ER_LOCK_DEADLOCK' || attempt === MAX_DEADLOCK_RETRIES) {
+          throw transactionError;
+        }
+        console.warn(
+          `Deadlock MySQL lors de la création d'un document pour le compte ${req.tenantId} (tentative ${attempt}/${MAX_DEADLOCK_RETRIES}) — nouvelle tentative.`
+        );
+        await new Promise(resolve => setTimeout(resolve, attempt * 40));
+      } finally {
+        conn.release();
+        conn = null;
+      }
     }
 
-    await conn.commit();
     const [factureRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [factureId]);
     res.status(201).json({ facture: factureRows[0] });
     if (docType === 'facture') {
@@ -456,32 +483,59 @@ router.post('/', async (req, res, next) => {
 router.put('/:id/statut', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
+    await conn.beginTransaction();
+    // La facture est lue avec un verrou dans la transaction : l'état consulté pour
+    // vérifier le solde ne peut pas devenir obsolète pendant la modification.
+    const [existingRows] = await conn.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
     const existing = existingRows[0];
-    if (!existing) { conn.release(); return res.status(404).json({ error: 'Facture introuvable.' }); }
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture introuvable.' });
+    }
 
     const { statut } = req.body;
     const valides = ['en_attente', 'payee', 'en_retard', 'annulee'];
-    if (!valides.includes(statut)) { conn.release(); return res.status(400).json({ error: 'Statut invalide.' }); }
+    if (!valides.includes(statut)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Statut invalide.' });
+    }
 
-    await conn.beginTransaction();
-    await conn.query('UPDATE factures SET statut = ? WHERE id = ? AND user_id = ?', [statut, existing.id, req.tenantId]);
+    // Un statut "payee" ne doit jamais remplacer un encaissement : cela fausserait
+    // les soldes clients et les rapports. Les paiements doivent être enregistrés via
+    // POST /:id/paiements, qui contrôle le montant restant et met à jour le statut.
+    if (statut === 'payee' &&
+        (existing.type !== 'facture' || Number(existing.montant_paye) < Number(existing.total))) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Impossible de marquer cette facture comme payée tant que son montant total n’a pas été encaissé et enregistré.',
+        code: 'PAIEMENT_INCOMPLET'
+      });
+    }
 
-    // Symétrie avec le décompte automatique du stock (voir POST / et /transformer-en-facture
-    // ci-dessus) : annuler une facture doit restituer le stock déjà décompté, et ré-annuler
-    // l'annulation (repasser à un autre statut) doit le redécompter — sinon le stock affiché
-    // dérive silencieusement de la réalité à chaque annulation/réactivation.
+    await conn.query(
+      'UPDATE factures SET statut = ? WHERE id = ? AND user_id = ?',
+      [statut, existing.id, req.tenantId]
+    );
+
+    // Symétrie avec le décompte automatique du stock : annuler restitue le stock,
+    // réactiver une facture annulée le redécompte dans la même transaction.
     if (existing.type === 'facture' && existing.statut !== 'annulee' && statut === 'annulee') {
-      await ajusterStockFacture(conn, existing.id, req.tenantId, +1); // restitue (+ stock)
+      await ajusterStockFacture(conn, existing.id, req.tenantId, +1);
     } else if (existing.type === 'facture' && existing.statut === 'annulee' && statut !== 'annulee') {
-      await ajusterStockFacture(conn, existing.id, req.tenantId, -1); // redécompte (- stock)
+      await ajusterStockFacture(conn, existing.id, req.tenantId, -1);
     }
 
     await conn.commit();
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    const [rows] = await pool.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ?',
+      [existing.id, req.tenantId]
+    );
     res.json({ facture: rows[0] });
   } catch (err) {
-    await conn.rollback();
+    try { await conn.rollback(); } catch (_) {}
     next(err);
   } finally {
     conn.release();
@@ -506,26 +560,57 @@ router.put('/:id/statut', async (req, res, next) => {
 router.post('/:id/transformer-en-facture', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [devisRows] = await pool.query(`SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis'`, [req.params.id, req.tenantId]);
-    const devis = devisRows[0];
-    if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
-
     await conn.beginTransaction();
-    const numero = await nextNumero(conn, req.tenantId, 'facture');
-    await conn.query(`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente', date_validite = NULL WHERE id = ? AND user_id = ?`, [numero, devis.id, req.tenantId]);
 
-    // Décompte du stock au moment où le devis devient une vraie vente (même règle qu'à la
-    // création directe d'une facture, voir POST / ci-dessus) — jamais fait tant que ce
-    // n'était qu'un devis.
-    const [lignesDevis] = await conn.query('SELECT produit_id, quantite FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL', [devis.id]);
-    await appliquerAjustementsStock(conn, req.tenantId, lignesDevis.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
+    // Même ordre de verrouillage que les autres parcours : compte, puis devis.
+    // Vérifier le devis avant de réserver une unité permet de conserver un 404 pour un ID
+    // inexistant, même lorsque le quota gratuit est déjà atteint.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    const [devisRows] = await conn.query(
+      `SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis' FOR UPDATE`,
+      [req.params.id, req.tenantId]
+    );
+    const devis = devisRows[0];
+    if (!devis) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Devis introuvable.' });
+    }
+
+    const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
+    if (!quota.allowed) {
+      await conn.rollback();
+      notifierUtilisateur(req.tenantId, 'alerte_quota', {
+        message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
+      });
+      return res.status(403).json({
+        error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant pour continuer.`,
+        code: 'QUOTA_DEPASSE'
+      });
+    }
+
+    const numero = await nextNumero(conn, req.tenantId, 'facture');
+    await conn.query(
+      `UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente', date_validite = NULL WHERE id = ? AND user_id = ? AND type = 'devis'`,
+      [numero, devis.id, req.tenantId]
+    );
+
+    const [lignesDevis] = await conn.query(
+      'SELECT produit_id, quantite FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL',
+      [devis.id]
+    );
+    await appliquerAjustementsStock(
+      conn, req.tenantId,
+      lignesDevis.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite }))
+    );
 
     await conn.commit();
-
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [devis.id, req.tenantId]);
+    const [rows] = await pool.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ?',
+      [devis.id, req.tenantId]
+    );
     res.json({ facture: rows[0] });
   } catch (err) {
-    await conn.rollback();
+    try { await conn.rollback(); } catch (_) {}
     next(err);
   } finally {
     conn.release();
@@ -547,18 +632,44 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
  *         schema: { type: integer }
  *     responses:
  *       201: { description: "Copie créée.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
+ *       403: { description: "Quota mensuel de factures gratuites atteint (code QUOTA_DEPASSE)." }
  *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/:id/dupliquer', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [sourceRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
-    const source = sourceRows[0];
-    if (!source) return res.status(404).json({ error: 'Document introuvable.' });
-
-    const [lignesSource] = await pool.query('SELECT * FROM facture_lignes WHERE facture_id = ?', [source.id]);
-
     await conn.beginTransaction();
+
+    // Même ordre de verrouillage que les créations standard : compte, puis document.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    const [sourceRows] = await conn.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
+    const source = sourceRows[0];
+    if (!source) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Document introuvable.' });
+    }
+
+    if (source.type === 'facture') {
+      const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
+      if (!quota.allowed) {
+        await conn.rollback();
+        notifierUtilisateur(req.tenantId, 'alerte_quota', {
+          message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
+        });
+        return res.status(403).json({
+          error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant pour continuer.`,
+          code: 'QUOTA_DEPASSE'
+        });
+      }
+    }
+
+    const [lignesSource] = await conn.query(
+      'SELECT * FROM facture_lignes WHERE facture_id = ?',
+      [source.id]
+    );
     const numero = await nextNumero(conn, req.tenantId, source.type);
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
@@ -566,19 +677,22 @@ router.post('/:id/dupliquer', async (req, res, next) => {
       [
         req.tenantId, source.client_id, numero, source.type, source.date_validite || null,
         source.objet || null, source.reference_externe || null, source.conditions_reglement || null,
-        source.remise, source.frais_livraison, source.mode_paiement, source.commentaires,
+        source.remise, positiveNumber(source.frais_livraison, 0), source.mode_paiement, source.commentaires,
         source.sous_total, source.total_tva, source.total
       ]
     );
     const nouvelId = result.insertId;
 
     await insererLignesFacture(conn, nouvelId, lignesSource);
-
     await conn.commit();
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [nouvelId, req.tenantId]);
+
+    const [rows] = await pool.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ?',
+      [nouvelId, req.tenantId]
+    );
     res.status(201).json({ facture: rows[0] });
   } catch (err) {
-    await conn.rollback();
+    try { await conn.rollback(); } catch (_) {}
     next(err);
   } finally {
     conn.release();
@@ -698,7 +812,7 @@ router.get('/:id/pdf', async (req, res, next) => {
 async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireForce) {
   const [rows] = await pool.query(
     `SELECT f.*, c.nom as client_nom, c.email as client_email,
-            u.entreprise_nom, u.nom as user_nom, u.email as user_email, u.role as user_role
+            u.entreprise_nom, u.nom as user_nom, u.email as user_email, u.role as user_role, u.token_version as user_token_version
      FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
      WHERE f.id = ? AND f.user_id = ?`,
     [factureId, userId]
@@ -726,7 +840,7 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
     // fournirait normalement, à partir des colonnes déjà jointes ci-dessus — pour que
     // l'envoi automatique (sans req, déclenché par le planificateur) se comporte
     // exactement comme l'envoi manuel depuis la route.
-    const pdfBuffer = await genererPdfFacture(facture.id, { id: userId, email: facture.user_email, role: facture.user_role, nom: facture.user_nom });
+    const pdfBuffer = await genererPdfFacture(facture.id, { id: userId, email: facture.user_email, role: facture.user_role, nom: facture.user_nom, token_version: facture.user_token_version });
     attachments = [{ filename: `${label}-${facture.numero}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }];
   } catch (pdfErr) {
     console.error('PDF joint à l\'email échoué (email envoyé sans pièce jointe) :', pdfErr.message);
@@ -840,18 +954,40 @@ router.post('/:id/relancer', async (req, res, next) => {
  *     responses:
  *       200: { description: "Supprimé." }
  *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Une facture avec règlement ou marquée payée ne peut pas être supprimée." }
  */
 router.delete('/:id', async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
-    const [existingRows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
-    const existing = existingRows[0];
-    if (!existing) { conn.release(); return res.status(404).json({ error: 'Facture introuvable.' }); }
-
     await conn.beginTransaction();
+    // Verrouille la facture avant de vérifier ses paiements : une suppression et un
+    // encaissement concurrents ne peuvent ainsi pas se valider tous les deux.
+    const [existingRows] = await conn.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
+    const existing = existingRows[0];
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture introuvable.' });
+    }
+
+    const [paymentRows] = await conn.query(
+      'SELECT id FROM paiements WHERE facture_id = ? AND user_id = ? LIMIT 1 FOR UPDATE',
+      [existing.id, req.tenantId]
+    );
+    // Une suppression en cascade ne doit jamais effacer un règlement, même partiel.
+    // Le statut "payee" est aussi protégé si une ancienne installation n'a pas de ligne
+    // paiements correspondante. Utiliser un avoir/une annulation conserve la piste comptable.
+    if (paymentRows.length || Number(existing.montant_paye) > 0 || existing.statut === 'payee') {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Cette facture possède un règlement ou est marquée comme payée. Conservez sa trace comptable et utilisez un avoir ou une annulation plutôt que de la supprimer.'
+      });
+    }
+
     // Restitue le stock déjà décompté avant de supprimer, sauf si la facture était déjà
-    // annulée (son stock avait alors déjà été restitué par PUT /:id/statut — le restituer
-    // une seconde fois créerait un stock fantôme supérieur à la réalité).
+    // annulée (son stock avait alors déjà été restitué par PUT /:id/statut).
     if (existing.type === 'facture' && existing.statut !== 'annulee') {
       await ajusterStockFacture(conn, existing.id, req.tenantId, +1);
     }
@@ -859,14 +995,14 @@ router.delete('/:id', async (req, res, next) => {
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    try { await conn.rollback(); } catch (_) {}
     next(err);
   } finally {
     conn.release();
   }
 });
 
-// --- Paiements liés à une facture ---
+//// --- Paiements liés à une facture ---
 /**
  * @openapi
  * /factures/{id}/paiements:
@@ -893,6 +1029,7 @@ router.delete('/:id', async (req, res, next) => {
  *       201: { description: "Paiement enregistré.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
  *       400: { description: "Montant ou méthode invalide.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  *       404: { description: "Facture introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Le devis n'est pas encaissable ou la facture est annulée." }
  */
 router.post('/:id/paiements', async (req, res, next) => {
   let conn;
@@ -902,9 +1039,13 @@ router.post('/:id/paiements', async (req, res, next) => {
       return res.status(400).json({ error: 'Idempotency-Key invalide (8 à 100 caractères).' });
     }
     const { montant, methode, reference } = req.body;
-    const montantNum = Number(montant);
-    if (!Number.isFinite(montantNum) || montantNum <= 0 || !methode) {
-      return res.status(400).json({ error: 'Montant (positif) et méthode de paiement requis.' });
+    // Les montants stockés en DECIMAL(14,2) doivent être ramenés aux centimes AVANT
+    // validation, comparaison, insertion et mise à jour du solde.
+    const montantNum = round2(Number(montant));
+    const methodeValidee = String(methode ?? '').trim().slice(0, 50);
+    const referenceValidee = optionalText(reference, 100);
+    if (!Number.isFinite(montantNum) || montantNum <= 0 || montantNum > 999999999999.99 || !methodeValidee) {
+      return res.status(400).json({ error: 'Montant positif (au centime) et méthode de paiement valides requis.' });
     }
 
     if (idempotencyKey) {
@@ -913,6 +1054,12 @@ router.post('/:id/paiements', async (req, res, next) => {
         [req.tenantId, idempotencyKey]
       );
       if (existingPayment.length) {
+        if (Number(existingPayment[0].facture_id) !== Number(req.params.id)) {
+          return res.status(409).json({
+            error: "Cette Idempotency-Key est déjà utilisée pour une autre facture.",
+            code: 'IDEMPOTENCY_KEY_REUTILISEE'
+          });
+        }
         const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.tenantId]);
         return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
       }
@@ -945,12 +1092,30 @@ router.post('/:id/paiements', async (req, res, next) => {
       );
       if (paymentRows.length) {
         await conn.rollback();
+        if (Number(paymentRows[0].facture_id) !== Number(req.params.id)) {
+          return res.status(409).json({
+            error: "Cette Idempotency-Key est déjà utilisée pour une autre facture.",
+            code: 'IDEMPOTENCY_KEY_REUTILISEE'
+          });
+        }
         const [existingFacture] = await pool.query(
           'SELECT * FROM factures WHERE id = ? AND user_id = ?',
           [paymentRows[0].facture_id, req.tenantId]
         );
         return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
       }
+    }
+
+    // Un devis n'est pas une créance à encaisser. Une facture annulée ne doit plus
+    // accepter de nouveau règlement ; les deux cas doivent être convertis/régularisés
+    // explicitement avant toute nouvelle écriture de paiement.
+    if (facture.type !== 'facture' || facture.statut === 'annulee') {
+      await conn.rollback();
+      return res.status(409).json({
+        error: facture.type !== 'facture'
+          ? 'Un devis ne peut pas recevoir de paiement. Transformez-le d’abord en facture.'
+          : 'Une facture annulée ne peut pas recevoir de nouveau paiement.'
+      });
     }
 
     // Empêche un paiement de dépasser le solde restant dû (ex. saisie manuelle erronée,
@@ -966,14 +1131,14 @@ router.post('/:id/paiements', async (req, res, next) => {
 
     await conn.query(
       `INSERT INTO paiements (user_id, facture_id, montant, methode, reference, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)`,
-      [req.tenantId, facture.id, montantNum, methode, reference || null, idempotencyKey]
+      [req.tenantId, facture.id, montantNum, methodeValidee, referenceValidee, idempotencyKey]
     );
 
     const nouveauMontantPaye = Number(facture.montant_paye) + montantNum;
     const nouveauStatut = nouveauMontantPaye >= Number(facture.total) ? 'payee' : facture.statut;
     await conn.query('UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ?', [nouveauMontantPaye, nouveauStatut, facture.id]);
     await conn.commit();
-    queueWebhookEvent(req.tenantId, 'payment.received', { facture_id: facture.id, montant: montantNum, methode }).catch(err => console.warn('Webhook payment.received ignoré :', err.message));
+    queueWebhookEvent(req.tenantId, 'payment.received', { facture_id: facture.id, montant: montantNum, methode: methodeValidee }).catch(err => console.warn('Webhook payment.received ignoré :', err.message));
 
     const [updatedRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [facture.id]);
     res.status(201).json({ facture: updatedRows[0] });
@@ -991,6 +1156,12 @@ router.post('/:id/paiements', async (req, res, next) => {
           [req.tenantId, key]
         );
         if (existingPayment.length) {
+          if (Number(existingPayment[0].facture_id) !== Number(req.params.id)) {
+            return res.status(409).json({
+              error: "Cette Idempotency-Key est déjà utilisée pour une autre facture.",
+              code: 'IDEMPOTENCY_KEY_REUTILISEE'
+            });
+          }
           const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.tenantId]);
           return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
         }

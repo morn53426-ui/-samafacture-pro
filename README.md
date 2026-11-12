@@ -20,14 +20,14 @@ Pour configurer et utiliser les modèles complets de factures et devis, consulte
   - Factures et devis : création avec lignes multiples, calcul automatique (sous-total, TVA, remise, livraison, total)
   - Transformation d'un devis en facture en un clic
   - Documents enrichis : objet, référence de commande, validité du devis, détail de TVA par taux, suivi du payé/reste à payer, conditions et zone « Bon pour accord »
-  - Enregistrement de paiements (Wave, Orange Money, PayDunya, Stripe, espèces, etc.) avec mise à jour automatique du statut
+  - Enregistrement manuel des règlements (Wave, Orange Money, PayDunya, espèces, virement, etc.) avec mise à jour automatique du solde et du statut ; aucun débit automatique par ces prestataires pour les factures
   - Vue facture imprimable → export PDF via l'impression du navigateur (Ctrl/Cmd+P → "Enregistrer en PDF")
   - Dépenses (CRUD) pour suivre les sorties d'argent
   - Rapports : ventes par jour/semaine/mois/année/client/produit, export CSV, résumé comptable (recettes, dépenses, bénéfice net, TVA collectée)
   - Paramètres entreprise : identité, coordonnées légales, banque/RIB, conditions de règlement, logo et personnalisation visuelle ; **15 modèles de facture/devis** partagés entre aperçu, impression et PDF
   - Centre d'aide (FAQ), Support technique (formulaire de contact) et Politique de confidentialité
   - Interface responsive : menu latéral escamotable sur mobile/tablette, tableaux et grilles adaptatifs
-  - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature électronique, factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle)
+  - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature interne simple (non qualifiée), factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle)
 
 ## Installation avec WAMPserver
 
@@ -39,7 +39,7 @@ Par défaut, WAMPserver expose MySQL sur `localhost:3306` avec l'utilisateur `ro
 
 ### 2. Installer Node.js
 
-Si ce n'est pas déjà fait, installez [Node.js](https://nodejs.org/) (version 18 ou plus récente). WAMPserver ne fournit que MySQL/Apache/PHP ; Node.js s'installe séparément et fait tourner le backend de l'application.
+Si ce n'est pas déjà fait, installez [Node.js](https://nodejs.org/) (version 22 ou plus récente). WAMPserver ne fournit que MySQL/Apache/PHP ; Node.js s'installe séparément et fait tourner le backend de l'application.
 
 ### 3. Configurer et lancer le serveur
 
@@ -49,6 +49,8 @@ npm install
 copy .env.example .env    (ou "cp .env.example .env" sous Git Bash/Mac/Linux)
 npm start
 ```
+
+Pour une utilisation locale, le fichier d'exemple définit `NODE_ENV=development` afin d'autoriser le sélecteur manuel de formule pour les tests. Pour tout serveur accessible publiquement, définissez impérativement `NODE_ENV=production` et utilisez des secrets forts ; le changement manuel de formule est refusé par défaut dès que l'environnement n'est pas explicitement `development` ou `test`. Docker Compose force déjà `NODE_ENV=production` dans les conteneurs.
 
 Le fichier `.env` contient déjà les valeurs par défaut d'une installation WAMPserver standard :
 
@@ -124,7 +126,7 @@ docker compose --env-file server/.env logs -f app
 ```
 
 `docker-compose.yml` (à la racine du dépôt) démarre deux services : l'API (`Dockerfile`, basé
-sur `node:20-bookworm-slim` avec Chromium système pour la génération PDF) et une base MySQL
+sur `node:24-bookworm-slim` avec Chromium système pour la génération PDF) et une base MySQL
 dédiée dans un réseau Docker privé — jamais exposée directement sur Internet. Si vous préférez
 un MySQL managé externe, supprimez le service `mysql` du fichier et pointez `DB_HOST` vers
 votre base dans `server/.env`.
@@ -244,7 +246,7 @@ TEST_DB_NAME=ma_base_de_test npm test
 
 ### Où les ajouter
 
-Les tests se trouvent dans `server/tests/`. Chaque nouveau fichier `*.test.js` y est automatiquement détecté (`node --test tests/`, le testeur intégré à Node.js — aucune dépendance supplémentaire à part `supertest` pour simuler des requêtes HTTP). `tests/setup.js` fournit les outils communs (email de test unique, nettoyage automatique des données créées).
+Les tests se trouvent dans `server/tests/`. Chaque nouveau fichier `*.test.js` y est automatiquement détecté par `npm test`. Les fichiers sont exécutés séquentiellement car ils partagent une base MySQL de test ; les scénarios de concurrence restent testés explicitement à l'intérieur des suites concernées. `tests/setup.js` fournit les outils communs (email de test unique, nettoyage automatique des données créées).
 
 **Recommandation** : avant chaque mise à jour importante du code de facturation ou d'authentification, lancez `npm test` — c'est exactement le genre de vérification qui aurait détecté immédiatement le bug `consulter.html` évoqué plus haut.
 
@@ -280,7 +282,7 @@ La facture "imprimable" (`facture-detail.html`) peut être exportée en vrai fic
 - **Téléchargement direct** — bouton "⬇️ Télécharger le PDF" sur la page de détail (`GET /api/factures/:id/pdf`).
 - **Pièce jointe email** — les emails envoyés via "Envoyer" et "Relancer" y joignent automatiquement le PDF (en plus du lien de consultation en ligne déjà présent). Si la génération du PDF échoue pour une raison quelconque, l'email part quand même sans pièce jointe plutôt que d'échouer entièrement.
 
-**Fonctionnement technique** : un navigateur headless (Puppeteer) charge la vraie page `facture-detail.html` (avec un jeton temporaire de 2 minutes injecté directement, sans passer par une route publique) puis l'imprime en PDF — exactement le même rendu que ce que l'utilisateur voit à l'écran (logo, QR code, signature, les 6 modèles), sans dupliquer ce rendu dans une deuxième librairie PDF.
+**Fonctionnement technique** : un navigateur headless (Puppeteer) charge la vraie page `facture-detail.html` (avec un jeton temporaire de 2 minutes injecté directement, sans passer par une route publique) puis l'imprime en PDF — exactement le même rendu que ce que l'utilisateur voit à l'écran (logo, QR code, signature et les 15 modèles), sans dupliquer ce rendu dans une deuxième librairie PDF.
 
 **Ce que ça implique en pratique** :
 - Puppeteer installe son propre Chromium (~300 Mo) au premier `npm install` — normal, ce n'est pas une erreur.
@@ -312,7 +314,7 @@ Le passage à un plan payant (Starter, Pro, Entreprise) peut se faire réellemen
 - **Wave for Business** — paiement direct
 - **PayDunya** — agrégateur qui gère en une seule intégration Orange Money **et** la carte bancaire (Visa/Mastercard)
 
-Tant que ces identifiants ne sont pas renseignés dans `server/.env`, un simple sélecteur de plan reste disponible dans Paramètres pour tester gratuitement les fonctionnalités en local — aucun bouton de paiement cassé, aucune erreur.
+En développement et en test uniquement, un sélecteur manuel de plan permet de vérifier les fonctionnalités sans transaction. Il est désactivé en production : les plans payants doivent être activés par un paiement d'abonnement confirmé.
 
 ### Configurer Wave
 1. Créez un compte sur [business.wave.com](https://business.wave.com), section "Developers" (validation sous 48–72h, NINEA requis)
@@ -358,12 +360,12 @@ SMTP_PASSWORD=un-mot-de-passe-d-application-google
 
 ## Feuille de route (non inclus dans cette version)
 
-- Intégrations réelles des paiements (Wave, Orange Money, PayDunya, Stripe, PayPal) — actuellement les méthodes sont enregistrées manuellement, sans passerelle de paiement connectée.
-- Application mobile native (React Native / Flutter) avec scan QR/code-barres et mode hors ligne.
+- Encaissement automatisé des factures par Wave, Orange Money, PayDunya ou carte : les règlements de factures sont actuellement enregistrés manuellement. À distinguer du paiement des abonnements, qui dispose déjà de connecteurs Wave et PayDunya configurables.
+- Enrichissement de l'application mobile Capacitor déjà présente (notifications push, scan caméra des reçus/QR codes et modes hors ligne).
 - Génération de facture par IA à partir d'un texte libre.
-- Signature électronique interactive (dessin/upload de signature).
-- Authentification à deux facteurs (2FA), chiffrement AES avancé.
-- Multi-utilisateurs avec rôles et permissions personnalisées par entreprise.
+- Signature électronique qualifiée/certifiée avec identité vérifiée, horodatage probant et preuve d'intégrité ; la signature actuelle est une signature interne simple.
+- Chiffrement avancé des données sensibles et gestion centralisée des clés.
+- Authentification à deux facteurs (2FA), gestion de sessions et durcissement cryptographique.
 - Espace administrateur SaaS (gestion des abonnements, statistiques globales, support).
 - Notifications par SMS/WhatsApp (les relances et envois par **email** sont déjà disponibles, voir factures.html/devis.html).
 - Comptabilité avancée (journal, balance détaillée) — l'export Excel et le résumé comptable (recettes/dépenses/bénéfice/TVA) sont déjà disponibles dans Rapports.

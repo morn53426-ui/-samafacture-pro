@@ -35,8 +35,8 @@ describe('Contrat de sauvegarde des paramètres — régression bouton Enregistr
     assert.match(js, /:4000\/api/);
   });
 
-  test('npm test cible les fichiers de test au lieu du dossier tests/', () => {
+  test('npm test cible les fichiers de test et séquence les suites partageant MySQL', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'server', 'package.json'), 'utf8'));
-    assert.equal(pkg.scripts.test, 'node --test "tests/*.test.js"');
+    assert.equal(pkg.scripts.test, 'node --test --test-concurrency=1 "tests/*.test.js"');
   });
 });

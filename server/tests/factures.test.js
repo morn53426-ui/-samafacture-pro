@@ -69,6 +69,45 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(facture.total, 11120); // 10000 - 1000 + 1620 + 500
   });
 
+  test('quantités, prix et TVA sont normalisés aux deux décimales MySQL avant calcul', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        lignes: [{ designation: 'Ligne arrondie', quantite: 1.3333, prix_unitaire: 10.005, tva: 18.555 }]
+      });
+    assert.equal(res.status, 201, res.text);
+
+    const detail = await request(app)
+      .get(`/api/factures/${res.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(detail.status, 200);
+    const line = detail.body.lignes[0];
+    assert.equal(Number(line.quantite), 1.33);
+    assert.equal(Number(line.prix_unitaire), 10.01);
+    assert.equal(Number(line.tva), 18.56);
+    assert.equal(Number(detail.body.facture.sous_total), 13.31);
+    assert.equal(Number(detail.body.facture.total), Number(line.total_ligne));
+  });
+
+  test('des frais de livraison négatifs ne sont ni calculés ni enregistrés', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        frais_livraison: -5000,
+        lignes: [{ designation: 'Livraison invalide', quantite: 1, prix_unitaire: 10000, tva: 0 }]
+      });
+
+    assert.equal(res.status, 201, res.text);
+    assert.equal(Number(res.body.facture.frais_livraison), 0);
+    assert.equal(Number(res.body.facture.total), 10000);
+  });
+
   test('une remise supérieure au sous-total est plafonnée (pas de base imposable négative)', async () => {
     const res = await request(app)
       .post('/api/factures')
@@ -257,6 +296,43 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(numerosUniques.size, numeros.length, `numéros en double détectés : ${numeros.join(', ')}`);
   });
 
+  test('une facture ne peut pas être déclarée payée sans encaissement complet enregistré', async () => {
+    const created = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Statut payé sécurisé', quantite: 1, prix_unitaire: 1000, tva: 0 }] });
+    assert.equal(created.status, 201, created.text);
+    const factureId = created.body.facture.id;
+
+    const paidWithoutCollection = await request(app)
+      .put(`/api/factures/${factureId}/statut`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ statut: 'payee' });
+    assert.equal(paidWithoutCollection.status, 409, paidWithoutCollection.text);
+    assert.equal(paidWithoutCollection.body.code, 'PAIEMENT_INCOMPLET');
+
+    const partial = await request(app)
+      .post(`/api/factures/${factureId}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 500, methode: 'Espèces' });
+    assert.equal(partial.status, 201, partial.text);
+    assert.equal(partial.body.facture.statut, 'en_attente');
+
+    const paidWithPartialCollection = await request(app)
+      .put(`/api/factures/${factureId}/statut`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ statut: 'payee' });
+    assert.equal(paidWithPartialCollection.status, 409, paidWithPartialCollection.text);
+
+    const remaining = await request(app)
+      .post(`/api/factures/${factureId}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 500, methode: 'Espèces' });
+    assert.equal(remaining.status, 201, remaining.text);
+    assert.equal(remaining.body.facture.statut, 'payee');
+    assert.equal(Number(remaining.body.facture.montant_paye), 1000);
+  });
+
   test('un paiement négatif ou nul est refusé', async () => {
     const facture = await request(app)
       .post('/api/factures')
@@ -275,6 +351,34 @@ describe('Factures : calcul et numérotation', () => {
       .send({ montant: 1000, methode: 'Espèces' });
     assert.equal(paiementValide.status, 201);
     assert.equal(paiementValide.body.facture.statut, 'payee');
+  });
+
+  test('un montant de paiement est arrondi au centime avant insertion et solde', async () => {
+    const facture = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Arrondi', quantite: 1, prix_unitaire: 100, tva: 0 }] });
+    assert.equal(facture.status, 201);
+
+    const tooSmall = await request(app)
+      .post(`/api/factures/${facture.body.facture.id}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 0.004, methode: 'Espèces' });
+    assert.equal(tooSmall.status, 400);
+
+    const rounded = await request(app)
+      .post(`/api/factures/${facture.body.facture.id}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 10.005, methode: '  Espèces  ', reference: '  Caisse  ' });
+    assert.equal(rounded.status, 201, rounded.text);
+    assert.equal(Number(rounded.body.facture.montant_paye), 10.01);
+
+    const detail = await request(app)
+      .get(`/api/factures/${facture.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(detail.status, 200);
+    assert.equal(Number(detail.body.paiements[0].montant), 10.01);
+    assert.equal(detail.body.paiements[0].methode, 'Espèces');
   });
 
   test('plusieurs paiements partiels simultanés sur la même facture ne se perdent jamais (correction de la race condition sur le solde)', async () => {
@@ -353,6 +457,58 @@ describe('Factures : idempotence des créations', () => {
       .set('Idempotency-Key', 'short')
       .send({ client_id: clientId, type: 'devis', lignes: [{ designation: 'X', quantite: 1, prix_unitaire: 100, tva: 0 }] });
     assert.equal(res.status, 400);
+  });
+});
+
+
+describe('Factures : quota du plan Gratuit', () => {
+  let userId;
+  let token;
+  let clientId;
+
+  before(async () => {
+    await setupTestDatabase();
+    const email = emailDeTest('quota-factures');
+    const inscription = await request(app)
+      .post('/api/auth/register')
+      .send({ nom: 'Compte quota', email, password: 'motdepasse123' });
+    userId = inscription.body.user.id;
+    token = inscription.body.token;
+    const client = await request(app)
+      .post('/api/clients')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Client quota' });
+    clientId = client.body.client.id;
+  });
+
+  after(async () => { await nettoyerUtilisateur(userId); });
+
+  test("une ancienne date d'émission ne contourne pas le quota et les créations concurrentes sont sérialisées", async () => {
+    const { FREE_MONTHLY_INVOICE_LIMIT } = require('../utils/plans');
+    const creer = () => request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        date_emission: '2000-01-01',
+        lignes: [{ designation: 'Facture quota', quantite: 1, prix_unitaire: 100, tva: 0 }]
+      });
+
+    for (let i = 0; i < FREE_MONTHLY_INVOICE_LIMIT - 1; i++) {
+      const result = await creer();
+      assert.equal(result.status, 201, result.text);
+    }
+
+    const concurrent = await Promise.all(Array.from({ length: 4 }, creer));
+    assert.equal(concurrent.filter(r => r.status === 201).length, 1);
+    assert.equal(concurrent.filter(r => r.status === 403 && r.body.code === 'QUOTA_DEPASSE').length, 3);
+
+    const [[row]] = await require('../config/db').pool.query(
+      "SELECT COUNT(*) AS n FROM factures WHERE user_id = ? AND type = 'facture' AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')",
+      [userId]
+    );
+    assert.equal(Number(row.n), FREE_MONTHLY_INVOICE_LIMIT);
   });
 });
 

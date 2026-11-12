@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
 const { computeTotals, insererLignesFacture } = require('./factures');
+const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -206,6 +207,7 @@ router.delete('/:id', async (req, res, next) => {
  *         schema: { type: integer }
  *     responses:
  *       201: { description: "Facture générée.", content: { application/json: { schema: { type: object, properties: { facture: { $ref: '#/components/schemas/Facture' } } } } } }
+ *       403: { description: "Quota mensuel de factures gratuites atteint (code QUOTA_DEPASSE)." }
  *       404: { description: "Introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/:id/generer', async (req, res, next) => {
@@ -213,7 +215,15 @@ router.post('/:id/generer', async (req, res, next) => {
     const facture = await genererFactureDepuisModele(req.params.id, req.tenantId);
     if (!facture) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
     res.status(201).json({ facture });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err?.code === 'QUOTA_DEPASSE') {
+      return res.status(403).json({
+        error: err.message,
+        code: 'QUOTA_DEPASSE'
+      });
+    }
+    next(err);
+  }
 });
 
 /**
@@ -226,6 +236,11 @@ async function genererFactureDepuisModele(id, userId) {
   try {
     await conn.beginTransaction();
 
+    // Tous les parcours qui créent une facture verrouillent d'abord le compte, puis
+    // la ressource métier (facture/devis/modèle récurrent). Garder ce même ordre ici
+    // évite les cycles de verrous entre génération récurrente et création manuelle.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
+
     // SELECT ... FOR UPDATE verrouille la ligne le temps de la transaction : si le
     // vérificateur périodique et un appel manuel (ou deux workers en mode cluster)
     // tentent de générer la même facture en même temps, le second attend que le premier
@@ -237,13 +252,27 @@ async function genererFactureDepuisModele(id, userId) {
       return null;
     }
 
+    // Une facture issue d'un modèle récurrent consomme la même unité mensuelle
+    // qu'une facture créée manuellement. En cas de quota atteint, la transaction est
+    // annulée et la prochaine échéance reste inchangée pour permettre une reprise après
+    // le renouvellement du mois ou le passage à un plan payant.
+    const quota = await reserveMonthlyInvoiceQuota(conn, userId);
+    if (!quota.allowed) {
+      const error = new Error(`Le plan Gratuit est limité à ${quota.limit} factures par mois.`);
+      error.code = 'QUOTA_DEPASSE';
+      throw error;
+    }
+
     const lignes = JSON.parse(modele.lignes_json);
     // Même règle de calcul qu'une facture créée manuellement (voir routes/factures.js) :
     // la remise est répartie au prorata de chaque ligne avant le calcul de la TVA. Avant
     // cette correction, cette fonction dupliquait le calcul en appliquant la TVA sur le HT
     // brut (sans tenir compte de la remise), ce qui surestimait la TVA des factures
     // générées automatiquement dès qu'un modèle récurrent avait une remise configurée.
-    const { computedLignes, sous_total, total_tva, total, remise: remiseAppliquee } = computeTotals(lignes, modele.remise, modele.frais_livraison);
+    const {
+      computedLignes, sous_total, total_tva, total,
+      remise: remiseAppliquee, frais_livraison: livraisonAppliquee
+    } = computeTotals(lignes, modele.remise, modele.frais_livraison);
 
     // Numérotation atomique (même mécanisme que POST /api/factures)
     const prefix = 'FAC';
@@ -260,7 +289,7 @@ async function genererFactureDepuisModele(id, userId) {
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
        VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, modele.client_id, numero, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
+      [userId, modele.client_id, numero, remiseAppliquee, livraisonAppliquee, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
     );
     const factureId = result.insertId;
 

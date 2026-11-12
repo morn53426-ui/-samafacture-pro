@@ -19,6 +19,7 @@ async function creerSessionWave({ amount, reference, successUrl, errorUrl }) {
       Authorization: `Bearer ${process.env.WAVE_API_KEY}`,
       'Content-Type': 'application/json'
     },
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({
       amount: String(Math.round(amount)),
       currency: 'XOF',
@@ -66,8 +67,9 @@ function verifierSignatureWave(rawBody, signatureHeader) {
 
 /** Consulte l'état d'une session Wave directement auprès de Wave (vérification de secours). */
 async function consulterSessionWave(sessionId) {
-  const res = await fetch(`https://api.wave.com/v1/checkout/sessions/${sessionId}`, {
-    headers: { Authorization: `Bearer ${process.env.WAVE_API_KEY}` }
+  const res = await fetch(`https://api.wave.com/v1/checkout/sessions/${encodeURIComponent(String(sessionId))}`, {
+    headers: { Authorization: `Bearer ${process.env.WAVE_API_KEY}` },
+    signal: AbortSignal.timeout(15000)
   });
   if (!res.ok) return null;
   return res.json();
@@ -97,6 +99,7 @@ async function creerFacturePaydunya({ amount, description, reference, storeName,
   const res = await fetch(`${paydunyaBaseUrl()}/checkout-invoice/create`, {
     method: 'POST',
     headers: paydunyaHeaders(),
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({
       invoice: {
         total_amount: Math.round(amount),
@@ -143,8 +146,9 @@ function verifierHashPaydunya(hash) {
  * foi de l'IPN : on interroge PayDunya pour obtenir le statut authentique avant de confirmer.
  */
 async function confirmerFacturePaydunya(token) {
-  const res = await fetch(`${paydunyaBaseUrl()}/checkout-invoice/confirm/${token}`, {
-    headers: paydunyaHeaders()
+  const res = await fetch(`${paydunyaBaseUrl()}/checkout-invoice/confirm/${encodeURIComponent(String(token))}`, {
+    headers: paydunyaHeaders(),
+    signal: AbortSignal.timeout(15000)
   });
   if (!res.ok) return null;
   return res.json();

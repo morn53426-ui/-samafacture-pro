@@ -239,7 +239,11 @@
       .join('');
 
     const aucunMoyenConfigure = !safeMoyens.wave && !safeMoyens.paydunya;
-    document.getElementById('plan-fallback').style.display = aucunMoyenConfigure ? 'block' : 'none';
+    const selectionManuelleAutorisee = safeMoyens.manual_plan_selection === true;
+    // Le sélecteur sans paiement sert au développement/test uniquement. En production,
+    // ne pas présenter de bouton qui tente une élévation de formule interdite par l'API.
+    document.getElementById('plan-fallback').style.display =
+      aucunMoyenConfigure && selectionManuelleAutorisee ? 'block' : 'none';
   }
 
   async function payerAbonnement(plan, fournisseur, btn) {

@@ -1,7 +1,10 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+const crypto = require('crypto');
 const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+// setup.js définit DB_NAME=TEST_DB_NAME avant le chargement du pool MySQL.
+const { pool } = require('../config/db');
 
 describe('Authentification', () => {
   let userId;
@@ -19,7 +22,7 @@ describe('Authentification', () => {
   test('inscription avec des informations valides crée un compte et renvoie un jeton', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Utilisateur Test', email, password, entreprise_nom: 'Boutique Test' });
+      .send({ nom: 'Utilisateur Test', email, password, entreprise_nom: 'Entreprise Test' });
 
     assert.equal(res.status, 201);
     assert.ok(res.body.token, 'un jeton JWT doit être renvoyé');
@@ -48,6 +51,71 @@ describe('Authentification', () => {
     const res = await request(app).post('/api/auth/login').send({ email, password });
     assert.equal(res.status, 200);
     assert.ok(res.body.token);
+  });
+
+  test('les informations de paiement indiquent que le sélecteur manuel est désactivé en production', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200, login.text);
+
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const response = await request(app)
+        .get('/api/abonnement/moyens-disponibles')
+        .set('Authorization', `Bearer ${login.body.token}`);
+      assert.equal(response.status, 200, response.text);
+      assert.equal(response.body.manual_plan_selection, false);
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  test('le sélecteur manuel de plan est désactivé si NODE_ENV est absent', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200, login.text);
+
+    const previousNodeEnv = process.env.NODE_ENV;
+    delete process.env.NODE_ENV;
+    try {
+      const availability = await request(app)
+        .get('/api/abonnement/moyens-disponibles')
+        .set('Authorization', `Bearer ${login.body.token}`);
+      assert.equal(availability.status, 200, availability.text);
+      assert.equal(availability.body.manual_plan_selection, false);
+
+      const response = await request(app)
+        .put('/api/auth/plan')
+        .set('Authorization', `Bearer ${login.body.token}`)
+        .send({ plan: 'pro' });
+      assert.equal(response.status, 403, response.text);
+      assert.equal(response.body.code, 'PLAN_MANUAL_DISABLED');
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  test('le sélecteur manuel de plan ne peut pas attribuer un plan payant en production', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200, login.text);
+
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const response = await request(app)
+        .put('/api/auth/plan')
+        .set('Authorization', `Bearer ${login.body.token}`)
+        .send({ plan: 'entreprise' });
+
+      assert.equal(response.status, 403, response.text);
+      assert.equal(response.body.code, 'PLAN_MANUAL_DISABLED');
+      const [[user]] = await pool.query('SELECT plan FROM users WHERE id = ?', [userId]);
+      assert.equal(user.plan, 'gratuit');
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
   });
 
   test('la connexion avec un mauvais mot de passe échoue', async () => {
@@ -124,6 +192,189 @@ describe('Authentification', () => {
     assert.equal(savedAgain.status, 200, savedAgain.text);
     assert.equal(savedAgain.body.user.entreprise_rccm, payload.entreprise_rccm);
     assert.equal(savedAgain.body.user.entreprise_rib, payload.entreprise_rib);
+  });
+
+  test('la route de déconnexion efface aussi le cookie si le jeton présenté est invalide', async () => {
+    const response = await request(app)
+      .post('/api/auth/logout')
+      .set('Authorization', 'Bearer jeton-expire-ou-invalide');
+    assert.equal(response.status, 401);
+    const cookies = response.headers['set-cookie'] || [];
+    assert.ok(cookies.some(value => value.startsWith('sf_token=;')), 'le cookie doit être effacé même si le JWT est invalide');
+  });
+
+  test('la déconnexion révoque le JWT Bearer utilisé, pas seulement le cookie', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200);
+    const oldToken = login.body.token;
+
+    const logout = await request(app)
+      .post('/api/auth/logout')
+      .set('Authorization', `Bearer ${oldToken}`);
+    assert.equal(logout.status, 204);
+
+    const refused = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${oldToken}`);
+    assert.equal(refused.status, 401);
+
+    const newLogin = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(newLogin.status, 200);
+    const accepted = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${newLogin.body.token}`);
+    assert.equal(accepted.status, 200);
+  });
+
+  test('la remise à zéro efface toutes les données opérationnelles professionnelles sans supprimer le compte ni ses paramètres', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200);
+    const token = login.body.token;
+    const suffix = String(Date.now());
+    const [client] = await pool.query(
+      'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+      [userId, 'Client remise à zéro']
+    );
+    const [invoice] = await pool.query(
+      "INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, total) VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', 12500)",
+      [userId, client.insertId, `RESET-${suffix}`]
+    );
+    const [payment] = await pool.query(
+      "INSERT INTO paiements (user_id, facture_id, montant, methode) VALUES (?, ?, 2500, 'Espèces')",
+      [userId, invoice.insertId]
+    );
+
+    const [order] = await pool.query(
+      "INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, total, lignes_json) VALUES (?, ?, ?, 'confirmee', CURDATE(), 12500, '[]')",
+      [userId, client.insertId, `CMD-RESET-${suffix}`]
+    );
+    await pool.query(
+      "INSERT INTO pro_bons_livraison (user_id, commande_id, facture_id, numero, date_livraison, lignes_json) VALUES (?, ?, ?, ?, CURDATE(), '[]')",
+      [userId, order.insertId, invoice.insertId, `BL-RESET-${suffix}`]
+    );
+    await pool.query(
+      "INSERT INTO pro_avoirs (user_id, facture_id, numero, date_emission, montant, motif) VALUES (?, ?, ?, CURDATE(), 1000, 'Test remise à zéro')",
+      [userId, invoice.insertId, `AV-RESET-${suffix}`]
+    );
+    await pool.query(
+      "INSERT INTO pro_acomptes (user_id, facture_id, numero, date_emission, montant) VALUES (?, ?, ?, CURDATE(), 1000)",
+      [userId, invoice.insertId, `ACP-RESET-${suffix}`]
+    );
+    await pool.query(
+      "INSERT INTO pro_refund_requests (user_id, paiement_id, montant, motif) VALUES (?, ?, 500, 'Test remise à zéro')",
+      [userId, payment.insertId]
+    );
+    await pool.query(
+      "INSERT INTO pro_payment_links (user_id, facture_id, token_hash, montant) VALUES (?, ?, ?, 2500)",
+      [userId, invoice.insertId, require('crypto').createHash('sha256').update(suffix).digest('hex')]
+    );
+    await pool.query(
+      "INSERT INTO pro_documents (user_id, facture_id, client_id, nom_fichier, mime_type, taille_octets, contenu) VALUES (?, ?, ?, 'preuve.pdf', 'application/pdf', 5, ?)",
+      [userId, invoice.insertId, client.insertId, Buffer.from('%PDF-')]
+    );
+    const [establishment] = await pool.query(
+      "INSERT INTO pro_etablissements (user_id, nom) VALUES (?, 'Établissement temporaire')",
+      [userId]
+    );
+    const [cash] = await pool.query(
+      "INSERT INTO pro_caisses (user_id, etablissement_id, nom) VALUES (?, ?, 'Caisse temporaire')",
+      [userId, establishment.insertId]
+    );
+    await pool.query(
+      "INSERT INTO pro_caisse_operations (user_id, caisse_id, type, montant, motif) VALUES (?, ?, 'entree', 2500, 'Test remise à zéro')",
+      [userId, cash.insertId]
+    );
+    await pool.query(
+      "INSERT INTO factures_recurrentes (user_id, client_id, libelle, frequence, prochaine_date, lignes_json) VALUES (?, ?, 'Modèle temporaire', 'mensuelle', DATE_ADD(CURDATE(), INTERVAL 1 MONTH), '[]')",
+      [userId, client.insertId]
+    );
+
+    const [webhook] = await pool.query(
+      "INSERT INTO pro_webhooks (user_id, url, secret_enc, evenements_json) VALUES (?, 'https://example.test/hooks', 'secret-chiffre', '[]')",
+      [userId]
+    );
+    await pool.query(
+      "INSERT INTO pro_webhook_deliveries (user_id, webhook_id, evenement, payload_json) VALUES (?, ?, 'invoice.created', '{}')",
+      [userId, webhook.insertId]
+    );
+    await pool.query(
+      'INSERT INTO pro_api_keys (user_id, nom, token_hash, scopes_json) VALUES (?, ?, ?, ?)',
+      [
+        userId,
+        'Clé conservée',
+        require('crypto').createHash('sha256').update('api-key-preserve-' + suffix).digest('hex'),
+        JSON.stringify(['invoices:read'])
+      ]
+    );
+    const reset = await request(app)
+      .delete('/api/auth/donnees')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(reset.status, 200, reset.text);
+
+    for (const table of [
+      'clients', 'factures', 'paiements', 'depenses',
+      'factures_recurrentes', 'compteurs_numerotation',
+      'pro_commandes', 'pro_bons_livraison', 'pro_avoirs', 'pro_acomptes',
+      'pro_refund_requests', 'pro_payment_links', 'pro_documents',
+      'pro_etablissements', 'pro_caisses', 'pro_caisse_operations',
+      'pro_webhook_deliveries'
+    ]) {
+      const [[count]] = await pool.query(`SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`, [userId]);
+      assert.equal(Number(count.n), 0, `la table ${table} doit avoir été vidée`);
+    }
+    // facture_lignes n'a pas de user_id propre : son appartenance passe par facture_id.
+    const [[remainingLines]] = await pool.query(
+      'SELECT COUNT(*) AS n FROM facture_lignes WHERE facture_id = ?',
+      [invoice.insertId]
+    );
+    assert.equal(Number(remainingLines.n), 0, 'les lignes de la facture supprimée doivent être supprimées par cascade');
+
+    // Les paramètres et l'identité du compte sont conservés ; les intégrations ne sont pas
+    // supprimées silencieusement, mais leur ancienne file d'événements est vidée.
+    const [[user]] = await pool.query('SELECT entreprise_nom, plan FROM users WHERE id = ?', [userId]);
+    assert.equal(user.entreprise_nom, 'Entreprise Test');
+    assert.equal(Number((await pool.query('SELECT COUNT(*) AS n FROM pro_webhooks WHERE user_id = ?', [userId]))[0][0].n), 1);
+    assert.equal(Number((await pool.query('SELECT COUNT(*) AS n FROM pro_api_keys WHERE user_id = ?', [userId]))[0][0].n), 1);
+
+    const stillAuthenticated = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(stillAuthenticated.status, 200);
+    assert.equal(stillAuthenticated.body.user.entreprise_nom, 'Entreprise Test');
+  });
+
+  test('la réinitialisation du mot de passe révoque les sessions et consomme le lien une seule fois', async () => {
+    const login = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(login.status, 200);
+    const oldToken = login.body.token;
+
+    const rawResetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawResetToken).digest('hex');
+    await pool.query(
+      'UPDATE users SET reset_token_hash = ?, reset_token_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = ?',
+      [tokenHash, userId]
+    );
+
+    const reset = await request(app)
+      .post('/api/auth/reinitialiser-mot-de-passe')
+      .send({ token: rawResetToken, password: 'nouveau-mot-de-passe-2026' });
+    assert.equal(reset.status, 200, reset.text);
+
+    const refused = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${oldToken}`);
+    assert.equal(refused.status, 401);
+
+    const reused = await request(app)
+      .post('/api/auth/reinitialiser-mot-de-passe')
+      .send({ token: rawResetToken, password: 'autre-mot-de-passe-2026' });
+    assert.equal(reused.status, 400);
+
+    const newLogin = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'nouveau-mot-de-passe-2026' });
+    assert.equal(newLogin.status, 200);
+    assert.ok(newLogin.body.token);
   });
 });
 

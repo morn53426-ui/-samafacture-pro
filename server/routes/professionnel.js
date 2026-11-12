@@ -227,7 +227,8 @@ router.post('/deposits/:id/receive', async (req, res, next) => {
   try {
     const uid = owner(req);
     const methode = String(req.body.methode || '').trim().slice(0, 50);
-    const reference = String(req.body.reference || '').trim().slice(0, 190) || null;
+    const reference = String(req.body.reference || '').trim().slice(0, 100) || null;
+    const referenceAcompte = String(req.body.reference || '').trim().slice(0, 190) || null;
     if (!methode) return res.status(400).json({ error: 'La méthode de règlement est obligatoire.' });
     await conn.beginTransaction();
     const [depositRows] = await conn.query('SELECT * FROM pro_acomptes WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
@@ -247,7 +248,7 @@ router.post('/deposits/:id/receive', async (req, res, next) => {
     const paid = Number(invoice.montant_paye) + Number(deposit.montant);
     const status = paid >= Number(invoice.total) ? 'payee' : invoice.statut;
     await conn.query('UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ? AND user_id = ?', [paid, status, invoice.id, uid]);
-    await conn.query("UPDATE pro_acomptes SET statut = 'encaisse', methode = ?, reference_paiement = ?, encaisse_le = NOW() WHERE id = ? AND user_id = ?", [methode, reference, deposit.id, uid]);
+    await conn.query("UPDATE pro_acomptes SET statut = 'encaisse', methode = ?, reference_paiement = ?, encaisse_le = NOW() WHERE id = ? AND user_id = ?", [methode, referenceAcompte, deposit.id, uid]);
     await conn.commit();
     await audit(req, 'acompte.encaisse', 'acompte', deposit.id, { facture_id: invoice.id, montant: deposit.montant, methode });
     queueWebhookEvent(uid, 'payment.received', { invoice_id: invoice.id, montant: Number(deposit.montant), methode, type: 'acompte' }).catch(err => console.warn('Webhook acompte ignoré :', err.message));

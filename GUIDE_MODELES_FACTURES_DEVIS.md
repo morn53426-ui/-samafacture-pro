@@ -58,7 +58,7 @@ Les préférences de thème, couleurs, polices et logo déjà configurées reste
 
 ## 6. Mise à niveau de la base
 
-La version de schéma passe à **5**. Au démarrage, le backend ajoute de façon idempotente les colonnes de l'entreprise et du document nécessaires à ces champs. Aucune table métier existante n'est supprimée. Il est toutefois recommandé de réaliser une sauvegarde MySQL avant de déployer une migration sur une base réelle et de vérifier la mise à niveau sur une copie de staging.
+La version de schéma de la branche de correctifs passe à **7** (les champs des documents ont été introduits dans les versions précédentes). Au démarrage, le backend ajoute de façon idempotente les colonnes de l'entreprise et du document nécessaires à ces champs. Aucune table métier existante n'est supprimée. Il est toutefois recommandé de réaliser une sauvegarde MySQL avant de déployer une migration sur une base réelle et de vérifier la mise à niveau sur une copie de staging.
 
 ## 7. Vérifications à effectuer avant production
 

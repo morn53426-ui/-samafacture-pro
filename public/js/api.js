@@ -39,15 +39,17 @@ const Api = {
     localStorage.setItem('sf_user', JSON.stringify(user));
   },
   clearSession() {
+    // Capture le jeton avant de vider localStorage : /auth/logout en a besoin pour
+    // révoquer la session du navigateur ou de l'application mobile appelante.
+    const token = localStorage.getItem('sf_token');
+    const headers = { 'X-Requested-With': 'SamaFacturePro' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    fetch(API_BASE + '/auth/logout', { method: 'POST', headers }).catch(() => {});
+
+    // La déconnexion locale reste immédiate même si le serveur est injoignable.
     localStorage.removeItem('sf_token');
     localStorage.removeItem('sf_user');
     localStorage.removeItem('sf_company_owner');
-    // Efface aussi le cookie de session HttpOnly posé en parallèle depuis la connexion (voir
-    // SECURITY_REPORT.md et server/routes/auth.js, /auth/logout). Best-effort et non bloquant :
-    // clearSession() reste synchrone comme avant (tous les appels existants, ex. sidebar.js,
-    // continuent de fonctionner sans modification) — un échec réseau ici ne doit jamais empêcher
-    // la déconnexion locale immédiate, qui reste ce qui protège réellement l'utilisateur.
-    fetch(API_BASE + '/auth/logout', { method: 'POST' }).catch(() => {});
   },
   currentUser() {
     const raw = localStorage.getItem('sf_user');

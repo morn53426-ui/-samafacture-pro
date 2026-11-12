@@ -29,8 +29,11 @@ jobs:
           --health-start-period=30s
 
     steps:
-      - name: Récupérer le dépôt
-        uses: actions/checkout@v4
+      - name: Récupérer exactement le commit de la PR
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
 
       - name: Valider Docker Compose et le chemin des variables
         run: |
@@ -41,9 +44,9 @@ jobs:
         run: docker build --tag samafacture-pro:ci .
 
       - name: Installer Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: server/package-lock.json
 
@@ -68,3 +71,22 @@ jobs:
           JWT_SECRET: ci-secret-ne-pas-utiliser-en-production
           APP_URL: http://127.0.0.1:4000
         run: npm test
+
+
+      - name: Préparer l'archive ZIP complète pour le test Docker local
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 3
+        run: |
+          mkdir -p dist
+          git archive --format=zip --prefix=SamaFacture-Pro-PR3/ HEAD > dist/SamaFacture-Pro-PR3.zip
+          test -s dist/SamaFacture-Pro-PR3.zip
+          unzip -t dist/SamaFacture-Pro-PR3.zip
+          sha256sum dist/SamaFacture-Pro-PR3.zip
+
+      - name: Publier l'archive ZIP de la PR #3
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 3
+        uses: actions/upload-artifact@v7
+        with:
+          name: SamaFacture-Pro-PR3-Docker-Local
+          path: dist/SamaFacture-Pro-PR3.zip
+          if-no-files-found: error
+          retention-days: 7
