@@ -14,12 +14,15 @@ function renderSidebar(activePage) {
     ]},
     { group: 'Comptabilité', items: [
       { id: 'finances', icon: 'credit-card', label: 'Paiements', href: 'finances.html' },
+      { id: 'paiements-pro', icon: 'wallet-cards', label: 'Paiements en ligne', href: 'paiements-professionnels.html' },
+      { id: 'comptabilite', icon: 'calculator', label: 'Comptabilité OHADA', href: 'comptabilite.html' },
       { id: 'depenses', icon: 'banknote', label: 'Dépenses', href: 'depenses.html' },
       { id: 'rapports', icon: 'bar-chart', label: 'Rapports', href: 'rapports.html' }
     ]},
     { group: 'Outils professionnels', items: [
       { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
       { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' },
+      { id: 'achats', icon: 'truck', label: 'Achats & stocks', href: 'achats.html' },
       { id: 'assistant-ia', icon: 'sparkles', label: 'Assistant IA', href: 'assistant-ia.html' },
       { id: 'facture-ia', icon: 'wand', label: 'Facture par IA', href: 'facture-ia.html' }
     ]},
