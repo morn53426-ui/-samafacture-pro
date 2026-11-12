@@ -133,6 +133,15 @@ router.post('/quotes/:invoiceId/decision', async (req, res, next) => {
       'INSERT INTO pro_portal_quote_decisions (user_id, client_id, facture_id, portal_access_id, decision, commentaire) VALUES (?, ?, ?, ?, ?, ?)',
       [access.user_id, access.client_id, quote.id, access.access_id, decision, commentaire || null]
     );
+    // Rendre la décision visible dans l'historique CRM de l'entreprise.
+    await pool.query(
+      "INSERT INTO pro_crm_activities (user_id, client_id, acteur_user_id, type, titre, description, statut, completed_at) VALUES (?, ?, NULL, 'note', ?, ?, 'terminee', NOW())",
+      [
+        access.user_id, access.client_id,
+        'Réponse client au devis ' + quote.numero,
+        (decision === 'accepte' ? 'Devis accepté' : 'Devis refusé') + (commentaire ? ' — ' + commentaire : '')
+      ]
+    );
     res.status(201).json({ success: true, numero: quote.numero, decision, message: decision === 'accepte' ? 'Votre acceptation a été transmise à l’entreprise.' : 'Votre réponse a été transmise à l’entreprise.' });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Une décision a déjà été enregistrée pour ce devis.' });
