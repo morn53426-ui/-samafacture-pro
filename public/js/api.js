@@ -165,7 +165,8 @@ function formatDate(iso) {
   if (format === 'MM/dd/yyyy') {
     return new Intl.DateTimeFormat('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', timeZone }).format(date);
   }
-  return new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone }).format(date);
+  // The selected date pattern takes precedence over the language of the interface.
+  return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone }).format(date);
 }
 function statutBadge(statut) {
   const map = {
