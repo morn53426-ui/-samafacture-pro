@@ -378,9 +378,13 @@ router.post('/', async (req, res, next) => {
     }
 
     const [companyRows] = await pool.query('SELECT devise FROM users WHERE id = ?', [req.tenantId]);
-    const documentCurrency = String(devise || companyRows[0]?.devise || 'FCFA').toUpperCase();
+    const companyCurrency = String(companyRows[0]?.devise || 'FCFA').toUpperCase();
+    const documentCurrency = String(devise || companyCurrency).toUpperCase();
     const supportedCurrencies = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
     if (!supportedCurrencies.includes(documentCurrency)) return res.status(400).json({ error: 'Devise de document non prise en charge.' });
+    if (documentCurrency !== companyCurrency) {
+      return res.status(409).json({ error: 'La devise du document doit correspondre à la devise de base de l’entreprise. Les conversions multi-devises ne sont pas encore activées.' });
+    }
     const docType = type === 'devis' ? 'devis' : 'facture';
     const dateValidite = docType === 'devis' ? optionalIsoDate(date_validite) : null;
     if (dateValidite === undefined) {
