@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mon espace client — SamaFacture Pro</title><meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer"><meta name="theme-color" content="#0F1B33">
+<link rel="stylesheet" href="css/style.css"><link rel="icon" type="image/png" href="images/icon-192.png">
+<style>
+.portal-shell{max-width:1080px;margin:32px auto;padding:0 18px 48px}
+.portal-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.portal-brand{display:flex;align-items:center;gap:12px;font-weight:800;color:var(--ink)}
+.portal-brand img{width:42px;height:42px;object-fit:contain;border-radius:12px}
+.portal-hero{background:linear-gradient(135deg,#0F1B33,#183B62);color:#fff;border-radius:20px;padding:26px;margin-bottom:18px}
+.portal-hero h1{margin:0 0 8px;color:#fff}
+.portal-hero p{margin:0;color:#d8e2f1}
+.portal-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}
+.portal-kpi{background:var(--card-bg,#fff);border:1px solid var(--line);border-radius:14px;padding:16px}
+.portal-kpi strong{display:block;font-size:1.35rem;margin-top:5px}
+.portal-doc{border:1px solid var(--line);background:var(--card-bg,#fff);border-radius:14px;padding:16px;margin:12px 0}
+.portal-doc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.portal-doc h3{margin:0 0 6px}.portal-meta{color:var(--ink-soft);font-size:.86rem}
+.portal-lines{width:100%;border-collapse:collapse;margin-top:12px;font-size:.88rem}
+.portal-lines td,.portal-lines th{padding:8px;border-bottom:1px solid var(--line);text-align:left}
+.portal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.portal-pill{display:inline-block;padding:4px 9px;border-radius:20px;background:var(--emerald-light);color:var(--emerald);font-size:.78rem;font-weight:700}
+.portal-error{padding:20px;background:var(--card-bg,#fff);border:1px solid var(--line);border-radius:14px}
+@media(max-width:620px){.portal-kpis{grid-template-columns:1fr}.portal-shell{margin-top:18px}.portal-hero{padding:20px}}
+</style>
+</head>
+<body>
+<main class="portal-shell">
+  <header class="portal-head">
+    <div class="portal-brand"><img id="company-logo" src="images/icon-192.png" alt=""><span id="company-name">SamaFacture Pro</span></div>
+    <span class="portal-meta">Espace client sécurisé</span>
+  </header>
+  <div id="portal-content"><section class="portal-error"><h2>Chargement de votre espace…</h2><p>Vérification de votre lien personnel.</p></section></div>
+  <footer class="portal-meta" style="text-align:center;margin-top:28px">Lien personnel et temporaire · SamaFacture Pro</footer>
+</main>
+<script>
+const token = new URLSearchParams(location.search).get('token') || '';
+const root = document.getElementById('portal-content');
+const safe = value => String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const money = (value,currency,locale) => {
+  try { return new Intl.NumberFormat(locale || 'fr-FR',{style:'currency',currency:currency==='FCFA'?'XOF':(currency||'XOF'),maximumFractionDigits:0}).format(Number(value)||0); }
+  catch (_) { return (Number(value)||0).toLocaleString('fr-FR')+' '+(currency||'FCFA'); }
+};
+const date = value => value ? new Date(String(value).slice(0,10)+'T12:00:00').toLocaleDateString('fr-FR') : '—';
+function render(data){
+  const company=data.entreprise||{},client=data.client||{},summary=data.resume||{};
+  document.title='Espace client — '+(company.nom||'SamaFacture Pro');
+  document.getElementById('company-name').textContent=company.nom||'SamaFacture Pro';
+  if(company.logo && /^data:image\/(png|jpe?g|webp|svg\+xml);base64,|^https:\/\//i.test(company.logo)) document.getElementById('company-logo').src=company.logo;
+  const docs=(data.documents||[]);
+  root.innerHTML='<section class="portal-hero"><h1>Bonjour '+safe(client.nom||'')+'</h1><p>Consultez ici vos factures, devis, échéances et décisions commerciales.</p></section>'+
+    '<section class="portal-kpis"><article class="portal-kpi"><span class="portal-meta">Factures et documents</span><strong>'+Number(summary.nb_factures||0)+'</strong></article>'+
+    '<article class="portal-kpi"><span class="portal-meta">Devis disponibles</span><strong>'+Number(summary.nb_devis||0)+'</strong></article>'+
+    '<article class="portal-kpi"><span class="portal-meta">Solde restant dû</span><strong>'+money(summary.solde_du,company.devise,company.locale)+'</strong></article></section>'+
+    '<section><div class="page-header"><div><h2>Mes documents</h2><p>Les informations sont mises à jour par votre entreprise.</p></div></div>'+
+    (docs.length?docs.map(doc=>{
+      const isQuote=doc.type==='devis', decision=doc.portail_decision;
+      const state=decision==='accepte'?'Devis accepté':decision==='refuse'?'Devis refusé':doc.statut==='payee'?'Payée':doc.statut==='annulee'?'Annulée':isQuote?'En attente de votre réponse':'En attente de règlement';
+      const lines=(doc.lignes||[]).map(line=>'<tr><td>'+safe(line.designation)+'</td><td>'+Number(line.quantite)+'</td><td>'+money(line.total_ligne,doc.devise,company.locale)+'</td></tr>').join('');
+      const actions=isQuote&&!decision?'<div class="portal-actions"><button class="btn btn-primary" type="button" data-decision="accepte" data-id="'+Number(doc.id)+'">Accepter le devis</button><button class="btn btn-outline" type="button" data-decision="refuse" data-id="'+Number(doc.id)+'">Refuser</button></div>':
+        (isQuote?'<p class="portal-meta">Votre décision : '+safe(state)+'</p>':'');
+      return '<article class="portal-doc"><div class="portal-doc-head"><div><h3>'+safe(isQuote?'Devis ':'Facture ')+safe(doc.numero)+'</h3><div class="portal-meta">Émis le '+date(doc.date_emission)+(isQuote?' · Valide jusqu’au '+date(doc.date_validite):' · Échéance '+date(doc.date_echeance))+'</div></div><div><span class="portal-pill">'+safe(state)+'</span><h3 style="text-align:right;margin-top:8px">'+money(doc.total,doc.devise,company.locale)+'</h3></div></div>'+
+        '<div class="portal-meta">Payé : '+money(doc.montant_paye,doc.devise,company.locale)+' · Solde : '+money(doc.solde,doc.devise,company.locale)+'</div>'+
+        '<details style="margin-top:12px"><summary>Détail des lignes</summary><table class="portal-lines"><thead><tr><th>Désignation</th><th>Qté</th><th>Total</th></tr></thead><tbody>'+lines+'</tbody></table></details>'+actions+'</article>';
+    }).join(''):'<article class="portal-doc"><p>Aucun document n’est encore disponible.</p></article>')+'</section>'+
+    '<section class="portal-doc"><h3>Besoin d’aide ?</h3><p class="portal-meta">Contactez directement '+safe(company.nom||'votre entreprise')+(company.telephone?' au '+safe(company.telephone):'')+(company.email?' ou par email : '+safe(company.email):'')+'.</p></section>';
+  root.querySelectorAll('[data-decision]').forEach(button=>button.addEventListener('click',()=>decide(button.dataset.id,button.dataset.decision,button)));
+}
+async function decide(id,decision,button){
+  const labels={accepte:'Confirmez-vous l’acceptation de ce devis ?',refuse:'Confirmez-vous le refus de ce devis ?'};
+  if(!window.confirm(labels[decision])) return;
+  button.disabled=true;
+  try{
+    const response=await fetch('/api/portal/'+encodeURIComponent(token)+'/quotes/'+encodeURIComponent(id)+'/decision',{
+      method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({decision})
+    });
+    const result=await response.json();
+    if(!response.ok) throw new Error(result.error||'Impossible d’enregistrer votre réponse.');
+    await load();
+  }catch(err){window.alert(err.message);button.disabled=false;}
+}
+async function load(){
+  if(!/^[a-f0-9]{64}$/i.test(token)){root.innerHTML='<section class="portal-error"><h2>Lien invalide</h2><p>Demandez à votre entreprise de vous envoyer un nouveau lien personnel.</p></section>';return;}
+  try{
+    const response=await fetch('/api/portal/'+encodeURIComponent(token),{headers:{Accept:'application/json'},cache:'no-store'});
+    const data=await response.json();
+    if(!response.ok) throw new Error(data.error||'Votre espace est indisponible.');
+    render(data);
+  }catch(err){root.innerHTML='<section class="portal-error"><h2>Accès indisponible</h2><p>'+safe(err.message)+'</p><p>Contactez directement votre entreprise pour demander un nouveau lien sécurisé.</p></section>';}
+}
+load();
+</script>
+</body>
+</html>
