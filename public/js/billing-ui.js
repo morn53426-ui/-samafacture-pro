@@ -84,28 +84,28 @@
       const cards = [
         {
           icon: 'banknote',
-          tone: 'tone-emerald',
+          tone: 'tone-blue',
           label: 'Chiffre d’affaires',
           value: formatMontant(stats.chiffre_affaires || 0),
           meta: 'Activité facturée'
         },
         {
           icon: 'check-circle',
-          tone: 'tone-emerald',
+          tone: 'tone-green',
           label: 'Factures payées',
           value: String(stats.factures_payees && stats.factures_payees.n != null ? stats.factures_payees.n : 0),
           meta: formatMontant(stats.factures_payees && stats.factures_payees.total || 0) + ' encaissés'
         },
         {
           icon: 'clock',
-          tone: 'tone-gold',
+          tone: 'tone-purple',
           label: 'En attente',
           value: String(stats.factures_en_attente && stats.factures_en_attente.n != null ? stats.factures_en_attente.n : 0),
           meta: formatMontant(stats.factures_en_attente && stats.factures_en_attente.total || 0) + ' en attente de règlement'
         },
         {
           icon: 'alert-triangle',
-          tone: 'tone-clay',
+          tone: 'tone-amber',
           label: 'En retard',
           value: String(stats.factures_en_retard && stats.factures_en_retard.n != null ? stats.factures_en_retard.n : 0),
           meta: formatMontant(stats.factures_en_retard && stats.factures_en_retard.total || 0) + ' de factures échues'
