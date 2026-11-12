@@ -91,11 +91,91 @@ async function executerRelancesAutomatiques() {
   try {
     await withMysqlAdvisoryLock('samafacture:pro-automatic-reminders', async () => {
       const [automations] = await pool.query(
-        "SELECT * FROM pro_automations WHERE actif = 1 AND type = 'relance_impayes_email' AND (prochaine_execution IS NULL OR prochaine_execution <= NOW()) ORDER BY id ASC LIMIT 50"
+        "SELECT * FROM pro_automations WHERE actif = 1 AND type IN ('relance_impayes_email','relance_devis_email','alerte_stock_email') AND (prochaine_execution IS NULL OR prochaine_execution <= NOW()) ORDER BY id ASC LIMIT 50"
       );
       for (const automation of automations) {
         try {
           const config = typeof automation.configuration_json === 'string'
+            ? JSON.parse(automation.configuration_json || '{}')
+            : (automation.configuration_json || {});
+
+          if (automation.type === 'relance_devis_email') {
+            const horizon = Math.min(30, Math.max(0, Number(config.jours_avant_expiration) || 5));
+            const frequency = Math.min(90, Math.max(1, Number(config.frequence_jours) || 3));
+            const [quotes] = await pool.query(
+              `SELECT f.id, f.numero, f.total, f.devise, f.date_validite, c.nom AS client, c.email
+               FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id
+               LEFT JOIN pro_portal_quote_decisions d ON d.facture_id = f.id AND d.user_id = f.user_id
+               WHERE f.user_id = ? AND f.type = 'devis' AND f.statut = 'en_attente'
+                 AND f.date_validite BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
+                 AND d.id IS NULL AND c.email IS NOT NULL AND c.email <> ''
+               ORDER BY f.date_validite ASC LIMIT 250`,
+              [automation.user_id, horizon]
+            );
+            let sent = 0, failed = false;
+            for (const quote of quotes) {
+              const runKey = 'devis:' + quote.id;
+              const [prior] = await pool.query('SELECT id FROM pro_automation_runs WHERE automation_id = ? AND run_key = ? LIMIT 1', [automation.id, runKey]);
+              if (prior.length) continue;
+              const result = await sendMail({
+                to: quote.email,
+                subject: 'Votre devis ' + quote.numero + ' arrive à expiration',
+                text: 'Bonjour ' + quote.client + ',\\n\\nVotre devis ' + quote.numero +
+                  ' d’un montant de ' + Number(quote.total).toLocaleString('fr-FR') + ' ' + (quote.devise || 'FCFA') +
+                  ' est valable jusqu’au ' + quote.date_validite + '. Contactez notre entreprise si vous souhaitez le valider.\\n'
+              });
+              if (result.sent) {
+                await pool.query(
+                  "INSERT IGNORE INTO pro_automation_runs (user_id, automation_id, entity_type, entity_id, run_key, result) VALUES (?, ?, 'devis', ?, ?, 'succes')",
+                  [automation.user_id, automation.id, quote.id, runKey]
+                );
+                sent++;
+              } else failed = true;
+            }
+            const delay = failed ? 1 : frequency * 24;
+            await pool.query(
+              'UPDATE pro_automations SET derniere_execution = NOW(), prochaine_execution = DATE_ADD(NOW(), INTERVAL ? HOUR), dernier_resultat = ? WHERE id = ? AND user_id = ?',
+              [delay, failed ? (sent ? 'partiel' : 'smtp_non_configure') : 'succes', automation.id, automation.user_id]
+            );
+            continue;
+          }
+
+          if (automation.type === 'alerte_stock_email') {
+            const frequency = Math.min(30, Math.max(1, Number(config.frequence_jours) || 1));
+            const [products] = await pool.query(
+              'SELECT nom, reference, stock, stock_minimum FROM produits WHERE user_id = ? AND stock_minimum > 0 AND stock <= stock_minimum ORDER BY (stock_minimum - stock) DESC, nom ASC LIMIT 200',
+              [automation.user_id]
+            );
+            const [[account]] = await pool.query('SELECT email, entreprise_nom FROM users WHERE id = ?', [automation.user_id]);
+            const runKey = 'stock:' + new Date().toISOString().slice(0, 10);
+            const [prior] = await pool.query('SELECT id FROM pro_automation_runs WHERE automation_id = ? AND run_key = ? LIMIT 1', [automation.id, runKey]);
+            if (!prior.length && products.length && account?.email) {
+              const details = products.map(p => '- ' + p.nom + (p.reference ? ' (' + p.reference + ')' : '') +
+                ' : stock ' + Number(p.stock) + ', seuil ' + Number(p.stock_minimum)).join('\\n');
+              const result = await sendMail({
+                to: account.email,
+                subject: 'Alerte stock — ' + (account.entreprise_nom || 'SamaFacture Pro'),
+                text: 'Les produits suivants ont atteint leur seuil minimum :\\n\\n' + details
+              });
+              if (result.sent) {
+                await pool.query(
+                  "INSERT IGNORE INTO pro_automation_runs (user_id, automation_id, entity_type, entity_id, run_key, result) VALUES (?, ?, 'stock', 0, ?, 'succes')",
+                  [automation.user_id, automation.id, runKey]
+                );
+              }
+            } else if (!products.length && !prior.length) {
+              await pool.query(
+                "INSERT IGNORE INTO pro_automation_runs (user_id, automation_id, entity_type, entity_id, run_key, result) VALUES (?, ?, 'stock', 0, ?, 'aucune_alerte')",
+                [automation.user_id, automation.id, runKey]
+              );
+            }
+            await pool.query(
+              'UPDATE pro_automations SET derniere_execution = NOW(), prochaine_execution = DATE_ADD(NOW(), INTERVAL ? DAY), dernier_resultat = ? WHERE id = ? AND user_id = ?',
+              [frequency, products.length ? (account?.email ? 'succes' : 'email_entreprise_absent') : 'aucune_alerte', automation.id, automation.user_id]
+            );
+            continue;
+          }
+
             ? JSON.parse(automation.configuration_json || '{}')
             : (automation.configuration_json || {});
           const jours = Math.min(120, Math.max(1, Number(config.jours_retard) || 7));
