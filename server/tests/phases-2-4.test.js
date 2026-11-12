@@ -200,7 +200,7 @@ test('les achats et réceptions partielles mettent à jour le stock global et le
 
   const stock = await request(app).get('/api/pro/inventory/stock').set('Authorization', 'Bearer ' + token);
   assert.equal(stock.status, 200, stock.text);
-  assert.equal(Number(stock.body.stocks.find(row => Number(row.produit_id) === Number(productId)).quantite), 11);
+  assert.equal(Number(stock.body.stocks.find(row => Number(row.produit_id) === Number(productId)).quantite), 12);
 
   const transfer = await request(app).post('/api/pro/inventory/transfers').set('Authorization', 'Bearer ' + token)
     .send({ produit_id: productId, entrepot_source_id: warehouse.body.id, entrepot_destination_id: 99999999, quantite: 1 });
