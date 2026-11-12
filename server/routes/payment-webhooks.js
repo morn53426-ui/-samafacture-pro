@@ -101,6 +101,20 @@ async function applySuccessfulCheckout(checkoutId, providerRef, amount, method, 
   return { ignored: true };
 }
 
+router.get('/:reference/status', async (req, res, next) => {
+  try {
+    const reference = String(req.params.reference || '');
+    if (!/^[a-f0-9]{64}$/.test(reference)) return res.status(404).json({ error: 'Session introuvable.' });
+    const [rows] = await pool.query(
+      'SELECT c.statut, c.montant, c.devise, c.fournisseur, c.created_at, c.paid_at, f.numero AS facture_numero, COALESCE(u.entreprise_nom, u.nom) AS entreprise_nom FROM pro_invoice_checkouts c JOIN factures f ON f.id = c.facture_id AND f.user_id = c.user_id JOIN users u ON u.id = c.user_id WHERE c.reference_interne = ? LIMIT 1',
+      [reference]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Session de paiement introuvable.' });
+    res.set('Cache-Control', 'no-store');
+    res.json({ checkout: rows[0] });
+  } catch (err) { next(err); }
+});
+
 router.post('/wave', async (req, res) => {
   const body = req.body || {};
   const data = body.data || {};
