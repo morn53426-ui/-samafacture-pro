@@ -517,9 +517,10 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   }));
   assert.deepEqual(unread, { badgeHidden: false, badge: '1', message: true },
     'Un événement reçu doit alimenter la liste et le compteur non lu.');
-  await page.click('#workspace-notification-toggle');
+  await page.click('#workspace-notification-toggle'); // fermer le panneau après réception
+  await page.click('#workspace-notification-toggle'); // le rouvrir pour consulter l’événement
   assert.equal(await page.$eval('#workspace-notification-badge', element => element.hidden), true,
-    'L’ouverture du panneau doit marquer les notifications consultées comme lues.');
+    'La réouverture du panneau doit marquer les notifications consultées comme lues.');
   await page.click('#workspace-notification-toggle');
   await page.click('.app-notification-clear');
   assert.equal(await page.$eval('#workspace-notification-list', element => element.textContent.trim()),
