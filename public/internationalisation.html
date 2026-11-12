@@ -34,7 +34,12 @@ function fillSelect(id,values,labels={}){
 function refreshPreview(){
   const locale=$('langue').value==='en'?'en-US':'fr-FR';
   const currency=$('devise').value||'FCFA';
-  $('sample-date').textContent=new Intl.DateTimeFormat(locale).format(new Date(2026,10,12));
+  const format=$('format_date').value||'dd/MM/yyyy';
+  const timeZone=$('fuseau_horaire').value||'UTC';
+  const sample=new Date(Date.UTC(2026,10,12,12,0,0));
+  const options={year:'numeric',month:'2-digit',day:'2-digit',timeZone};
+  const dateLocale=format==='yyyy-MM-dd'?'en-CA':format==='MM/dd/yyyy'?'en-US':'en-GB';
+  $('sample-date').textContent=new Intl.DateTimeFormat(dateLocale,options).format(sample);
   $('sample-money').textContent=(1250000).toLocaleString(locale,{maximumFractionDigits:2})+' '+currency;
 }
 async function load(){
@@ -49,7 +54,7 @@ async function load(){
   Object.keys(p).forEach(key=>{if($(key))$(key).value=p[key];});
   refreshPreview();
 }
-$('langue').addEventListener('change',refreshPreview);$('devise').addEventListener('change',refreshPreview);
+['langue','devise','format_date','fuseau_horaire'].forEach(id=>$(id).addEventListener('change',refreshPreview));
 $('save-localization').addEventListener('click',async()=>{
   const button=$('save-localization');button.disabled=true;
   try{
