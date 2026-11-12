@@ -1795,6 +1795,19 @@ router.put('/localization', async (req, res, next) => {
       return res.status(400).json({ error: 'Un paramètre pays, langue, devise, fuseau horaire ou fiscalité est invalide.' });
     }
     const locale = language + '-' + country;
+    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
+    const currentCurrency = String(company?.devise || 'FCFA').toUpperCase();
+    if (currency !== currentCurrency) {
+      const [[history]] = await pool.query(
+        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements',
+        [owner(req), owner(req), owner(req)]
+      );
+      if (Number(history.factures) + Number(history.depenses) + Number(history.paiements) > 0) {
+        return res.status(409).json({
+          error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents ou de mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
+        });
+      }
+    }
     await pool.query(
       'UPDATE users SET pays_code = ?, langue = ?, locale = ?, devise = ?, fuseau_horaire = ?, format_date = ?, regime_fiscal = ? WHERE id = ?',
       [country, language, locale, currency, timezone, dateFormat, taxRegime, owner(req)]
