@@ -144,6 +144,23 @@ test('internationalisation : devises, langue, fuseau et format de date sont vali
   assert.notEqual(secondTenant.body.parametres.devise, 'USD', 'les paramètres d’entreprise ne doivent pas fuiter');
 });
 
+test('seuil minimum de stock : la fiche produit conserve le seuil utilisable par les alertes', async () => {
+  const created = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Produit seuil phases 5-7', prix_ht: 1000, prix_achat: 500, stock: 2, stock_minimum: 5 });
+  assert.equal(created.status, 201, created.text);
+  assert.equal(Number(created.body.produit.stock_minimum), 5);
+
+  const updated = await request(app).put('/api/produits/' + created.body.produit.id)
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ stock_minimum: 3 });
+  assert.equal(updated.status, 200, updated.text);
+  assert.equal(Number(updated.body.produit.stock_minimum), 3);
+
+  const [[stored]] = await pool.query('SELECT stock_minimum FROM produits WHERE id = ? AND user_id = ?', [created.body.produit.id, userA]);
+  assert.equal(Number(stored.stock_minimum), 3);
+});
+
 test('automatisations : créer, lister, désactiver et supprimer les règles autorisées', async () => {
   const rules = [
     { type: 'relance_impayes_email', nom: 'Relance impayés test', configuration: { jours_retard: 10, frequence_jours: 5 } },
