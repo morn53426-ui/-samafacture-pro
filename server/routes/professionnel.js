@@ -1122,6 +1122,12 @@ router.post('/purchase-orders', async (req, res, next) => {
   let conn;
   try {
     const uid = owner(req), supplierId = Number(req.body.fournisseur_id), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
+    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [uid]);
+    const companyCurrency = String(company?.devise || 'FCFA').toUpperCase();
+    const orderCurrency = String(req.body.devise || companyCurrency).toUpperCase();
+    const supportedCurrencies = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
+    if (!supportedCurrencies.includes(orderCurrency)) return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
+    if (orderCurrency !== companyCurrency) return res.status(409).json({ error: 'La devise de la commande doit correspondre à la devise de base de l’entreprise. Les conversions ne sont pas encore activées.' });
     if (!idOk(supplierId) || !lines.length || lines.length > 100) return res.status(400).json({ error: 'Fournisseur et 1 à 100 lignes obligatoires.' });
     const [[supplier]] = await pool.query('SELECT id FROM pro_fournisseurs WHERE id = ? AND user_id = ? AND actif = 1', [supplierId, uid]);
     if (!supplier) return res.status(400).json({ error: 'Fournisseur inconnu ou inactif.' });
@@ -1151,7 +1157,7 @@ router.post('/purchase-orders', async (req, res, next) => {
     await conn.beginTransaction();
     const [created] = await conn.query(
       "INSERT INTO pro_commandes_fournisseurs (user_id, fournisseur_id, numero, statut, date_commande, date_livraison_prevue, devise, total_ht, total_tva, total_ttc, notes) VALUES (?, ?, ?, 'confirmee', ?, ?, ?, ?, ?, ?, ?)",
-      [uid, supplierId, numero, safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, String(req.body.devise || 'XOF').slice(0, 10), totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
+      [uid, supplierId, numero, safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, orderCurrency, totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
     );
     for (const line of normalized) {
       await conn.query(
@@ -1323,7 +1329,8 @@ router.get('/inventory/valuation', async (req, res, next) => {
       [owner(req)]
     );
     const total = rows.reduce((sum, row) => sum + Number(row.valeur), 0);
-    res.json({ valorisation: rows, valeur_totale: Math.round(total * 100) / 100, devise: 'XOF' });
+    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
+    res.json({ valorisation: rows, valeur_totale: Math.round(total * 100) / 100, devise: company?.devise || 'FCFA' });
   } catch (err) { next(err); }
 });
 
