@@ -306,7 +306,10 @@
     { icon: 'bar-chart', text: 'Résume mes ventes du mois' },
     { icon: 'clock', text: 'Quels clients sont en retard de paiement ?' },
     { icon: 'mail', text: 'Rédige une relance de facture impayée' },
-    { icon: 'package', text: 'Ajoute un nouveau produit au catalogue' }
+    { icon: 'package', text: 'Ajoute un nouveau produit au catalogue' },
+    { icon: 'calendar-clock', text: 'Analyse les créances attendues sur 30 jours' },
+    { icon: 'alert-triangle', text: 'Quels produits sont sous leur seuil de stock ?' },
+    { icon: 'users', text: 'Quels clients n’ont pas commandé depuis 90 jours ?' }
   ];
 
   let conversations = [];
@@ -344,11 +347,11 @@
 
   function renderSuggestions() {
     const box = document.getElementById('ia-suggestions');
-    box.innerHTML = SUGGESTIONS.map(s => `<button type="button" class="ia-chip" onclick="useSuggestion(this)">${escapeHtml(s)}</button>`).join('');
+    box.innerHTML = SUGGESTIONS.map(s => '<button type="button" class="ia-chip" onclick="useSuggestion(this)">' + Icon(s.icon) + ' ' + escapeHtml(s.text) + '</button>').join('');
   }
 
   function useSuggestion(btn) {
-    const text = btn.textContent.replace(/^\S+\s/, ''); // retire l'emoji devant
+    const text = btn.textContent.trim();
     const input = document.getElementById('ia-input');
     input.value = text;
     input.focus();

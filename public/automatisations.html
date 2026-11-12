@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr"><head>
+<script src="js/theme.js"></script><script src="js/icons.js"></script><script src="js/tooltip.js"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Automatisations — SamaFacture Pro</title><meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0F1B33">
+<style>.automation-row{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:16px 0;border-bottom:1px solid var(--line)}.automation-row:last-child{border:0}.automation-actions{display:flex;gap:8px;flex-wrap:wrap}@media(max-width:620px){.automation-row{flex-direction:column}}</style>
+</head><body><div class="app-shell"><div id="sidebar-root"></div><main class="main-content">
+<div class="page-header"><div><div class="pro-eyebrow">RÈGLES MÉTIER AUTOMATIQUES</div><h1>Automatisations</h1><p>Programmez des relances de factures, des rappels de devis et des alertes internes de stock.</p></div><button id="refresh" class="btn btn-outline">Actualiser</button></div>
+<section class="card" style="max-width:850px;margin-bottom:18px">
+<h2 style="margin-top:0">Créer une automatisation</h2>
+<form id="automation-form">
+<div class="grid grid-2">
+  <div class="field"><label for="type">Scénario</label><select id="type"><option value="relance_impayes_email">Relancer les factures impayées par email</option><option value="relance_devis_email">Rappeler les devis proches de l’expiration</option><option value="alerte_stock_email">Alerter l’entreprise sur les stocks faibles</option></select></div>
+  <div class="field"><label for="nom">Nom de la règle *</label><input id="nom" required maxlength="150" placeholder="Ex. Suivi hebdomadaire des impayés"></div>
+</div>
+<div id="config-arrears" class="grid grid-2">
+  <div class="field"><label for="jours-retard">Déclencher après (jours de retard)</label><input id="jours-retard" type="number" min="1" max="120" value="7"></div>
+  <div class="field"><label for="frequence">Répéter tous les (jours)</label><input id="frequence" type="number" min="1" max="90" value="7"></div>
+</div>
+<div id="config-quotes" class="grid grid-2" hidden>
+  <div class="field"><label for="jours-validite">Rappel avant expiration (jours)</label><input id="jours-validite" type="number" min="0" max="30" value="5"></div>
+  <div class="field"><label for="frequence-devis">Fréquence de vérification (jours)</label><input id="frequence-devis" type="number" min="1" max="90" value="3"></div>
+</div>
+<div id="config-stock" class="field" hidden><label for="frequence-stock">Fréquence de contrôle (jours)</label><input id="frequence-stock" type="number" min="1" max="30" value="1"><p class="pro-note">Les seuils sont définis produit par produit dans Achats & stocks. Le système n’alerte pas sur les produits dont le seuil minimum est égal à zéro.</p></div>
+<button class="btn btn-primary" type="submit">Créer la règle</button>
+</form>
+</section>
+<section class="card" style="max-width:850px">
+<div class="page-header" style="margin-bottom:12px"><div><h2 style="margin:0">Mes automatisations</h2><p>Le moteur vérifie les règles environ toutes les heures.</p></div></div>
+<div id="automation-list"><p class="pro-muted">Chargement…</p></div>
+</section>
+<section class="card" style="max-width:850px;margin-top:18px">
+<h3 style="margin-top:0">Conditions et limites</h3>
+<ul>
+<li>Les emails nécessitent la configuration SMTP du serveur.</li>
+<li>Les rappels de devis ne ciblent que les devis non décidés dont l’échéance approche.</li>
+<li>Les alertes de stock sont envoyées à l’adresse de l’entreprise, jamais aux clients.</li>
+<li>WhatsApp automatique et campagnes marketing autonomes ne sont pas activés.</li>
+</ul>
+</section>
+</main></div>
+<script src="js/api.js"></script><script src="js/pwa.js"></script><script src="js/sidebar.js"></script>
+<script>
+requireAuthPage();renderSidebar('automatisations');
+const $=id=>document.getElementById(id);
+function configVisibility(){
+  const type=$('type').value;
+  $('config-arrears').hidden=type!=='relance_impayes_email';
+  $('config-quotes').hidden=type!=='relance_devis_email';
+  $('config-stock').hidden=type!=='alerte_stock_email';
+}
+$('type').addEventListener('change',configVisibility);configVisibility();
+const labels={relance_impayes_email:'Relance impayés email',relance_devis_email:'Rappel de devis',alerte_stock_email:'Alerte de stock'};
+function render(rows){
+  $('automation-list').innerHTML=(rows||[]).map(a=>{
+    const cfg=a.configuration||{};
+    let detail=labels[a.type]||a.type;
+    if(a.type==='relance_impayes_email')detail+=' · '+Number(cfg.jours_retard||7)+' jours de retard · répétition '+Number(cfg.frequence_jours||7)+' j';
+    if(a.type==='relance_devis_email')detail+=' · '+Number(cfg.jours_avant_expiration||5)+' jours avant échéance';
+    if(a.type==='alerte_stock_email')detail+=' · Seuils définis sur les produits';
+    return '<div class="automation-row"><div><strong>'+escapeHtml(a.nom)+'</strong><p class="pro-muted">'+escapeHtml(detail)+'</p><small>Dernière exécution : '+(a.derniere_execution?formatDate(a.derniere_execution):'Jamais')+' · Prochaine : '+(a.prochaine_execution?formatDate(a.prochaine_execution):'Désactivée')+' · Résultat : '+escapeHtml(a.dernier_resultat||'—')+'</small></div><div class="automation-actions"><button class="btn btn-sm '+(a.actif?'btn-outline':'btn-primary')+'" data-toggle="'+a.id+'" data-active="'+(a.actif?0:1)+'">'+(a.actif?'Désactiver':'Activer')+'</button><button class="btn btn-sm btn-danger" data-delete="'+a.id+'">Supprimer</button></div></div>';
+  }).join('')||'<p class="pro-muted">Aucune automatisation. Créez votre première règle ci-dessus.</p>';
+  $('automation-list').querySelectorAll('[data-toggle]').forEach(b=>b.addEventListener('click',async()=>{try{await Api.put('/pro/automations/'+b.dataset.toggle,{actif:b.dataset.active==='1'});await load();}catch(e){showToast(e.message,'error');}}));
+  $('automation-list').querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',async()=>{if(!confirm('Supprimer définitivement cette règle ?'))return;try{await Api.del('/pro/automations/'+b.dataset.delete);await load();}catch(e){showToast(e.message,'error');}}));
+}
+async function load(){const data=await Api.get('/pro/automations');render(data.automatisations||[]);}
+$('automation-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const type=$('type').value;
+  const configuration=type==='relance_impayes_email'
+    ? {jours_retard:Number($('jours-retard').value),frequence_jours:Number($('frequence').value)}
+    : type==='relance_devis_email'
+      ? {jours_avant_expiration:Number($('jours-validite').value),frequence_jours:Number($('frequence-devis').value)}
+      : {frequence_jours:Number($('frequence-stock').value)};
+  try{await Api.post('/pro/automations',{type,nom:$('nom').value,configuration});$('nom').value='';await load();showToast('Automatisation créée.','success');}
+  catch(err){showToast(err.message,'error');}
+});
+$('refresh').addEventListener('click',()=>load().catch(e=>showFatalError(e.message)));
+load().catch(err=>showFatalError(err.message));
+</script></body></html>

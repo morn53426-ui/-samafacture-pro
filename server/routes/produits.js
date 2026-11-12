@@ -92,13 +92,13 @@ router.get('/', async (req, res, next) => {
  */
 router.post('/', async (req, res, next) => {
   try {
-    const { nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image } = req.body;
+    const { nom, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
     if (!nom) return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
 
     const [result] = await pool.query(
-      `INSERT INTO produits (user_id, nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.tenantId, nom, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), nonNegativeQuantity(stock), categorie || null, description || null, image || null]
+      `INSERT INTO produits (user_id, nom, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.tenantId, nom, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), nonNegativeQuantity(stock), nonNegativeQuantity(stock_minimum), categorie || null, description || null, image || null]
     );
 
     await initialiserStockEntrepotPrincipal(pool, req.tenantId, result.insertId, nonNegativeQuantity(stock));
@@ -133,7 +133,7 @@ router.put('/:id', async (req, res, next) => {
     const existing = existingRows[0];
     if (!existing) { await conn.rollback(); return res.status(404).json({ error: 'Produit introuvable.' }); }
 
-    const { nom, reference, prix_ht, prix_achat, tva, stock, categorie, description, image } = req.body;
+    const { nom, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
     if (nom !== undefined && !nom) {
       await conn.rollback();
       return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
@@ -174,13 +174,14 @@ router.put('/:id', async (req, res, next) => {
     }
 
     await conn.query(
-      'UPDATE produits SET nom=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, categorie=?, description=?, image=? WHERE id = ? AND user_id = ?',
+      'UPDATE produits SET nom=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, stock_minimum=?, categorie=?, description=?, image=? WHERE id = ? AND user_id = ?',
       [
         nom ?? existing.nom, reference ?? existing.reference,
         prix_ht !== undefined ? positiveNumber(prix_ht, existing.prix_ht) : existing.prix_ht,
         prix_achat !== undefined ? positiveNumber(prix_achat, existing.prix_achat) : existing.prix_achat,
         tva !== undefined ? percentage(tva, existing.tva) : existing.tva,
         nextStock,
+        stock_minimum !== undefined ? nonNegativeQuantity(stock_minimum, existing.stock_minimum) : existing.stock_minimum,
         categorie ?? existing.categorie, description ?? existing.description, image ?? existing.image,
         existing.id, req.tenantId
       ]

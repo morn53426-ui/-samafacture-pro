@@ -4,7 +4,7 @@ const QRCode = require('qrcode');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission, ROLE_PERMISSIONS } = require('../middleware/tenant');
-const { sendMail } = require('../config/mailer');
+const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { encryptSecret, decryptSecret } = require('../utils/pro-webhooks');
 const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydunya } = require('../config/payments');
 const net = require('net');
@@ -564,7 +564,7 @@ router.get('/team', async (req, res, next) => {
 router.post('/team/roles', async (req, res, next) => {
   try {
     const nom = String(req.body.nom || '').trim().slice(0, 100);
-    const allowed = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','purchasing.read','purchasing.write','inventory.read','inventory.write','accounting.read','accounting.write','audit.read'];
+    const allowed = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','purchasing.read','purchasing.write','inventory.read','inventory.write','accounting.read','accounting.write','crm.read','crm.write','localization.read','localization.write','audit.read'];
     const permissions = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions.filter(p => allowed.includes(p)))] : [];
     if (!nom || !permissions.length) return res.status(400).json({ error: 'Nom et au moins une permission valide obligatoires.' });
     const [result] = await pool.query('INSERT INTO pro_team_roles (user_id, nom, permissions_json) VALUES (?, ?, ?)', [owner(req), nom, JSON.stringify(permissions)]);
@@ -580,7 +580,7 @@ router.post('/team/invitations', async (req, res, next) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const role = String(req.body.role || 'employe').trim();
     const allowedRoles = ['administrateur','manager','comptable','commercial','caissier','employe','lecture_seule'];
-    const allowedPermissions = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','purchasing.read','purchasing.write','inventory.read','inventory.write','accounting.read','accounting.write','audit.read'];
+    const allowedPermissions = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','purchasing.read','purchasing.write','inventory.read','inventory.write','accounting.read','accounting.write','crm.read','crm.write','localization.read','localization.write','audit.read'];
     let permissions = ROLE_PERMISSIONS[role];
     if (role === 'personnalise') permissions = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions.filter(p => allowedPermissions.includes(p)))] : [];
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (!allowedRoles.includes(role) && role !== 'personnalise')) return res.status(400).json({ error: 'Adresse email ou rôle invalide.' });
@@ -733,15 +733,36 @@ router.get('/automations', async (req, res, next) => {
 router.post('/automations', async (req, res, next) => {
   try {
     const type = String(req.body.type || '');
-    const allowed = ['relance_impayes_email','relance_impayes_whatsapp'];
+    const allowed = ['relance_impayes_email','relance_impayes_whatsapp','relance_devis_email','alerte_stock_email'];
     const nom = String(req.body.nom || '').trim().slice(0, 150);
     const config = req.body.configuration && typeof req.body.configuration === 'object' ? req.body.configuration : {};
     if (!allowed.includes(type) || !nom) return res.status(400).json({ error: 'Type ou nom d’automatisation invalide.' });
-    if (type === 'relance_impayes_whatsapp') return res.status(501).json({ error: 'L’envoi WhatsApp automatique exige un fournisseur WhatsApp Business configuré. Le lien de relance manuelle reste disponible.' });
-    const jours = Math.min(120, Math.max(1, Number(config.jours_retard || 7)));
-    const frequence = Math.min(90, Math.max(1, Number(config.frequence_jours || 7)));
-    const normalized = { jours_retard: jours, frequence_jours: frequence, canal: 'email' };
-    const [result] = await pool.query('INSERT INTO pro_automations (user_id, type, nom, configuration_json, prochaine_execution) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))', [owner(req), type, nom, JSON.stringify(normalized)]);
+    if (type === 'relance_impayes_whatsapp') return res.status(501).json({ error: 'L’envoi WhatsApp automatique exige un fournisseur WhatsApp Business configuré. Le canal email reste disponible.' });
+
+    let normalized;
+    if (type === 'relance_impayes_email') {
+      normalized = {
+        jours_retard: Math.min(120, Math.max(1, Number(config.jours_retard) || 7)),
+        frequence_jours: Math.min(90, Math.max(1, Number(config.frequence_jours) || 7)),
+        canal: 'email'
+      };
+    } else if (type === 'relance_devis_email') {
+      normalized = {
+        jours_avant_expiration: Math.min(30, Math.max(0, Number(config.jours_avant_expiration ?? 5))),
+        frequence_jours: Math.min(90, Math.max(1, Number(config.frequence_jours) || 3)),
+        canal: 'email'
+      };
+    } else {
+      normalized = {
+        frequence_jours: Math.min(30, Math.max(1, Number(config.frequence_jours) || 1)),
+        canal: 'email',
+        utiliser_seuils_produits: true
+      };
+    }
+    const [result] = await pool.query(
+      'INSERT INTO pro_automations (user_id, type, nom, configuration_json, prochaine_execution) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))',
+      [owner(req), type, nom, JSON.stringify(normalized)]
+    );
     await audit(req, 'automatisation.creee', 'automatisation', result.insertId, { type, configuration: normalized });
     res.status(201).json({ id: result.insertId, type, prochaine_execution: 'dans environ une heure' });
   } catch (err) { next(err); }
@@ -1101,6 +1122,12 @@ router.post('/purchase-orders', async (req, res, next) => {
   let conn;
   try {
     const uid = owner(req), supplierId = Number(req.body.fournisseur_id), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
+    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [uid]);
+    const companyCurrency = String(company?.devise || 'FCFA').toUpperCase();
+    const orderCurrency = String(req.body.devise || companyCurrency).toUpperCase();
+    const supportedCurrencies = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
+    if (!supportedCurrencies.includes(orderCurrency)) return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
+    if (orderCurrency !== companyCurrency) return res.status(409).json({ error: 'La devise de la commande doit correspondre à la devise de base de l’entreprise. Les conversions ne sont pas encore activées.' });
     if (!idOk(supplierId) || !lines.length || lines.length > 100) return res.status(400).json({ error: 'Fournisseur et 1 à 100 lignes obligatoires.' });
     const [[supplier]] = await pool.query('SELECT id FROM pro_fournisseurs WHERE id = ? AND user_id = ? AND actif = 1', [supplierId, uid]);
     if (!supplier) return res.status(400).json({ error: 'Fournisseur inconnu ou inactif.' });
@@ -1130,7 +1157,7 @@ router.post('/purchase-orders', async (req, res, next) => {
     await conn.beginTransaction();
     const [created] = await conn.query(
       "INSERT INTO pro_commandes_fournisseurs (user_id, fournisseur_id, numero, statut, date_commande, date_livraison_prevue, devise, total_ht, total_tva, total_ttc, notes) VALUES (?, ?, ?, 'confirmee', ?, ?, ?, ?, ?, ?, ?)",
-      [uid, supplierId, numero, safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, String(req.body.devise || 'XOF').slice(0, 10), totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
+      [uid, supplierId, numero, safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, orderCurrency, totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
     );
     for (const line of normalized) {
       await conn.query(
@@ -1302,7 +1329,8 @@ router.get('/inventory/valuation', async (req, res, next) => {
       [owner(req)]
     );
     const total = rows.reduce((sum, row) => sum + Number(row.valeur), 0);
-    res.json({ valorisation: rows, valeur_totale: Math.round(total * 100) / 100, devise: 'XOF' });
+    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
+    res.json({ valorisation: rows, valeur_totale: Math.round(total * 100) / 100, devise: company?.devise || 'FCFA' });
   } catch (err) { next(err); }
 });
 
@@ -1549,6 +1577,255 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
       { code: '571', libelle: 'Règlement dépense', debit: 0, credit: amount }
     ]);
     res.status(result.duplicate ? 200 : 201).json(result);
+  } catch (err) { next(err); }
+});
+
+
+/* ----------------------- PORTAIL CLIENT & CRM -------------------------- */
+function htmlEscape(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+router.get('/clients/:id/portal', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [clients] = await pool.query('SELECT id, nom, email FROM clients WHERE id = ? AND user_id = ?', [req.params.id, uid]);
+    if (!clients.length) return res.status(404).json({ error: 'Client introuvable.' });
+    const [rows] = await pool.query(
+      'SELECT id, expires_at, last_access_at, created_at FROM pro_customer_portal_access WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+      [uid, req.params.id]
+    );
+    res.json({ client: clients[0], portail_actif: !!rows.length, acces: rows[0] || null });
+  } catch (err) { next(err); }
+});
+
+router.post('/clients/:id/portal', async (req, res, next) => {
+  const conn = await pool.getConnection();
+  try {
+    const uid = owner(req);
+    await conn.beginTransaction();
+    const [clients] = await conn.query('SELECT id, nom, email FROM clients WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
+    const client = clients[0];
+    if (!client) { await conn.rollback(); return res.status(404).json({ error: 'Client introuvable.' }); }
+    if (!client.email) { await conn.rollback(); return res.status(400).json({ error: 'Ajoutez une adresse email au client avant de lui envoyer son portail.' }); }
+    const baseUrl = String(process.env.APP_URL || '').replace(/\/$/, '');
+    if (!baseUrl || !/^https:\/\//i.test(baseUrl)) {
+      if (process.env.NODE_ENV === 'production') {
+        await conn.rollback();
+        return res.status(503).json({ error: 'APP_URL doit être une URL HTTPS publique avant de partager un portail client.' });
+      }
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 30 * 86400000);
+    await conn.query(
+      'UPDATE pro_customer_portal_access SET revoked_at = NOW() WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL',
+      [uid, client.id]
+    );
+    const [created] = await conn.query(
+      'INSERT INTO pro_customer_portal_access (user_id, client_id, token_hash, expires_at) VALUES (?, ?, ?, ?)',
+      [uid, client.id, hash, expiresAt]
+    );
+    const [[company]] = await conn.query('SELECT entreprise_nom FROM users WHERE id = ?', [uid]);
+    await conn.commit();
+
+    const url = baseUrl + '/portail-client.html#token=' + token;
+    // Ne jamais écrire le lien secret dans les logs quand le SMTP est absent.
+    // Le lien est remis à l'utilisateur uniquement dans la réponse HTTP (une seule fois).
+    const smtpReady = isSmtpConfigured();
+    let mail = { sent: false };
+    let mailFailure = false;
+    if (smtpReady) {
+      try {
+        mail = await sendMail({
+          to: client.email,
+          subject: 'Votre espace client sécurisé — ' + (company.entreprise_nom || 'SamaFacture Pro'),
+          text: 'Bonjour ' + client.nom + ',\\n\\nVotre entreprise ' + (company.entreprise_nom || '') +
+            ' vous donne accès à un espace sécurisé pour consulter vos factures, devis et paiements :\\n' +
+            url + '\\n\\nCe lien est personnel, valable 30 jours et peut être révoqué par l’entreprise. Ne le transférez pas.\\n',
+          html: '<p>Bonjour ' + htmlEscape(client.nom) + ',</p><p>Votre espace client sécurisé est prêt.</p><p><a href="' +
+            htmlEscape(url) + '">Consulter mes factures et devis</a></p><p>Ce lien est personnel, valable 30 jours et révocable.</p>'
+        });
+      } catch (mailError) {
+        mailFailure = true;
+        console.warn('Invitation portail client non envoyée :', mailError.message);
+      }
+    }
+    await audit(req, 'portail.client_invite', 'client', client.id, { access_id: created.insertId, email: client.email });
+    res.status(201).json({
+      success: true, email: client.email, sent: !!mail.sent, url,
+      expires_at: expiresAt.toISOString(),
+      warning: mail.sent ? 'Invitation envoyée. Le lien ne sera plus réaffiché.' : (mailFailure ? 'L’envoi email a échoué. Le lien est affiché une seule fois pour copie manuelle.' : (!smtpReady ? 'SMTP non configuré : lien affiché une seule fois pour copie manuelle.' : 'L’envoi email n’a pas été confirmé. Le lien est affiché une seule fois pour copie manuelle.'))
+    });
+  } catch (err) {
+    try { await conn.rollback(); } catch (_) {}
+    next(err);
+  } finally { conn.release(); }
+});
+
+router.delete('/clients/:id/portal', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [result] = await pool.query(
+      'UPDATE pro_customer_portal_access SET revoked_at = NOW() WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL',
+      [uid, req.params.id]
+    );
+    await audit(req, 'portail.client_revoque', 'client', req.params.id, { acces_revoques: result.affectedRows });
+    res.json({ success: true, acces_revoques: result.affectedRows });
+  } catch (err) { next(err); }
+});
+
+router.get('/crm/overview', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [[stats]] = await pool.query(
+      `SELECT COUNT(*) AS total_activites,
+        SUM(CASE WHEN statut = 'a_faire' THEN 1 ELSE 0 END) AS taches_ouvertes,
+        SUM(CASE WHEN statut = 'a_faire' AND due_at IS NOT NULL AND due_at < NOW() THEN 1 ELSE 0 END) AS taches_en_retard
+       FROM pro_crm_activities WHERE user_id = ?`,
+      [uid]
+    );
+    const [upcoming] = await pool.query(
+      `SELECT a.id, a.client_id, c.nom AS client_nom, a.type, a.titre, a.due_at, a.statut
+       FROM pro_crm_activities a JOIN clients c ON c.id = a.client_id AND c.user_id = a.user_id
+       WHERE a.user_id = ? AND a.statut = 'a_faire'
+       ORDER BY a.due_at IS NULL, a.due_at ASC, a.id DESC LIMIT 20`,
+      [uid]
+    );
+    res.json({ statistiques: stats, prochaines_taches: upcoming });
+  } catch (err) { next(err); }
+});
+
+router.get('/crm/activities', async (req, res, next) => {
+  try {
+    const uid = owner(req), params = [uid];
+    let where = 'a.user_id = ?';
+    if (req.query.client_id) { where += ' AND a.client_id = ?'; params.push(Number(req.query.client_id)); }
+    if (req.query.statut && ['a_faire','terminee','annulee'].includes(req.query.statut)) { where += ' AND a.statut = ?'; params.push(req.query.statut); }
+    const limit = Math.min(300, Math.max(1, Number(req.query.limite) || 100));
+    const [rows] = await pool.query(
+      `SELECT a.id, a.client_id, c.nom AS client_nom, a.acteur_user_id, a.type, a.titre,
+              a.description, a.statut, a.due_at, a.completed_at, a.created_at, a.updated_at
+       FROM pro_crm_activities a JOIN clients c ON c.id = a.client_id AND c.user_id = a.user_id
+       WHERE ${where} ORDER BY COALESCE(a.due_at, a.created_at) DESC, a.id DESC LIMIT ?`,
+      [...params, limit]
+    );
+    res.json({ activites: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/crm/activities', async (req, res, next) => {
+  try {
+    const uid = owner(req), clientId = Number(req.body.client_id);
+    const types = ['note','appel','reunion','email','tache','relance'];
+    const type = String(req.body.type || 'note');
+    const titre = String(req.body.titre || '').trim().slice(0, 190);
+    const description = optionalText(req.body.description, 10000);
+    const dueAt = req.body.due_at ? new Date(req.body.due_at) : null;
+    if (!idOk(clientId) || !types.includes(type) || !titre || (dueAt && Number.isNaN(dueAt.getTime()))) {
+      return res.status(400).json({ error: 'Client, type, titre et date de rappel valide sont requis.' });
+    }
+    const [clients] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [clientId, uid]);
+    if (!clients.length) return res.status(404).json({ error: 'Client introuvable dans cette entreprise.' });
+    const statut = type === 'tache' || dueAt ? 'a_faire' : 'terminee';
+    const [result] = await pool.query(
+      'INSERT INTO pro_crm_activities (user_id, client_id, acteur_user_id, type, titre, description, statut, due_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [uid, clientId, actor(req), type, titre, description, statut, dueAt, statut === 'terminee' ? new Date() : null]
+    );
+    await audit(req, 'crm.activite_creee', 'client', clientId, { activite_id: result.insertId, type });
+    res.status(201).json({ id: result.insertId, client_id: clientId, type, titre, statut });
+  } catch (err) { next(err); }
+});
+
+router.put('/crm/activities/:id', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const [rows] = await pool.query('SELECT id, statut FROM pro_crm_activities WHERE id = ? AND user_id = ?', [req.params.id, uid]);
+    if (!rows.length) return res.status(404).json({ error: 'Activité CRM introuvable.' });
+    const current = rows[0], status = req.body.statut;
+    if (status !== undefined && !['a_faire','terminee','annulee'].includes(status)) return res.status(400).json({ error: 'Statut CRM invalide.' });
+    const title = req.body.titre === undefined ? null : String(req.body.titre).trim().slice(0, 190);
+    if (title !== null && !title) return res.status(400).json({ error: 'Le titre ne peut pas être vide.' });
+    const dueAt = req.body.due_at === undefined ? null : (req.body.due_at ? new Date(req.body.due_at) : null);
+    if (dueAt && Number.isNaN(dueAt.getTime())) return res.status(400).json({ error: 'Date de rappel invalide.' });
+    await pool.query(
+      `UPDATE pro_crm_activities SET
+       titre = COALESCE(?, titre),
+       description = CASE WHEN ? = 1 THEN ? ELSE description END,
+       statut = COALESCE(?, statut),
+       completed_at = CASE WHEN COALESCE(?, statut) = 'terminee' THEN COALESCE(completed_at, NOW()) WHEN COALESCE(?, statut) <> 'terminee' THEN NULL ELSE completed_at END,
+       due_at = CASE WHEN ? = 1 THEN ? ELSE due_at END
+       WHERE id = ? AND user_id = ?`,
+      [title, req.body.description !== undefined ? 1 : 0, optionalText(req.body.description,10000),
+       status || null, status || null, status || null,
+       req.body.due_at !== undefined ? 1 : 0, dueAt,
+       req.params.id, uid]
+    );
+    await audit(req, 'crm.activite_modifiee', 'activite', req.params.id, { statut: status || current.statut });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+/* ---------------------- PARAMÈTRES INTERNATIONAUX ---------------------- */
+const SUPPORTED_CURRENCIES = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
+const SUPPORTED_COUNTRIES = ['SN','CI','ML','BF','BJ','TG','NE','GN','CM','GA','TD','CG','CD','FR','BE','CH','US','GB','CA','MA'];
+const SUPPORTED_TIMEZONES = [
+  'Africa/Dakar','Africa/Abidjan','Africa/Bamako','Africa/Ouagadougou','Africa/Porto-Novo',
+  'Africa/Lome','Africa/Niamey','Africa/Conakry','Africa/Douala','Africa/Libreville',
+  'Africa/Ndjamena','Africa/Brazzaville','Africa/Kinshasa','Europe/Paris','Europe/Brussels',
+  'Europe/Zurich','Europe/London','America/New_York','America/Toronto','UTC'
+];
+
+router.get('/localization', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT pays_code, langue, locale, devise, fuseau_horaire, format_date, regime_fiscal FROM users WHERE id = ?',
+      [owner(req)]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Entreprise introuvable.' });
+    res.json({
+      parametres: rows[0],
+      options: { pays: SUPPORTED_COUNTRIES, langues: ['fr','en'], devises: SUPPORTED_CURRENCIES, fuseaux: SUPPORTED_TIMEZONES, formats_date: ['dd/MM/yyyy','yyyy-MM-dd','MM/dd/yyyy'], regimes_fiscaux: ['standard','simplifie','franchise','autre'] }
+    });
+  } catch (err) { next(err); }
+});
+
+router.put('/localization', async (req, res, next) => {
+  try {
+    const country = String(req.body.pays_code || 'SN').toUpperCase();
+    const language = String(req.body.langue || 'fr').toLowerCase();
+    const currency = String(req.body.devise || 'FCFA').toUpperCase();
+    const timezone = String(req.body.fuseau_horaire || 'Africa/Dakar');
+    const dateFormat = String(req.body.format_date || 'dd/MM/yyyy');
+    const taxRegime = String(req.body.regime_fiscal || 'standard');
+    if (!SUPPORTED_COUNTRIES.includes(country) || !['fr','en'].includes(language) ||
+        !SUPPORTED_CURRENCIES.includes(currency) || !SUPPORTED_TIMEZONES.includes(timezone) ||
+        !['dd/MM/yyyy','yyyy-MM-dd','MM/dd/yyyy'].includes(dateFormat) ||
+        !['standard','simplifie','franchise','autre'].includes(taxRegime)) {
+      return res.status(400).json({ error: 'Un paramètre pays, langue, devise, fuseau horaire ou fiscalité est invalide.' });
+    }
+    const locale = language + '-' + country;
+    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
+    const currentCurrency = String(company?.devise || 'FCFA').toUpperCase();
+    if (currency !== currentCurrency) {
+      const [[history]] = await pool.query(
+        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
+        [owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req)]
+      );
+      if (Number(history.factures) + Number(history.depenses) + Number(history.paiements) + Number(history.achats) + Number(history.mouvements_stock) + Number(history.ecritures) + Number(history.produits) + Number(history.modeles_recurrents) > 0) {
+        return res.status(409).json({
+          error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents, produits tarifés, modèles récurrents ou mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
+        });
+      }
+    }
+    await pool.query(
+      'UPDATE users SET pays_code = ?, langue = ?, locale = ?, devise = ?, fuseau_horaire = ?, format_date = ?, regime_fiscal = ? WHERE id = ?',
+      [country, language, locale, currency, timezone, dateFormat, taxRegime, owner(req)]
+    );
+    await audit(req, 'entreprise.localisation_modifiee', 'entreprise', owner(req), { country, language, currency, timezone, dateFormat, taxRegime });
+    res.json({ success: true, parametres: { pays_code: country, langue: language, locale, devise: currency, fuseau_horaire: timezone, format_date: dateFormat, regime_fiscal: taxRegime } });
   } catch (err) { next(err); }
 });
 

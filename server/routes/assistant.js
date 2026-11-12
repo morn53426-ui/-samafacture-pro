@@ -2,9 +2,16 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant } = require('../middleware/tenant');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, (req, res, next) => {
+  const permissions = req.permissions || [];
+  const canReadFinancialData = permissions.includes('*') ||
+    (permissions.includes('reports.read') && permissions.includes('invoices.read') && permissions.includes('clients.read'));
+  if (!canReadFinancialData) return res.status(403).json({ error: 'Votre rôle ne permet pas de consulter les analyses financières de cette entreprise.' });
+  next();
+});
 
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 const MAX_HISTORIQUE = 20; // nombre de messages précédents rechargés dans le contexte, pour borner le coût par appel
@@ -14,7 +21,7 @@ function isConfigured() {
   return !!process.env.ANTHROPIC_API_KEY;
 }
 
-// Chaque appel d'outil ci-dessous reçoit `userId` directement depuis req.user.id (jamais
+// Chaque appel d'outil ci-dessous reçoit `userId` directement depuis req.tenantId (jamais
 // depuis les paramètres fournis par le modèle) : c'est ce qui garantit qu'une conversation
 // ne peut jamais faire fuiter les données d'un autre utilisateur, quoi que le modèle "demande".
 const TOOLS = [
@@ -44,16 +51,31 @@ const TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: 'prevision_tresorerie',
+    description: "Analyse les créances clients attendues à court terme à partir des dates d’échéance. Ces montants ne sont pas des paiements garantis.",
+    input_schema: { type: 'object', properties: { horizon_jours: { type: 'integer', enum: [7, 30, 60, 90] } }, required: ['horizon_jours'] }
+  },
+  {
+    name: 'alertes_stock',
+    description: "Liste les produits dont le stock atteint ou passe sous le seuil minimum défini par l’entreprise.",
+    input_schema: { type: 'object', properties: { limite: { type: 'integer' } }, required: [] }
+  },
+  {
+    name: 'clients_inactifs',
+    description: "Identifie les clients sans facture récente et leur dernière activité commerciale pour aider au suivi CRM.",
+    input_schema: { type: 'object', properties: { jours_inactivite: { type: 'integer', enum: [30, 60, 90, 180] }, limite: { type: 'integer' } }, required: ['jours_inactivite'] }
   }
 ];
 
 async function execFacturesEnRetard(userId) {
   const [rows] = await pool.query(
-    `SELECT f.numero, f.date_echeance, f.total, c.nom as client,
+    `SELECT f.numero, f.date_echeance, f.total, (f.total - f.montant_paye) AS solde_restant, c.nom as client,
             DATEDIFF(CURDATE(), f.date_echeance) as jours_retard
      FROM factures f JOIN clients c ON c.id = f.client_id
      WHERE f.user_id = ? AND f.type = 'facture' AND f.statut IN ('en_attente', 'en_retard')
-       AND f.date_echeance IS NOT NULL AND f.date_echeance < CURDATE()
+       AND f.date_echeance IS NOT NULL AND f.date_echeance < CURDATE() AND f.total > f.montant_paye
      ORDER BY f.date_echeance ASC
      LIMIT 30`,
     [userId]
@@ -75,7 +97,7 @@ async function execResumeVentes(userId, { periode }) {
 
   const [[ventes]] = await pool.query(
     `SELECT COUNT(*) as nb_factures, COALESCE(SUM(total), 0) as chiffre_affaires
-     FROM factures WHERE user_id = ? AND type = 'facture'
+     FROM factures WHERE user_id = ? AND type = 'facture' AND statut <> 'annulee'
        AND date_emission >= ${dateDebut} AND date_emission < ${dateFinSql}`,
     [userId]
   );
@@ -98,11 +120,52 @@ async function execTopClients(userId, { limite }) {
   const [rows] = await pool.query(
     `SELECT c.nom as client, COUNT(*) as nb_factures, COALESCE(SUM(f.total), 0) as total
      FROM factures f JOIN clients c ON c.id = f.client_id
-     WHERE f.user_id = ? AND f.type = 'facture'
+     WHERE f.user_id = ? AND f.type = 'facture' AND f.statut <> 'annulee'
      GROUP BY c.id, c.nom ORDER BY total DESC LIMIT ?`,
     [userId, n]
   );
   return rows;
+}
+
+async function execPrevisionTresorerie(userId, { horizon_jours }) {
+  const horizon = [7, 30, 60, 90].includes(Number(horizon_jours)) ? Number(horizon_jours) : 30;
+  const [[summary]] = await pool.query(
+    "SELECT COALESCE(SUM(CASE WHEN date_echeance < CURDATE() THEN total - montant_paye ELSE 0 END),0) AS deja_en_retard, COALESCE(SUM(CASE WHEN date_echeance >= CURDATE() AND date_echeance <= DATE_ADD(CURDATE(), INTERVAL ? DAY) THEN total - montant_paye ELSE 0 END),0) AS attendu_horizon, COUNT(CASE WHEN date_echeance BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY) THEN 1 END) AS nb_echeances FROM factures WHERE user_id = ? AND type = 'facture' AND statut IN ('en_attente','en_retard') AND total > montant_paye AND date_echeance IS NOT NULL",
+    [horizon, horizon, userId]
+  );
+  return {
+    horizon_jours: horizon,
+    creances_en_retard: Number(summary.deja_en_retard),
+    creances_a_echeance: Number(summary.attendu_horizon),
+    nombre_echeances: Number(summary.nb_echeances),
+    avertissement: 'Créances attendues uniquement : elles ne constituent pas une prévision de trésorerie garantie et ne tiennent pas compte des décaissements futurs.'
+  };
+}
+
+async function execAlertesStock(userId, { limite }) {
+  const n = Math.min(Math.max(Number(limite) || 20, 1), 100);
+  const [rows] = await pool.query(
+    'SELECT nom, reference, stock, stock_minimum, prix_achat FROM produits WHERE user_id = ? AND stock_minimum > 0 AND stock <= stock_minimum ORDER BY (stock_minimum-stock) DESC, nom ASC LIMIT ?',
+    [userId, n]
+  );
+  return rows.map(row => ({
+    produit: row.nom,
+    reference: row.reference,
+    stock_actuel: Number(row.stock),
+    seuil_minimum: Number(row.stock_minimum),
+    quantite_a_reapprovisionner: Math.max(0, Number(row.stock_minimum) - Number(row.stock)),
+    prix_achat: Number(row.prix_achat)
+  }));
+}
+
+async function execClientsInactifs(userId, { jours_inactivite, limite }) {
+  const days = [30, 60, 90, 180].includes(Number(jours_inactivite)) ? Number(jours_inactivite) : 60;
+  const n = Math.min(Math.max(Number(limite) || 20, 1), 100);
+  const [rows] = await pool.query(
+    "SELECT c.nom AS client, c.email, MAX(f.date_emission) AS derniere_facture, COALESCE(SUM(CASE WHEN f.type = 'facture' AND f.statut <> 'annulee' THEN f.total - f.montant_paye ELSE 0 END),0) AS solde_du, DATEDIFF(CURDATE(), COALESCE(MAX(f.date_emission), c.created_at)) AS jours_sans_activite FROM clients c LEFT JOIN factures f ON f.client_id = c.id AND f.user_id = c.user_id WHERE c.user_id = ? GROUP BY c.id, c.nom, c.email, c.created_at HAVING jours_sans_activite >= ? ORDER BY derniere_facture ASC LIMIT ?",
+    [userId, days, n]
+  );
+  return rows.map(row => ({ ...row, solde_du: Number(row.solde_du), jours_sans_activite: Number(row.jours_sans_activite) }));
 }
 
 async function executerOutil(name, input, userId) {
@@ -110,19 +173,29 @@ async function executerOutil(name, input, userId) {
     case 'factures_en_retard': return execFacturesEnRetard(userId);
     case 'resume_ventes': return execResumeVentes(userId, input || {});
     case 'top_clients': return execTopClients(userId, input || {});
+    case 'prevision_tresorerie': return execPrevisionTresorerie(userId, input || {});
+    case 'alertes_stock': return execAlertesStock(userId, input || {});
+    case 'clients_inactifs': return execClientsInactifs(userId, input || {});
     default: return { error: `Outil inconnu : ${name}` };
   }
 }
 
-function systemPrompt(nomEntreprise) {
-  return `Tu es l'Assistant Comptable de SamaFacture Pro, une application de facturation pour les commerçants, artisans et PME d'Afrique de l'Ouest. Tu aides l'utilisateur de l'entreprise "${nomEntreprise || 'cette entreprise'}" à comprendre ses finances, à obtenir des conseils pratiques et à rédiger des messages de relance.
-
-Règles importantes :
-- Réponds toujours en français, de façon concise et actionnable.
-- Les montants sont en Francs CFA (FCFA).
-- Utilise les outils fournis pour obtenir les vrais chiffres de l'entreprise avant de répondre à toute question sur ses factures, ventes ou clients — ne devine jamais un montant.
-- Tu n'es ni comptable agréé ni conseiller fiscal : pour toute question de fiscalité ou de droit des affaires, invite l'utilisateur à consulter un professionnel plutôt que de donner une réponse définitive.
-- Pour une relance de facture impayée, reste courtois et professionnel, jamais menaçant.`;
+function systemPrompt(company) {
+  const name = typeof company === 'string' ? company : company?.entreprise_nom;
+  const currency = typeof company === 'object' && company?.devise ? company.devise : 'FCFA';
+  const language = typeof company === 'object' && company?.langue === 'en' ? 'anglais' : 'français';
+  return [
+    'Tu es l’Assistant de gestion de SamaFacture Pro pour l’entreprise "' + (name || 'cette entreprise') + '".',
+    '',
+    'Règles importantes :',
+    '- Réponds en ' + language + ', de façon concise, structurée et actionnable.',
+    '- La devise configurée de l’entreprise est ' + currency + ' ; ne convertis pas une devise sans taux de change fiable.',
+    '- Utilise les outils pour obtenir les vrais chiffres avant toute analyse ; ne fabrique jamais un montant.',
+    '- Distingue les factures payées des créances attendues. Une échéance attendue n’est pas une garantie d’encaissement.',
+    '- Les recommandations IA sont une aide à la décision : elles ne déclenchent jamais de paiement, remboursement, commande ou email client sans action explicite d’un utilisateur.',
+    '- Tu n’es ni expert-comptable ni conseiller fiscal : les obligations officielles doivent être validées par un professionnel habilité.',
+    '- Les emails et messages de relance doivent rester courtois et professionnels.'
+  ].join('\n');
 }
 
 async function appelerClaude(messages, system) {
@@ -155,7 +228,7 @@ const assistantLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => String(req.user?.id || req.ip),
+  keyGenerator: (req) => String(req.tenantId || req.user?.id || req.ip),
   message: { error: "Trop de messages envoyés à l'assistant en peu de temps. Réessayez dans quelques minutes." }
 });
 
@@ -176,7 +249,7 @@ router.get('/conversations', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       'SELECT id, titre, updated_at FROM assistant_conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50',
-      [req.user.id]
+      [req.tenantId]
     );
     res.json({ conversations: rows });
   } catch (err) { next(err); }
@@ -209,7 +282,7 @@ router.get('/conversations/:id', async (req, res, next) => {
   try {
     const [convRows] = await pool.query(
       'SELECT id, titre FROM assistant_conversations WHERE id = ? AND user_id = ?',
-      [req.params.id, req.user.id]
+      [req.params.id, req.tenantId]
     );
     if (!convRows.length) return res.status(404).json({ error: 'Conversation introuvable.' });
 
@@ -240,7 +313,7 @@ router.delete('/conversations/:id', async (req, res, next) => {
   try {
     const [result] = await pool.query(
       'DELETE FROM assistant_conversations WHERE id = ? AND user_id = ?',
-      [req.params.id, req.user.id]
+      [req.params.id, req.tenantId]
     );
     if (!result.affectedRows) return res.status(404).json({ error: 'Conversation introuvable.' });
     res.json({ ok: true });
@@ -290,14 +363,14 @@ router.post('/message', assistantLimiter, async (req, res, next) => {
     if (conversationId) {
       const [rows] = await pool.query(
         'SELECT id FROM assistant_conversations WHERE id = ? AND user_id = ?',
-        [conversationId, req.user.id]
+        [conversationId, req.tenantId]
       );
       if (!rows.length) return res.status(404).json({ error: 'Conversation introuvable.' });
     } else {
       const titre = texte.slice(0, 60);
       const [result] = await pool.query(
         'INSERT INTO assistant_conversations (user_id, titre) VALUES (?, ?)',
-        [req.user.id, titre]
+        [req.tenantId, titre]
       );
       conversationId = result.insertId;
     }
@@ -313,8 +386,8 @@ router.post('/message', assistantLimiter, async (req, res, next) => {
     );
     historique.reverse();
 
-    const [[user]] = await pool.query('SELECT entreprise_nom FROM users WHERE id = ?', [req.user.id]);
-    const system = systemPrompt(user?.entreprise_nom);
+    const [[user]] = await pool.query('SELECT entreprise_nom, devise, langue, locale FROM users WHERE id = ?', [req.tenantId]);
+    const system = systemPrompt(user || {});
 
     let messages = historique.map(m => ({ role: m.role, content: m.contenu }));
     let reponseTexte = '';
@@ -333,7 +406,7 @@ router.post('/message', assistantLimiter, async (req, res, next) => {
       for (const tu of toolUses) {
         let resultat;
         try {
-          resultat = await executerOutil(tu.name, tu.input, req.user.id);
+          resultat = await executerOutil(tu.name, tu.input, req.tenantId);
         } catch (err) {
           resultat = { error: err.message };
         }

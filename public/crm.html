@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr"><head>
+<script src="js/theme.js"></script><script src="js/icons.js"></script><script src="js/tooltip.js"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>CRM & suivi client — SamaFacture Pro</title><meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0F1B33">
+<style>
+.crm-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.72fr);gap:18px}
+.crm-stat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.crm-task{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.crm-task:last-child{border-bottom:0}.crm-task small{display:block;color:var(--ink-soft);margin-top:4px}
+.portal-link-box{padding:12px;background:var(--cream);border:1px solid var(--line);border-radius:12px;overflow-wrap:anywhere}
+@media(max-width:850px){.crm-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.crm-stat{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app-shell"><div id="sidebar-root"></div><main class="main-content">
+<div class="page-header"><div><div class="pro-eyebrow">RELATION CLIENT & ACTIVITÉS</div><h1>CRM & suivi client</h1><p>Consignez les échanges, planifiez les rappels et partagez un espace sécurisé avec vos clients.</p></div><button class="btn btn-outline" id="refresh-crm">Actualiser</button></div>
+<section class="crm-stat">
+  <article class="card stat-card"><div class="stat-label">Activités enregistrées</div><div class="stat-value" id="stat-activities">—</div></article>
+  <article class="card stat-card"><div class="stat-label">Tâches ouvertes</div><div class="stat-value" id="stat-open">—</div></article>
+  <article class="card stat-card"><div class="stat-label">Tâches en retard</div><div class="stat-value" id="stat-late">—</div></article>
+</section>
+<div class="crm-grid">
+<section class="card">
+  <h2 style="margin-top:0">Nouvelle activité ou tâche</h2>
+  <form id="activity-form">
+    <div class="field"><label for="client_id">Client *</label><select id="client_id" required></select></div>
+    <div class="grid grid-2">
+      <div class="field"><label for="type">Type</label><select id="type"><option value="note">Note</option><option value="appel">Appel</option><option value="reunion">Réunion</option><option value="email">Email</option><option value="tache">Tâche</option><option value="relance">Relance</option></select></div>
+      <div class="field"><label for="due_at">Date de rappel (facultative)</label><input id="due_at" type="datetime-local"></div>
+    </div>
+    <div class="field"><label for="titre">Titre *</label><input id="titre" maxlength="190" required placeholder="Ex. Appeler pour valider le devis"></div>
+    <div class="field"><label for="description">Compte rendu / détails</label><textarea id="description" rows="3" maxlength="10000"></textarea></div>
+    <button class="btn btn-primary" type="submit">Enregistrer l’activité</button>
+  </form>
+  <div class="divider" style="margin:20px 0"></div>
+  <h2>Historique des activités</h2>
+  <div class="field"><label for="filter-client">Filtrer par client</label><select id="filter-client"><option value="">Tous les clients</option></select></div>
+  <div id="activities-list" class="pro-list"><p class="pro-muted">Chargement…</p></div>
+</section>
+<aside style="display:flex;flex-direction:column;gap:18px">
+  <section class="card">
+    <h2 style="margin-top:0">Portail client sécurisé</h2>
+    <p class="pro-muted">Envoyez un lien personnel valable 30 jours. Le client pourra consulter ses factures et devis, puis répondre aux devis. Vous pouvez révoquer le lien à tout moment.</p>
+    <div class="field"><label for="portal-client">Client</label><select id="portal-client"></select></div>
+    <div id="portal-current" class="pro-list"><p class="pro-muted">Sélectionnez un client.</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn btn-primary" id="create-portal" type="button">Créer / renouveler le lien</button>
+      <button class="btn btn-outline" id="revoke-portal" type="button">Révoquer</button>
+    </div>
+    <div id="portal-result" style="margin-top:12px" aria-live="polite"></div>
+  </section>
+  <section class="card">
+    <h2 style="margin-top:0">Prochaines tâches</h2>
+    <div id="upcoming-list" class="pro-list"></div>
+  </section>
+</aside>
+</div>
+</main></div>
+<script src="js/api.js"></script><script src="js/pwa.js"></script><script src="js/sidebar.js"></script>
+<script>
+requireAuthPage();renderSidebar('crm');
+const $=id=>document.getElementById(id);
+let clients=[];
+const esc=value=>String(value==null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+function fillClientOptions(){
+  const opts=clients.map(c=>'<option value="'+c.id+'">'+esc(c.nom)+'</option>').join('');
+  $('client_id').innerHTML=opts;$('filter-client').innerHTML='<option value="">Tous les clients</option>'+opts;$('portal-client').innerHTML=opts;
+}
+function formatWhen(value){return value?formatDate(value):'Sans échéance';}
+async function loadActivities(){
+  const qs=$('filter-client').value?'?client_id='+encodeURIComponent($('filter-client').value):'';
+  const data=await Api.get('/pro/crm/activities'+qs);
+  $('activities-list').innerHTML=(data.activites||[]).map(a=>'<div class="crm-task"><div><strong>'+esc(a.titre)+'</strong><small>'+esc(a.client_nom)+' · '+esc(a.type)+' · '+formatWhen(a.due_at)+'</small><p class="pro-muted">'+esc(a.description||'')+'</p></div><div><span class="badge">'+esc(a.statut)+'</span>'+(a.statut==='a_faire'?'<button class="btn btn-sm btn-outline" type="button" data-complete="'+a.id+'">Terminer</button>':'')+'</div></div>').join('')||'<p class="pro-muted">Aucune activité pour ce filtre.</p>';
+  $('activities-list').querySelectorAll('[data-complete]').forEach(b=>b.addEventListener('click',async()=>{await Api.put('/pro/crm/activities/'+b.dataset.complete,{statut:'terminee'});await loadAll();}));
+}
+async function loadPortal(){
+  const id=$('portal-client').value;if(!id){$('portal-current').textContent='Sélectionnez un client.';return;}
+  const data=await Api.get('/pro/clients/'+id+'/portal');
+  $('portal-current').innerHTML=data.portail_actif
+    ? '<div class="pro-list-row"><strong>Portail actif</strong><span>Expire le '+formatDate(data.acces.expires_at)+'</span></div>'
+    : '<p class="pro-muted">Aucun lien actif pour ce client.</p>';
+}
+async function loadAll(){
+  const [cl,overview]=await Promise.all([Api.get('/clients?limite=100'),Api.get('/pro/crm/overview')]);
+  clients=cl.clients||[];fillClientOptions();
+  const s=overview.statistiques||{};
+  $('stat-activities').textContent=Number(s.total_activites||0);
+  $('stat-open').textContent=Number(s.taches_ouvertes||0);
+  $('stat-late').textContent=Number(s.taches_en_retard||0);
+  $('upcoming-list').innerHTML=(overview.prochaines_taches||[]).map(t=>'<div class="crm-task"><div><strong>'+esc(t.titre)+'</strong><small>'+esc(t.client_nom)+' · '+formatWhen(t.due_at)+'</small></div><span class="badge">À faire</span></div>').join('')||'<p class="pro-muted">Aucune tâche en attente.</p>';
+  await Promise.all([loadActivities(),loadPortal()]);
+}
+$('activity-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  try{
+    const payload={client_id:Number($('client_id').value),type:$('type').value,titre:$('titre').value,description:$('description').value,due_at:$('due_at').value?new Date($('due_at').value).toISOString():null};
+    await Api.post('/pro/crm/activities',payload);e.target.reset();await loadAll();showToast('Activité enregistrée.','success');
+  }catch(err){showToast(err.message,'error');}
+});
+$('filter-client').addEventListener('change',()=>loadActivities().catch(e=>showToast(e.message,'error')));
+$('portal-client').addEventListener('change',()=>loadPortal().catch(e=>showToast(e.message,'error')));
+$('create-portal').addEventListener('click',async()=>{
+  const id=$('portal-client').value;if(!id)return;
+  try{
+    const result=await Api.post('/pro/clients/'+id+'/portal',{});
+    $('portal-result').innerHTML='<div class="portal-link-box"><strong>'+(result.sent?'Invitation envoyée':'Lien prêt à copier')+'</strong><p>'+esc(result.warning)+'</p><input id="portal-once-url" readonly value="'+esc(result.url)+'" style="width:100%"><button class="btn btn-sm btn-outline" id="copy-portal" type="button">Copier le lien</button></div>';
+    $('copy-portal').addEventListener('click',async()=>{
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(result.url);
+        else { $('portal-once-url').select(); document.execCommand('copy'); }
+        showToast('Lien copié.','success');
+      } catch (_) { $('portal-once-url').focus(); $('portal-once-url').select(); showToast('Sélectionnez le lien puis copiez-le.','info'); }
+    });
+    await loadPortal();
+  }catch(err){showToast(err.message,'error');}
+});
+$('revoke-portal').addEventListener('click',async()=>{
+  const id=$('portal-client').value;if(!id)return;
+  try{await Api.del('/pro/clients/'+id+'/portal');$('portal-result').textContent='Accès révoqué.';await loadPortal();}
+  catch(err){showToast(err.message,'error');}
+});
+$('refresh-crm').addEventListener('click',()=>loadAll().catch(e=>showFatalError(e.message)));
+loadAll().catch(err=>showFatalError(err.message));
+</script></body></html>

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr"><head>
+<script src="js/theme.js"></script><script src="js/icons.js"></script><script src="js/tooltip.js"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Internationalisation — SamaFacture Pro</title><meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0F1B33">
+</head><body><div class="app-shell"><div id="sidebar-root"></div><main class="main-content">
+<div class="page-header"><div><div class="pro-eyebrow">PARAMÈTRES DE L’ENTREPRISE</div><h1>Internationalisation</h1><p>Définissez le pays, la langue, la devise, le fuseau horaire et les formats utilisés dans l’application.</p></div></div>
+<section class="card" style="max-width:880px">
+  <div class="grid grid-2">
+    <div class="field"><label for="pays_code">Pays de l’entreprise</label><select id="pays_code"></select></div>
+    <div class="field"><label for="langue">Langue préférée (assistant et formats)</label><select id="langue"><option value="fr">Français</option><option value="en">English</option></select></div>
+    <div class="field"><label for="devise">Devise par défaut des nouveaux documents</label><select id="devise"></select></div>
+    <div class="field"><label for="fuseau_horaire">Fuseau horaire</label><select id="fuseau_horaire"></select></div>
+    <div class="field"><label for="format_date">Format de date</label><select id="format_date"></select></div>
+    <div class="field"><label for="regime_fiscal">Régime fiscal (paramètre indicatif)</label><select id="regime_fiscal"></select></div>
+  </div>
+  <div class="pro-note" style="margin:18px 0">La devise est verrouillée après l’enregistrement d’un document, d’un produit tarifé, d’un modèle récurrent ou d’un mouvement financier afin d’éviter de mélanger des montants non convertis. Les anciens documents conservent leur devise d’origine. Le changement de devise nécessite un processus de migration comptable. Les paramètres fiscaux ne calculent ni ne certifient les taxes : les règles locales doivent être configurées et validées par un professionnel habilité.</div>
+  <div style="display:flex;justify-content:flex-end"><button id="save-localization" class="btn btn-primary" type="button">Enregistrer les paramètres</button></div>
+  <div id="localization-status" aria-live="polite" class="pro-list" style="margin-top:14px"></div>
+</section>
+<section class="card" style="max-width:880px;margin-top:18px">
+  <h2>Formats appliqués dans l’application</h2>
+  <div class="grid grid-2"><div><span class="pro-muted">Exemple de date</span><strong id="sample-date">—</strong></div><div><span class="pro-muted">Exemple de montant</span><strong id="sample-money">—</strong></div></div>
+</section>
+</main></div>
+<script src="js/api.js"></script><script src="js/pwa.js"></script><script src="js/sidebar.js"></script>
+<script>
+requireAuthPage();renderSidebar('internationalisation');
+const $=id=>document.getElementById(id);
+let options={};
+function fillSelect(id,values,labels={}){
+  $(id).innerHTML=(values||[]).map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(labels[v]||v)+'</option>').join('');
+}
+function refreshPreview(){
+  const locale=$('langue').value==='en'?'en-US':'fr-FR';
+  const currency=$('devise').value||'FCFA';
+  const format=$('format_date').value||'dd/MM/yyyy';
+  const timeZone=$('fuseau_horaire').value||'UTC';
+  const sample=new Date(Date.UTC(2026,10,12,12,0,0));
+  const options={year:'numeric',month:'2-digit',day:'2-digit',timeZone};
+  const dateLocale=format==='yyyy-MM-dd'?'en-CA':format==='MM/dd/yyyy'?'en-US':'en-GB';
+  $('sample-date').textContent=new Intl.DateTimeFormat(dateLocale,options).format(sample);
+  $('sample-money').textContent=(1250000).toLocaleString(locale,{maximumFractionDigits:2})+' '+currency;
+}
+async function load(){
+  const data=await Api.get('/pro/localization');
+  options=data.options||{};
+  fillSelect('pays_code',options.pays||[]);
+  fillSelect('devise',options.devises||[]);
+  fillSelect('fuseau_horaire',options.fuseaux||[]);
+  fillSelect('format_date',options.formats_date||[]);
+  fillSelect('regime_fiscal',options.regimes_fiscaux||[],{standard:'Standard',simplifie:'Régime simplifié',franchise:'Franchise',autre:'Autre'});
+  const p=data.parametres||{};
+  Object.keys(p).forEach(key=>{if($(key))$(key).value=p[key];});
+  refreshPreview();
+}
+['langue','devise','format_date','fuseau_horaire'].forEach(id=>$(id).addEventListener('change',refreshPreview));
+$('save-localization').addEventListener('click',async()=>{
+  const button=$('save-localization');button.disabled=true;
+  try{
+    const payload={pays_code:$('pays_code').value,langue:$('langue').value,devise:$('devise').value,fuseau_horaire:$('fuseau_horaire').value,format_date:$('format_date').value,regime_fiscal:$('regime_fiscal').value};
+    const data=await Api.put('/pro/localization',payload);
+    const user=Api.currentUser()||{};
+    Object.assign(user,payload,{locale:data.parametres.locale});
+    localStorage.setItem('sf_user',JSON.stringify(user));
+    $('localization-status').innerHTML='<p class="success-box">Paramètres enregistrés. La devise des prochains documents et les formats de l’interface ont été actualisés.</p>';
+    refreshPreview();
+  }catch(err){$('localization-status').innerHTML='<p class="error-box">'+escapeHtml(err.message)+'</p>';}
+  finally{button.disabled=false;}
+});
+load().catch(err=>showFatalError(err.message));
+</script></body></html>
