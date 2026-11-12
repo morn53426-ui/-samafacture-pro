@@ -272,7 +272,7 @@ function fixtureFor(pathname, fixtures) {
       { id: 2, client_id: 2, client_nom: 'Client secondaire', type: 'appel', titre: 'Confirmer la réception du document', description: 'Note courte.', statut: 'terminee', due_at: null, created_at: '2026-11-11 16:00:00' }
     ]
   };
-  if (/^\\/api\\/pro\\/clients\\/\\d+\\/portal$/.test(pathname)) return {
+  if (pathname.startsWith('/api/pro/clients/') && pathname.endsWith('/portal')) return {
     client: fixtures.clients[0] || { id: 1, nom: 'Client recette', email: 'client@example.test' },
     portail_actif: false,
     acces: null
