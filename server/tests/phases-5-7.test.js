@@ -144,6 +144,42 @@ test('internationalisation : devise, langue, fuseau et formats sont propres à c
   assert.equal(secondTenant.body.parametres.devise, 'FCFA', 'les paramètres d’entreprise ne doivent pas fuiter');
 });
 
+test('assistant IA : conversations et analyses respectent l’entreprise sélectionnée', async () => {
+  const [created] = await pool.query(
+    'INSERT INTO assistant_conversations (user_id, titre) VALUES (?, ?)',
+    [userA, 'Conversation privée entreprise A']
+  );
+  const ownerView = await request(app).get('/api/assistant/conversations')
+    .set('Authorization', 'Bearer ' + tokenA);
+  assert.equal(ownerView.status, 200, ownerView.text);
+  assert.ok(ownerView.body.conversations.some(row => Number(row.id) === Number(created.insertId)));
+
+  const foreignView = await request(app).get('/api/assistant/conversations')
+    .set('Authorization', 'Bearer ' + tokenB);
+  assert.equal(foreignView.status, 200, foreignView.text);
+  assert.equal(foreignView.body.conversations.some(row => Number(row.id) === Number(created.insertId)), false);
+});
+
+test('automation stock : sans SMTP, aucune alerte n’est déclarée envoyée', async () => {
+  const product = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Stock sans SMTP', prix_ht: 500, prix_achat: 200, stock: 1, stock_minimum: 3 });
+  assert.equal(product.status, 201, product.text);
+
+  const created = await request(app).post('/api/pro/automations')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ type: 'alerte_stock_email', nom: 'Test SMTP absent', configuration: { frequence_jours: 1 } });
+  assert.equal(created.status, 201, created.text);
+  await pool.query('UPDATE pro_automations SET prochaine_execution = NOW() WHERE id = ? AND user_id = ?', [created.body.id, userA]);
+
+  const { executerRelancesAutomatiques } = require('../config/scheduler');
+  await executerRelancesAutomatiques();
+  const [[automation]] = await pool.query('SELECT dernier_resultat FROM pro_automations WHERE id = ? AND user_id = ?', [created.body.id, userA]);
+  assert.equal(automation.dernier_resultat, 'smtp_non_configure');
+  const [[runs]] = await pool.query('SELECT COUNT(*) AS total FROM pro_automation_runs WHERE automation_id = ?', [created.body.id]);
+  assert.equal(Number(runs.total), 0, 'un email non envoyé ne doit pas être enregistré comme livré');
+});
+
 test('seuil minimum de stock : la fiche produit conserve le seuil utilisable par les alertes', async () => {
   const created = await request(app).post('/api/produits')
     .set('Authorization', 'Bearer ' + tokenA)
