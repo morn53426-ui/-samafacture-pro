@@ -276,6 +276,42 @@ async function verifyPage(browser, baseUrl, pageDefinition, viewport, fixtures, 
   assert.deepEqual(pageErrors, [],
     pageDefinition.name + ' a généré des erreurs JavaScript: ' + pageErrors.join(' | '));
 
+  let responsiveContent = null;
+  if (viewport.width <= 640 && DATASET !== 'empty' &&
+      (pageDefinition.name === 'clients' || pageDefinition.name === 'produits')) {
+    responsiveContent = await page.evaluate((pageName) => {
+      const isClients = pageName === 'clients';
+      const row = document.querySelector(isClients
+        ? '#clients-body tr:not(.row-skeleton)'
+        : '#produits-body tr:not(.row-skeleton)');
+      if (!row) return { found: false };
+      const name = row.querySelector(isClients ? '.client-name' : '.product-name');
+      const style = name ? getComputedStyle(name) : null;
+      return {
+        found: Boolean(name),
+        clientWidth: name ? name.clientWidth : 0,
+        scrollWidth: name ? name.scrollWidth : 0,
+        height: name ? name.getBoundingClientRect().height : 0,
+        lineHeight: style ? parseFloat(style.lineHeight) : 0,
+        labels: Array.from(row.querySelectorAll(':scope > td')).map((cell) => cell.dataset.label || '')
+      };
+    }, pageDefinition.name);
+    assert.equal(responsiveContent.found, true,
+      pageDefinition.name + ' doit exposer le libellé principal dans la vue mobile.');
+    assert.ok(responsiveContent.clientWidth > 0 &&
+      responsiveContent.scrollWidth <= responsiveContent.clientWidth + 1,
+      pageDefinition.name + ' : le libellé long est coupé à ' + viewport.width + 'px : ' +
+      JSON.stringify(responsiveContent));
+    assert.ok(responsiveContent.labels.every(Boolean),
+      pageDefinition.name + ' : chaque cellule de la carte mobile doit avoir son libellé : ' +
+      JSON.stringify(responsiveContent.labels));
+    if (DATASET === 'worst') {
+      assert.ok(responsiveContent.height > responsiveContent.lineHeight * 1.4,
+        pageDefinition.name + ' : le texte extrême doit passer sur plusieurs lignes : ' +
+        JSON.stringify(responsiveContent));
+    }
+  }
+
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
   await page.screenshot({
     path: path.join(screenshots, filename),
