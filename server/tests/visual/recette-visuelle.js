@@ -25,7 +25,11 @@ const PAGES = [
   { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'], responsiveTable: '#table-body' },
   { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
   { name: 'parametres', file: 'parametres.html', ready: '#entreprise_nom' },
-  { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' }
+  { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' },
+  { name: 'crm', file: 'crm.html', ready: '#activity-form' },
+  { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
+  { name: 'automatisations', file: 'automatisations.html', ready: '#automation-form' },
+  { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true }
 ];
 
 function makeLong(prefix, length) {
@@ -256,6 +260,51 @@ function fixtureFor(pathname, fixtures) {
       entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro'
     }
   };
+  if (pathname === '/api/pro/crm/overview') return {
+    statistiques: { total_activites: DATASET === 'empty' ? 0 : 18, taches_ouvertes: DATASET === 'empty' ? 0 : 4, taches_en_retard: DATASET === 'empty' ? 0 : 1 },
+    prochaines_taches: DATASET === 'empty' ? [] : [
+      { id: 1, client_id: 1, client_nom: fixtures.clients[0]?.nom || 'Client recette', type: 'appel', titre: 'Rappeler le client après le devis', due_at: '2026-11-20 10:00:00', statut: 'a_faire' }
+    ]
+  };
+  if (pathname === '/api/pro/crm/activities') return {
+    activites: DATASET === 'empty' ? [] : [
+      { id: 1, client_id: 1, client_nom: fixtures.clients[0]?.nom || 'Client recette', type: 'tache', titre: makeLong('Préparer le suivi commercial du grand compte ', 185), description: 'Compte rendu de recette visuelle.', statut: 'a_faire', due_at: '2026-11-20 10:00:00', created_at: '2026-11-12 09:00:00' },
+      { id: 2, client_id: 2, client_nom: 'Client secondaire', type: 'appel', titre: 'Confirmer la réception du document', description: 'Note courte.', statut: 'terminee', due_at: null, created_at: '2026-11-11 16:00:00' }
+    ]
+  };
+  if (/^\\/api\\/pro\\/clients\\/\\d+\\/portal$/.test(pathname)) return {
+    client: fixtures.clients[0] || { id: 1, nom: 'Client recette', email: 'client@example.test' },
+    portail_actif: false,
+    acces: null
+  };
+  if (pathname === '/api/pro/localization') return {
+    parametres: {
+      pays_code: 'SN', langue: 'fr', locale: 'fr-SN', devise: 'FCFA',
+      fuseau_horaire: 'Africa/Dakar', format_date: 'dd/MM/yyyy', regime_fiscal: 'standard'
+    },
+    options: {
+      pays: ['SN','CI','ML','BF','FR','US'],
+      devises: ['FCFA','XOF','XAF','EUR','USD'],
+      fuseaux: ['Africa/Dakar','Africa/Abidjan','Europe/Paris','America/New_York','UTC'],
+      formats_date: ['dd/MM/yyyy','yyyy-MM-dd','MM/dd/yyyy'],
+      regimes_fiscaux: ['standard','simplifie','franchise','autre']
+    }
+  };
+  if (pathname === '/api/pro/automations') return {
+    automatisations: DATASET === 'empty' ? [] : [
+      { id: 1, nom: 'Relance impayés chaque semaine', type: 'relance_impayes_email', actif: true, configuration: { jours_retard: 7, frequence_jours: 7 }, derniere_execution: null, prochaine_execution: '2026-11-13 08:00:00', dernier_resultat: null },
+      { id: 2, nom: 'Alertes de stock faible', type: 'alerte_stock_email', actif: false, configuration: { frequence_jours: 1 }, derniere_execution: '2026-11-11 08:00:00', prochaine_execution: null, dernier_resultat: 'smtp_non_configure' }
+    ]
+  };
+  if (pathname === '/api/portal/') return {
+    client: { nom: fixtures.clients[0]?.nom || 'Client de recette', email: fixtures.clients[0]?.email || 'client@example.test' },
+    entreprise: { nom: 'SamaFacture — Société de test', logo: null, email: 'support@example.test', telephone: '+221 77 000 00 00', site_web: 'https://example.test', devise: 'FCFA', langue: 'fr', locale: 'fr-SN' },
+    resume: { nb_factures: DATASET === 'empty' ? 0 : 3, nb_devis: DATASET === 'empty' ? 0 : 2, solde_du: DATASET === 'empty' ? 0 : 250000 },
+    documents: DATASET === 'empty' ? [] : [
+      { id: 1, numero: 'FAC-2026-0001', type: 'facture', date_emission: '2026-11-10', date_echeance: '2026-11-20', statut: 'en_attente', total: 250000, montant_paye: 50000, solde: 200000, devise: 'FCFA', lignes: [{ designation: 'Prestation de conseil', quantite: 2, prix_unitaire: 125000, tva: 18, total_ligne: 250000 }] },
+      { id: 2, numero: 'DEV-2026-0002', type: 'devis', date_emission: '2026-11-11', date_validite: '2026-12-15', statut: 'en_attente', total: 180000, montant_paye: 0, solde: 180000, devise: 'FCFA', portail_decision: null, lignes: [{ designation: 'Maintenance annuelle', quantite: 1, prix_unitaire: 180000, tva: 18, total_ligne: 180000 }] }
+    ]
+  };
   return {};
 }
 
@@ -339,20 +388,22 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await new Promise((resolve) => setTimeout(resolve, 120));
 
-  const shell = await page.evaluate(() => ({
-    toolbar: Boolean(document.querySelector('.app-topbar')),
-    search: Boolean(document.querySelector('.app-topbar-search input#workspace-search')),
-    notificationBell: Boolean(document.querySelector('#workspace-notification-toggle .ic svg')),
-    notificationPanel: Boolean(document.querySelector('#workspace-notification-panel[hidden]')),
-    sidebar: Boolean(document.querySelector('#app-sidebar')),
-    activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active'))
-  }));
-  assert.equal(shell.toolbar, true, pageDefinition.name + ' doit afficher la barre supérieure commune.');
-  assert.equal(shell.search, true, pageDefinition.name + ' doit afficher la recherche globale.');
-  assert.equal(shell.notificationBell, true, pageDefinition.name + ' doit afficher la cloche de notifications.');
-  assert.equal(shell.notificationPanel, true, pageDefinition.name + ' doit garder le panneau fermé au chargement.');
-  assert.equal(shell.sidebar, true, pageDefinition.name + ' doit afficher la navigation latérale.');
-  assert.equal(shell.activeNavigation, true, pageDefinition.name + ' doit signaler la page active.');
+  if (!pageDefinition.public) {
+    const shell = await page.evaluate(() => ({
+      toolbar: Boolean(document.querySelector('.app-topbar')),
+      search: Boolean(document.querySelector('.app-topbar-search input#workspace-search')),
+      notificationBell: Boolean(document.querySelector('#workspace-notification-toggle .ic svg')),
+      notificationPanel: Boolean(document.querySelector('#workspace-notification-panel[hidden]')),
+      sidebar: Boolean(document.querySelector('#app-sidebar')),
+      activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active'))
+    }));
+    assert.equal(shell.toolbar, true, pageDefinition.name + ' doit afficher la barre supérieure commune.');
+    assert.equal(shell.search, true, pageDefinition.name + ' doit afficher la recherche globale.');
+    assert.equal(shell.notificationBell, true, pageDefinition.name + ' doit afficher la cloche de notifications.');
+    assert.equal(shell.notificationPanel, true, pageDefinition.name + ' doit garder le panneau fermé au chargement.');
+    assert.equal(shell.sidebar, true, pageDefinition.name + ' doit afficher la navigation latérale.');
+    assert.equal(shell.activeNavigation, true, pageDefinition.name + ' doit signaler la page active.');
+  }
 
   const metrics = await page.evaluate(() => ({
     viewport: window.innerWidth,
