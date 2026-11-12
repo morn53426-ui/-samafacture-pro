@@ -152,13 +152,17 @@ function formatDate(iso) {
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(source);
   if (dateOnly) {
     const [year, month, day] = source.split('-').map(Number);
-    // Noon UTC preserves the intended calendar date across all supported timezones.
+    // Noon UTC preserves the intended calendar date across supported timezones.
     date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-    // MySQL DATETIME values are written in UTC; apply the company's chosen timezone only when formatting.
-    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(source) ? source.replace(' ', 'T') + 'Z' : source;
+  } else {
+    // MySQL DATETIME strings are stored in UTC. Safari/iOS does not reliably parse
+    // the space separator, so normalize it and state the UTC offset explicitly.
+    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/.test(source)
+      ? source.replace(' ', 'T') + 'Z'
+      : source;
     date = new Date(normalized);
   }
-  if (Number.isNaN(date.getTime())) return iso;
+  if (!date || Number.isNaN(date.getTime())) return iso;
   if (format === 'yyyy-MM-dd') {
     return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).format(date);
   }
