@@ -1364,18 +1364,24 @@ async function postSystemEntry(uid, actorId, sourceType, sourceId, date, label, 
     }
     await conn.commit();
     return { id: entry.insertId, numero, duplicate: false };
-  } catch (err) { await conn.rollback(); throw err; }
-  finally { conn.release(); }
+  } catch (err) {
+    await conn.rollback();
+    if (err.code === 'ER_DUP_ENTRY') {
+      const [rows] = await pool.query('SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = ? AND source_id = ? LIMIT 1', [uid, sourceType, sourceId]);
+      if (rows.length) return { id: rows[0].id, numero: rows[0].numero, duplicate: true };
+    }
+    throw err;
+  } finally { conn.release(); }
 }
 
 router.get('/accounting/config', async (req, res, next) => {
   try {
     await ensureAccountingDefaults(owner(req));
-    const [[accounts], [journals]] = await Promise.all([
+    const [accountsResult, journalsResult] = await Promise.all([
       pool.query('SELECT id, code, libelle, classe, nature, lettrable, actif FROM pro_compta_comptes WHERE user_id = ? ORDER BY code', [owner(req)]),
       pool.query('SELECT id, code, libelle, type, actif FROM pro_compta_journaux WHERE user_id = ? ORDER BY code', [owner(req)])
     ]);
-    res.json({ comptes: accounts, journaux: journals, standard: 'SYSCOHADA — plan de démarrage à valider avec un expert-comptable local' });
+    res.json({ comptes: accountsResult[0], journaux: journalsResult[0], standard: 'SYSCOHADA — plan de démarrage à valider avec un expert-comptable local' });
   } catch (err) { next(err); }
 });
 
@@ -1442,7 +1448,14 @@ router.get('/accounting/trial-balance', async (req, res, next) => {
     if (from) { filters += ' AND e.date_ecriture >= ?'; params.push(from); }
     if (to) { filters += ' AND e.date_ecriture <= ?'; params.push(to); }
     const [rows] = await pool.query(
-      `SELECT c.id, c.code, c.libelle, c.classe, COALESCE(SUM(l.debit),0) AS total_debit, COALESCE(SUM(l.credit),0) AS total_credit, COALESCE(SUM(l.debit-l.credit),0) AS solde FROM pro_compta_comptes c LEFT JOIN pro_compta_lignes l ON l.compte_id = c.id AND l.user_id = c.user_id LEFT JOIN pro_compta_ecritures e ON e.id = l.ecriture_id AND e.user_id = c.user_id ${filters.replace(' AND e.statut = ?', ' AND e.statut = ?')} WHERE c.user_id = ? GROUP BY c.id ORDER BY c.code`,
+      `SELECT c.id, c.code, c.libelle, c.classe,
+        COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.debit ELSE 0 END),0) AS total_debit,
+        COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.credit ELSE 0 END),0) AS total_credit,
+        COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.debit-l.credit ELSE 0 END),0) AS solde
+       FROM pro_compta_comptes c
+       LEFT JOIN pro_compta_lignes l ON l.compte_id = c.id AND l.user_id = c.user_id
+       LEFT JOIN pro_compta_ecritures e ON e.id = l.ecriture_id AND e.user_id = c.user_id ${filters}
+       WHERE c.user_id = ? GROUP BY c.id ORDER BY c.code`,
       [...params.slice(1), owner(req)]
     );
     const totalDebit = rows.reduce((sum,row)=>sum+Number(row.total_debit),0);
