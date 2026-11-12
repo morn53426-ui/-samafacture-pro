@@ -521,7 +521,6 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   await page.click('#workspace-notification-toggle'); // le rouvrir pour consulter l’événement
   assert.equal(await page.$eval('#workspace-notification-badge', element => element.hidden), true,
     'La réouverture du panneau doit marquer les notifications consultées comme lues.');
-  await page.click('#workspace-notification-toggle');
   await page.click('.app-notification-clear');
   assert.equal(await page.$eval('#workspace-notification-list', element => element.textContent.trim()),
     'Aucune notification reçue pendant cette session.', 'Le bouton Effacer doit vider la liste.');
