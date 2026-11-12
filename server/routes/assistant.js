@@ -2,9 +2,16 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { resolveTenant } = require('../middleware/tenant');
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, resolveTenant, (req, res, next) => {
+  const permissions = req.permissions || [];
+  const canReadFinancialData = permissions.includes('*') ||
+    (permissions.includes('reports.read') && permissions.includes('invoices.read') && permissions.includes('clients.read'));
+  if (!canReadFinancialData) return res.status(403).json({ error: 'Votre rôle ne permet pas de consulter les analyses financières de cette entreprise.' });
+  next();
+});
 
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 const MAX_HISTORIQUE = 20; // nombre de messages précédents rechargés dans le contexte, pour borner le coût par appel
@@ -14,7 +21,7 @@ function isConfigured() {
   return !!process.env.ANTHROPIC_API_KEY;
 }
 
-// Chaque appel d'outil ci-dessous reçoit `userId` directement depuis req.user.id (jamais
+// Chaque appel d'outil ci-dessous reçoit `userId` directement depuis req.tenantId (jamais
 // depuis les paramètres fournis par le modèle) : c'est ce qui garantit qu'une conversation
 // ne peut jamais faire fuiter les données d'un autre utilisateur, quoi que le modèle "demande".
 const TOOLS = [
@@ -221,7 +228,7 @@ const assistantLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => String(req.user?.id || req.ip),
+  keyGenerator: (req) => String(req.tenantId || req.user?.id || req.ip),
   message: { error: "Trop de messages envoyés à l'assistant en peu de temps. Réessayez dans quelques minutes." }
 });
 
@@ -242,7 +249,7 @@ router.get('/conversations', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       'SELECT id, titre, updated_at FROM assistant_conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50',
-      [req.user.id]
+      [req.tenantId]
     );
     res.json({ conversations: rows });
   } catch (err) { next(err); }
@@ -275,7 +282,7 @@ router.get('/conversations/:id', async (req, res, next) => {
   try {
     const [convRows] = await pool.query(
       'SELECT id, titre FROM assistant_conversations WHERE id = ? AND user_id = ?',
-      [req.params.id, req.user.id]
+      [req.params.id, req.tenantId]
     );
     if (!convRows.length) return res.status(404).json({ error: 'Conversation introuvable.' });
 
@@ -306,7 +313,7 @@ router.delete('/conversations/:id', async (req, res, next) => {
   try {
     const [result] = await pool.query(
       'DELETE FROM assistant_conversations WHERE id = ? AND user_id = ?',
-      [req.params.id, req.user.id]
+      [req.params.id, req.tenantId]
     );
     if (!result.affectedRows) return res.status(404).json({ error: 'Conversation introuvable.' });
     res.json({ ok: true });
@@ -356,14 +363,14 @@ router.post('/message', assistantLimiter, async (req, res, next) => {
     if (conversationId) {
       const [rows] = await pool.query(
         'SELECT id FROM assistant_conversations WHERE id = ? AND user_id = ?',
-        [conversationId, req.user.id]
+        [conversationId, req.tenantId]
       );
       if (!rows.length) return res.status(404).json({ error: 'Conversation introuvable.' });
     } else {
       const titre = texte.slice(0, 60);
       const [result] = await pool.query(
         'INSERT INTO assistant_conversations (user_id, titre) VALUES (?, ?)',
-        [req.user.id, titre]
+        [req.tenantId, titre]
       );
       conversationId = result.insertId;
     }
@@ -379,7 +386,7 @@ router.post('/message', assistantLimiter, async (req, res, next) => {
     );
     historique.reverse();
 
-    const [[user]] = await pool.query('SELECT entreprise_nom, devise, langue, locale FROM users WHERE id = ?', [req.user.id]);
+    const [[user]] = await pool.query('SELECT entreprise_nom, devise, langue, locale FROM users WHERE id = ?', [req.tenantId]);
     const system = systemPrompt(user || {});
 
     let messages = historique.map(m => ({ role: m.role, content: m.contenu }));
@@ -399,7 +406,7 @@ router.post('/message', assistantLimiter, async (req, res, next) => {
       for (const tu of toolUses) {
         let resultat;
         try {
-          resultat = await executerOutil(tu.name, tu.input, req.user.id);
+          resultat = await executerOutil(tu.name, tu.input, req.tenantId);
         } catch (err) {
           resultat = { error: err.message };
         }
