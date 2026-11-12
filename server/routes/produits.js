@@ -140,6 +140,7 @@ router.put('/:id', async (req, res, next) => {
     }
 
     let nextStock = stock !== undefined ? nonNegativeQuantity(stock, Number(existing.stock)) : Number(existing.stock);
+    let stockMovement = null;
     const [warehouses] = await conn.query(
       "SELECT id FROM pro_entrepots WHERE user_id = ? AND code = 'PRINCIPAL' LIMIT 1",
       [req.tenantId]
@@ -159,6 +160,7 @@ router.put('/:id', async (req, res, next) => {
       const main = stockRows.find(row => Number(row.entrepot_id) === warehouseId);
       const currentTotal = stockRows.reduce((sum, row) => sum + Number(row.quantite), 0);
       const delta = Math.round((nextStock - currentTotal) * 1000) / 1000;
+      stockMovement = { warehouseId, delta };
       if (!main || Number(main.quantite) + delta < 0) {
         await conn.rollback();
         return res.status(409).json({ error: 'La nouvelle quantité ne peut pas être obtenue en réduisant uniquement le dépôt principal. Utilisez Achats & stocks pour ajuster chaque entrepôt.' });
@@ -183,6 +185,12 @@ router.put('/:id', async (req, res, next) => {
         existing.id, req.tenantId
       ]
     );
+    if (stockMovement && stockMovement.delta !== 0) {
+      await conn.query(
+        "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, motif) VALUES (?, ?, ?, 'ajustement_catalogue', ?, ?, ?)",
+        [req.tenantId, existing.id, stockMovement.warehouseId, stockMovement.delta, Number(prix_achat !== undefined ? positiveNumber(prix_achat, existing.prix_achat) : existing.prix_achat), 'Modification de quantité depuis la fiche produit']
+      );
+    }
     const [rows] = await conn.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     await conn.commit();
     res.json({ produit: rows[0] });
