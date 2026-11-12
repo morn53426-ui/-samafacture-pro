@@ -104,7 +104,13 @@ $('create-portal').addEventListener('click',async()=>{
   try{
     const result=await Api.post('/pro/clients/'+id+'/portal',{});
     $('portal-result').innerHTML='<div class="portal-link-box"><strong>'+(result.sent?'Invitation envoyée':'Lien prêt à copier')+'</strong><p>'+esc(result.warning)+'</p><input id="portal-once-url" readonly value="'+esc(result.url)+'" style="width:100%"><button class="btn btn-sm btn-outline" id="copy-portal" type="button">Copier le lien</button></div>';
-    $('copy-portal').addEventListener('click',()=>GenUI.copy?GenUI.copy(result.url):navigator.clipboard.writeText(result.url));
+    $('copy-portal').addEventListener('click',async()=>{
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(result.url);
+        else { $('portal-once-url').select(); document.execCommand('copy'); }
+        showToast('Lien copié.','success');
+      } catch (_) { $('portal-once-url').focus(); $('portal-once-url').select(); showToast('Sélectionnez le lien puis copiez-le.','info'); }
+    });
     await loadPortal();
   }catch(err){showToast(err.message,'error');}
 });
