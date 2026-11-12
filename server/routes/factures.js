@@ -139,7 +139,7 @@ async function appliquerAjustementsStock(conn, userId, ajustements) {
     [userId]
   );
   const [[warehouse]] = await conn.query(
-    'SELECT id FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1',
+    'SELECT id, nom FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1',
     [userId, 'PRINCIPAL']
   );
   await conn.query(
@@ -162,8 +162,8 @@ async function appliquerAjustementsStock(conn, userId, ajustements) {
       [productId, userId]
     );
     await conn.query(
-      "INSERT INTO pro_mouvements_stock (user_id, produit_id, entrepot_id, type, quantite, cout_unitaire, reference, motif) SELECT ?, p.id, ?, ?, ?, p.prix_achat, CONCAT('FACT-', ?), ? FROM produits p WHERE p.id = ? AND p.user_id = ?",
-      [userId, warehouse.id, delta < 0 ? 'vente' : 'annulation_vente', delta, productId, delta < 0 ? 'Sortie liée à une facture client' : 'Restitution liée à une annulation de facture', productId, userId]
+      "INSERT INTO pro_mouvements_stock (user_id, produit_id, produit_nom, entrepot_id, entrepot_nom, type, quantite, cout_unitaire, reference, motif) SELECT ?, p.id, p.nom, ?, ?, ?, ?, p.prix_achat, CONCAT('PROD-', ?), ? FROM produits p WHERE p.id = ? AND p.user_id = ?",
+      [userId, warehouse.id, warehouse.nom, delta < 0 ? 'vente' : 'annulation_vente', delta, productId, delta < 0 ? 'Sortie liée à une facture client' : 'Restitution liée à une annulation de facture', productId, userId]
     );
   }
 
