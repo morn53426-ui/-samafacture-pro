@@ -188,6 +188,11 @@ test('les achats et réceptions partielles mettent à jour le stock global et le
   const [[afterReceipt]] = await pool.query('SELECT stock FROM produits WHERE id = ? AND user_id = ?', [productId, userId]);
   assert.equal(Number(afterReceipt.stock), 11, 'la réception doit augmenter le stock total après la vente de deux unités');
 
+  const catalogueStock = await request(app).put('/api/produits/' + productId)
+    .set('Authorization', 'Bearer ' + token)
+    .send({ stock: 12 });
+  assert.equal(catalogueStock.status, 200, catalogueStock.text);
+  assert.equal(Number(catalogueStock.body.produit.stock), 12, 'la modification du catalogue doit ajuster le dépôt principal et conserver le total');
   const duplicate = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
     .set('Authorization', 'Bearer ' + token)
     .send({ entrepot_id: warehouse.body.id, lignes: [{ ligne_id: lineId, quantite: 3 }, { ligne_id: lineId, quantite: 1 }] });
