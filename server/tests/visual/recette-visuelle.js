@@ -315,10 +315,10 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
   return page;
 }
 
-async function verifyPage(browser, baseUrl, pageDefinition, viewport, fixtures, screenshots) {
-  const page = await preparePage(browser, baseUrl, fixtures, false);
+async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) {
   const pageErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message));
+  const onPageError = (error) => pageErrors.push(error.message);
+  page.on('pageerror', onPageError);
 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
@@ -407,7 +407,7 @@ async function verifyPage(browser, baseUrl, pageDefinition, viewport, fixtures, 
     fullPage: true,
     captureBeyondViewport: true
   });
-  await page.close();
+  page.off('pageerror', onPageError);
   return { page: pageDefinition.name, viewport: viewport.name, width: viewport.width, horizontalOverflow: false };
 }
 
@@ -532,9 +532,17 @@ async function main() {
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const results = [];
-    for (const pageDefinition of PAGES) {
-      for (const viewport of VIEWPORTS) {
-        results.push(await verifyPage(browser, baseUrl, pageDefinition, viewport, fixtures, OUTPUT_DIR));
+    // Réutiliser un onglet métier pour tous les écrans d'une même largeur réduit
+    // fortement le nombre de sessions CDP créées pendant la recette, tout en rechargeant
+    // chaque vrai document HTML avec ses propres scripts et son état initial.
+    for (const viewport of VIEWPORTS) {
+      const page = await preparePage(browser, baseUrl, fixtures, false);
+      try {
+        for (const pageDefinition of PAGES) {
+          results.push(await verifyPage(page, baseUrl, pageDefinition, viewport, OUTPUT_DIR));
+        }
+      } finally {
+        await page.close();
       }
     }
     const shell = await verifyWorkspaceShell(browser, baseUrl, fixtures);
