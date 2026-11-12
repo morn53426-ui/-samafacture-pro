@@ -50,7 +50,10 @@
   --dur-base: 0.18s;
   --dur-med: 0.2s;
   --dur-slow: 0.25s;
+  --dur-press: 130ms;
+  --dur-tooltip: 150ms;
   --ease-standard: ease;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Échelle d'espacement — base 4px. À privilégier pour toute nouvelle règle plutôt que
@@ -630,9 +633,13 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
   padding: 10px 18px; border-radius: var(--radius-sm); border: 1px solid transparent;
   font-family: var(--font-body); font-weight: 600; font-size: 0.88rem; line-height: 1;
   cursor: pointer; user-select: none; white-space: nowrap;
-  transition: opacity var(--dur-fast) var(--ease-standard), transform 0.1s ease, background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard);
+  transition: opacity var(--dur-fast) var(--ease-standard),
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
 }
-.btn:active { transform: translateY(1px); }
+.btn:active { transform: scale(0.97); }
 
 /* Focus clavier accessible : visible uniquement à la navigation clavier (pas au clic
    souris, grâce à :focus-visible), sur fond clair comme sombre. */
@@ -701,14 +708,21 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-lg);
   font-family: var(--font-body); font-size: 0.88rem; font-weight: 600; line-height: 1.4;
-  --fade-in-y: 10px;
-  --fade-in-scale: 0.95;
-  animation: fade-in-up var(--dur-slow) var(--ease-spring);
+  --fade-in-y: 8px;
+  --fade-in-scale: 0.97;
+  opacity: 0;
+  transform: translateY(var(--fade-in-y)) scale(var(--fade-in-scale));
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
 }
+.toast.is-visible { opacity: 1; transform: translateY(0) scale(1); }
 .toast-error { background: var(--clay); }
 .toast-info { background: var(--structural-dark-1); }
 
-.toast.toast-leaving { animation: toast-out var(--dur-med) var(--ease-standard) forwards; }
+.toast.toast-leaving {
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  pointer-events: none;
+}
 
 /* Fondu + translation + léger zoom d'entrée — partagé par toast, modale, info-bulles
    vides et bannière de connexion, qui utilisaient jusqu'ici 4 @keyframes quasi identiques
@@ -719,12 +733,15 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
   from { opacity: 0; transform: translateY(var(--fade-in-y, 10px)) scale(var(--fade-in-scale, 1)); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-@keyframes toast-out {
-  to { opacity: 0; transform: translateY(6px) scale(0.97); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .toast { animation: none; }
-  .toast.toast-leaving { animation: none; opacity: 0; transition: opacity 0.2s; }
+  .toast,
+  .toast.is-visible,
+  .toast.toast-leaving {
+    animation: none;
+    transform: none;
+    transition: opacity 0.01ms linear;
+  }
+  .toast.toast-leaving { opacity: 0; }
 }
 
 @media (max-width: 480px) {
@@ -744,6 +761,7 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%) translateY(4px);
+  transform-origin: center bottom;
   background: var(--structural-dark-1);
   color: #fff;
   font-family: var(--font-body);
@@ -758,46 +776,64 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard), visibility 0.15s;
+  transition: opacity var(--dur-tooltip) var(--ease-out),
+    transform var(--dur-tooltip) var(--ease-out),
+    visibility 0s linear var(--dur-tooltip);
   z-index: 80;
 }
 
-[data-tooltip]:hover::after,
 [data-tooltip]:focus-visible::after {
   opacity: 1;
   visibility: visible;
   transform: translateX(-50%) translateY(0);
+  transition-delay: 0s;
 }
 
-/* Un peu de délai avant apparition, pour ne pas déclencher la bulle au simple passage
-   du curseur — évite un effet clignotant quand la souris traverse plusieurs éléments. */
-[data-tooltip]:hover::after { transition-delay: 0.35s; }
-[data-tooltip]:focus-visible::after { transition-delay: 0s; } /* immédiat au clavier */
+/* Le délai évite les apparitions accidentelles quand le pointeur traverse une barre d'actions.
+   Les appareils tactiles n'ont pas de hover : le focus clavier reste disponible. */
+@media (hover: hover) and (pointer: fine) {
+  [data-tooltip]:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    transition-delay: 0.25s;
+  }
+}
 
 /* Positions alternatives, quand la bulle par défaut (au-dessus) déborderait de l'écran */
 [data-tooltip-pos="bottom"]::after {
   bottom: auto; top: calc(100% + 8px);
   transform: translateX(-50%) translateY(-4px);
 }
-[data-tooltip-pos="bottom"]:hover::after,
 [data-tooltip-pos="bottom"]:focus-visible::after { transform: translateX(-50%) translateY(0); }
+@media (hover: hover) and (pointer: fine) {
+  [data-tooltip-pos="bottom"]:hover::after { transform: translateX(-50%) translateY(0); }
+}
 
 [data-tooltip-pos="left"]::after {
   bottom: auto; top: 50%; left: auto; right: calc(100% + 8px);
   transform: translateY(-50%) translateX(4px);
 }
-[data-tooltip-pos="left"]:hover::after,
 [data-tooltip-pos="left"]:focus-visible::after { transform: translateY(-50%) translateX(0); }
+@media (hover: hover) and (pointer: fine) {
+  [data-tooltip-pos="left"]:hover::after { transform: translateY(-50%) translateX(0); }
+}
 
 [data-tooltip-pos="right"]::after {
   bottom: auto; top: 50%; left: calc(100% + 8px);
   transform: translateY(-50%) translateX(-4px);
 }
-[data-tooltip-pos="right"]:hover::after,
 [data-tooltip-pos="right"]:focus-visible::after { transform: translateY(-50%) translateX(0); }
+@media (hover: hover) and (pointer: fine) {
+  [data-tooltip-pos="right"]:hover::after { transform: translateY(-50%) translateX(0); }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  [data-tooltip]::after { transition-duration: 0.01ms !important; transition-delay: 0s !important; }
+  [data-tooltip]::after {
+    transform: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+  }
 }
 
 /* Les info-bulles n'ont pas d'équivalent tactile fiable (pas de survol sur mobile) — on
@@ -905,14 +941,22 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
 /* Points de navigation */
 .auth-slider-dots { display: flex; gap: 8px; margin-top: 14px; }
 .auth-slider-dots .dot {
-  width: 7px; height: 7px; border-radius: 50%;
+  width: 22px; height: 7px; border-radius: 999px;
   background: rgba(255,255,255,0.4);
-  cursor: pointer; transition: all var(--dur-slow) var(--ease-standard);
+  cursor: pointer;
+  transform: scaleX(0.32);
+  transform-origin: left center;
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-base) var(--ease-out);
 }
-.auth-slider-dots .dot.active { background: #fff; width: 22px; border-radius: 4px; }
+.auth-slider-dots .dot.active {
+  background: #fff;
+  transform: scaleX(1);
+  border-radius: 4px;
+}
 
 /* Bannière défilante (ticker) en verre dépoli, remplace l'ancien texte statique */
-.auth-marquee-group { --fade-in-y: 12px; animation: fade-in-up 0.9s var(--ease-standard) both; animation-delay: var(--dur-slow); }
+.auth-marquee-group { --fade-in-y: 8px; animation: fade-in-up 220ms var(--ease-out) both; animation-delay: 40ms; }
 .auth-marquee {
   position: relative;
   overflow: hidden;
@@ -1489,6 +1533,29 @@ img {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Interactions tactiles : réponse immédiate, sans hover collant sur iOS/Android. */
+html { -webkit-tap-highlight-color: transparent; }
+button, a, [role="button"] { touch-action: manipulation; }
+
+@media (pointer: coarse) {
+  input[type=text], input[type=email], input[type=password], input[type=number],
+  input[type=date], input[type=tel], input[type=search], input[type=url],
+  select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Les actions répétées gardent un retour visuel sans déplacement lorsque l'utilisateur
+   demande une réduction des mouvements : couleur/opacité restent disponibles. */
+@media (prefers-reduced-motion: reduce) {
+  .btn:active,
+  .auth-slider-arrow:active,
+  .lp-home-arrow:active,
+  .lp-home-pause:active {
+    transform: none !important;
   }
 }
 
