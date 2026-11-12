@@ -3813,3 +3813,162 @@ thead th { background: #F2F6FD; color: #52627D; }
   word-break:normal;
   font-size:.69rem;
 }
+
+
+/* Cloche de notifications : alimentée exclusivement par les événements Socket.IO reçus. */
+.app-notification { position:relative; flex:0 0 auto; }
+.app-notification-toggle {
+  position:relative;
+  display:grid;
+  place-items:center;
+  width:44px;
+  height:44px;
+  border:1px solid transparent;
+  border-radius:50%;
+  background:transparent;
+  color:var(--navy-900);
+  cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.app-notification-toggle:hover,
+.app-notification-toggle[aria-expanded="true"] {
+  border-color:var(--line);
+  background:var(--cream);
+}
+.app-notification-toggle:focus-visible,
+.app-notification-clear:focus-visible {
+  outline:2px solid var(--workspace-blue);
+  outline-offset:3px;
+}
+.app-notification-toggle .ic { font-size:1.35rem; line-height:1; }
+.app-notification-badge {
+  position:absolute;
+  top:0;
+  right:-1px;
+  display:grid;
+  place-items:center;
+  min-width:19px;
+  height:19px;
+  padding:0 4px;
+  border:2px solid var(--paper);
+  border-radius:999px;
+  background:#E6384B;
+  color:#fff;
+  font-size:.63rem;
+  font-weight:800;
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.app-notification-badge[hidden],
+.app-notification-panel[hidden] { display:none !important; }
+.app-notification-panel {
+  position:absolute;
+  z-index:150;
+  top:calc(100% + 11px);
+  right:0;
+  width:min(360px, calc(100vw - 24px));
+  max-height:min(430px, calc(100vh - 112px));
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:15px;
+  background:var(--paper);
+  color:var(--ink);
+  box-shadow:0 18px 48px rgba(13,29,59,.2);
+}
+.app-notification-panel-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:15px 16px 13px;
+  border-bottom:1px solid var(--line);
+  background:var(--paper);
+}
+.app-notification-panel-head strong {
+  display:block;
+  color:var(--navy-950);
+  font-size:.91rem;
+  font-weight:800;
+}
+.app-notification-panel-head small {
+  display:block;
+  margin-top:3px;
+  color:var(--ink-soft);
+  font-size:.7rem;
+}
+.app-notification-clear {
+  flex:0 0 auto;
+  border:0;
+  padding:6px 8px;
+  border-radius:7px;
+  background:transparent;
+  color:var(--workspace-blue);
+  font-size:.7rem;
+  font-weight:750;
+  cursor:pointer;
+}
+.app-notification-clear:hover:not(:disabled) { background:rgba(23,105,245,.08); }
+.app-notification-clear:disabled { color:var(--ink-soft); cursor:not-allowed; opacity:.55; }
+.app-notification-list { max-height:340px; overflow-y:auto; overscroll-behavior:contain; }
+.app-notification-empty {
+  padding:28px 20px;
+  color:var(--ink-soft);
+  font-size:.78rem;
+  line-height:1.55;
+  text-align:center;
+}
+.app-notification-item {
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  padding:13px 16px;
+  border-bottom:1px solid var(--line);
+}
+.app-notification-item:last-child { border-bottom:0; }
+.app-notification-item.is-unread { background:rgba(23,105,245,.045); }
+.app-notification-item-dot {
+  flex:0 0 8px;
+  width:8px;
+  height:8px;
+  margin-top:6px;
+  border-radius:50%;
+  background:var(--workspace-blue);
+}
+.app-notification-item.tone-success .app-notification-item-dot { background:var(--emerald); }
+.app-notification-item.tone-warning .app-notification-item-dot { background:var(--workspace-amber); }
+.app-notification-item.tone-error .app-notification-item-dot { background:#E1484F; }
+.app-notification-item-content { min-width:0; flex:1; }
+.app-notification-item-content strong {
+  display:block;
+  color:var(--navy-950);
+  font-size:.77rem;
+  font-weight:800;
+}
+.app-notification-item-content p {
+  margin:3px 0 5px;
+  color:var(--ink-soft);
+  font-size:.73rem;
+  line-height:1.45;
+  overflow-wrap:anywhere;
+}
+.app-notification-item-content time {
+  color:var(--ink-soft);
+  font-size:.64rem;
+  font-variant-numeric:tabular-nums;
+}
+:root[data-theme="dark"] .app-notification-panel { box-shadow:0 18px 48px rgba(0,0,0,.42); }
+:root[data-theme="dark"] .app-notification-item.is-unread { background:rgba(55,119,237,.12); }
+
+@media (max-width:900px) {
+  .app-topbar { flex-wrap:wrap; }
+  .app-topbar-search { flex:1 1 100%; width:100%; }
+  .app-topbar-account { margin-left:auto; }
+}
+@media (max-width:640px) {
+  .app-topbar-account { gap:7px; }
+  .app-notification-toggle { width:42px; height:42px; }
+  .app-notification-panel { right:-4px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .app-notification-toggle { transition:none; }
+}
