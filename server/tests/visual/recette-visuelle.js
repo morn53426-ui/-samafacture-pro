@@ -874,7 +874,7 @@ async function main() {
       workspaceShell: shell,
       themeAndZoom,
       documentFlows,
-      screenshots: results.length + 2,
+      screenshots: results.length + 4,
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
