@@ -15,7 +15,7 @@ describe('Nouveaux modèles de facture — PUT /api/auth/entreprise', () => {
     await setupTestDatabase();
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Modèles', email, password: 'motdepasse123', entreprise_nom: 'Boutique Modèles' });
+      .send({ nom: 'Testeur Modèles', email, password: 'motdepasse123', entreprise_nom: 'Boutique Modèles' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
   });
