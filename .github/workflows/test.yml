@@ -51,11 +51,23 @@ jobs:
         working-directory: server
         run: npm ci
 
-      - name: Installer le navigateur requis par Puppeteer
-        working-directory: server
+      - name: Détecter le navigateur Chromium du runner CI
+        shell: bash
         run: |
-          rm -rf "$HOME/.cache/puppeteer"
-          PUPPETEER_SKIP_DOWNLOAD=false node node_modules/puppeteer/install.mjs
+          BROWSER_PATH=""
+          for browser in google-chrome-stable google-chrome chromium chromium-browser; do
+            if command -v "$browser" >/dev/null 2>&1; then
+              BROWSER_PATH="$(command -v "$browser")"
+              break
+            fi
+          done
+          if [ -z "$BROWSER_PATH" ]; then
+            echo "Aucun Chrome/Chromium préinstallé sur ce runner." >&2
+            exit 1
+          fi
+          test -x "$BROWSER_PATH"
+          "$BROWSER_PATH" --version
+          echo "PUPPETEER_EXECUTABLE_PATH=$BROWSER_PATH" >> "$GITHUB_ENV"
 
       - name: Vérifier le script de recette staging
         working-directory: server
