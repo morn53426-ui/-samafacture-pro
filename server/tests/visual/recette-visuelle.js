@@ -219,7 +219,7 @@ const CHART_STUB = [
   '      } else {',
   '        context.strokeStyle = "rgba(105,125,160,.16)"; context.lineWidth = 1;',
   '        for (let row = 1; row < 5; row++) { context.beginPath(); context.moveTo(0, row * height / 5); context.lineTo(width, row * height / 5); context.stroke(); }',
-  '        context.strokeStyle = "#1769F5"; context.lineWidth = 3; context.beginPath();',
+  '        context.strokeStyle = "#087A57"; context.lineWidth = 3; context.beginPath();',
   '        const points = [0.85, 0.72, 0.77, 0.55, 0.62, 0.39, 0.48, 0.28, 0.34, 0.12];',
   '        points.forEach((point, index) => { const x = 10 + index * (width - 20) / (points.length - 1); const y = point * (height - 18) + 9; if (index === 0) context.moveTo(x, y); else context.lineTo(x, y); });',
   '        context.stroke();',
