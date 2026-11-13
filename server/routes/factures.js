@@ -143,25 +143,45 @@ function computeTotals(lignes, remise, frais_livraison) {
   });
   const remiseCents = remiseValidee.scaled > sousTotalCents ? sousTotalCents : remiseValidee.scaled;
 
-  // Répartir la remise au centime près ; la dernière ligne absorbe l'écart d'arrondi.
-  let remiseDistribuee = 0n;
-  const lignesAvecRemise = brutLignes.map((ligne, index) => {
-    const part = index === brutLignes.length - 1
-      ? remiseCents - remiseDistribuee
-      : (sousTotalCents > 0n
-        ? roundBigIntDivision(remiseCents * ligne.ligneHTCents, sousTotalCents)
-        : 0n);
-    remiseDistribuee += part;
-    return { ...ligne, ligneHTNetteCents: ligne.ligneHTCents - part };
+  // Répartir la remise proportionnellement en centimes entiers. On prend d'abord
+  // la partie entière de chaque quote-part, puis on distribue les centimes restants
+  // aux plus grands restes décimaux. Aucune ligne ne reçoit ainsi une remise négative
+  // ou supérieure à son propre montant, même avec beaucoup de lignes à faible valeur.
+  const allocationsRemise = brutLignes.map((ligne, index) => {
+    const numerateur = remiseCents * ligne.ligneHTCents;
+    return {
+      index,
+      part: sousTotalCents > 0n ? numerateur / sousTotalCents : 0n,
+      reste: sousTotalCents > 0n ? numerateur % sousTotalCents : 0n
+    };
   });
+  let centimesRestants = remiseCents -
+    allocationsRemise.reduce((sum, allocation) => sum + allocation.part, 0n);
+  const ordreAllocation = [...allocationsRemise]
+    .filter(allocation => allocation.part < brutLignes[allocation.index].ligneHTCents)
+    .sort((a, b) => {
+      if (a.reste === b.reste) return a.index - b.index;
+      return a.reste > b.reste ? -1 : 1;
+    });
+  for (const allocation of ordreAllocation) {
+    if (centimesRestants <= 0n) break;
+    allocation.part += 1n;
+    centimesRestants -= 1n;
+  }
+  if (centimesRestants !== 0n) {
+    throw new Error('Impossible de répartir la remise au centime près.');
+  }
 
-  let totalTVACents = 0n;
+  const lignesAvecRemise = brutLignes.map((ligne, index) => ({
+    ...ligne,
+    ligneHTNetteCents: ligne.ligneHTCents - allocationsRemise[index].part
+  }));
+
+  // La TVA est arrondie une seule fois au niveau du document (comme dans le calcul
+  // comptable précédent), plutôt que d'arrondir chaque ligne indépendamment.
+  let totalTVANumerateur = 0n;
   const computedLignes = lignesAvecRemise.map((ligne) => {
-    const ligneTVACents = roundBigIntDivision(
-      ligne.ligneHTNetteCents * ligne.tvaHundredths,
-      taxScale
-    );
-    totalTVACents += ligneTVACents;
+    totalTVANumerateur += ligne.ligneHTNetteCents * ligne.tvaHundredths;
     const totalLigneTVACents = roundBigIntDivision(
       ligne.ligneHTCents * ligne.tvaHundredths,
       taxScale
@@ -175,6 +195,7 @@ function computeTotals(lignes, remise, frais_livraison) {
     };
   });
 
+  const totalTVACents = roundBigIntDivision(totalTVANumerateur, taxScale);
   const totalCents = sousTotalCents - remiseCents + totalTVACents + frais.scaled;
   return {
     computedLignes,
