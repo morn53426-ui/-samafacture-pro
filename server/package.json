@@ -12,6 +12,7 @@
     "start:cluster": "node cluster.js",
     "dev": "node app.js",
     "backup": "node backup-now.js",
+    "restore": "node restore-backup.js",
     "test": "node --test \"tests/*.test.js\"",
     "smoke:staging": "node scripts/staging-smoke.js",
     "test:visual": "node tests/visual/recette-visuelle.js"
