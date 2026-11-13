@@ -841,6 +841,8 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   }));
   assert.equal(darkMetrics.theme, 'dark', 'Le thème sombre doit être appliqué avant le rendu du tableau de bord.');
   assert.notEqual(darkMetrics.card, 'rgb(255, 255, 255)', 'Les cartes ne doivent pas rester blanches en thème sombre.');
+  assert.equal(darkMetrics.background, 'rgb(29, 28, 24)', 'Le thème sombre doit reprendre le fond graphite de la direction Unslop.');
+  assert.equal(darkMetrics.card, 'rgb(40, 39, 32)', 'Les cartes sombres doivent utiliser la teinte papier profonde.');
   assert.equal(darkMetrics.horizontalOverflow, false, 'Le thème sombre ne doit pas créer de débordement.');
   const darkContrast = contrastRatio(darkMetrics.text, darkMetrics.background);
   assert.ok(darkContrast >= 4.5, 'Le contraste du titre doit atteindre 4,5:1 en thème sombre. Valeur : ' + darkContrast.toFixed(2));
