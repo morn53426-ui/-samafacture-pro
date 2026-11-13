@@ -22,12 +22,13 @@ test('configuration runtime expose des valeurs scalables', () => {
 
 
 test('la production refuse HTTP et exige exactement son origine HTTPS publique', () => {
-  const names = ['NODE_ENV', 'JWT_SECRET', 'APP_URL', 'ALLOWED_ORIGINS', 'REDIS_URL'];
+  const names = ['NODE_ENV', 'JWT_SECRET', 'APP_URL', 'ALLOWED_ORIGINS', 'REDIS_URL', 'BACKUP_ENCRYPTION_KEY'];
   const saved = Object.fromEntries(names.map(name => [name, process.env[name]]));
 
   try {
     process.env.NODE_ENV = 'production';
     process.env.JWT_SECRET = 'secret-de-test-pas-utilisable-qui-depasse-32-caracteres';
+    process.env.BACKUP_ENCRYPTION_KEY = 'ab'.repeat(32);
     process.env.APP_URL = 'http://factures.example.com';
     process.env.ALLOWED_ORIGINS = 'http://factures.example.com';
     assert.throws(() => require('../config/runtime').validateProductionConfig(), /HTTPS/);
