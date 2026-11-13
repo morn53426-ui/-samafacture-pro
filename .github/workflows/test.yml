@@ -69,6 +69,11 @@ jobs:
           "$BROWSER_PATH" --version
           echo "PUPPETEER_EXECUTABLE_PATH=$BROWSER_PATH" >> "$GITHUB_ENV"
 
+      - name: Diagnostiquer les avis npm sans modifier les versions
+        working-directory: server
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e "const a=require('./npm-audit.json'); console.log(JSON.stringify({metadata:a.metadata?.vulnerabilities,packages:Object.entries(a.vulnerabilities||{}).map(([name,v])=>({name,severity:v.severity,isDirect:v.isDirect,range:v.range,fixAvailable:v.fixAvailable,via:(v.via||[]).map(x=>typeof x==='string'?x:{name:x.name,title:x.title,url:x.url,range:x.range})}))},null,2))"
       - name: Vérifier le script de recette staging
         working-directory: server
         run: node --check scripts/staging-smoke.js
