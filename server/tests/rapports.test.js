@@ -71,7 +71,17 @@ describe('Rapports', () => {
   });
 
   test('GET /rapports/export-excel est refusé (403) sur le plan gratuit', async () => {
-    const res = await request(app).get('/api/rapports/export-excel').set('Authorization', `Bearer ${token}`);
+    const res = await request(app)
+      .get('/api/rapports/export-excel')
+      .set('Authorization', `Bearer ${token}`)
+      // Le classeur est une réponse binaire : demander explicitement un Buffer à Supertest.
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks = [];
+        response.on('data', chunk => chunks.push(Buffer.from(chunk)));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+        response.on('error', callback);
+      });
     assert.equal(res.status, 403);
     assert.equal(res.body.code, 'FONCTIONNALITE_PRO');
   });
