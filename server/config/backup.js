@@ -16,7 +16,12 @@ const BACKUP_MAGIC = Buffer.from('SFBK1');
 
 function getBackupEncryptionKey() {
   const value = process.env.BACKUP_ENCRYPTION_KEY;
-  if (!value) return null;
+  if (!value) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('BACKUP_ENCRYPTION_KEY est obligatoire en production ; aucune sauvegarde en clair ne sera créée.');
+    }
+    return null;
+  }
   if (!/^[a-fA-F0-9]{64}$/.test(value)) {
     throw new Error('BACKUP_ENCRYPTION_KEY doit être une clé hexadécimale de 64 caractères (32 octets).');
   }
