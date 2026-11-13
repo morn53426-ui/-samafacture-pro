@@ -5270,3 +5270,41 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
     min-height: 42px;
   }
 }
+
+/* Correction responsive étroit : conserver les quatre commandes sur une seule ligne
+   sans élargir le document sur les téléphones de 320 à 380 px. */
+@media (max-width: 380px) {
+  .app-topbar-account {
+    gap: 0;
+    flex-wrap: nowrap;
+    max-width: 100%;
+  }
+  .app-topbar-avatar {
+    flex-basis: 38px;
+    width: 38px;
+    height: 38px;
+  }
+  .app-topbar-quick-actions {
+    gap: 0;
+    flex-wrap: nowrap;
+  }
+  .app-notification-toggle,
+  .app-topbar-quick-actions .theme-toggle-btn,
+  .app-topbar-localization,
+  .app-topbar-logout {
+    flex: 0 0 42px;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+  }
+  .app-topbar-quick-actions .theme-toggle-icone,
+  .app-topbar-localization > .ic,
+  .app-notification-toggle .ic,
+  .app-notification-toggle .ic svg,
+  .app-topbar-logout > .icon {
+    width: 23px;
+    height: 23px;
+    font-size: 23px;
+  }
+}
