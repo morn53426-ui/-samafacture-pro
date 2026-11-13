@@ -30,8 +30,7 @@ function renderSidebar(activePage) {
     ]},
     { group: 'Compte', items: [
       { id: 'abonnement', icon: 'gem', label: 'Abonnement', href: 'abonnement.html' },
-      { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' },
-      { id: 'internationalisation', icon: 'globe', label: 'Pays, langue & devise', href: 'internationalisation.html' }
+      { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' }
     ]},
     { group: 'Aide et ressources', items: [
       { id: 'aide', icon: 'help-circle', label: 'Centre d’aide', href: 'aide.html' },
@@ -76,7 +75,6 @@ function renderSidebar(activePage) {
       <nav class="sidebar-nav" id="app-navigation" aria-label="Navigation principale">${navHtml}</nav>
       <div class="sidebar-foot">
         <button type="button" class="install-app-btn" style="display:none;" onclick="installApp()"><span class="ic">${Icon('smartphone')}</span> Installer l'application</button>
-        <div class="sidebar-theme-control">${window.SamaTheme ? SamaTheme.boutonHtml() : ''}</div>
         <div class="sidebar-user-info">
           <div class="plan-badge">${planLabels[user?.plan] || 'Plan Gratuit'}</div>
           <div class="sidebar-user-name">${escapeHtml(user?.entreprise_nom || user?.nom || 'Mon compte')}</div>
@@ -185,6 +183,14 @@ function renderTopbar(title, subtitle) {
               <div class="app-notification-empty">Aucune notification reçue pendant cette session.</div>
             </div>
           </section>
+        </div>
+        <div class="app-topbar-quick-actions" role="group" aria-label="Accès rapides">
+          ${window.SamaTheme ? SamaTheme.boutonHtml('-topbar') : ''}
+          <a href="internationalisation.html" class="app-topbar-localization"
+            aria-label="Pays, langue et devise" title="Pays, langue et devise">
+            <span class="ic" aria-hidden="true">${Icon('globe')}</span>
+            <span class="app-topbar-localization-label">Pays, langue &amp; devise</span>
+          </a>
         </div>
         <button type="button" class="app-topbar-logout"
           onclick="Api.clearSession(); location.href='login.html';"
