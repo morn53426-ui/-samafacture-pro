@@ -589,15 +589,15 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Change le plan de l'abonnement. En l'absence de passerelle de paiement réelle connectée
-// (Wave/Orange Money/PayDunya/Stripe — voir la feuille de route du README), ce changement
-// est auto-service et immédiat, pour que vous puissiez tester les fonctionnalités Pro dès
-// maintenant. À remplacer par un vrai flux de paiement avant une mise en production commerciale.
+// Cette route ne peut plus attribuer de plan payant. Les plans Starter, Pro et
+// Entreprise sont activés exclusivement par /abonnement/webhook/* après vérification
+// serveur-à-serveur du paiement. La route reste disponible uniquement pour revenir au
+// plan gratuit ; masquer le bouton dans le frontend ne constitue jamais une protection.
 /**
  * @openapi
  * /auth/plan:
  *   put:
- *     summary: Change le plan d'abonnement (sélecteur manuel gratuit, utilisé quand aucune passerelle de paiement n'est configurée)
+ *     summary: Permet uniquement de revenir au plan Gratuit ; les plans payants exigent un paiement confirmé
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -608,22 +608,28 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  *             required: [plan]
  *             properties: { plan: { type: string, enum: [gratuit, starter, pro, entreprise] } }
  *     responses:
- *       200:
- *         description: Plan mis à jour.
- *         content:
- *           application/json:
- *             schema: { type: object, properties: { user: { $ref: '#/components/schemas/Utilisateur' } } }
+ *       200: { description: Retour au plan Gratuit. }
+ *       403: { description: Un paiement confirmé côté serveur est requis pour activer un plan payant. }
  */
 router.put('/plan', requireAuth, async (req, res, next) => {
   try {
     const { plan } = req.body;
-    const plansValides = ['gratuit', 'starter', 'pro', 'entreprise'];
-    if (!plansValides.includes(plan)) {
+    if (!['gratuit', 'starter', 'pro', 'entreprise'].includes(plan)) {
       return res.status(400).json({ error: 'Plan invalide.' });
     }
-    await pool.query('UPDATE users SET plan = ? WHERE id = ?', [plan, req.user.id]);
+    if (plan !== 'gratuit') {
+      return res.status(403).json({
+        error: 'Un plan payant ne peut être activé qu’après confirmation du paiement par le prestataire.',
+        code: 'PAIEMENT_REQUIS'
+      });
+    }
+    const [result] = await pool.query(
+      "UPDATE users SET plan = 'gratuit' WHERE id = ? AND plan <> 'gratuit'",
+      [req.user.id]
+    );
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
-    res.json({ user: sanitizeUser(rows[0]) });
+    if (!rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    res.json({ user: sanitizeUser(rows[0]), changed: result.affectedRows > 0 });
   } catch (err) { next(err); }
 });
 
