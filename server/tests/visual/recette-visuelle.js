@@ -738,8 +738,8 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     labelsHidden: true,
     promoRemoved: true,
     toggleExpanded: 'false',
-    headingFont: 'IBM Plex Sans, sans-serif',
-    bodyFont: 'IBM Plex Sans, sans-serif',
+    headingFont: '"IBM Plex Sans", sans-serif',
+    bodyFont: '"IBM Plex Sans", sans-serif',
     iconsConsistent: true
   }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
 
