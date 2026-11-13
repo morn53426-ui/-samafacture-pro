@@ -48,6 +48,9 @@ function renderSidebar(activePage) {
     try { return localStorage.getItem('sf-sidebar-collapsed') !== 'false'; }
     catch { return true; }
   })();
+  // Évite de montrer le menu en position développée pendant son repli initial.
+  // La transition reste disponible après l'initialisation pour les clics utilisateur.
+  document.body.classList.add('sidebar-initializing');
   document.body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
 
   const navHtml = nav.map(section => `
@@ -86,6 +89,9 @@ function renderSidebar(activePage) {
   document.getElementById('sidebar-root').outerHTML = html;
   ensureWorkspaceTopbar();
   initRealtime();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.body.classList.remove('sidebar-initializing');
+  }));
 }
 
 function toggleSidebar() {
