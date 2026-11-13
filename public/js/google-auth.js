@@ -40,7 +40,8 @@ async function initGoogleButton(containerId) {
 async function handleGoogleCredential(response) {
   const errorBox = document.getElementById('error-box');
   try {
-    const { token, user } = await Api.post('/auth/google', { credential: response.credential });
+    const acceptTerms = document.getElementById('accept-terms')?.checked === true;
+    const { token, user } = await Api.post('/auth/google', { credential: response.credential, acceptTerms });
     Api.setSession(token, user);
     location.href = 'dashboard.html';
   } catch (err) {
