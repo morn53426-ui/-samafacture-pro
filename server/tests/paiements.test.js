@@ -13,7 +13,7 @@ describe("Paiements d'abonnement", () => {
     await setupTestDatabase();
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Utilisateur Paiement', email: emailDeTest('pay'), password: 'motdepasse123' });
+      .send({ nom: 'Utilisateur Paiement', email: emailDeTest('pay'), password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
   });
@@ -183,7 +183,7 @@ describe("Paiements de facture : idempotence HTTP", () => {
     const email = emailDeTest('payfact-idem');
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Paiement Idempotent', email, password: 'motdepasse123' });
+      .send({ nom: 'Testeur Paiement Idempotent', email, password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
     const client = await request(app)
