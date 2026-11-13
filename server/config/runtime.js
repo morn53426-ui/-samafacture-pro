@@ -33,6 +33,9 @@ function validateProductionConfig() {
       errors.push('APP_URL doit être une URL publique valide.');
     }
   }
+  if (!/^[a-fA-F0-9]{64}$/.test(process.env.BACKUP_ENCRYPTION_KEY || '')) {
+    errors.push('BACKUP_ENCRYPTION_KEY doit contenir 64 caractères hexadécimaux pour chiffrer les sauvegardes en production.');
+  }
   if (!process.env.ALLOWED_ORIGINS) {
     errors.push('ALLOWED_ORIGINS doit autoriser explicitement le domaine HTTPS public.');
   }
