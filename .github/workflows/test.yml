@@ -49,15 +49,27 @@ jobs:
           docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml config --quiet
           rm -f .env
 
-      - name: Construire l'image Docker sans publication
-        run: docker build --tag samafacture-pro:ci .
-
       - name: Installer Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: npm
           cache-dependency-path: server/package-lock.json
+
+      - name: Régénérer le lockfile après mise à niveau des dépendances
+        working-directory: server
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Publier le lockfile résolu pour contrôle et intégration
+        uses: actions/upload-artifact@v5
+        with:
+          name: samafacture-package-lock-${{ github.run_number }}
+          path: server/package-lock.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Construire l'image Docker sans publication
+        run: docker build --tag samafacture-pro:ci .
 
       - name: Installer les dépendances
         working-directory: server
