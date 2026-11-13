@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   tests:
@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Valider Docker Compose et le chemin des variables
         run: |
@@ -131,3 +133,27 @@ jobs:
           path: server/tests/visual/artifacts/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Enregistrer le lockfile testé sur la branche de la PR
+        if: ${{ success() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HEAD_REF: ${{ github.head_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- server/package-lock.json; then
+            echo "Le lockfile est déjà synchronisé."
+            exit 0
+          fi
+          git check-ref-format --branch "$PR_HEAD_REF"
+          cp server/package-lock.json "$RUNNER_TEMP/package-lock.json"
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c http.extraheader="$AUTH_HEADER" fetch origin "refs/heads/$PR_HEAD_REF"
+          git checkout --detach FETCH_HEAD
+          cp "$RUNNER_TEMP/package-lock.json" server/package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/package-lock.json
+          git commit -m "chore(deps): commit tested npm lockfile"
+          git -c http.extraheader="$AUTH_HEADER" push origin "HEAD:refs/heads/$PR_HEAD_REF"
