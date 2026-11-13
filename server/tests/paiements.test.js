@@ -89,6 +89,24 @@ describe("Paiements d'abonnement", () => {
     assert.equal(apres.statut, 'en_attente', 'le paiement ne doit pas être crédité si le montant ne correspond pas');
   });
 
+  test('une confirmation sans montant fourni par le prestataire ne peut pas activer un plan', async () => {
+    const reference = `test-montant-absent-${Date.now()}`;
+    const [insert] = await pool.query(
+      `INSERT INTO abonnement_paiements (user_id, plan, montant, devise, fournisseur, reference, internal_reference, statut)
+       VALUES (?, 'pro', 15000, 'XOF', 'wave', ?, ?, 'en_attente')`,
+      [userId, reference, reference]
+    );
+    const { confirmerPaiementPourTests } = require('../routes/abonnement');
+    const [[paiement]] = await pool.query('SELECT * FROM abonnement_paiements WHERE id = ?', [insert.insertId]);
+
+    const confirme = await confirmerPaiementPourTests(paiement, undefined);
+    assert.equal(confirme, false);
+    const [[apres]] = await pool.query('SELECT statut FROM abonnement_paiements WHERE id = ?', [insert.insertId]);
+    const [[utilisateur]] = await pool.query('SELECT plan FROM users WHERE id = ?', [userId]);
+    assert.equal(apres.statut, 'en_attente');
+    assert.equal(utilisateur.plan, 'gratuit');
+  });
+
   test('un paiement en_attente ancien est marqué "expiree" par la tâche planifiée', async () => {
     const reference = `test-expire-${Date.now()}`;
     const [insert] = await pool.query(
