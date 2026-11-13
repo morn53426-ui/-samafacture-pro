@@ -685,7 +685,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
       themeButtonInTopbar: Boolean(document.querySelector('.app-topbar-quick-actions .theme-toggle-btn')),
       localizationHref: document.querySelector('.app-topbar-localization')?.getAttribute('href'),
       localizationLabel: document.querySelector('.app-topbar-localization')?.getAttribute('aria-label'),
-      localizationTooltip: document.querySelector('.app-topbar-localization')?.getAttribute('title'),
+      localizationTooltip: document.querySelector('.app-topbar-localization')?.getAttribute('data-tooltip'),
       localizationTextVisuallyHidden: (() => {
         const label = document.querySelector('.app-topbar-localization-label');
         const style = label ? getComputedStyle(label) : null;
