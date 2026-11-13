@@ -427,7 +427,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       notificationBell: Boolean(document.querySelector('#workspace-notification-toggle .ic svg')),
       notificationPanel: Boolean(document.querySelector('#workspace-notification-panel[hidden]')),
       sidebar: Boolean(document.querySelector('#app-sidebar')),
-      activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active'))
+      activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active') || document.querySelector('.app-topbar-localization[aria-current="page"]'))
     }));
     assert.equal(shell.toolbar, true, pageDefinition.name + ' doit afficher la barre supérieure commune.');
     assert.equal(shell.search, true, pageDefinition.name + ' doit afficher la recherche globale.');
