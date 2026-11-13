@@ -36,6 +36,18 @@ jobs:
         run: |
           cp server/.env.example server/.env
           docker compose --env-file server/.env config --quiet
+          cat > .env <<'ENV'
+          APP_DOMAIN=example.invalid
+          DB_NAME=samafacture
+          DB_USER=samafacture
+          DB_PASSWORD=ci-db-password-not-used
+          DB_ROOT_PASSWORD=ci-root-password-not-used
+          JWT_SECRET=ci-secret-ne-pas-utiliser-en-production
+          APP_URL=https://example.invalid
+          ALLOWED_ORIGINS=https://example.invalid
+          ENV
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml config --quiet
+          rm -f .env
 
       - name: Construire l'image Docker sans publication
         run: docker build --tag samafacture-pro:ci .
