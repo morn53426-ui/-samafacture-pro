@@ -65,19 +65,16 @@
     <section id="plan-fallback" class="subscription-test card" style="display:none;">
       <div class="subscription-test-heading">
         <span class="ic">${Icon('info')}</span>
-        <div><strong>Mode de test</strong><p>Aucun fournisseur de paiement n’est configuré sur ce serveur. Ce réglage sert uniquement à tester les droits des formules ; il ne réalise aucun paiement.</p></div>
+        <div><strong>Mode sans paiement</strong><p>Aucun prestataire n’est configuré sur ce serveur. Les formules payantes restent verrouillées jusqu’à l’activation d’un paiement vérifié. Vous pouvez toujours revenir à la formule Gratuit.</p></div>
       </div>
       <div class="subscription-test-controls">
         <div class="field">
-          <label for="plan-select">Formule de test</label>
+          <label for="plan-select">Formule de repli</label>
           <select id="plan-select">
             <option value="gratuit">Gratuit — 10 factures/mois</option>
-            <option value="starter">Starter — factures illimitées</option>
-            <option value="pro">Pro — fonctionnalités premium</option>
-            <option value="entreprise">Entreprise — options à venir</option>
           </select>
         </div>
-        <button type="button" class="btn btn-outline" onclick="changePlan(this)">Appliquer le plan de test</button>
+        <button type="button" class="btn btn-outline" onclick="changePlan(this)">Revenir au plan Gratuit</button>
       </div>
     </section>
   </main>
@@ -262,7 +259,7 @@
       localStorage.setItem('sf_user', JSON.stringify(user));
       renderCurrentPlan(user.plan || plan);
       document.getElementById('plan-msg').innerHTML =
-        '<div class="success-notice"><span class="ic">' + Icon('check-circle') + '</span> Plan de test mis à jour. Rechargez la page pour actualiser les options.</div>';
+        '<div class="success-notice"><span class="ic">' + Icon('check-circle') + '</span> Formule Gratuit activée. Rechargez la page pour actualiser les options.</div>';
       await loadPlans();
     } catch (err) {
       document.getElementById('plan-msg').innerHTML = '<div class="error-box">' + escapeHtml(err.message) + '</div>';
