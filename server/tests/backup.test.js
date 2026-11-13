@@ -67,8 +67,9 @@ describe('Sauvegardes automatiques', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.BACKUP_ENCRYPTION_KEY;
     try {
+      const before = await fs.promises.readdir(BACKUP_DIR);
       await assert.rejects(effectuerSauvegarde(), /obligatoire en production/);
-      assert.equal((await fs.promises.readdir(BACKUP_DIR)).length, 0);
+      assert.deepEqual(await fs.promises.readdir(BACKUP_DIR), before, 'aucun nouveau fichier de sauvegarde ne doit être créé');
     } finally {
       process.env.NODE_ENV = savedMode;
       if (savedKey === undefined) delete process.env.BACKUP_ENCRYPTION_KEY;
