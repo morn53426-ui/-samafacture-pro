@@ -114,6 +114,29 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(res.body.facture.total, 0.35);
   });
 
+  test('la remise répartie entre petites lignes ne crée pas de remise négative et la TVA reste cohérente', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        remise: 0.02,
+        lignes: [
+          { designation: 'Petite ligne 1', quantite: 1, prix_unitaire: 0.10, tva: 0 },
+          { designation: 'Petite ligne 2', quantite: 1, prix_unitaire: 0.10, tva: 0 },
+          { designation: 'Petite ligne 3', quantite: 1, prix_unitaire: 0.10, tva: 0 },
+          { designation: 'Ligne imposable', quantite: 1, prix_unitaire: 0.10, tva: 100 }
+        ]
+      });
+
+    assert.equal(res.status, 201, res.text);
+    assert.equal(res.body.facture.sous_total, 0.40);
+    assert.equal(res.body.facture.remise, 0.02);
+    assert.equal(res.body.facture.total_tva, 0.10);
+    assert.equal(res.body.facture.total, 0.48);
+  });
+
   test('un prix avec plus de deux décimales est refusé et ne crée pas de facture', async () => {
     const res = await request(app)
       .post('/api/factures')
