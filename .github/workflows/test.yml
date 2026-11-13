@@ -63,7 +63,7 @@ jobs:
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
       - name: Publier le lockfile résolu pour contrôle et intégration
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: samafacture-package-lock-${{ github.run_number }}
           path: server/package-lock.json
@@ -158,7 +158,7 @@ jobs:
 
       - name: Publier les captures de la recette visuelle
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: samafacture-recette-visuelle-${{ github.run_number }}
           path: server/tests/visual/artifacts/
