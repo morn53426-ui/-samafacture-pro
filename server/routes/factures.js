@@ -108,11 +108,11 @@ function centsToAmount(cents, field = 'Montant') {
 
 /** Calcule la facture en centimes entiers. Les entrées ont déjà été validées à l'API. */
 function computeTotals(lignes, remise, frais_livraison) {
-  const quantityScale = 1000n;
+  const quantityScale = 100n; // facture_lignes.quantite est stockée en DECIMAL(14,2)
   const taxScale = 10000n; // taux exprimé en centièmes de pourcentage
   const brutLignes = lignes.map((ligne) => {
     const quantite = parseDecimalInput(ligne.quantite, {
-      field: 'Quantité', scale: 3, maxScaled: 99999999999999n
+      field: 'Quantité', scale: 2, maxScaled: 99999999999999n
     });
     if (quantite.scaled <= 0n) throw new Error('La quantité doit être supérieure à zéro.');
     const prix = parseDecimalInput(ligne.prix_unitaire, {
@@ -476,7 +476,7 @@ router.post('/', async (req, res, next) => {
     try {
       lignesValidees = lignes.map((ligne) => ({
         ...ligne,
-        quantite: parseDecimalInput(ligne.quantite, { field: 'Quantité', scale: 3, maxScaled: 99999999999999n }).value,
+        quantite: parseDecimalInput(ligne.quantite, { field: 'Quantité', scale: 2, maxScaled: 99999999999999n }).value,
         prix_unitaire: parseDecimalInput(ligne.prix_unitaire, { field: 'Prix unitaire', scale: 2, maxScaled: MAX_MONEY_CENTS }).value,
         tva: parseDecimalInput(ligne.tva, { field: 'TVA', scale: 2, optional: true, maxScaled: 10000n }).value
       }));
