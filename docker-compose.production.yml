@@ -1,0 +1,30 @@
+# Production overlay:
+# docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml up -d --build
+services:
+  app:
+    environment:
+      NODE_ENV: production
+      APP_URL: "https://${APP_DOMAIN:?Définissez APP_DOMAIN dans le fichier .env}"
+      ALLOWED_ORIGINS: "https://${APP_DOMAIN:?Définissez APP_DOMAIN dans le fichier .env}"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Définissez APP_DOMAIN dans le fichier .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile.production:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [samafacture_net]
+
+volumes:
+  caddy_data:
+  caddy_config:
