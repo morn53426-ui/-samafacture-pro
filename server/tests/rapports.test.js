@@ -73,15 +73,7 @@ describe('Rapports', () => {
   test('GET /rapports/export-excel est refusé (403) sur le plan gratuit', async () => {
     const res = await request(app)
       .get('/api/rapports/export-excel')
-      .set('Authorization', `Bearer ${token}`)
-      // Le classeur est une réponse binaire : demander explicitement un Buffer à Supertest.
-      .buffer(true)
-      .parse((response, callback) => {
-        const chunks = [];
-        response.on('data', chunk => chunks.push(Buffer.from(chunk)));
-        response.on('end', () => callback(null, Buffer.concat(chunks)));
-        response.on('error', callback);
-      });
+      .set('Authorization', `Bearer ${token}`);
     assert.equal(res.status, 403);
     assert.equal(res.body.code, 'FONCTIONNALITE_PRO');
   });
@@ -103,8 +95,9 @@ describe('Rapports', () => {
     assert.match(res.headers['content-disposition'] || '', /\.xlsx"?$/);
     assert.ok(Number(res.headers['content-length']) > 0, 'le fichier généré ne doit pas être vide');
 
+    assert.ok(Buffer.isBuffer(res.body), 'la réponse .xlsx doit être un Buffer binaire');
     const workbook = new (require('exceljs').Workbook)();
-    await workbook.xlsx.load(res.body);
+    await workbook.xlsx.load(Buffer.from(res.body));
     assert.deepEqual(workbook.worksheets.map(sheet => sheet.name), ['Ventes', 'Dépenses']);
     assert.equal(workbook.getWorksheet('Ventes').getCell('A1').value, 'Période / Client');
     assert.equal(workbook.getWorksheet('Dépenses').getCell('A1').value, 'Libellé');
