@@ -1,5 +1,16 @@
 # Docker — SamaFacture Pro
 
+## Prérequis et versions
+
+Le runtime du projet est **Node.js 26 LTS** (image Docker `node:26-bookworm-slim`). Pour une installation hors Docker, utilisez Node.js 26 LTS et installez les dépendances depuis le lockfile versionné :
+
+```bash
+cd server
+npm ci
+```
+
+Ne supprimez pas `server/package-lock.json` et n'utilisez pas `npm install` pour déployer une version existante : le lockfile assure que l'environnement installé correspond aux versions testées dans la CI.
+
 ## Développement local
 
 Depuis la racine du dépôt :
