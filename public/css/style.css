@@ -5054,10 +5054,15 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
   border: 0;
 }
 .app-topbar-localization-label {
-  display: inline;
-  font-size: .75rem;
-  font-weight: 500;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
+  border: 0;
 }
 :root[data-theme="dark"] .app-topbar-quick-actions .theme-toggle-btn,
 :root[data-theme="dark"] .app-topbar-localization {
@@ -5079,7 +5084,6 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
     height: 40px;
     min-height: 40px;
   }
-  .app-topbar-localization-label { display: none; }
 }
 
 
