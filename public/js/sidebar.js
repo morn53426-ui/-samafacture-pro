@@ -24,9 +24,9 @@ function renderSidebar(activePage) {
       { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
       { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' },
       { id: 'achats', icon: 'truck', label: 'Achats & stocks', href: 'achats.html' },
-      { id: 'assistant-ia', icon: 'sparkles', label: 'Assistant IA', href: 'assistant-ia.html' },
+      { id: 'assistant-ia', icon: 'message-circle', label: 'Assistant IA', href: 'assistant-ia.html' },
       { id: 'automatisations', icon: 'workflow', label: 'Automatisations', href: 'automatisations.html' },
-      { id: 'facture-ia', icon: 'wand', label: 'Facture par IA', href: 'facture-ia.html' }
+      { id: 'facture-ia', icon: 'file-check', label: 'Facture par IA', href: 'facture-ia.html' }
     ]},
     { group: 'Compte', items: [
       { id: 'abonnement', icon: 'gem', label: 'Abonnement', href: 'abonnement.html' },
@@ -68,7 +68,7 @@ function renderSidebar(activePage) {
         <div class="mark"><img src="images/icon-192.png" alt="SamaFacture Pro" /></div>
         <div class="sidebar-brand-copy">
           <div class="name">SamaFacture <span class="brand-pro">Pro</span></div>
-          <div class="sub">Facturez • Gérez • Développez</div>
+          <div class="sub">Gestion commerciale</div>
         </div>
         <button type="button" class="sidebar-collapse-toggle" id="sidebar-collapse-toggle" onclick="toggleDesktopSidebar()" aria-label="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}" aria-expanded="${String(!sidebarCollapsed)}" title="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}">${Icon(sidebarCollapsed ? 'arrow-right' : 'arrow-left')}</button>
         <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu" aria-controls="app-navigation" aria-expanded="false">${Icon('menu')}</button>
@@ -78,7 +78,7 @@ function renderSidebar(activePage) {
         <button type="button" class="install-app-btn" style="display:none;" onclick="installApp()"><span class="ic">${Icon('smartphone')}</span> Installer l'application</button>
         <div class="sidebar-theme-control">${window.SamaTheme ? SamaTheme.boutonHtml() : ''}</div>
         <div class="sidebar-user-info">
-          <div class="plan-badge"><span class="ic">${Icon('star')}</span> ${planLabels[user?.plan] || 'Plan Gratuit'}</div>
+          <div class="plan-badge">${planLabels[user?.plan] || 'Plan Gratuit'}</div>
           <div class="sidebar-user-name">${escapeHtml(user?.entreprise_nom || user?.nom || 'Mon compte')}</div>
         </div>
         <button type="button" class="sidebar-logout" onclick="Api.clearSession(); location.href='login.html';" aria-label="Se déconnecter" title="Se déconnecter"><span class="ic" aria-hidden="true">${Icon('log-out')}</span><span class="sidebar-logout-label">Se déconnecter</span></button>
