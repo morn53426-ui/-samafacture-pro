@@ -475,6 +475,10 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       sidebarOpen: Boolean(sidebar?.classList.contains('open')),
       overlayVisible: document.getElementById('sidebar-overlay')?.classList.contains('show') || false,
       mainLeft: main ? Math.round(main.getBoundingClientRect().left) : null,
+      mainMargin: main ? Math.round(parseFloat(getComputedStyle(main).marginLeft) || 0) : null,
+      firstContentLeft: main?.querySelector('.app-topbar, .dashboard-welcome, .page-header, .workspace-page-header')
+        ? Math.round(main.querySelector('.app-topbar, .dashboard-welcome, .page-header, .workspace-page-header').getBoundingClientRect().left)
+        : null,
       expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim()
     };
   });
@@ -483,8 +487,13 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' : le menu de bureau doit démarrer compact.');
     assert.equal(navigationGeometry.sidebarWidth, 76,
       pageDefinition.name + ' : la largeur réelle du rail desktop doit rester à 76 px : ' + JSON.stringify(navigationGeometry));
-    assert.equal(navigationGeometry.mainLeft, 76,
-      pageDefinition.name + ' : le contenu principal doit commencer après le rail compact : ' + JSON.stringify(navigationGeometry));
+    assert.equal(navigationGeometry.mainMargin, 76,
+      pageDefinition.name + ' : la marge CSS du contenu doit correspondre au rail compact : ' + JSON.stringify(navigationGeometry));
+    assert.ok(navigationGeometry.mainLeft >= navigationGeometry.sidebarWidth &&
+      navigationGeometry.mainLeft <= navigationGeometry.sidebarWidth + 16,
+      pageDefinition.name + ' : le conteneur principal ne doit pas chevaucher le rail : ' + JSON.stringify(navigationGeometry));
+    assert.ok(navigationGeometry.firstContentLeft >= navigationGeometry.sidebarWidth,
+      pageDefinition.name + ' : le premier contenu ne doit pas être masqué sous la navigation : ' + JSON.stringify(navigationGeometry));
     assert.equal(navigationGeometry.sidebarOpen, false,
       pageDefinition.name + ' : le tiroir mobile ne doit pas s’ouvrir sur ordinateur.');
     assert.equal(navigationGeometry.overlayVisible, false,
