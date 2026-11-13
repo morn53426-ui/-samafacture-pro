@@ -84,7 +84,7 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(res.body.facture.total, 0); // remise plafonnée à 1000, donc 1000 - 1000 = 0
   });
 
-  test('une quantité ou un prix négatif envoyé directement à l'API est refusé', async () => {
+  test("une quantité ou un prix négatif envoyé directement à l'API est refusé", async () => {
     const res = await request(app)
       .post('/api/factures')
       .set('Authorization', `Bearer ${token}`)
