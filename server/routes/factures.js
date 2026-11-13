@@ -477,8 +477,13 @@ router.post('/', async (req, res, next) => {
         [req.tenantId, ...produitIds]
       );
       const ownedIds = new Set(ownedRows.map(r => r.id));
-      for (const l of lignes) {
-        if (l.produit_id && !ownedIds.has(l.produit_id)) l.produit_id = null;
+      for (const l of lignesValidees) {
+        const productId = Number(l.produit_id);
+        if (l.produit_id && (!Number.isSafeInteger(productId) || !ownedIds.has(productId))) {
+          l.produit_id = null;
+        } else if (l.produit_id) {
+          l.produit_id = productId;
+        }
       }
     }
 
