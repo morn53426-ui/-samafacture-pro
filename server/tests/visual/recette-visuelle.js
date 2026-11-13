@@ -685,6 +685,12 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
       themeButtonInTopbar: Boolean(document.querySelector('.app-topbar-quick-actions .theme-toggle-btn')),
       localizationHref: document.querySelector('.app-topbar-localization')?.getAttribute('href'),
       localizationLabel: document.querySelector('.app-topbar-localization')?.getAttribute('aria-label'),
+      localizationTooltip: document.querySelector('.app-topbar-localization')?.getAttribute('title'),
+      localizationTextVisuallyHidden: (() => {
+        const label = document.querySelector('.app-topbar-localization-label');
+        const style = label ? getComputedStyle(label) : null;
+        return Boolean(style && style.position === 'absolute' && style.width === '1px' && style.height === '1px');
+      })(),
       themeInSidebar: Boolean(document.querySelector('.sidebar-theme-control .theme-toggle-btn')),
       localizationInSidebar: Boolean(document.querySelector('#app-navigation a[href="internationalisation.html"]'))
     };
@@ -695,6 +701,8 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
     themeButtonInTopbar: true,
     localizationHref: 'internationalisation.html',
     localizationLabel: 'Pays, langue et devise',
+    localizationTooltip: 'Pays, langue et devise',
+    localizationTextVisuallyHidden: true,
     themeInSidebar: false,
     localizationInSidebar: false
   }, 'Le bouton Système et l’accès Pays, langue & devise doivent être placés entre Notifications et Déconnexion dans la barre supérieure.');
@@ -771,7 +779,12 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
       [...document.querySelectorAll('.nav-item svg.icon')].every(icon =>
         icon.getAttribute('viewBox') === '0 0 24 24' &&
         icon.getAttribute('stroke-linecap') === 'round' &&
-        icon.getAttribute('stroke-linejoin') === 'round')
+        icon.getAttribute('stroke-linejoin') === 'round'),
+    topbarQuickActionsDoNotOverlap: (() => {
+      const quick = document.querySelector('.app-topbar-quick-actions')?.getBoundingClientRect();
+      const logout = document.querySelector('.app-topbar-logout')?.getBoundingClientRect();
+      return Boolean(quick && logout && quick.right <= logout.left + 1);
+    })()
   }));
   assert.deepEqual(compact, {
     collapsed: true,
@@ -783,7 +796,8 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     toggleExpanded: 'false',
     headingFont: '"IBM Plex Sans", sans-serif',
     bodyFont: '"IBM Plex Sans", sans-serif',
-    iconsConsistent: true
+    iconsConsistent: true,
+    topbarQuickActionsDoNotOverlap: true
   }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
 
   await page.click('#sidebar-collapse-toggle');
