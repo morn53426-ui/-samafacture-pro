@@ -60,6 +60,8 @@ Les captures sont générées avec des réponses API fictives de recette ; aucun
 
 La PR #15 reste ouverte et non fusionnée ; la branche `main` n'a pas été modifiée.
 
+Le thème sombre a été lui aussi harmonisé sur un fond graphite, des surfaces charbon et le même accent émeraude ; la recette vérifie désormais ses valeurs de fond et de carte en plus du contraste.
+
 ## Limites et sécurité
 
 Aucune migration SQL, API, donnée utilisateur, formule de calcul, intégration de paiement ou permission n'a été modifiée volontairement. Les archives de distribution doivent exclure les fichiers `.env` réels et identifiants.
