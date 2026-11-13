@@ -138,10 +138,10 @@ function computeTotals(lignes, remise, frais_livraison) {
   const frais = parseDecimalInput(frais_livraison, {
     field: 'Frais de livraison', scale: 2, optional: true, maxScaled: MAX_MONEY_CENTS
   });
-  const remise = parseDecimalInput(remiseInputValue(remise), {
+  const remiseValidee = parseDecimalInput(remiseInputValue(remise), {
     field: 'Remise', scale: 2, optional: true, maxScaled: MAX_MONEY_CENTS
   });
-  const remiseCents = remise.scaled > sousTotalCents ? sousTotalCents : remise.scaled;
+  const remiseCents = remiseValidee.scaled > sousTotalCents ? sousTotalCents : remiseValidee.scaled;
 
   // Répartir la remise au centime près ; la dernière ligne absorbe l'écart d'arrondi.
   let remiseDistribuee = 0n;
