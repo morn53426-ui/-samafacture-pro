@@ -58,49 +58,6 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
 
-      - name: Régénérer le lockfile après mise à niveau des dépendances
-        working-directory: server
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Publier le lockfile résolu pour contrôle et intégration
-        uses: actions/upload-artifact@v7
-        with:
-          name: samafacture-package-lock-${{ github.run_number }}
-          path: server/package-lock.json
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Enregistrer le lockfile résolu dans la branche PR
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const fs = require('fs');
-            const path = 'server/package-lock.json';
-            const branch = context.payload.pull_request.head.ref;
-            const content = fs.readFileSync(path);
-            const existing = await github.rest.repos.getContent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              path,
-              ref: branch
-            });
-            const current = Buffer.from(existing.data.content, 'base64');
-            if (current.equals(content)) {
-              core.info('Le lockfile du dépôt est déjà à jour.');
-              return;
-            }
-            await github.rest.repos.createOrUpdateFileContents({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              path,
-              message: 'chore(deps): commit resolved npm lockfile',
-              content: content.toString('base64'),
-              sha: existing.data.sha,
-              branch
-            });
-            core.info('Le lockfile résolu a été enregistré dans la branche PR.');
-
       - name: Construire l'image Docker sans publication
         run: docker build --tag samafacture-pro:ci .
 
