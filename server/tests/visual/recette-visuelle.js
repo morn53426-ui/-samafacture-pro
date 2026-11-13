@@ -512,16 +512,47 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' : aucun voile de navigation ne doit masquer le contenu desktop.');
   }
 
-  const metrics = await page.evaluate(() => ({
-    viewport: window.innerWidth,
-    document: document.documentElement.scrollWidth,
-    body: document.body.scrollWidth,
-    page: location.pathname,
-    xssMarker: window.__visualXss || false,
-    paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
-      ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
-      : null
-  }));
+  const metrics = await page.evaluate(() => {
+    const overflowElements = Array.from(document.body.querySelectorAll('*')).map((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const selector = element.tagName.toLowerCase() +
+        (element.id ? '#' + element.id : '') +
+        (typeof element.className === 'string' && element.className.trim()
+          ? '.' + element.className.trim().split(/\\s+/).slice(0, 3).join('.')
+          : '');
+      return {
+        selector,
+        left: Math.round(rect.left * 10) / 10,
+        right: Math.round(rect.right * 10) / 10,
+        width: Math.round(rect.width * 10) / 10,
+        position: style.position,
+        overflowX: style.overflowX
+      };
+    }).filter((item) => item.width > 0 &&
+      (item.right > window.innerWidth + 1 || item.left < -1) &&
+      item.position !== 'fixed' && item.position !== 'sticky')
+      .sort((a, b) => b.right - a.right)
+      .slice(0, 16);
+    return {
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth,
+      page: location.pathname,
+      xssMarker: window.__visualXss || false,
+      paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
+        ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
+        : null,
+      overflowElements
+    };
+  });
+  if (metrics.document > metrics.viewport + 1 || metrics.body > metrics.viewport + 1) {
+    await page.screenshot({
+      path: path.join(screenshots, 'overflow-' + pageDefinition.name + '-' + viewport.name + '.png'),
+      fullPage: true,
+      captureBeyondViewport: true
+    });
+  }
   assert.ok(metrics.document <= metrics.viewport + 1,
     pageDefinition.name + ' déborde horizontalement à ' + viewport.width + 'px: ' + JSON.stringify(metrics));
   assert.ok(metrics.body <= metrics.viewport + 1,
