@@ -13,13 +13,13 @@ describe('Génération PDF de facture', () => {
     await setupTestDatabase();
     const a = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur PDF A', email: emailDeTest('pdf-a'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur PDF A', email: emailDeTest('pdf-a'), password: 'motdepasse123' , acceptTerms: true});
     userIdA = a.body.user.id;
     tokenA = a.body.token;
 
     const b = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur PDF B', email: emailDeTest('pdf-b'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur PDF B', email: emailDeTest('pdf-b'), password: 'motdepasse123' , acceptTerms: true});
     userIdB = b.body.user.id;
     tokenB = b.body.token;
 
