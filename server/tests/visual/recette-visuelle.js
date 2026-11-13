@@ -930,6 +930,52 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   return { invoiceCreation: 'ok', quoteCreation: 'ok', totalWithDiscountVatAndDelivery: 20380 };
 }
 
+async function capturePublicPages(browser, baseUrl, fixtures, screenshotsDir) {
+  const captures = [];
+  const viewports = [
+    { name: 'mobile-320', width: 320, height: 812 },
+    { name: 'mobile-390', width: 390, height: 844 },
+    { name: 'tablet-768', width: 768, height: 1024 },
+    { name: 'desktop-1440', width: 1440, height: 1000 }
+  ];
+  for (const file of ['index.html', 'login.html']) {
+    const name = file === 'index.html' ? 'accueil' : 'connexion';
+    for (const viewport of viewports) {
+      const page = await preparePage(browser, baseUrl, fixtures, true);
+      const pageErrors = [];
+      page.on('pageerror', error => pageErrors.push(error.message));
+      try {
+        await page.evaluate(() => {
+          localStorage.removeItem('sf_token');
+          localStorage.removeItem('sf_user');
+        });
+        await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
+        await page.goto(baseUrl + '/' + file, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector(file === 'index.html' ? '.lp-hero' : '#login-form', { timeout: 15000 });
+        await page.evaluate(() => document.fonts && document.fonts.ready);
+        await new Promise(resolve => setTimeout(resolve, 120));
+        const metrics = await page.evaluate(() => ({
+          viewport: window.innerWidth,
+          document: document.documentElement.scrollWidth,
+          body: document.body.scrollWidth,
+          title: document.title
+        }));
+        assert.ok(metrics.document <= metrics.viewport + 1,
+          name + ' déborde horizontalement à ' + viewport.width + 'px : ' + JSON.stringify(metrics));
+        assert.ok(metrics.body <= metrics.viewport + 1,
+          name + ' élargit le body à ' + viewport.width + 'px : ' + JSON.stringify(metrics));
+        assert.deepEqual(pageErrors, [], name + ' a généré des erreurs JavaScript : ' + pageErrors.join(' | '));
+        const filename = name + '-' + viewport.name + '-' + DATASET + '.png';
+        await page.screenshot({ path: path.join(screenshotsDir, filename), fullPage: true, captureBeyondViewport: true });
+        captures.push({ page: name, viewport: viewport.name, width: viewport.width, horizontalOverflow: false });
+      } finally {
+        await page.close();
+      }
+    }
+  }
+  return captures;
+}
+
 async function main() {
   if (!['worst', 'normal', 'empty'].includes(DATASET)) {
     throw new Error('VISUAL_DATASET doit valoir worst, normal ou empty.');
@@ -964,6 +1010,7 @@ async function main() {
         await page.close();
       }
     }
+    const publicPages = await capturePublicPages(browser, baseUrl, fixtures, OUTPUT_DIR);
     const compactSidebar = await verifyCompactSidebar(browser, baseUrl, fixtures);
     const shell = await verifyWorkspaceShell(browser, baseUrl, fixtures);
     const motion = await verifyMotion(browser, baseUrl, fixtures);
@@ -973,12 +1020,13 @@ async function main() {
       dataset: DATASET,
       generatedAt: new Date().toISOString(),
       pages: results,
+      publicPages,
       motion,
       compactSidebar,
       workspaceShell: shell,
       themeAndZoom,
       documentFlows,
-      screenshots: results.length + 2,
+      screenshots: results.length + 2 + publicPages.length,
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
