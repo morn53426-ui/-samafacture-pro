@@ -11,8 +11,8 @@ const {
 
 const router = express.Router();
 
-// Tarifs des plans payants (FCFA / mois). À ajuster selon votre marché — ce sont des
-// valeurs de départ raisonnables pour des PME/commerçants d'Afrique de l'Ouest.
+// Montants des achats ponctuels de plans payants (FCFA). Ils sont débités une seule fois
+// par commande ; aucun abonnement récurrent ni prélèvement automatique n'est créé.
 const TARIFS = {
   starter: 5000,
   pro: 15000,
@@ -41,13 +41,20 @@ function baseUrl(req) {
  *               properties:
  *                 wave: { type: boolean }
  *                 paydunya: { type: boolean }
- *                 tarifs: { type: object, properties: { starter: { type: integer }, pro: { type: integer }, entreprise: { type: integer } } }
+ *                 tarifs: { type: object, properties: { starter: { type: integer }, pro: { type: integer }, entreprise: { type: integer } } }\n                 facturation:\n                   type: object\n                   properties:\n                     mode: { type: string, enum: [paiement_unique] }\n                     renouvellement_automatique: { type: boolean }\n                     expiration_automatique: { type: boolean }\n                     acces_jusqua_changement_manuel: { type: boolean }\n                     activation: { type: string, enum: [apres_confirmation] }
  */
 router.get('/moyens-disponibles', requireAuth, (req, res) => {
   res.json({
     wave: waveConfigured(),
     paydunya: paydunyaConfigured(),
-    tarifs: TARIFS
+    tarifs: TARIFS,
+    facturation: {
+      mode: 'paiement_unique',
+      renouvellement_automatique: false,
+      expiration_automatique: false,
+      acces_jusqua_changement_manuel: true,
+      activation: 'apres_confirmation'
+    }
   });
 });
 
