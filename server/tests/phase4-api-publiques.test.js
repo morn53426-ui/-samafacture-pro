@@ -15,7 +15,7 @@ describe('Phase 4 — API publiques : plus de fuite de données internes', () =>
 
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Phase4', email, password: 'motdepasse123', entreprise_nom: 'Boutique Phase4' });
+      .send({ nom: 'Testeur Phase4', email, password: 'motdepasse123', entreprise_nom: 'Boutique Phase4' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
 
