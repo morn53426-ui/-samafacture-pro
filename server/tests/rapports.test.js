@@ -83,6 +83,13 @@ describe('Rapports', () => {
     assert.equal(res.headers['content-type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     assert.match(res.headers['content-disposition'] || '', /\.xlsx"?$/);
     assert.ok(Number(res.headers['content-length']) > 0, 'le fichier généré ne doit pas être vide');
+
+    const workbook = new (require('exceljs').Workbook)();
+    await workbook.xlsx.load(res.body);
+    assert.deepEqual(workbook.worksheets.map(sheet => sheet.name), ['Ventes', 'Dépenses']);
+    assert.equal(workbook.getWorksheet('Ventes').getCell('A1').value, 'Période / Client');
+    assert.equal(workbook.getWorksheet('Dépenses').getCell('A1').value, 'Libellé');
+    assert.equal(Number(workbook.getWorksheet('Dépenses').getCell('D2').value), 500);
   });
 
   test('un utilisateur B ne voit jamais les ventes/dépenses de A dans ses rapports', async () => {
