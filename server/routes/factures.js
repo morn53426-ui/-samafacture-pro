@@ -166,9 +166,12 @@ function computeTotals(lignes, remise, frais_livraison) {
       ligne.ligneHTCents * ligne.tvaHundredths,
       taxScale
     );
+    const {
+      ligneHTCents, tvaHundredths, ligneHTNetteCents, ...lignePublique
+    } = ligne;
     return {
-      ...ligne,
-      total_ligne: centsToAmount(ligne.ligneHTCents + totalLigneTVACents, 'Total de ligne')
+      ...lignePublique,
+      total_ligne: centsToAmount(ligneHTCents + totalLigneTVACents, 'Total de ligne')
     };
   });
 
@@ -442,6 +445,10 @@ router.post('/', async (req, res, next) => {
     const [clientRows] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client_id, req.tenantId]);
     if (!clientRows.length) {
       return res.status(400).json({ error: 'Client invalide.' });
+    }
+
+    if (lignes.some((ligne) => !ligne || typeof ligne !== 'object' || Array.isArray(ligne))) {
+      return res.status(400).json({ error: 'Chaque ligne doit être un objet de facture valide.' });
     }
 
     let lignesValidees;
