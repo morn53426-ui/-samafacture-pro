@@ -167,6 +167,9 @@ async function runMigrations(conn) {
     { table: 'users', column: 'reset_token_hash', definition: 'VARCHAR(64)' },
     { table: 'users', column: 'reset_token_expires', definition: 'DATETIME' },
     { table: 'users', column: 'signature_default', definition: 'MEDIUMTEXT' },
+    { table: 'users', column: 'terms_accepted_at', definition: 'DATETIME NULL' },
+    { table: 'users', column: 'terms_version', definition: 'VARCHAR(30) NULL' },
+    { table: 'users', column: 'privacy_version', definition: 'VARCHAR(30) NULL' }
     { table: 'users', column: 'pays_code', definition: "VARCHAR(2) NOT NULL DEFAULT 'SN'" },
     { table: 'users', column: 'langue', definition: "VARCHAR(5) NOT NULL DEFAULT 'fr'" },
     { table: 'users', column: 'locale', definition: "VARCHAR(12) NOT NULL DEFAULT 'fr-SN'" },
