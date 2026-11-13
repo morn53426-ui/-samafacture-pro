@@ -55,7 +55,7 @@ jobs:
         working-directory: server
         run: |
           rm -rf "$HOME/.cache/puppeteer"
-          npx puppeteer browsers install chrome
+          PUPPETEER_SKIP_DOWNLOAD=false node node_modules/puppeteer/install.mjs
 
       - name: Vérifier le script de recette staging
         working-directory: server
