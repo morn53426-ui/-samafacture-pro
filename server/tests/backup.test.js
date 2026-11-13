@@ -3,12 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const zlib = require('zlib');
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'samafacture-backup-test-'));
 process.env.BACKUP_DIR = path.join(tempRoot, 'backups');
 
 const { pool, setupTestDatabase, teardownTestEnvironment } = require('./setup');
-const { executerSauvegardeQuotidienne, BACKUP_DIR } = require('../config/backup');
+const { executerSauvegardeQuotidienne, effectuerSauvegarde, BACKUP_DIR } = require('../config/backup');
+const { preparerFluxGzip } = require('../restore-backup');
 
 const fakeDump = path.join(tempRoot, 'fake-mysqldump.sh');
 
@@ -57,6 +59,25 @@ describe('Sauvegardes automatiques', () => {
 
     const doublon = await executerSauvegardeQuotidienne();
     assert.equal(doublon, false, 'une seule sauvegarde quotidienne doit être enregistrée');
+  });
+
+  test('une sauvegarde avec clé est chiffrée et déchiffrable avant restauration', async () => {
+    ecrireFauxDump(0);
+    process.env.MYSQLDUMP_PATH = fakeDump;
+    process.env.BACKUP_ENCRYPTION_KEY = 'ab'.repeat(32);
+
+    const result = await effectuerSauvegarde();
+    assert.ok(result.path.endsWith('.sql.gz.enc'));
+
+    const prepared = await preparerFluxGzip(result.path);
+    try {
+      assert.equal(prepared.temporary, true);
+      const sql = zlib.gunzipSync(await fs.promises.readFile(prepared.gzipPath)).toString('utf8');
+      assert.match(sql, /CREATE TABLE backup_test_fixture/);
+    } finally {
+      await fs.promises.unlink(prepared.gzipPath).catch(() => {});
+      delete process.env.BACKUP_ENCRYPTION_KEY;
+    }
   });
 });
 
