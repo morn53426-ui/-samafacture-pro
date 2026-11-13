@@ -20,6 +20,7 @@ const PAGES = [
   { name: 'clients', file: 'clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
   { name: 'produits', file: 'produits.html', ready: '#produits-body tr:not(.row-skeleton)' },
   { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
+  { name: 'factures-recurrentes', file: 'factures-recurrentes.html', ready: '#recurrentes-body tr' },
   { name: 'devis', file: 'devis.html', ready: '#devis-body tr', responsiveTable: '#devis-body' },
   { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
   { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'], responsiveTable: '#table-body' },
@@ -231,6 +232,7 @@ const CHART_STUB = [
 ].join('\n');
 
 function fixtureFor(pathname, fixtures) {
+  if (pathname === '/api/factures-recurrentes') return { recurrentes: [] };
   if (pathname === '/api/dashboard') return fixtures.dashboard;
   if (pathname === '/api/rapports/ventes') return { rows: fixtures.ventes };
   if (pathname === '/api/clients') return {
@@ -438,18 +440,27 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       hasKicker,
       dataHeading: Boolean(main?.querySelector('.workspace-data-heading')),
       filterPanel: Boolean(main?.querySelector('.workspace-filter-card')),
-      unhydratedIcons
+      unhydratedIcons,
+      headingFont: getComputedStyle(document.querySelector('h1')).fontFamily,
+      bodyFont: getComputedStyle(document.body).fontFamily
     };
   });
-  const structuredPages = ['dashboard', 'clients', 'produits', 'factures', 'devis', 'depenses', 'rapports', 'finances', 'crm'];
+  const structuredPages = ['dashboard', 'clients', 'produits', 'factures', 'factures-recurrentes', 'devis', 'depenses', 'rapports', 'finances', 'crm', 'internationalisation', 'automatisations', 'nouvelle-facture'];
   if (structuredPages.includes(pageDefinition.name)) {
     assert.equal(layoutAudit.workspacePage, true, pageDefinition.name + ' doit utiliser le cadre de page commun.');
     assert.equal(layoutAudit.hasHeader, true, pageDefinition.name + ' doit présenter un en-tête de page clair.');
     assert.equal(layoutAudit.hasKicker, true, pageDefinition.name + ' doit identifier clairement la section métier.');
   }
-  const tableHeadingPages = ['clients', 'produits', 'devis', 'depenses', 'rapports'];
+  const tableHeadingPages = ['clients', 'produits', 'factures-recurrentes', 'devis', 'depenses', 'rapports'];
   if (tableHeadingPages.includes(pageDefinition.name)) {
     assert.equal(layoutAudit.dataHeading, true, pageDefinition.name + ' doit titrer sa zone de données.');
+  }
+  assert.ok(layoutAudit.headingFont.toLowerCase().includes('manrope'),
+    pageDefinition.name + ' doit utiliser Manrope pour les titres.');
+  assert.ok(layoutAudit.bodyFont.toLowerCase().includes('inter'),
+    pageDefinition.name + ' doit utiliser Inter pour les textes.');
+  if (['clients', 'rapports'].includes(pageDefinition.name)) {
+    assert.equal(layoutAudit.filterPanel, true, pageDefinition.name + ' doit séparer les filtres du contenu métier.');
   }
   assert.deepEqual(layoutAudit.unhydratedIcons, [],
     pageDefinition.name + ' contient des icônes statiques non reconnues : ' + JSON.stringify(layoutAudit.unhydratedIcons));
