@@ -465,6 +465,32 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   assert.deepEqual(layoutAudit.unhydratedIcons, [],
     pageDefinition.name + ' contient des icônes statiques non reconnues : ' + JSON.stringify(layoutAudit.unhydratedIcons));
 
+  const navigationGeometry = await page.evaluate(() => {
+    const sidebar = document.getElementById('app-sidebar');
+    const main = document.querySelector('.main-content');
+    return {
+      viewport: window.innerWidth,
+      sidebarWidth: sidebar ? Math.round(sidebar.getBoundingClientRect().width) : null,
+      sidebarCollapsed: Boolean(sidebar?.classList.contains('is-collapsed')),
+      sidebarOpen: Boolean(sidebar?.classList.contains('open')),
+      overlayVisible: document.getElementById('sidebar-overlay')?.classList.contains('show') || false,
+      mainLeft: main ? Math.round(main.getBoundingClientRect().left) : null,
+      expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim()
+    };
+  });
+  if (!pageDefinition.public && viewport.width >= 901) {
+    assert.equal(navigationGeometry.sidebarCollapsed, true,
+      pageDefinition.name + ' : le menu de bureau doit démarrer compact.');
+    assert.equal(navigationGeometry.sidebarWidth, 76,
+      pageDefinition.name + ' : la largeur réelle du rail desktop doit rester à 76 px : ' + JSON.stringify(navigationGeometry));
+    assert.equal(navigationGeometry.mainLeft, 76,
+      pageDefinition.name + ' : le contenu principal doit commencer après le rail compact : ' + JSON.stringify(navigationGeometry));
+    assert.equal(navigationGeometry.sidebarOpen, false,
+      pageDefinition.name + ' : le tiroir mobile ne doit pas s’ouvrir sur ordinateur.');
+    assert.equal(navigationGeometry.overlayVisible, false,
+      pageDefinition.name + ' : aucun voile de navigation ne doit masquer le contenu desktop.');
+  }
+
   const metrics = await page.evaluate(() => ({
     viewport: window.innerWidth,
     document: document.documentElement.scrollWidth,
