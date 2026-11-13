@@ -44,7 +44,7 @@ Périmètre : pages publiques, inscription/connexion, confidentialité, conditio
 | 11 | Prix, taxes et périodicité affichés sans ambiguïté | **À vérifier avant achat — P1** |
 | 12 | Renouvellement et modification de prix expliqués | **À compléter — P0** |
 | 13 | Résiliation et remboursement documentés | **Manquant — P0** |
-| 14 | Consentement contractuel à l'inscription enregistré | **Manquant — P0** |
+| 14 | Consentement contractuel à l'inscription enregistré | **Correction technique ajoutée** : case obligatoire, contrôle API et versions datées enregistrées pour l'inscription email et nouvelle création Google. Recette CI à confirmer. |
 | 15 | Consentements marketing facultatifs séparés et non précochés | **À vérifier / non identifié** |
 | 16 | Aucune publicité trompeuse, faux avis ou frais cachés | **Audit éditorial à terminer** |
 | 17 | Images, polices, icônes et contenus utilisés sous licence | **Justificatifs à vérifier** |
@@ -56,9 +56,9 @@ Périmètre : pages publiques, inscription/connexion, confidentialité, conditio
 
 - `public/confidentialite.html` : mention « Modèle à valider avant publication », date à compléter ; décrit les données de compte, d'entreprise et de facturation, mais ne détaille pas suffisamment les traitements de sécurité/monitoring, les durées, les destinataires et les transferts.
 - `public/conditions.html` : mention « Modèle à valider avant publication », date à compléter ; la section 6 reporte les règles de facturation, résiliation et remboursement à une publication ultérieure.
-- `public/register.html` : champs nom, entreprise, email et mot de passe ; labels associés et attributs d'autocomplétion corrigés. Aucun consentement explicite ou lien d'acceptation n'est encore présent dans le formulaire.
-- `server/routes/auth.js` : la route d'inscription vérifie les champs et la longueur du mot de passe, mais ne reçoit pas de preuve d'acceptation des conditions.
-- `public/js/api.js` : le jeton et le profil sont conservés dans localStorage ; le commentaire de code décrit aussi un cookie de session HttpOnly supprimé à la déconnexion.
+- `public/register.html` : labels et autocomplétion corrigés ; case obligatoire d'acceptation des CGU et de prise de connaissance de la politique ajoutée. Le consentement est envoyé à l'API.
+- `server/routes/auth.js` : l'inscription refuse l'absence d'acceptation ; les versions des CGU et de la politique et la date d'acceptation sont enregistrées dans les colonnes utilisateurs. Les nouvelles créations via Google suivent la même règle.
+- `public/js/api.js` : le jeton et le profil sont conservés dans localStorage ; le serveur pose également un cookie de session HttpOnly. La page de confidentialité a été corrigée pour ne plus prétendre que le stockage local est l'unique mécanisme.
 - `public/index.html`, `login.html`, `register.html`, `support.html`, `confidentialite.html`, `conditions.html` : les URL de démonstration `https://votredomaine.com` ont été retirées des balises canoniques/Open Graph auditées. Le domaine public réel devra être configuré ultérieurement.
 - `public/abonnement.html` et `server/routes/abonnement.js` : les plans et tarifs sont affichés côté client mais les montants de référence sont définis côté serveur ; les paiements dépendent de la configuration réelle des prestataires.
 
@@ -80,6 +80,8 @@ Périmètre : pages publiques, inscription/connexion, confidentialité, conditio
 ## Corrections techniques réalisées dans la branche
 
 - Retrait des URL de démonstration `votredomaine.com` des balises canoniques et Open Graph de l'accueil, connexion, inscription, support, confidentialité et conditions ; aucun domaine réel n'a été inventé.
+- Ajout d'une acceptation obligatoire des CGU et d'une prise de connaissance de la politique de confidentialité à l'inscription email et aux nouvelles créations de compte Google. L'API vérifie le booléen et enregistre la date ainsi que les versions acceptées.
+- Correction de la description des stockages de session dans la politique de confidentialité ; inventaire complet des traceurs encore requis.
 - Correction de la syntaxe JSON-LD de l'organisation sur l'accueil après retrait de l'URL fictive.
 - Association explicite des labels aux champs email/mot de passe de connexion et nom/entreprise/email/mot de passe d'inscription ; ajout des attributs `autocomplete`, `name` et `minlength=8` pour le mot de passe.
 - Ajout de ce rapport d'audit à la branche.
