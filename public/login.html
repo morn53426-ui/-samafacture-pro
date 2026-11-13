@@ -8,7 +8,6 @@
 <title>Connexion — SamaFacture Pro</title>
 <meta name="description" content="Connectez-vous à SamaFacture Pro pour gérer vos factures, devis, clients et paiements." />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="canonical" href="https://votredomaine.com/login.html" />
 <meta name="robots" content="index, follow" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="manifest" href="manifest.json" />
@@ -36,15 +35,15 @@
 
         <form id="login-form">
           <div class="field">
-            <label>Adresse email</label>
-            <input type="email" id="email" required placeholder="vous@entreprise.com" />
+            <label for="email">Adresse email</label>
+            <input type="email" id="email" name="email" autocomplete="username" required placeholder="vous@entreprise.com" />
           </div>
           <div class="field">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <label style="margin-bottom:0;">Mot de passe</label>
+              <label for="password" style="margin-bottom:0;">Mot de passe</label>
               <a href="mot-de-passe-oublie.html" style="font-size:0.8rem; color:var(--emerald); font-weight:600;">Mot de passe oublié ?</a>
             </div>
-            <input type="password" id="password" required placeholder="••••••••" />
+            <input type="password" id="password" name="password" autocomplete="current-password" required placeholder="••••••••" />
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; padding:12px;">Se connecter</button>
         </form>
