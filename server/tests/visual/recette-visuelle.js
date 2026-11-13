@@ -631,6 +631,81 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   return { globalSearch: 'ok', mobileNavigation: 'ok', notifications: 'ok' };
 }
 
+async function verifyCompactSidebar(browser, baseUrl, fixtures) {
+  const page = await preparePage(browser, baseUrl, fixtures, false);
+  await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await page.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+
+  const compact = await page.evaluate(() => ({
+    collapsed: document.getElementById('app-sidebar')?.classList.contains('is-collapsed'),
+    sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
+    mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
+    bodyState: document.body.classList.contains('sidebar-collapsed'),
+    labelsHidden: [...document.querySelectorAll('.nav-label')].every(element => getComputedStyle(element).display === 'none'),
+    promoRemoved: !document.querySelector('.sidebar-promo'),
+    toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded'),
+    headingFont: getComputedStyle(document.querySelector('.page-header h1') || document.querySelector('h1')).fontFamily,
+    bodyFont: getComputedStyle(document.body).fontFamily,
+    iconsConsistent: [...document.querySelectorAll('.nav-item svg.icon')].length > 0 &&
+      [...document.querySelectorAll('.nav-item svg.icon')].every(icon =>
+        icon.getAttribute('viewBox') === '0 0 24 24' &&
+        icon.getAttribute('stroke-linecap') === 'round' &&
+        icon.getAttribute('stroke-linejoin') === 'round')
+  }));
+  assert.deepEqual(compact, {
+    collapsed: true,
+    sidebarWidth: 76,
+    mainMargin: 76,
+    bodyState: true,
+    labelsHidden: true,
+    promoRemoved: true,
+    toggleExpanded: 'false',
+    headingFont: 'Manrope, sans-serif',
+    bodyFont: 'Inter, sans-serif',
+    iconsConsistent: true
+  }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
+
+  await page.click('#sidebar-collapse-toggle');
+  await new Promise(resolve => setTimeout(resolve, 240));
+  const expanded = await page.evaluate(() => ({
+    collapsed: document.getElementById('app-sidebar')?.classList.contains('is-collapsed'),
+    sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
+    mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
+    toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded')
+  }));
+  assert.deepEqual(expanded, {
+    collapsed: false,
+    sidebarWidth: 248,
+    mainMargin: 248,
+    toggleExpanded: 'true'
+  }, 'Le bouton doit élargir la navigation et réaligner la zone de travail.');
+
+  await page.click('#sidebar-collapse-toggle');
+  await new Promise(resolve => setTimeout(resolve, 240));
+  assert.equal(await page.evaluate(() => localStorage.getItem('sf-sidebar-collapsed')), 'true',
+    'La préférence compacte doit être mémorisée.');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  assert.equal(await page.$eval('#app-sidebar', element => element.classList.contains('is-collapsed')), true,
+    'La navigation doit conserver le mode compact après un changement de page.');
+
+  await page.setViewport({ width: 768, height: 1024, deviceScaleFactor: 1 });
+  const tablet = await page.evaluate(() => ({
+    mobileToggleVisible: getComputedStyle(document.getElementById('mobile-toggle-btn')).display !== 'none',
+    desktopToggleHidden: getComputedStyle(document.getElementById('sidebar-collapse-toggle')).display === 'none',
+    mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0)
+  }));
+  assert.deepEqual(tablet, {
+    mobileToggleVisible: true,
+    desktopToggleHidden: true,
+    mainMargin: 0
+  }, 'À la largeur tablette, le menu mobile doit prendre le relais sans marge latérale.');
+
+  await page.close();
+  return { desktopCompact: 'ok', desktopExpandCollapse: 'ok', preferencePersistence: 'ok', tabletNavigation: 'ok' };
+}
+
 function contrastRatio(foreground, background) {
   function luminance(color) {
     let channels;
@@ -812,6 +887,7 @@ async function main() {
         await page.close();
       }
     }
+    const compactSidebar = await verifyCompactSidebar(browser, baseUrl, fixtures);
     const shell = await verifyWorkspaceShell(browser, baseUrl, fixtures);
     const motion = await verifyMotion(browser, baseUrl, fixtures);
     const themeAndZoom = await verifyThemeAndZoom(browser, baseUrl, fixtures);
@@ -821,6 +897,7 @@ async function main() {
       generatedAt: new Date().toISOString(),
       pages: results,
       motion,
+      compactSidebar,
       workspaceShell: shell,
       themeAndZoom,
       documentFlows,

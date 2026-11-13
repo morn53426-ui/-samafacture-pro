@@ -42,39 +42,43 @@ function renderSidebar(activePage) {
   ];
 
   const planLabels = { gratuit: 'Plan Gratuit', starter: 'Plan Starter', pro: 'Plan Pro', entreprise: 'Plan Entreprise' };
+  // Sur ordinateur, la navigation démarre en mode compact pour laisser la priorité
+  // à la zone de travail. La préférence utilisateur est conservée entre les pages.
+  const sidebarCollapsed = window.matchMedia('(min-width: 901px)').matches && (() => {
+    try { return localStorage.getItem('sf-sidebar-collapsed') !== 'false'; }
+    catch { return true; }
+  })();
+  document.body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
 
   const navHtml = nav.map(section => `
     ${section.group ? `<div class="nav-group-label">${section.group}</div>` : ''}
     ${section.items.map(item => `
-      <a href="${item.href}" class="nav-item ${(activePage === item.id || (activePage === 'nouvelle-facture' && item.id === 'factures')) ? 'active' : ''}" onclick="closeSidebar()">
-        <span class="ic">${Icon(item.icon)}</span><span>${item.label}</span>
+      <a href="${item.href}" class="nav-item ${(activePage === item.id || (activePage === 'nouvelle-facture' && item.id === 'factures')) ? 'active' : ''}" title="${item.label}" aria-label="${item.label}" onclick="closeSidebar()">
+        <span class="ic" aria-hidden="true">${Icon(item.icon)}</span><span class="nav-label">${item.label}</span>
       </a>
     `).join('')}
   `).join('');
 
   const html = `
-    <aside class="sidebar" id="app-sidebar">
+    <aside class="sidebar${sidebarCollapsed ? ' is-collapsed' : ''}" id="app-sidebar">
       <div class="sidebar-brand">
         <div class="mark"><img src="images/icon-192.png" alt="SamaFacture Pro" /></div>
-        <div>
+        <div class="sidebar-brand-copy">
           <div class="name">SamaFacture <span class="brand-pro">Pro</span></div>
           <div class="sub">Facturez • Gérez • Développez</div>
         </div>
+        <button type="button" class="sidebar-collapse-toggle" id="sidebar-collapse-toggle" onclick="toggleDesktopSidebar()" aria-label="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}" aria-expanded="${String(!sidebarCollapsed)}" title="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}">${Icon(sidebarCollapsed ? 'arrow-right' : 'arrow-left')}</button>
         <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu" aria-controls="app-navigation" aria-expanded="false">${Icon('menu')}</button>
       </div>
       <nav class="sidebar-nav" id="app-navigation" aria-label="Navigation principale">${navHtml}</nav>
-      <section class="sidebar-promo" aria-label="Présentation de SamaFacture Pro">
-        <div class="promo-icon" aria-hidden="true">✦</div>
-        <strong>SamaFacture Pro</strong>
-        <p>Votre espace pour gérer clients, produits, factures et suivi commercial.</p>
-        <a href="aide.html">Découvrir l'aide ${Icon('arrow-up-right')}</a>
-      </section>
       <div class="sidebar-foot">
         <button type="button" class="install-app-btn" style="display:none;" onclick="installApp()"><span class="ic">${Icon('smartphone')}</span> Installer l'application</button>
-        ${window.SamaTheme ? SamaTheme.boutonHtml() : ''}
-        <div class="plan-badge"><span class="ic">${Icon('star')}</span> ${planLabels[user?.plan] || 'Plan Gratuit'}</div>
-        <div>${escapeHtml(user?.entreprise_nom || user?.nom)}</div>
-        <div style="margin-top:10px; cursor:pointer; color:#B7C0DA; display:flex; align-items:center; gap:6px;" onclick="Api.clearSession(); location.href='login.html';"><span class="ic">${Icon('log-out')}</span> Se déconnecter</div>
+        <div class="sidebar-theme-control">${window.SamaTheme ? SamaTheme.boutonHtml() : ''}</div>
+        <div class="sidebar-user-info">
+          <div class="plan-badge"><span class="ic">${Icon('star')}</span> ${planLabels[user?.plan] || 'Plan Gratuit'}</div>
+          <div class="sidebar-user-name">${escapeHtml(user?.entreprise_nom || user?.nom || 'Mon compte')}</div>
+        </div>
+        <button type="button" class="sidebar-logout" onclick="Api.clearSession(); location.href='login.html';" aria-label="Se déconnecter" title="Se déconnecter"><span class="ic" aria-hidden="true">${Icon('log-out')}</span><span class="sidebar-logout-label">Se déconnecter</span></button>
       </div>
     </aside>
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -96,6 +100,23 @@ function toggleSidebar() {
     btn.setAttribute('aria-label', isOpen ? 'Fermer le menu' : 'Ouvrir le menu');
   }
 }
+function toggleDesktopSidebar() {
+  const sidebar = document.getElementById('app-sidebar');
+  const button = document.getElementById('sidebar-collapse-toggle');
+  if (!sidebar || window.matchMedia('(max-width: 900px)').matches) return;
+
+  const isCollapsed = sidebar.classList.toggle('is-collapsed');
+  document.body.classList.toggle('sidebar-collapsed', isCollapsed);
+  try { localStorage.setItem('sf-sidebar-collapsed', String(isCollapsed)); } catch { /* préférence facultative */ }
+
+  if (button) {
+    button.innerHTML = Icon(isCollapsed ? 'arrow-right' : 'arrow-left');
+    button.setAttribute('aria-expanded', String(!isCollapsed));
+    button.setAttribute('aria-label', isCollapsed ? 'Élargir le menu' : 'Réduire le menu');
+    button.title = isCollapsed ? 'Élargir le menu' : 'Réduire le menu';
+  }
+}
+
 function closeSidebar() {
   document.getElementById('app-sidebar')?.classList.remove('open');
   document.getElementById('sidebar-overlay')?.classList.remove('show');
