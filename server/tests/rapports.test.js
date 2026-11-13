@@ -11,7 +11,7 @@ describe('Rapports', () => {
     await setupTestDatabase();
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Rapports', email: emailDeTest('rapports'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Rapports', email: emailDeTest('rapports'), password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
 
@@ -107,7 +107,7 @@ describe('Rapports', () => {
   test('un utilisateur B ne voit jamais les ventes/dépenses de A dans ses rapports', async () => {
     const b = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Rapports B', email: emailDeTest('rapports-b'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Rapports B', email: emailDeTest('rapports-b'), password: 'motdepasse123' , acceptTerms: true});
     const res = await request(app).get('/api/rapports/comptabilite').set('Authorization', `Bearer ${b.body.token}`);
     assert.equal(Number(res.body.recettes), 0);
     assert.equal(Number(res.body.depenses), 0);
