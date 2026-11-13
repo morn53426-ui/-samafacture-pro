@@ -2,6 +2,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const crypto = require('crypto');
 const { pipeline } = require('stream/promises');
 const { pool } = require('./db');
 const { captureException } = require('./monitoring');
@@ -11,13 +12,24 @@ const BACKUP_DIR = process.env.BACKUP_DIR
   : path.join(__dirname, '..', 'backups');
 const DAILY_BACKUP_LOCK = 'samafacture:backup-daily';
 
+const BACKUP_MAGIC = Buffer.from('SFBK1');
+
+function getBackupEncryptionKey() {
+  const value = process.env.BACKUP_ENCRYPTION_KEY;
+  if (!value) return null;
+  if (!/^[a-fA-F0-9]{64}$/.test(value)) {
+    throw new Error('BACKUP_ENCRYPTION_KEY doit être une clé hexadécimale de 64 caractères (32 octets).');
+  }
+  return Buffer.from(value, 'hex');
+}
+
 function isBackupEnabled() {
   return process.env.BACKUP_ENABLED !== 'false';
 }
 
 /** Lance mysqldump et vérifie à la fois la fermeture du processus et celle du flux gzip.
  * Un fichier gzip partiel ne doit jamais être considéré comme une sauvegarde réussie. */
-async function runMysqldump(outputPath) {
+async function runMysqldump(outputPath, encryptionKey = null) {
   const bin = process.env.MYSQLDUMP_PATH || 'mysqldump';
   const args = [
     `--host=${process.env.DB_HOST || 'localhost'}`,
@@ -42,17 +54,28 @@ async function runMysqldump(outputPath) {
       else reject(new Error(`mysqldump a échoué (code ${code ?? 'inconnu'}, signal ${signal || 'aucun'}) : ${stderr.slice(0, 500)}`));
     });
   });
-  const pipePromise = pipeline(
-    dump.stdout,
-    zlib.createGzip(),
-    fs.createWriteStream(outputPath, { flags: 'wx', mode: 0o600 })
-  );
+
+  let cipher = null;
+  const gzip = zlib.createGzip();
+  const output = fs.createWriteStream(outputPath, { flags: 'wx', mode: 0o600 });
+  if (encryptionKey) {
+    const iv = crypto.randomBytes(12);
+    cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey, iv);
+    output.write(Buffer.concat([BACKUP_MAGIC, iv]));
+  }
+  const pipePromise = encryptionKey
+    ? pipeline(dump.stdout, gzip, cipher, output)
+    : pipeline(dump.stdout, gzip, output);
 
   const results = await Promise.allSettled([exitPromise, pipePromise]);
   const failed = results.find((result) => result.status === 'rejected');
   if (failed) {
     if (dump.exitCode === null && !dump.killed) dump.kill('SIGTERM');
     throw failed.reason;
+  }
+
+  if (cipher) {
+    await fs.promises.appendFile(outputPath, cipher.getAuthTag(), { mode: 0o600 });
   }
 }
 
@@ -62,7 +85,7 @@ async function nettoyerAnciennesSauvegardes() {
   const limite = Date.now() - retentionJours * 24 * 60 * 60 * 1000;
   const fichiers = await fs.promises.readdir(BACKUP_DIR).catch(() => []);
   for (const fichier of fichiers) {
-    if (!fichier.startsWith('samafacture-') || !fichier.endsWith('.sql.gz')) continue;
+    if (!fichier.startsWith('samafacture-') || !(fichier.endsWith('.sql.gz') || fichier.endsWith('.sql.gz.enc'))) continue;
     const chemin = path.join(BACKUP_DIR, fichier);
     const stat = await fs.promises.stat(chemin).catch(() => null);
     if (stat && stat.mtimeMs < limite) {
@@ -74,16 +97,18 @@ async function nettoyerAnciennesSauvegardes() {
 
 /** Effectue une sauvegarde. En cas d'échec, l'appelant reçoit une erreur explicite. */
 async function effectuerSauvegarde() {
+  const encryptionKey = getBackupEncryptionKey();
   await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
   const horodatage = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const suffixe = require('crypto').randomBytes(3).toString('hex');
-  const fichier = path.join(BACKUP_DIR, `samafacture-${horodatage}-${suffixe}.sql.gz`);
+  const extension = encryptionKey ? '.sql.gz.enc' : '.sql.gz';
+  const fichier = path.join(BACKUP_DIR, `samafacture-${horodatage}-${suffixe}${extension}`);
 
   try {
-    await runMysqldump(fichier);
+    await runMysqldump(fichier, encryptionKey);
     const stat = await fs.promises.stat(fichier);
     if (!stat.size) throw new Error('mysqldump a produit un fichier vide.');
-    console.log(`💾 Sauvegarde de la base effectuée : ${fichier} (${(stat.size / 1024).toFixed(0)} Ko)`);
+    console.log(`💾 Sauvegarde de la base effectuée : ${fichier} (${(stat.size / 1024).toFixed(0)} Ko)${encryptionKey ? ' — chiffrée AES-256-GCM' : ' — non chiffrée (développement uniquement)'}`);
     await nettoyerAnciennesSauvegardes().catch((err) => {
       console.warn('Nettoyage des anciennes sauvegardes ignoré :', err.message);
     });
