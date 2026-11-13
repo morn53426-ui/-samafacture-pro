@@ -89,6 +89,24 @@ describe("Paiements d'abonnement", () => {
     assert.equal(apres.statut, 'en_attente', 'le paiement ne doit pas être crédité si le montant ne correspond pas');
   });
 
+  test('un renouvellement du plan déjà actif est confirmé sans faux échec SQL', async () => {
+    await pool.query("UPDATE users SET plan = 'pro' WHERE id = ?", [userId]);
+    const reference = `test-renouvellement-${Date.now()}`;
+    const [insert] = await pool.query(
+      `INSERT INTO abonnement_paiements (user_id, plan, montant, devise, fournisseur, reference, internal_reference, statut)
+       VALUES (?, 'pro', 15000, 'XOF', 'wave', ?, ?, 'en_attente')`,
+      [userId, reference, reference]
+    );
+    const { confirmerPaiementPourTests } = require('../routes/abonnement');
+    const [[paiement]] = await pool.query('SELECT * FROM abonnement_paiements WHERE id = ?', [insert.insertId]);
+
+    assert.equal(await confirmerPaiementPourTests(paiement, 15000), true);
+    const [[apres]] = await pool.query('SELECT statut FROM abonnement_paiements WHERE id = ?', [insert.insertId]);
+    const [[utilisateur]] = await pool.query('SELECT plan FROM users WHERE id = ?', [userId]);
+    assert.equal(apres.statut, 'payee');
+    assert.equal(utilisateur.plan, 'pro');
+  });
+
   test('une confirmation sans montant fourni par le prestataire ne peut pas activer un plan', async () => {
     // Le test d'idempotence précédent active Starter sur ce même utilisateur.
     // On repart explicitement du plan Gratuit pour tester l'absence de rétrogradation.
