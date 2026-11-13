@@ -18,8 +18,8 @@ Périmètre : pages publiques, inscription/connexion, confidentialité, conditio
 | Cookies et stockage local | La politique ne décrit que le stockage local de session et affirme l'absence de cookies publicitaires. Le code utilise localStorage pour le jeton/profil, un cookie de session HttpOnly, et un service worker/PWA. Un inventaire complet des traceurs et services activés reste nécessaire. | P1 |
 | Prestataires et transferts | Google Identity, Wave/PayDunya, email et monitoring sont présents dans le code ou prévus par configuration. Les finalités, catégories de données, lieux de traitement et durées doivent être documentés précisément selon les services effectivement activés. | P1 |
 | Droits des personnes et suppression | La politique renvoie à une fonction de réinitialisation pour supprimer des données transactionnelles et au support pour la suppression complète. Il faut vérifier les effets réels, les sauvegardes, les délais et le traitement des demandes. | P1 |
-| SEO et transparence du domaine | Les pages d'accueil, connexion, inscription, support, confidentialité et conditions contiennent encore des URL canoniques ou Open Graph en `votredomaine.com`. | P1 |
-| Accessibilité des formulaires | Plusieurs champs d'authentification ont des labels visuels sans association explicite `for/id`. À corriger et tester avec lecteur d'écran et clavier. | P1 |
+| SEO et transparence du domaine | **Corrigé dans cette branche** : les URL canoniques/Open Graph de démonstration ont été retirées des pages auditées jusqu'à ce que le domaine réel soit confirmé. | Corrigé techniquement |
+| Accessibilité des formulaires | **Correction partielle** : labels associés, attributs `autocomplete`, `name` et `minlength=8` ajoutés aux formulaires de connexion/inscription. Les tests clavier et lecteur d'écran restent à exécuter. | P1 — recette requise |
 | Sécurité des comptes | Le code vérifié comprend hachage bcrypt, limitation des tentatives, sessions JWT et cookie HttpOnly. Cela ne remplace pas une recette de sécurité complète. | Contrôle partiel |
 | Transparence des prix | Les prix des abonnements sont définis côté serveur (Starter 5 000, Pro 15 000, Entreprise 35 000 FCFA/mois). Vérifier affichage TTC/HT, taxes éventuelles, renouvellement, date de débit et changement de prix avant achat. | P1 |
 | Avis, témoignages et allégations | Aucune preuve suffisante pour certifier l'ensemble des pages et campagnes ; audit éditorial à terminer. | À vérifier |
@@ -31,10 +31,10 @@ Périmètre : pages publiques, inscription/connexion, confidentialité, conditio
 
 - `public/confidentialite.html` : mention « Modèle à valider avant publication », date à compléter ; décrit les données de compte, d'entreprise et de facturation, mais ne détaille pas suffisamment les traitements de sécurité/monitoring, les durées, les destinataires et les transferts.
 - `public/conditions.html` : mention « Modèle à valider avant publication », date à compléter ; la section 6 reporte les règles de facturation, résiliation et remboursement à une publication ultérieure.
-- `public/register.html` : champs nom, entreprise, email et mot de passe ; aucun consentement explicite ou lien d'acceptation dans le formulaire.
+- `public/register.html` : champs nom, entreprise, email et mot de passe ; labels associés et attributs d'autocomplétion corrigés. Aucun consentement explicite ou lien d'acceptation n'est encore présent dans le formulaire.
 - `server/routes/auth.js` : la route d'inscription vérifie les champs et la longueur du mot de passe, mais ne reçoit pas de preuve d'acceptation des conditions.
 - `public/js/api.js` : le jeton et le profil sont conservés dans localStorage ; le commentaire de code décrit aussi un cookie de session HttpOnly supprimé à la déconnexion.
-- `public/index.html`, `login.html`, `register.html`, `support.html`, `confidentialite.html`, `conditions.html` : présence d'URL de démonstration `https://votredomaine.com`.
+- `public/index.html`, `login.html`, `register.html`, `support.html`, `confidentialite.html`, `conditions.html` : les URL de démonstration `https://votredomaine.com` ont été retirées des balises canoniques/Open Graph auditées. Le domaine public réel devra être configuré ultérieurement.
 - `public/abonnement.html` et `server/routes/abonnement.js` : les plans et tarifs sont affichés côté client mais les montants de référence sont définis côté serveur ; les paiements dépendent de la configuration réelle des prestataires.
 
 ## Actions obligatoires avant ouverture au public
@@ -51,6 +51,15 @@ Périmètre : pages publiques, inscription/connexion, confidentialité, conditio
 10. Vérifier les licences des photos, polices, icônes et autres contenus tiers.
 11. Effectuer des transactions sandbox Wave/PayDunya, y compris échec, remboursement si disponible, doublon de webhook et annulation.
 12. Faire réaliser une revue juridique et une recette de préproduction sur données fictives/anonymisées avant toute mise en ligne.
+
+## Corrections techniques réalisées dans la branche
+
+- Retrait des URL de démonstration `votredomaine.com` des balises canoniques et Open Graph de l'accueil, connexion, inscription, support, confidentialité et conditions ; aucun domaine réel n'a été inventé.
+- Correction de la syntaxe JSON-LD de l'organisation sur l'accueil après retrait de l'URL fictive.
+- Association explicite des labels aux champs email/mot de passe de connexion et nom/entreprise/email/mot de passe d'inscription ; ajout des attributs `autocomplete`, `name` et `minlength=8` pour le mot de passe.
+- Ajout de ce rapport d'audit à la branche.
+
+Ces changements ne résolvent pas les blocages P0 (identité juridique, politique de confidentialité validée, conditions de vente/remboursement et preuve de consentement). Ils doivent être traités avant l'ouverture publique.
 
 ## Limites de cet audit
 
