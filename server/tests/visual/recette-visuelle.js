@@ -411,6 +411,15 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await new Promise((resolve) => setTimeout(resolve, 120));
 
+  if (!pageDefinition.public && viewport.width >= 901) {
+    const geometry = await page.evaluate(() => ({
+      sidebarRight: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().right || 0),
+      headingLeft: Math.round(document.querySelector('main.workspace-page h1')?.getBoundingClientRect().left || 0)
+    }));
+    assert.ok(geometry.headingLeft >= geometry.sidebarRight + 24,
+      pageDefinition.name + ' : le titre ne doit pas passer sous le rail latéral. ' + JSON.stringify(geometry));
+  }
+
   if (!pageDefinition.public) {
     const shell = await page.evaluate(() => ({
       toolbar: Boolean(document.querySelector('.app-topbar')),
@@ -601,7 +610,13 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   }));
   await normalPage.mouse.up();
   assert.equal(buttonState.active, true, 'Le pointeur doit maintenir le bouton pressé pendant la mesure.');
-  assert.match(buttonState.transform, /matrix\(0\.97,\s*0,\s*0,\s*0\.97/,
+  const pressMatrix = buttonState.transform.match(/^matrix\(([^)]+)\)$/);
+  const pressScale = pressMatrix ? pressMatrix[1].split(',').map(Number) : [];
+  assert.ok(pressScale.length === 6 &&
+    Math.abs(pressScale[0] - 0.97) < 0.002 &&
+    Math.abs(pressScale[3] - 0.97) < 0.002 &&
+    Math.abs(pressScale[1]) < 0.001 &&
+    Math.abs(pressScale[2]) < 0.001,
     'Le bouton doit fournir un retour press scale(0.97). Valeur observée : ' + buttonState.transform);
   await normalPage.close();
 
