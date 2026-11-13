@@ -5097,3 +5097,176 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
   background: rgba(8,122,87,.2);
   color: #91CDB0;
 }
+
+/* --------------------------------------------------------------------------
+   Barre supérieure — commandes plus visibles et tactiles
+   Icônes 24px, cibles 48px sur desktop et 44px sur mobile.
+   -------------------------------------------------------------------------- */
+.app-topbar-account {
+  gap: 9px;
+}
+
+.app-notification-toggle {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(36, 33, 29, .04);
+}
+.app-notification-toggle .ic {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+}
+.app-notification-toggle .ic svg,
+.app-notification-toggle > .icon {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.8;
+}
+.app-notification-toggle:hover,
+.app-notification-toggle[aria-expanded="true"] {
+  border-color: rgba(8, 122, 87, .28);
+  background: var(--emerald-light);
+  color: var(--emerald);
+}
+
+.app-topbar-quick-actions {
+  gap: 6px;
+}
+.app-topbar-quick-actions .theme-toggle-btn,
+.app-topbar-localization {
+  flex-basis: 48px;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(36, 33, 29, .04);
+}
+.app-topbar-quick-actions .theme-toggle-icone,
+.app-topbar-localization > .ic {
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+}
+.app-topbar-quick-actions .theme-toggle-icone svg,
+.app-topbar-localization > .ic svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.8;
+}
+.app-topbar-quick-actions .theme-toggle-btn:hover,
+.app-topbar-localization:hover {
+  border-color: rgba(8, 122, 87, .28);
+  background: var(--emerald-light);
+  color: var(--emerald);
+}
+.app-topbar-quick-actions .theme-toggle-btn:focus-visible,
+.app-topbar-localization:focus-visible,
+.app-notification-toggle:focus-visible,
+.app-topbar-logout:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 3px;
+}
+
+.app-topbar-logout {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0 13px;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: .84rem;
+  font-weight: 500;
+}
+.app-topbar-logout > .icon {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.8;
+}
+.app-topbar-logout:hover {
+  border-color: rgba(8, 122, 87, .28);
+  background: var(--emerald-light);
+  color: var(--emerald);
+}
+
+:root[data-theme="dark"] .app-notification-toggle,
+:root[data-theme="dark"] .app-topbar-quick-actions .theme-toggle-btn,
+:root[data-theme="dark"] .app-topbar-localization,
+:root[data-theme="dark"] .app-topbar-logout {
+  border-color: var(--line);
+  background: #302E27;
+  color: #E0DACF;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .app-notification-toggle:hover,
+:root[data-theme="dark"] .app-notification-toggle[aria-expanded="true"],
+:root[data-theme="dark"] .app-topbar-quick-actions .theme-toggle-btn:hover,
+:root[data-theme="dark"] .app-topbar-localization:hover,
+:root[data-theme="dark"] .app-topbar-logout:hover {
+  border-color: rgba(145, 205, 176, .3);
+  background: rgba(8, 122, 87, .2);
+  color: #91CDB0;
+}
+
+@media (max-width: 640px) {
+  .app-topbar-account { gap: 6px; }
+  .app-notification-toggle {
+    width: 44px;
+    height: 44px;
+  }
+  .app-topbar-quick-actions { gap: 4px; }
+  .app-topbar-quick-actions .theme-toggle-btn,
+  .app-topbar-localization {
+    flex-basis: 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+  .app-topbar-quick-actions .theme-toggle-icone,
+  .app-topbar-localization > .ic,
+  .app-notification-toggle .ic,
+  .app-notification-toggle .ic svg {
+    width: 23px;
+    height: 23px;
+    font-size: 23px;
+  }
+  .app-topbar-logout {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 12px;
+  }
+  .app-topbar-logout > .icon {
+    width: 23px;
+    height: 23px;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-topbar-account { gap: 4px; }
+  .app-notification-toggle,
+  .app-topbar-quick-actions .theme-toggle-btn,
+  .app-topbar-localization,
+  .app-topbar-logout {
+    width: 42px;
+    min-width: 42px;
+    flex-basis: 42px;
+    height: 42px;
+    min-height: 42px;
+  }
+}
