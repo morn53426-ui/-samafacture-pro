@@ -24,3 +24,17 @@ Le test Puppeteer de recette vérifie désormais :
 
 ## Limites de la recette
 Les tests Puppeteer utilisent des réponses API fictives, comme les autres tests visuels du dépôt. Les captures sur les appareils réels, les navigateurs effectivement utilisés par les clients et la vérification de l'ensemble des formulaires métier restent nécessaires avant mise en production.
+
+## Finition visuelle globale
+- Police des titres remplacée par Manrope ; les contenus utilisent Inter et les références chiffrées conservent JetBrains Mono.
+- Hiérarchie des titres, espacements, paragraphes et en-têtes de page harmonisés.
+- Champs et libellés de formulaires clarifiés, hauteurs et focus clavier uniformisés.
+- Boutons, tableaux et cartes bénéficient de règles communes plus sobres.
+- Les pictogrammes utilisent le jeu SVG existant (79 icônes) avec dimensions, épaisseur de trait, coins et alignements harmonisés.
+- La variable de largeur active de la sidebar qui redéfinissait le menu à 286 px a été corrigée à 248 px ; le contrôle automatisé avait détecté cet écart.
+
+## Tests complémentaires
+- Contrôle de l'alignement à 248 px en mode développé.
+- Vérification du choix Manrope/Inter dans le rendu CSS.
+- Contrôle des attributs SVG communs (viewBox, linecap et linejoin).
+- L'ensemble du contrôle responsive reste soumis au résultat du pipeline GitHub Actions.
