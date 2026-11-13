@@ -90,6 +90,9 @@ describe("Paiements d'abonnement", () => {
   });
 
   test('une confirmation sans montant fourni par le prestataire ne peut pas activer un plan', async () => {
+    // Le test d'idempotence précédent active Starter sur ce même utilisateur.
+    // On repart explicitement du plan Gratuit pour tester l'absence de rétrogradation.
+    await pool.query("UPDATE users SET plan = 'gratuit' WHERE id = ?", [userId]);
     const reference = `test-montant-absent-${Date.now()}`;
     const [insert] = await pool.query(
       `INSERT INTO abonnement_paiements (user_id, plan, montant, devise, fournisseur, reference, internal_reference, statut)
