@@ -11,6 +11,10 @@ const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = req
 const { sendMail } = require('../config/mailer');
 
 const router = express.Router();
+
+// Incrémenter ces versions à chaque modification substantielle des documents publics.
+const TERMS_VERSION = '2026-11-13';
+const PRIVACY_VERSION = '2026-11-13';
 const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
 
 // Personnalisation des modèles de facture (couleurs / logo / police) — voir la même liste de clés
@@ -172,10 +176,13 @@ function definirCookieSession(res, token) {
  */
 router.post('/register', registerLimiter, async (req, res, next) => {
   try {
-    const { nom, email, password, entreprise_nom } = req.body;
+    const { nom, email, password, entreprise_nom, acceptTerms } = req.body;
 
     if (!nom || !email || !password) {
       return res.status(400).json({ error: 'Nom, email et mot de passe sont obligatoires.' });
+    }
+    if (acceptTerms !== true) {
+      return res.status(400).json({ error: 'Vous devez accepter les conditions d’utilisation et confirmer avoir pris connaissance de la politique de confidentialité.' });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' });
@@ -189,8 +196,8 @@ router.post('/register', registerLimiter, async (req, res, next) => {
 
     const hash = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
-      `INSERT INTO users (nom, email, password_hash, entreprise_nom) VALUES (?, ?, ?, ?)`,
-      [nom, emailLower, hash, entreprise_nom || nom]
+      `INSERT INTO users (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version) VALUES (?, ?, ?, ?, NOW(), ?, ?)`,
+      [nom, emailLower, hash, entreprise_nom || nom, TERMS_VERSION, PRIVACY_VERSION]
     );
 
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
@@ -286,7 +293,7 @@ router.post('/google', async (req, res, next) => {
     if (!googleClient) {
       return res.status(503).json({ error: "La connexion Google n'est pas configurée sur ce serveur." });
     }
-    const { credential } = req.body;
+    const { credential, acceptTerms } = req.body;
     if (!credential) return res.status(400).json({ error: 'Jeton Google manquant.' });
 
     let payload;
@@ -315,11 +322,14 @@ router.post('/google', async (req, res, next) => {
     }
 
     if (!user) {
+      if (acceptTerms !== true) {
+        return res.status(400).json({ error: 'Pour créer un compte avec Google, acceptez d’abord les conditions d’utilisation et confirmez avoir pris connaissance de la politique de confidentialité.' });
+      }
       // Nouveau compte : mot de passe aléatoire inutilisable (la connexion se fera via Google)
       const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
       const [result] = await pool.query(
-        `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id) VALUES (?, ?, ?, ?, ?)`,
-        [name || emailLower, emailLower, randomPassword, name || emailLower, googleId]
+        `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)`,
+        [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION]
       );
       [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
       user = rows[0];
