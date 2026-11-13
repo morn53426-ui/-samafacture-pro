@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact PR source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
@@ -30,7 +30,7 @@ jobs:
           sha256sum dist/SamaFacture-Pro-Complet.zip
 
       - name: Upload source ZIP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: SamaFacture-Pro-Complet-PR-${{ github.event.pull_request.number }}
           path: dist/SamaFacture-Pro-Complet.zip
