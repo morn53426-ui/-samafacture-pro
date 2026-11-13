@@ -30,7 +30,7 @@ jobs:
           sha256sum dist/SamaFacture-Pro-Complet.zip
 
       - name: Upload source ZIP
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: SamaFacture-Pro-Complet-PR-${{ github.event.pull_request.number }}
           path: dist/SamaFacture-Pro-Complet.zip
