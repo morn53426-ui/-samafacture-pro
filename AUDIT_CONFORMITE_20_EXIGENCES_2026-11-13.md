@@ -27,6 +27,31 @@ Périmètre : pages publiques, inscription/connexion, confidentialité, conditio
 | Droits sur les images et contenus | La présence d'images dans les pages ne suffit pas à établir les licences. Vérifier les licences et conserver les justificatifs. | À vérifier |
 | Contraste et navigation | Le rapport Unslop documente un contraste mesuré de 14,86:1 en thème sombre et une recette responsive. Ces résultats ne certifient pas toutes les exigences WCAG ni les parcours clavier/lecteur d'écran. | Contrôle partiel |
 
+## Grille des 20 contrôles
+
+| N° | Exigence | Résultat |
+|---:|---|---|
+| 1 | Identité légale de l'éditeur clairement affichée | **À compléter — P0** |
+| 2 | Coordonnées de contact et support vérifiables | **Partiel** — support technique présent, coordonnées légales incomplètes |
+| 3 | Politique de confidentialité accessible et datée | **À valider — P0** |
+| 4 | Données collectées et finalités expliquées | **Partiel** — catégories principales décrites, traitements secondaires incomplets |
+| 5 | Durées de conservation et suppression expliquées | **À compléter — P1** |
+| 6 | Destinataires, sous-traitants et transferts décrits | **À compléter — P1** |
+| 7 | Droits d'accès, rectification, export et suppression opérationnels | **À tester — P1** |
+| 8 | Cookies, stockage local et traceurs inventoriés | **À compléter — P1** |
+| 9 | Consentement aux traceurs non essentiels, si présents | **À déterminer après inventaire — P1** |
+| 10 | Conditions d'utilisation datées et validées | **À valider — P0** |
+| 11 | Prix, taxes et périodicité affichés sans ambiguïté | **À vérifier avant achat — P1** |
+| 12 | Renouvellement et modification de prix expliqués | **À compléter — P0** |
+| 13 | Résiliation et remboursement documentés | **Manquant — P0** |
+| 14 | Consentement contractuel à l'inscription enregistré | **Manquant — P0** |
+| 15 | Consentements marketing facultatifs séparés et non précochés | **À vérifier / non identifié** |
+| 16 | Aucune publicité trompeuse, faux avis ou frais cachés | **Audit éditorial à terminer** |
+| 17 | Images, polices, icônes et contenus utilisés sous licence | **Justificatifs à vérifier** |
+| 18 | Labels, clavier, focus, contrastes et lecteurs d'écran | **Partiel** — labels de connexion/inscription corrigés ; recette assistive requise |
+| 19 | Âge minimal et protection des mineurs définis | **À décider** |
+| 20 | Sécurité des comptes, paiements et parcours d'achat testée | **Partiel** — protections de code présentes ; sandbox et recette de sécurité requises |
+
 ## Détails techniques vérifiés
 
 - `public/confidentialite.html` : mention « Modèle à valider avant publication », date à compléter ; décrit les données de compte, d'entreprise et de facturation, mais ne détaille pas suffisamment les traitements de sécurité/monitoring, les durées, les destinataires et les transferts.
