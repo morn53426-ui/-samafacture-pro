@@ -47,9 +47,9 @@
         <div>
           <span class="subscription-overline">NOS FORMULES</span>
           <h2 id="offers-title">Comparez les offres</h2>
-          <p>Des outils adaptés à chaque étape de votre activité.</p>
+          <p>Les montants affichés correspondent à un paiement unique. Le détail est présenté avant chaque redirection.</p>
         </div>
-        <div class="subscription-billing-note"><span class="ic">${Icon('calendar-days')}</span> Tarifs mensuels en FCFA</div>
+        <div class="subscription-billing-note"><span class="ic">${Icon('credit-card')}</span> Paiement ponctuel en FCFA</div>
       </div>
       <div id="plan-cards" class="subscription-plan-grid">
         <div class="subscription-loading card"><span class="loading-spinner"></span> Chargement des offres…</div>
@@ -61,6 +61,36 @@
       <div><span class="ic">${Icon('smartphone')}</span><span><strong>Paiements locaux</strong><small>Wave et PayDunya selon la configuration du serveur.</small></span></div>
       <div><span class="ic">${Icon('help-circle')}</span><span><strong>Accompagnement</strong><small>Un espace de facturation pensé pour les professionnels.</small></span></div>
     </section>
+
+    <dialog id="checkout-dialog" class="subscription-checkout-dialog" aria-labelledby="checkout-title" aria-describedby="checkout-description">
+      <div class="subscription-checkout-panel">
+        <button type="button" class="subscription-checkout-close" aria-label="Fermer la fenêtre" onclick="fermerPaiement()">${Icon('x')}</button>
+        <span class="subscription-overline">RÉCAPITULATIF AVANT PAIEMENT</span>
+        <h2 id="checkout-title">Vérifiez votre commande</h2>
+        <p id="checkout-description">Contrôlez le montant et le moyen de paiement avant de continuer.</p>
+        <dl class="subscription-checkout-summary">
+          <div><dt>Formule</dt><dd id="checkout-plan">—</dd></div>
+          <div><dt>Montant à payer</dt><dd id="checkout-amount">—</dd></div>
+          <div><dt>Moyen de paiement</dt><dd id="checkout-provider">—</dd></div>
+          <div><dt>Type de paiement</dt><dd>Paiement unique</dd></div>
+        </dl>
+        <div class="subscription-checkout-disclosure">
+          <strong>À savoir avant de payer</strong>
+          <p>Il n’y a ni renouvellement automatique ni prélèvement ultérieur. Dans la version actuelle, aucune date d’expiration automatique n’est appliquée : le plan reste associé à votre compte jusqu’à un changement manuel de formule.</p>
+          <p>Votre formule sera activée uniquement après confirmation du paiement par le serveur et le fournisseur.</p>
+        </div>
+        <label class="subscription-checkout-consent" for="checkout-agreement">
+          <input type="checkbox" id="checkout-agreement" onchange="actualiserConfirmationPaiement()" />
+          <span>J’ai compris qu’il s’agit d’un paiement ponctuel, sans renouvellement automatique et sans échéance automatique actuellement définie.</span>
+        </label>
+        <div id="checkout-message" aria-live="polite"></div>
+        <div class="subscription-checkout-actions">
+          <button type="button" class="btn btn-outline" onclick="fermerPaiement()">Annuler</button>
+          <button type="button" class="btn btn-primary" id="checkout-continue" onclick="confirmerPaiement()" disabled>Continuer vers le paiement</button>
+        </div>
+        <p class="subscription-checkout-legal">Consultez également les <a href="conditions.html" target="_blank" rel="noopener">conditions d’utilisation</a> et la <a href="confidentialite.html" target="_blank" rel="noopener">politique de confidentialité</a>.</p>
+      </div>
+    </dialog>
 
     <section id="plan-fallback" class="subscription-test card" style="display:none;">
       <div class="subscription-test-heading">
@@ -100,6 +130,9 @@
     pro: 'Pour gagner du temps avec les outils avancés de SamaFacture Pro.',
     entreprise: 'Pour les structures qui ont besoin d’options avancées.'
   };
+
+  let intentionPaiement = null;
+  window.SF_TARIFS_ABONNEMENT = {};
 
   const PLANS = [
     {
@@ -167,7 +200,7 @@
     const price = plan.id === 'gratuit' ? 0 : Number(moyens.tarifs?.[plan.id] || 0);
     const priceHtml = isFree
       ? '<span class="plan-price-free">Gratuit</span>'
-      : '<span class="plan-price-value">' + formatMontant(price, 'FCFA') + '</span><span class="plan-price-period">/ mois</span>';
+      : '<span class="plan-price-value">' + formatMontant(price, 'FCFA') + '</span><span class="plan-price-period">paiement unique</span>';
 
     let actions = '';
     if (isCurrent) {
@@ -179,10 +212,10 @@
     } else {
       const providers = [];
       if (moyens.wave) {
-        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="payerAbonnement(\'' + plan.id + '\', \'wave\', this)">' + Icon('smartphone') + ' Payer avec Wave</button>');
+        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'wave\', this)">' + Icon('smartphone') + ' Payer avec Wave</button>');
       }
       if (moyens.paydunya) {
-        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="payerAbonnement(\'' + plan.id + '\', \'paydunya\', this)">' + Icon('credit-card') + ' Orange Money / Carte</button>');
+        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', this)">' + Icon('credit-card') + ' Orange Money / Carte</button>');
       }
       actions = providers.length
         ? '<div class="plan-payment-actions">' + providers.join('') + '</div>'
@@ -231,6 +264,8 @@
       tarifs: moyens.tarifs || {}
     };
 
+    window.SF_TARIFS_ABONNEMENT = safeMoyens.tarifs;
+
     document.getElementById('plan-cards').innerHTML = PLANS
       .map(plan => renderPlanCard(plan, user, safeMoyens))
       .join('');
@@ -239,17 +274,59 @@
     document.getElementById('plan-fallback').style.display = aucunMoyenConfigure ? 'block' : 'none';
   }
 
-  async function payerAbonnement(plan, fournisseur, btn) {
+  function preparerPaiement(plan, fournisseur) {
+    const montant = Number(window.SF_TARIFS_ABONNEMENT?.[plan]);
+    if (!Number.isSafeInteger(montant) || montant <= 0) {
+      document.getElementById('plan-msg').innerHTML =
+        '<div class="error-box">Le tarif de cette formule est indisponible. Actualisez la page puis réessayez.</div>';
+      return;
+    }
+
+    intentionPaiement = { plan, fournisseur, montant };
+    document.getElementById('checkout-plan').textContent = PLAN_LABELS[plan] || plan;
+    document.getElementById('checkout-amount').textContent = formatMontant(montant, 'FCFA');
+    document.getElementById('checkout-provider').textContent =
+      fournisseur === 'wave' ? 'Wave' : 'Orange Money / Carte via PayDunya';
+    document.getElementById('checkout-agreement').checked = false;
+    document.getElementById('checkout-continue').disabled = true;
+    document.getElementById('checkout-message').textContent = '';
+    document.getElementById('checkout-dialog').showModal();
+  }
+
+  function actualiserConfirmationPaiement() {
+    document.getElementById('checkout-continue').disabled =
+      !document.getElementById('checkout-agreement').checked;
+  }
+
+  function fermerPaiement() {
+    const dialog = document.getElementById('checkout-dialog');
+    if (dialog.open) dialog.close();
+    intentionPaiement = null;
+  }
+
+  async function confirmerPaiement() {
+    if (!intentionPaiement || !document.getElementById('checkout-agreement').checked) return;
+
+    const btn = document.getElementById('checkout-continue');
     const restore = setButtonLoading(btn, 'Redirection…');
     try {
-      const { checkout_url } = await Api.post('/abonnement/payer', { plan, fournisseur });
+      const { checkout_url } = await Api.post('/abonnement/payer', {
+        plan: intentionPaiement.plan,
+        fournisseur: intentionPaiement.fournisseur
+      });
       if (!checkout_url) throw new Error('Le fournisseur n’a pas retourné de lien de paiement.');
       location.href = checkout_url;
     } catch (err) {
-      document.getElementById('plan-msg').innerHTML = '<div class="error-box">' + escapeHtml(err.message) + '</div>';
+      document.getElementById('checkout-message').innerHTML =
+        '<div class="error-box">' + escapeHtml(err.message) + '</div>';
       restore();
+      btn.disabled = !document.getElementById('checkout-agreement').checked;
     }
   }
+
+  document.getElementById('checkout-dialog').addEventListener('close', () => {
+    intentionPaiement = null;
+  });
 
   async function changePlan(btn) {
     const plan = document.getElementById('plan-select').value;
