@@ -40,7 +40,8 @@
   --shadow-lg: 0 14px 36px rgba(15, 27, 51, 0.12);
   --shadow-xl: 0 24px 60px rgba(15, 27, 51, 0.18);
   --shadow-card: var(--shadow-xs), var(--shadow-md); /* alias historique, gardé pour compatibilité */
-  --sidebar-w: 260px;
+  --sidebar-w: 248px;
+  --sidebar-collapsed-w: 76px;
 
   /* Échelle de transition — durées et courbe réutilisées par tous les composants animés
      (cartes, boutons, champs, menus, toasts, modales, info-bulles...). Remplace les valeurs
@@ -3971,4 +3972,103 @@ thead th { background: #F2F6FD; color: #52627D; }
 }
 @media (prefers-reduced-motion:reduce) {
   .app-notification-toggle { transition:none; }
+}
+
+
+/* --------------------------------------------------------------------------
+   Navigation compacte — plus d'espace pour les pages métier.
+   Le menu conserve toutes ses destinations ; le mode réduit masque uniquement
+   les libellés, qui restent accessibles via title et aria-label.
+   -------------------------------------------------------------------------- */
+.sidebar-promo { display: none !important; }
+
+.sidebar-brand-copy { min-width: 0; }
+.sidebar-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 9px;
+  background: rgba(255,255,255,.07);
+  color: #DCE6F8;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+}
+.sidebar-collapse-toggle:hover { background: rgba(255,255,255,.15); color: #fff; }
+.sidebar-collapse-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.sidebar-logout {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #CCD7EA;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.sidebar-logout:hover { background: rgba(255,255,255,.08); color: #fff; }
+.sidebar-logout:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+@media (min-width: 901px) {
+  .main-content { margin-left: var(--sidebar-w); transition: margin-left .2s ease; }
+  .sidebar { width: var(--sidebar-w); transition: width .2s ease; }
+  .sidebar-collapse-toggle { display: inline-flex; }
+  .mobile-toggle { display: none; }
+
+  body.sidebar-collapsed .main-content { margin-left: var(--sidebar-collapsed-w); }
+  .sidebar.is-collapsed { width: var(--sidebar-collapsed-w); }
+  .sidebar.is-collapsed .sidebar-brand {
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+    padding: 14px 8px;
+  }
+  .sidebar.is-collapsed .sidebar-brand-copy,
+  .sidebar.is-collapsed .nav-group-label,
+  .sidebar.is-collapsed .nav-label,
+  .sidebar.is-collapsed .sidebar-theme-control,
+  .sidebar.is-collapsed .sidebar-user-info,
+  .sidebar.is-collapsed .install-app-btn,
+  .sidebar.is-collapsed .sidebar-logout-label {
+    display: none !important;
+  }
+  .sidebar.is-collapsed .sidebar-collapse-toggle { margin: 0; }
+  .sidebar.is-collapsed .sidebar-nav { padding: 12px 8px; }
+  .sidebar.is-collapsed .nav-item {
+    justify-content: center;
+    width: 48px;
+    min-height: 46px;
+    margin: 3px auto;
+    padding: 10px 6px;
+    gap: 0;
+  }
+  .sidebar.is-collapsed .nav-item .ic { width: auto; font-size: 1.18rem; }
+  .sidebar.is-collapsed .sidebar-foot {
+    display: flex;
+    align-items: center;
+    padding: 10px 8px 14px;
+  }
+  .sidebar.is-collapsed .sidebar-logout {
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .sidebar-collapse-toggle { display: none; }
+  .sidebar-brand-copy { min-width: 0; }
+  .sidebar-promo { display: none !important; }
+  .sidebar.open .sidebar-foot { display: block; }
+  .sidebar.open .sidebar-logout { min-height: 44px; }
 }
