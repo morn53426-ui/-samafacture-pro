@@ -50,6 +50,34 @@ describe('Authentification', () => {
     assert.ok(res.body.token);
   });
 
+  test('un utilisateur ne peut pas attribuer lui-même un plan Starter, Pro ou Entreprise', async () => {
+    const connexion = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(connexion.status, 200);
+    const token = connexion.body.token;
+
+    for (const plan of ['starter', 'pro', 'entreprise']) {
+      const res = await request(app)
+        .put('/api/auth/plan')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ plan });
+      assert.equal(res.status, 403, `le plan ${plan} doit exiger un paiement confirmé`);
+      assert.equal(res.body.code, 'PAIEMENT_REQUIS');
+    }
+
+    const me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    assert.equal(me.status, 200);
+    assert.equal(me.body.user.plan, 'gratuit');
+  });
+
+  test('le changement vers un plan inconnu est refusé', async () => {
+    const connexion = await request(app).post('/api/auth/login').send({ email, password });
+    const res = await request(app)
+      .put('/api/auth/plan')
+      .set('Authorization', `Bearer ${connexion.body.token}`)
+      .send({ plan: 'enterprise-premium' });
+    assert.equal(res.status, 400);
+  });
+
   test('la connexion avec un mauvais mot de passe échoue', async () => {
     const res = await request(app).post('/api/auth/login').send({ email, password: 'mauvais-mot-de-passe' });
     assert.equal(res.status, 401);
