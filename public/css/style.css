@@ -3972,3 +3972,139 @@ thead th { background: #F2F6FD; color: #52627D; }
 @media (prefers-reduced-motion:reduce) {
   .app-notification-toggle { transition:none; }
 }
+
+
+/* ==========================================================================
+   Finition interface — navigation compacte, contenu prioritaire et lisibilité
+   ========================================================================== */
+:root { --sidebar-w: 264px; }
+
+@media (min-width: 901px) {
+  .sidebar {
+    width: var(--sidebar-w);
+  }
+  .main-content {
+    margin-left: var(--sidebar-w);
+    padding: 28px clamp(22px, 2.4vw, 36px) 56px;
+  }
+  .sidebar-brand {
+    padding: 16px 18px 14px;
+    gap: 10px;
+  }
+  .sidebar-brand .mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+  }
+  .sidebar-brand .name { font-size: .98rem; }
+  .sidebar-brand .sub { font-size: .62rem; letter-spacing: .035em; }
+  .sidebar-nav {
+    min-height: 0;
+    padding: 10px 10px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.2) transparent;
+  }
+  .nav-group-label {
+    margin: 13px 10px 5px;
+    font-size: .62rem;
+    letter-spacing: .09em;
+  }
+  .nav-item {
+    min-height: 38px;
+    padding: 8px 10px;
+    gap: 10px;
+    font-size: .82rem;
+    border-radius: 9px;
+  }
+  .nav-item .ic {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    font-size: 1rem;
+  }
+
+  /* Le grand encart d'aide ne doit plus concurrencer les liens de navigation. */
+  .sidebar-promo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 5px 10px 7px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    text-align: left;
+  }
+  .sidebar-promo .promo-icon,
+  .sidebar-promo p { display: none; }
+  .sidebar-promo strong {
+    min-width: 0;
+    font-size: .69rem;
+    line-height: 1.25;
+  }
+  .sidebar-promo a {
+    flex: 0 0 auto;
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    font-size: .64rem;
+    white-space: nowrap;
+  }
+  .sidebar-promo a .icon { width: 12px; height: 12px; }
+  .sidebar-foot {
+    padding: 8px 14px 12px;
+    font-size: .74rem;
+    line-height: 1.35;
+    border-top: 1px solid rgba(255,255,255,.08);
+  }
+  .sidebar-foot .plan-badge { margin: 0 0 7px; }
+  .sidebar-foot > div[style*="margin-top"] { margin-top: 7px !important; }
+}
+
+@media (min-width: 901px) and (max-height: 760px) {
+  .sidebar-promo { display: none; }
+  .sidebar-brand { padding-top: 11px; padding-bottom: 10px; }
+  .sidebar-nav { padding-top: 6px; }
+  .nav-group-label { margin-top: 9px; }
+  .nav-item { min-height: 34px; padding-top: 6px; padding-bottom: 6px; }
+  .sidebar-foot { padding-top: 6px; padding-bottom: 8px; }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  :root { --sidebar-w: 244px; }
+  .main-content { padding-left: 22px; padding-right: 22px; }
+  .app-topbar { gap: 14px; }
+  .app-topbar-search { width: min(480px, 58%); }
+}
+
+@media (max-width: 900px) {
+  /* Sur tablette et mobile, le menu reste un tiroir compact ouvrable,
+     et ne réserve jamais une colonne permanente au contenu. */
+  :root { --sidebar-w: 0px; }
+  .main-content { margin-left: 0; min-width: 0; }
+  .sidebar { width: 100%; }
+  .sidebar.open .sidebar-nav {
+    display: block;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .sidebar.open .sidebar-promo { display: none; }
+  .sidebar.open .sidebar-foot { display: block; }
+}
+
+.main-content,
+.page-header,
+.card,
+.form-grid,
+.table-wrap,
+.app-topbar { min-width: 0; }
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid rgba(23,105,245,.42);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-item,
+  .sidebar-promo a { transition: none !important; }
+}
