@@ -40,7 +40,7 @@ describe('Authentification', () => {
   test("l'inscription avec un email déjà utilisé est refusée", async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Autre Utilisateur', email, password: 'autremotdepasse' });
+      .send({ nom: 'Autre Utilisateur', email, password: 'autremotdepasse', acceptTerms: true });
 
     assert.equal(res.status, 409);
   });
@@ -48,7 +48,7 @@ describe('Authentification', () => {
   test('un mot de passe trop court est refusé à l\'inscription', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Test', email: emailDeTest('court'), password: '123' });
+      .send({ nom: 'Test', email: emailDeTest('court'), password: '123', acceptTerms: true });
 
     assert.equal(res.status, 400);
   });
