@@ -5308,3 +5308,19 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
     font-size: 23px;
   }
 }
+
+/* Sur mobile, la déconnexion reste une commande icône seule :
+   empêcher le libellé de reprendre de la place après l'agrandissement du bouton. */
+@media (max-width: 640px) {
+  .app-topbar-logout {
+    gap: 0;
+    font-size: 0;
+    line-height: 0;
+  }
+  .app-topbar-logout > .icon {
+    display: block;
+    width: 23px;
+    height: 23px;
+    flex: 0 0 23px;
+  }
+}
