@@ -426,6 +426,34 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.equal(shell.activeNavigation, true, pageDefinition.name + ' doit signaler la page active.');
   }
 
+  const layoutAudit = await page.evaluate(() => {
+    const main = document.querySelector('main.workspace-page');
+    const hasHeader = Boolean(main?.querySelector(':scope > .page-header, :scope > .workspace-page-header, :scope > .dashboard-welcome'));
+    const hasKicker = Boolean(main?.querySelector('.workspace-page-kicker, .pro-eyebrow, .billing-eyebrow, .subscription-eyebrow'));
+    const unhydratedIcons = Array.from(document.querySelectorAll('i[data-icon]'))
+      .map(element => element.getAttribute('data-icon'));
+    return {
+      workspacePage: Boolean(main),
+      hasHeader,
+      hasKicker,
+      dataHeading: Boolean(main?.querySelector('.workspace-data-heading')),
+      filterPanel: Boolean(main?.querySelector('.workspace-filter-card')),
+      unhydratedIcons
+    };
+  });
+  const structuredPages = ['dashboard', 'clients', 'produits', 'factures', 'devis', 'depenses', 'rapports', 'finances', 'crm'];
+  if (structuredPages.includes(pageDefinition.name)) {
+    assert.equal(layoutAudit.workspacePage, true, pageDefinition.name + ' doit utiliser le cadre de page commun.');
+    assert.equal(layoutAudit.hasHeader, true, pageDefinition.name + ' doit présenter un en-tête de page clair.');
+    assert.equal(layoutAudit.hasKicker, true, pageDefinition.name + ' doit identifier clairement la section métier.');
+  }
+  const tableHeadingPages = ['clients', 'produits', 'devis', 'depenses', 'rapports'];
+  if (tableHeadingPages.includes(pageDefinition.name)) {
+    assert.equal(layoutAudit.dataHeading, true, pageDefinition.name + ' doit titrer sa zone de données.');
+  }
+  assert.deepEqual(layoutAudit.unhydratedIcons, [],
+    pageDefinition.name + ' contient des icônes statiques non reconnues : ' + JSON.stringify(layoutAudit.unhydratedIcons));
+
   const metrics = await page.evaluate(() => ({
     viewport: window.innerWidth,
     document: document.documentElement.scrollWidth,

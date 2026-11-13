@@ -17,20 +17,26 @@
 <body>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content">
+  <main class="main-content workspace-page page-clients">
     <div class="page-header">
       <div>
+        <div class="workspace-page-kicker">RELATION CLIENT</div>
         <h1>Clients</h1>
         <p>Gérez votre portefeuille clients</p>
       </div>
       <button class="btn btn-primary" onclick="openModal()"><i class="ic" data-icon="plus"></i> Nouveau client</button>
     </div>
 
-    <div class="card" style="margin-bottom:18px; padding:14px 18px;">
-      <input type="text" id="search" placeholder="Rechercher un client (nom, téléphone, email)..." style="border:none; outline:none; width:100%;" />
-    </div>
+    <section class="card workspace-filter-card" aria-label="Recherche dans le répertoire clients">
+      <div class="workspace-filter-title"><i class="ic" data-icon="search"></i><div><strong>Recherche rapide</strong><span>Nom, numéro de téléphone ou adresse email</span></div></div>
+      <div class="workspace-search-control"><i class="ic" data-icon="search" aria-hidden="true"></i><input type="search" id="search" placeholder="Rechercher un client..." aria-label="Rechercher un client par nom, téléphone ou email" /></div>
+    </section>
 
-    <div class="card" style="padding:0;">
+    <div class="card workspace-data-card" style="padding:0;">
+      <div class="workspace-data-heading">
+        <div><h2>Répertoire clients</h2><p>Coordonnées, encours et suivi commercial de votre portefeuille</p></div>
+        <span class="workspace-data-type"><i class="ic" data-icon="file-stack"></i> Données du compte</span>
+      </div>
       <table class="table-stack clients-table">
         <thead><tr><th>Client</th><th>Contact</th><th>Montant dû</th><th>Total facturé</th><th></th></tr></thead>
         <tbody id="clients-body">

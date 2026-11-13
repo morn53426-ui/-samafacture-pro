@@ -4233,3 +4233,320 @@ button .icon { vertical-align: -.14em; }
     transition-duration: .01ms !important;
   }
 }
+
+
+/* ==========================================================================
+   Architecture des pages métier — structure de logiciel de gestion
+   Chaque écran partage les mêmes repères : en-tête, filtres, sections et données.
+   ========================================================================== */
+.workspace-page {
+  --workspace-section-gap: 22px;
+  min-width: 0;
+  width: 100%;
+}
+.workspace-page > .page-header,
+.workspace-page > .workspace-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  margin: 26px 0 24px;
+  padding: 0 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+.workspace-page > .page-header > div:first-child,
+.workspace-page-header > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.workspace-page-kicker {
+  margin: 0 0 7px;
+  color: var(--workspace-blue, #1769F5);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+.workspace-page > .page-header h1,
+.workspace-page-header h1 {
+  margin: 0 0 6px;
+  color: var(--navy-950);
+  font-size: clamp(1.55rem, 2vw, 2.05rem);
+  line-height: 1.18;
+  letter-spacing: -.045em;
+}
+.workspace-page > .page-header p,
+.workspace-page-header p {
+  max-width: 76ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: .91rem;
+  line-height: 1.62;
+}
+.workspace-page > .page-header > .btn,
+.workspace-page > .page-header > a,
+.workspace-page-header > .btn,
+.workspace-page-header > a {
+  flex: 0 0 auto;
+  min-height: 43px;
+  white-space: nowrap;
+}
+
+/* Filtres en panneau dédié, distinct du tableau qu'ils pilotent. */
+.workspace-filter-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+  margin-bottom: var(--workspace-section-gap);
+  padding: 17px 20px !important;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: var(--shadow-xs);
+}
+.workspace-filter-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 190px;
+}
+.workspace-filter-title > .ic {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--workspace-blue, #1769F5) 10%, var(--paper));
+  color: var(--workspace-blue, #1769F5);
+  font-size: 1.05rem;
+}
+.workspace-filter-title strong,
+.workspace-data-heading h2 {
+  display: block;
+  margin: 0;
+  color: var(--navy-950);
+  font-family: var(--font-display);
+  font-size: .96rem;
+  font-weight: 750;
+  letter-spacing: -.02em;
+}
+.workspace-filter-title span,
+.workspace-data-heading p {
+  display: block;
+  margin: 3px 0 0;
+  color: var(--ink-soft);
+  font-size: .77rem;
+  line-height: 1.5;
+}
+.workspace-search-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 360px;
+  max-width: 560px;
+  min-width: 220px;
+  min-height: 44px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--cream);
+  color: var(--ink-soft);
+}
+.workspace-search-control:focus-within {
+  border-color: var(--workspace-blue, #1769F5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-blue, #1769F5) 12%, transparent);
+}
+.workspace-search-control > .ic { flex: 0 0 auto; color: var(--workspace-blue, #1769F5); }
+.workspace-search-control input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 0;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  color: var(--ink);
+  box-shadow: none !important;
+}
+.workspace-search-control input:focus { border: 0 !important; box-shadow: none !important; }
+.workspace-filter-card .field { min-width: 130px; margin: 0; }
+.workspace-filter-card .btn { flex: 0 0 auto; }
+
+/* Les tableaux ont un titre et un contexte ; l'en-tête de données n'est pas confondu
+   avec le nom de la page ou avec la barre de recherche. */
+.workspace-data-card {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 !important;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--paper);
+}
+.workspace-data-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 21px 15px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.workspace-data-heading > div { min-width: 0; }
+.workspace-data-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--cream);
+  color: var(--ink-soft);
+  font-size: .7rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.workspace-data-type .ic { color: var(--workspace-blue, #1769F5); }
+.workspace-data-card > table {
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.workspace-data-card > table thead th {
+  padding: 13px 15px;
+  background: color-mix(in srgb, var(--cream) 82%, var(--paper));
+  color: var(--ink-soft);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .065em;
+}
+.workspace-data-card > table tbody td {
+  padding: 14px 15px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  color: var(--ink);
+  font-size: .84rem;
+}
+.workspace-data-card > table tbody tr:last-child td { border-bottom: 0; }
+.workspace-data-card > table tbody tr:hover { background: color-mix(in srgb, var(--workspace-blue, #1769F5) 3%, var(--paper)); }
+.workspace-data-card .empty-state {
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 26px 18px;
+  color: var(--ink-soft);
+  font-size: .86rem;
+  text-align: center;
+}
+.workspace-data-card .empty-state > .ic {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--workspace-blue, #1769F5) 9%, var(--paper));
+  color: var(--workspace-blue, #1769F5);
+  font-size: 1.25rem;
+}
+.workspace-page #pagination {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 15px;
+}
+.workspace-page .grid { align-items: stretch; }
+.workspace-page .stat-card { height: 100%; }
+
+/* Les vues de gestion conservent un rythme vertical régulier. */
+.workspace-page > .billing-stats,
+.workspace-page > .billing-list-section,
+.workspace-page > .workspace-finance-grid,
+.workspace-page > .dashboard-welcome,
+.workspace-page > .dashboard-kpis,
+.workspace-page > .dashboard-grid,
+.workspace-page > .dashboard-bottom-grid {
+  margin-bottom: var(--workspace-section-gap);
+}
+.workspace-page .card h2,
+.workspace-page .card h3 { line-height: 1.35; }
+.workspace-page .field { min-width: 0; }
+.workspace-page .pro-eyebrow { margin-bottom: 7px; }
+
+/* Tableaux larges : défilement contenu à la carte, jamais à toute la page. */
+.workspace-data-card { overflow-x: auto; overscroll-behavior-x: contain; }
+.workspace-data-card > table { min-width: 640px; }
+.page-clients .workspace-data-card > table { min-width: 600px; }
+.page-devis .workspace-data-card > table { min-width: 680px; }
+.page-depenses .workspace-data-card > table { min-width: 570px; }
+.page-produits .workspace-data-card > table { min-width: 760px; }
+
+@media (max-width: 900px) {
+  .workspace-page > .page-header,
+  .workspace-page > .workspace-page-header {
+    margin-top: 18px;
+    padding-bottom: 17px;
+    gap: 13px;
+  }
+  .workspace-page > .page-header > .btn,
+  .workspace-page > .page-header > a,
+  .workspace-page-header > .btn,
+  .workspace-page-header > a {
+    align-self: flex-start;
+  }
+}
+@media (max-width: 640px) {
+  .workspace-page { --workspace-section-gap: 15px; }
+  .workspace-page > .page-header,
+  .workspace-page > .workspace-page-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin: 14px 0 18px;
+    padding-bottom: 15px;
+  }
+  .workspace-page > .page-header > .btn,
+  .workspace-page > .page-header > a,
+  .workspace-page-header > .btn,
+  .workspace-page-header > a {
+    width: 100%;
+    justify-content: center;
+    align-self: stretch;
+  }
+  .workspace-page-kicker { font-size: .62rem; }
+  .workspace-page > .page-header p,
+  .workspace-page-header p { font-size: .85rem; }
+  .workspace-filter-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px !important;
+  }
+  .workspace-filter-title { min-width: 0; }
+  .workspace-search-control { min-width: 0; max-width: none; width: 100%; }
+  .workspace-filter-card > div[style*="display:flex"] { width: 100%; }
+  .workspace-filter-card .field { flex: 1 1 100%; width: 100%; }
+  .workspace-filter-card .btn { width: 100%; }
+  .workspace-data-heading {
+    align-items: flex-start;
+    padding: 15px 14px 13px;
+  }
+  .workspace-data-heading h2 { font-size: .9rem; }
+  .workspace-data-heading p { font-size: .72rem; }
+  .workspace-data-type { display: none; }
+  .workspace-data-card > table { min-width: 560px; }
+  .page-clients .workspace-data-card > table,
+  .page-depenses .workspace-data-card > table { min-width: 0; }
+}
+@media (max-width: 380px) {
+  .workspace-page > .page-header h1,
+  .workspace-page-header h1 { font-size: 1.42rem; }
+  .workspace-filter-title > .ic { flex-basis: 34px; width: 34px; height: 34px; }
+}

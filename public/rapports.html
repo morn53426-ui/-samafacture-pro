@@ -18,12 +18,12 @@
 <body>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content">
+  <main class="main-content workspace-page page-rapports">
     <div class="page-header">
-      <div><h1>Rapports</h1><p>Analysez vos ventes et votre comptabilité</p></div>
+      <div><div class="workspace-page-kicker">ANALYSE & PERFORMANCE</div><h1>Rapports</h1><p>Analysez vos ventes et votre comptabilité sur une période choisie.</p></div>
     </div>
 
-    <div class="card" style="margin-bottom:18px;">
+    <div class="card workspace-filter-card reports-filter-card" style="margin-bottom:18px;">
       <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end;">
         <div class="field" style="margin:0;"><label>Du</label><input type="date" id="from" /></div>
         <div class="field" style="margin:0;"><label>Au</label><input type="date" id="to" /></div>
@@ -72,7 +72,8 @@
       <canvas id="chart-ventes" height="110" role="img" aria-label="Graphique des ventes selon les filtres sélectionnés."></canvas>
     </div>
 
-    <div class="card" style="padding:0;">
+    <div class="card workspace-data-card" style="padding:0;">
+      <div class="workspace-data-heading"><div><h2>Détail des résultats</h2><p>Valeurs agrégées selon les filtres et le regroupement sélectionnés</p></div><span class="workspace-data-type"><i class="ic" data-icon="bar-chart"></i> Analyse</span></div>
       <table class="table-stack reports-data-table">
         <thead id="table-head"></thead>
         <tbody id="table-body"></tbody>

@@ -17,16 +17,21 @@
 <body>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content">
+  <main class="main-content workspace-page page-devis">
     <div class="page-header">
       <div>
+        <div class="workspace-page-kicker">GESTION COMMERCIALE</div>
         <h1>Devis</h1>
         <p>Transformez vos devis acceptés en factures en un clic</p>
       </div>
       <a href="nouvelle-facture.html" class="btn btn-primary"><i class="ic" data-icon="plus"></i> Nouveau devis</a>
     </div>
 
-    <div class="card" style="padding:0;">
+    <div class="card workspace-data-card" style="padding:0;">
+      <div class="workspace-data-heading">
+        <div><h2>Suivi des devis</h2><p>Consultez les propositions, suivez leur statut et transformez les devis acceptés en factures</p></div>
+        <span class="workspace-data-type"><i class="ic" data-icon="file-stack"></i> Données du compte</span>
+      </div>
       <table class="table-stack devis-table">
         <thead><tr><th>N°</th><th>Client</th><th>Émission</th><th>Total</th><th>Statut</th><th></th></tr></thead>
         <tbody id="devis-body"></tbody>
