@@ -7,12 +7,12 @@
 # Le contexte doit inclure les deux dossiers, car server/app.js sert le frontend statique
 # depuis ../public (chemin relatif à server/, voir express.static(PUBLIC_DIR) dans app.js).
 #
-# Basée sur node:20-bookworm-slim (pas "alpine") : Puppeteer a besoin de Chromium et de
+# Basée sur node:26-bookworm-slim (pas "alpine") : Puppeteer a besoin de Chromium et de
 # ses bibliothèques système (libnss3, libatk, etc.), disponibles en paquets .deb standards
 # mais pas toujours compatibles/simples à installer sous Alpine (musl) — c'est le choix
 # recommandé par la documentation officielle de Puppeteer pour un déploiement Docker fiable.
 # ---------------------------------------------------------------------------
-FROM node:20-bookworm-slim
+FROM node:26-bookworm-slim
 
 # Dépendances système requises par Chromium (Puppeteer, génération PDF — voir
 # server/utils/pdf.js) + mysqldump (sauvegarde automatique quotidienne — voir
