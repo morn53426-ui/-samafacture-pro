@@ -4573,3 +4573,11 @@ button .icon { vertical-align: -.14em; }
   body .main-content { margin-left: var(--sidebar-w); }
   body.sidebar-collapsed .main-content { margin-left: var(--sidebar-collapsed-w); }
 }
+
+
+/* Pas de transition au chargement : seul le changement déclenché par l'utilisateur
+   anime la largeur du rail et le décalage de la zone de travail. */
+body.sidebar-initializing #app-sidebar,
+body.sidebar-initializing .main-content {
+  transition: none !important;
+}
