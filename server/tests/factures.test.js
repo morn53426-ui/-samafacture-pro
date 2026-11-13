@@ -14,7 +14,7 @@ describe('Factures : calcul et numérotation', () => {
     const email = emailDeTest('factures');
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Factures', email, password: 'motdepasse123' });
+      .send({ nom: 'Testeur Factures', email, password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
     // Ce scénario crée plus de 10 factures au total : utiliser Pro évite le quota
@@ -380,7 +380,7 @@ describe('Factures : idempotence des créations', () => {
     const email = emailDeTest('factures-idem');
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Idempotence', email, password: 'motdepasse123' });
+      .send({ nom: 'Testeur Idempotence', email, password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
     const client = await request(app)
