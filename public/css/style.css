@@ -4690,6 +4690,13 @@ input:focus, select:focus, textarea:focus {
     padding-left: clamp(24px, 2.2vw, 32px) !important;
     padding-right: clamp(24px, 2.2vw, 32px) !important;
   }
+  /* Les blocs métier commencent à droite du rail compact avec un retrait mesurable.
+     La barre d'outils reste pleine largeur. */
+  body .main-content.workspace-page > :not(.app-topbar):not(#topbar-root) {
+    margin-left: 32px !important;
+    width: calc(100% - 32px) !important;
+    max-width: calc(100% - 32px) !important;
+  }
   .app-topbar {
     margin: -24px -28px 24px; padding: 14px 28px; min-height: 72px;
     background: var(--paper); border-bottom: 1px solid var(--line); box-shadow: none;
@@ -4699,6 +4706,11 @@ input:focus, select:focus, textarea:focus {
   .main-content, body .main-content, body .main-content.workspace-page {
     margin-left: 0 !important;
     padding: calc(84px + env(safe-area-inset-top)) 18px 48px !important;
+  }
+  body .main-content.workspace-page > :not(.app-topbar):not(#topbar-root) {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
   .app-topbar {
     margin: 0 0 22px; padding: 12px 14px; min-height: 64px;
