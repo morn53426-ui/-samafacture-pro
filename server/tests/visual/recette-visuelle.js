@@ -661,8 +661,8 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     labelsHidden: true,
     promoRemoved: true,
     toggleExpanded: 'false',
-    headingFont: 'Manrope, Inter, sans-serif',
-    bodyFont: 'Inter, Arial, sans-serif',
+    headingFont: 'Manrope, sans-serif',
+    bodyFont: 'Inter, sans-serif',
     iconsConsistent: true
   }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
 
