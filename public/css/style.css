@@ -4094,14 +4094,14 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 body {
-  font-family: var(--font-body), Arial, sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
   font-weight: 400;
   line-height: 1.62;
   letter-spacing: .002em;
 }
 h1, h2, h3, h4 {
-  font-family: var(--font-display), var(--font-body), sans-serif;
+  font-family: var(--font-display);
   font-optical-sizing: auto;
   font-kerning: normal;
   text-wrap: balance;
