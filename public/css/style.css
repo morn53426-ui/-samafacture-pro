@@ -4581,3 +4581,13 @@ body.sidebar-initializing #app-sidebar,
 body.sidebar-initializing .main-content {
   transition: none !important;
 }
+
+
+/* Zone de travail desktop : conserver une marge de respiration visible après le rail. */
+@media (min-width: 901px) {
+  body .main-content.workspace-page {
+    padding-left: clamp(24px, 2.2vw, 36px) !important;
+    padding-right: clamp(24px, 2.2vw, 36px) !important;
+    box-sizing: border-box;
+  }
+}
