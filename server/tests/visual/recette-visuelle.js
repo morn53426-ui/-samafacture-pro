@@ -644,7 +644,14 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     bodyState: document.body.classList.contains('sidebar-collapsed'),
     labelsHidden: [...document.querySelectorAll('.nav-label')].every(element => getComputedStyle(element).display === 'none'),
     promoRemoved: !document.querySelector('.sidebar-promo'),
-    toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded')
+    toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded'),
+    headingFont: getComputedStyle(document.querySelector('.page-header h1') || document.querySelector('h1')).fontFamily,
+    bodyFont: getComputedStyle(document.body).fontFamily,
+    iconsConsistent: [...document.querySelectorAll('.nav-item svg.icon')].length > 0 &&
+      [...document.querySelectorAll('.nav-item svg.icon')].every(icon =>
+        icon.getAttribute('viewBox') === '0 0 24 24' &&
+        icon.getAttribute('stroke-linecap') === 'round' &&
+        icon.getAttribute('stroke-linejoin') === 'round')
   }));
   assert.deepEqual(compact, {
     collapsed: true,
@@ -653,8 +660,11 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     bodyState: true,
     labelsHidden: true,
     promoRemoved: true,
-    toggleExpanded: 'false'
-  }, 'La navigation de bureau doit démarrer en rail compact sans réduire la zone de travail.');
+    toggleExpanded: 'false',
+    headingFont: 'Manrope, Inter, sans-serif',
+    bodyFont: 'Inter, Arial, sans-serif',
+    iconsConsistent: true
+  }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
 
   await page.click('#sidebar-collapse-toggle');
   await new Promise(resolve => setTimeout(resolve, 240));
