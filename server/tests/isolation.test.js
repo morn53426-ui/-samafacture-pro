@@ -14,13 +14,13 @@ describe('Isolation des données entre utilisateurs', () => {
 
     const inscriptionA = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Utilisateur A', email: emailDeTest('isoA'), password: 'motdepasseA123' });
+      .send({ nom: 'Utilisateur A', email: emailDeTest('isoA'), password: 'motdepasseA123' , acceptTerms: true});
     userIdA = inscriptionA.body.user.id;
     tokenA = inscriptionA.body.token;
 
     const inscriptionB = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Utilisateur B', email: emailDeTest('isoB'), password: 'motdepasseB123' });
+      .send({ nom: 'Utilisateur B', email: emailDeTest('isoB'), password: 'motdepasseB123' , acceptTerms: true});
     userIdB = inscriptionB.body.user.id;
     tokenB = inscriptionB.body.token;
 
