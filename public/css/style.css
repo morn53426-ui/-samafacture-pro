@@ -4693,9 +4693,9 @@ input:focus, select:focus, textarea:focus {
   /* Les blocs métier commencent à droite du rail compact avec un retrait mesurable.
      La barre d'outils reste pleine largeur. */
   body .main-content.workspace-page > :not(.app-topbar):not(#topbar-root) {
-    margin-left: 32px !important;
-    width: calc(100% - 32px) !important;
-    max-width: calc(100% - 32px) !important;
+    margin-left: 56px !important;
+    width: calc(100% - 56px) !important;
+    max-width: calc(100% - 56px) !important;
   }
   .app-topbar {
     margin: -24px -28px 24px; padding: 14px 28px; min-height: 72px;
