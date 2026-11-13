@@ -88,7 +88,16 @@ describe('Rapports', () => {
 
   test('GET /rapports/export-excel renvoie un classeur .xlsx pour un compte plan Pro', async () => {
     await pool.query("UPDATE users SET plan = 'pro' WHERE id = ?", [userId]);
-    const res = await request(app).get('/api/rapports/export-excel').set('Authorization', `Bearer ${token}`);
+    const res = await request(app)
+      .get('/api/rapports/export-excel')
+      .set('Authorization', `Bearer ${token}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks = [];
+        response.on('data', chunk => chunks.push(Buffer.from(chunk)));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+        response.on('error', callback);
+      });
     assert.equal(res.status, 200);
     assert.equal(res.headers['content-type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     assert.match(res.headers['content-disposition'] || '', /\.xlsx"?$/);
