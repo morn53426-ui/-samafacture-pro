@@ -670,6 +670,34 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
     expanded: 'false',
     emptyMessage: 'Aucune notification reçue pendant cette session.'
   }, 'Aucun compteur fictif ne doit apparaître sans événement reçu.');
+  const topbarControls = await page.evaluate(() => {
+    const account = document.querySelector('.app-topbar-account');
+    const order = Array.from(account?.children || []).map(element => {
+      if (element.matches('.app-topbar-avatar')) return 'avatar';
+      if (element.matches('.app-notification')) return 'notifications';
+      if (element.matches('.app-topbar-quick-actions')) return 'system-and-localization';
+      if (element.matches('.app-topbar-logout')) return 'logout';
+      return 'identity';
+    });
+    return {
+      order,
+      themeButtonCount: document.querySelectorAll('.theme-toggle-btn').length,
+      themeButtonInTopbar: Boolean(document.querySelector('.app-topbar-quick-actions .theme-toggle-btn')),
+      localizationHref: document.querySelector('.app-topbar-localization')?.getAttribute('href'),
+      localizationLabel: document.querySelector('.app-topbar-localization')?.getAttribute('aria-label'),
+      themeInSidebar: Boolean(document.querySelector('.sidebar-theme-control .theme-toggle-btn')),
+      localizationInSidebar: Boolean(document.querySelector('#app-navigation a[href="internationalisation.html"]'))
+    };
+  });
+  assert.deepEqual(topbarControls, {
+    order: ['avatar', 'identity', 'notifications', 'system-and-localization', 'logout'],
+    themeButtonCount: 1,
+    themeButtonInTopbar: true,
+    localizationHref: 'internationalisation.html',
+    localizationLabel: 'Pays, langue et devise',
+    themeInSidebar: false,
+    localizationInSidebar: false
+  }, 'Le bouton Système et l’accès Pays, langue & devise doivent être placés entre Notifications et Déconnexion dans la barre supérieure.');
   await page.click('#workspace-notification-toggle');
   assert.equal(await page.$eval('#workspace-notification-panel', element => !element.hidden), true,
     'La cloche doit ouvrir le panneau de notifications.');
