@@ -156,12 +156,13 @@ function definirCookieSession(res, token) {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [nom, email, password]
+ *             required: [nom, email, password, acceptTerms]
  *             properties:
  *               nom: { type: string, example: 'Fatou Ndiaye' }
  *               email: { type: string, example: 'fatou@example.com' }
  *               password: { type: string, format: password, minLength: 8 }
  *               entreprise_nom: { type: string, nullable: true }
+ *               acceptTerms: { type: boolean, enum: [true], description: 'Acceptation des conditions et prise de connaissance de la politique de confidentialité.' }
  *     responses:
  *       201:
  *         description: Compte créé.
