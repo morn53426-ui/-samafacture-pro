@@ -3,19 +3,19 @@ function renderAuthSide() {
   const slides = [
     {
       src: 'images/auth-slide-1.jpg',
-      eyebrow: 'GESTION AU QUOTIDIEN',
+      eyebrow: 'Gestion au quotidien',
       title: 'Votre activité, mieux organisée.',
       description: 'Centralisez vos devis, factures et clients dans un seul espace.'
     },
     {
       src: 'images/auth-slide-2.jpg',
-      eyebrow: 'IMAGE PROFESSIONNELLE',
+      eyebrow: 'Documents professionnels',
       title: 'Des documents clairs et soignés.',
       description: 'Créez des factures professionnelles en quelques clics.'
     },
     {
       src: 'images/auth-slide-3.jpg',
-      eyebrow: 'SUIVI SIMPLIFIÉ',
+      eyebrow: 'Suivi des règlements',
       title: 'Gardez le contrôle de vos encaissements.',
       description: 'Suivez les règlements et l’évolution de votre activité plus facilement.'
     }
@@ -23,12 +23,12 @@ function renderAuthSide() {
 
   const messages = [
     { icon: 'check-circle', text: 'Facturation rapide et professionnelle.' },
-    { icon: 'sparkles', text: 'Gérez vos clients en quelques clics.' },
+    { icon: 'users', text: 'Gérez vos clients en quelques clics.' },
     { icon: 'file-text', text: 'Devis et factures conformes.' },
     { icon: 'credit-card', text: 'Paiement via Wave, Orange Money, PayDunya et Stripe.' },
     { icon: 'bar-chart', text: 'Tableau de bord intelligent.' }
   ];
-  const marqueeItems = [...messages, ...messages]
+  const marqueeItems = messages
     .map(m => '<span class="auth-marquee-item">' + Icon(m.icon) + ' ' + m.text + '</span>')
     .join('');
 
@@ -110,9 +110,9 @@ function initAuthSlider() {
   }
 
   const slidesData = [
-    { eyebrow: 'GESTION AU QUOTIDIEN', title: 'Votre activité, mieux organisée.', description: 'Centralisez vos devis, factures et clients dans un seul espace.' },
-    { eyebrow: 'IMAGE PROFESSIONNELLE', title: 'Des documents clairs et soignés.', description: 'Créez des factures professionnelles en quelques clics.' },
-    { eyebrow: 'SUIVI SIMPLIFIÉ', title: 'Gardez le contrôle de vos encaissements.', description: 'Suivez les règlements et l’évolution de votre activité plus facilement.' }
+    { eyebrow: 'Gestion au quotidien', title: 'Votre activité, mieux organisée.', description: 'Centralisez vos devis, factures et clients dans un seul espace.' },
+    { eyebrow: 'Documents professionnels', title: 'Des documents clairs et soignés.', description: 'Créez des factures professionnelles en quelques clics.' },
+    { eyebrow: 'Suivi des règlements', title: 'Gardez le contrôle de vos encaissements.', description: 'Suivez les règlements et l’évolution de votre activité plus facilement.' }
   ];
 
   function setPaused(paused) {
