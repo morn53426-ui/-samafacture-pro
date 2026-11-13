@@ -19,13 +19,22 @@ describe('Authentification', () => {
   test('inscription avec des informations valides crée un compte et renvoie un jeton', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Utilisateur Test', email, password, entreprise_nom: 'Boutique Test' });
+      .send({ nom: 'Utilisateur Test', email, password, entreprise_nom: 'Boutique Test', acceptTerms: true });
 
     assert.equal(res.status, 201);
     assert.ok(res.body.token, 'un jeton JWT doit être renvoyé');
     assert.equal(res.body.user.email, email);
     assert.equal(res.body.user.password_hash, undefined, 'le mot de passe ne doit jamais être renvoyé');
     userId = res.body.user.id;
+  });
+
+  test("l'inscription sans acceptation des documents est refusée", async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ nom: 'Sans Consentement', email: emailDeTest('sans-accord'), password, acceptTerms: false });
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /accepter les conditions/i);
   });
 
   test("l'inscription avec un email déjà utilisé est refusée", async () => {
@@ -42,6 +51,16 @@ describe('Authentification', () => {
       .send({ nom: 'Test', email: emailDeTest('court'), password: '123' });
 
     assert.equal(res.status, 400);
+  });
+
+  test("l'acceptation des documents est enregistrée avec leurs versions", async () => {
+    const [rows] = await require('../config/db').pool.query(
+      'SELECT terms_accepted_at, terms_version, privacy_version FROM users WHERE email = ?',
+      [email]
+    );
+    assert.ok(rows[0].terms_accepted_at);
+    assert.equal(rows[0].terms_version, '2026-11-13');
+    assert.equal(rows[0].privacy_version, '2026-11-13');
   });
 
   test('la connexion avec les bons identifiants réussit', async () => {
