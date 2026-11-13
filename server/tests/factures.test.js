@@ -137,6 +137,20 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(res.body.facture.total, 0.48);
   });
 
+  test('une quantité avec plus de deux décimales est refusée au lieu d’être tronquée par MySQL', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        lignes: [{ designation: 'Quantité trop précise', quantite: '1.234', prix_unitaire: 1000, tva: 18 }]
+      });
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /Quantité.*décimale/);
+  });
+
   test('un prix avec plus de deux décimales est refusé et ne crée pas de facture', async () => {
     const res = await request(app)
       .post('/api/factures')
