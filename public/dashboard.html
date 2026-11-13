@@ -23,9 +23,9 @@
 
     <section class="dashboard-welcome">
       <div>
-        <div class="workspace-page-kicker">VUE D’ENSEMBLE</div>
-        <h1 id="dashboard-greeting">Bonjour !</h1>
-        <p>Voici un aperçu de votre activité et de vos indicateurs de gestion.</p>
+        <div class="workspace-page-kicker">Activité</div>
+        <h1 id="dashboard-greeting">Tableau de bord</h1>
+        <p>Indicateurs et mouvements récents de votre activité.</p>
       </div>
       <div class="dashboard-context"><i class="ic" data-icon="calendar"></i><span id="dashboard-period-label">Vue d'ensemble de votre activité</span></div>
     </section>
@@ -142,8 +142,7 @@
   let periode = 'week';
 
   const user = Api.currentUser() || {};
-  const firstName = (user.nom || user.entreprise_nom || 'vous').trim().split(/\s+/)[0];
-  document.getElementById('dashboard-greeting').textContent = 'Bonjour, ' + firstName + ' !';
+  document.getElementById('dashboard-greeting').textContent = 'Tableau de bord';
 
   function renderKpis(stats) {
     const value = (v) => Number(v || 0);
@@ -232,7 +231,7 @@
         datasets: [{
           label: 'Ventes',
           data: rows?.length ? rows.map(row => Number(row.total || 0)) : [0],
-          borderColor: '#1769F5',
+          borderColor: '#087A57',
           backgroundColor: gradient,
           borderWidth: 3,
           fill: true,
@@ -240,7 +239,7 @@
           pointRadius: rows?.length ? 3 : 0,
           pointHoverRadius: 5,
           pointBackgroundColor: '#FFFFFF',
-          pointBorderColor: '#1769F5',
+          pointBorderColor: '#087A57',
           pointBorderWidth: 2
         }]
       },
@@ -257,7 +256,7 @@
         interaction: { intersect: false, mode: 'index' },
         plugins: {
           legend: { display: false },
-          tooltip: { displayColors: false, backgroundColor: '#142B53', padding: 11 }
+          tooltip: { displayColors: false, backgroundColor: '#292822', padding: 11 }
         },
         scales: {
           y: { beginAtZero: true, grid: { color: 'rgba(105,125,160,.14)' }, ticks: { color: '#8290A8', callback: value => Number(value).toLocaleString('fr-FR') } },
@@ -270,9 +269,9 @@
 
   async function renderStatusChart(stats) {
     const rows = [
-      { label: 'Payées', value: Number(stats.factures_payees?.n || 0), color: '#1769F5' },
-      { label: 'En attente', value: Number(stats.factures_en_attente?.n || 0), color: '#0DAF83' },
-      { label: 'En retard', value: Number(stats.factures_en_retard?.n || 0), color: '#F5A623' }
+      { label: 'Payées', value: Number(stats.factures_payees?.n || 0), color: '#087A57' },
+      { label: 'En attente', value: Number(stats.factures_en_attente?.n || 0), color: '#96713E' },
+      { label: 'En retard', value: Number(stats.factures_en_retard?.n || 0), color: '#B64D48' }
     ];
     const total = rows.reduce((sum, row) => sum + row.value, 0);
     document.getElementById('invoice-total').textContent = total.toLocaleString('fr-FR');
