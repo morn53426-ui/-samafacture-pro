@@ -53,7 +53,9 @@ jobs:
 
       - name: Installer le navigateur requis par Puppeteer
         working-directory: server
-        run: npx puppeteer browsers install chrome
+        run: |
+          rm -rf "$HOME/.cache/puppeteer"
+          npx puppeteer browsers install chrome
 
       - name: Vérifier le script de recette staging
         working-directory: server
