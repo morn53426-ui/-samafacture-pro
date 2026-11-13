@@ -4850,6 +4850,18 @@ tbody td { border-color: #ECE6DC; }
 .auth-content { padding: clamp(24px, 4vw, 48px); }
 .auth-slider-dots .dot { border-radius: 3px; }
 .lp-home-slide figcaption span { letter-spacing: .02em; text-transform: none; }
+.lp-eyebrow, .auth-slide-caption .eyebrow {
+  color: var(--ink-soft);
+  font-size: .76rem;
+  font-weight: 500;
+  letter-spacing: .02em !important;
+  text-transform: none !important;
+}
+thead th, .workspace-data-card th {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+.workspace-page-kicker { text-transform: none !important; letter-spacing: .02em !important; }
 
 /* Icônes SVG homogènes. */
 .ic svg, .icon, .nav-item svg.icon, .lp-feature-card svg {
