@@ -560,6 +560,56 @@ async function verifyMotion(browser, baseUrl, fixtures) {
 }
 
 async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
+  // Desktop : le menu compact libère de l'espace au tableau de bord.
+  const desktop = await preparePage(browser, baseUrl, fixtures, false);
+  await desktop.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
+  await desktop.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
+  await desktop.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  const compactMetrics = await desktop.evaluate(() => ({
+    compact: document.querySelector('.app-shell')?.classList.contains('is-sidebar-compact'),
+    sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
+    mainOffset: Math.round(document.querySelector('.main-content')?.getBoundingClientRect().left || 0),
+    labelHidden: getComputedStyle(document.querySelector('.nav-label'))?.display === 'none',
+    toggleVisible: getComputedStyle(document.getElementById('sidebar-collapse-btn'))?.display !== 'none',
+    overflow: document.documentElement.scrollWidth > window.innerWidth
+  }));
+  assert.equal(compactMetrics.compact, true, 'Le menu de bureau doit être compact par défaut.');
+  assert.ok(compactMetrics.sidebarWidth >= 72 && compactMetrics.sidebarWidth <= 84,
+    'Le menu compact doit rester proche de 78 px : ' + JSON.stringify(compactMetrics));
+  assert.ok(Math.abs(compactMetrics.mainOffset - compactMetrics.sidebarWidth) <= 2,
+    'Le contenu doit s’aligner après le menu compact : ' + JSON.stringify(compactMetrics));
+  assert.equal(compactMetrics.labelHidden, true, 'Les libellés doivent se masquer en mode compact.');
+  assert.equal(compactMetrics.toggleVisible, true, 'Le bouton de déploiement doit rester accessible.');
+  assert.equal(compactMetrics.overflow, false, 'Le mode compact ne doit pas provoquer de débordement.');
+  await desktop.screenshot({ path: path.join(OUTPUT_DIR, 'sidebar-compact-1440.png'), fullPage: true });
+
+  await desktop.click('#sidebar-collapse-btn');
+  await desktop.waitForFunction(() =>
+    document.getElementById('app-sidebar')?.getBoundingClientRect().width >= 250
+  , { timeout: 5000 });
+  const expandedMetrics = await desktop.evaluate(() => ({
+    compact: document.querySelector('.app-shell')?.classList.contains('is-sidebar-compact'),
+    sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
+    mainOffset: Math.round(document.querySelector('.main-content')?.getBoundingClientRect().left || 0),
+    labelVisible: getComputedStyle(document.querySelector('.nav-label'))?.display !== 'none',
+    activeCurrent: document.querySelector('.nav-item.active')?.getAttribute('aria-current'),
+    overflow: document.documentElement.scrollWidth > window.innerWidth
+  }));
+  assert.equal(expandedMetrics.compact, false, 'Le bouton doit déployer le menu latéral.');
+  assert.ok(expandedMetrics.sidebarWidth >= 250 && expandedMetrics.sidebarWidth <= 270,
+    'La largeur déployée doit rester maîtrisée : ' + JSON.stringify(expandedMetrics));
+  assert.ok(Math.abs(expandedMetrics.mainOffset - expandedMetrics.sidebarWidth) <= 2,
+    'Le contenu doit suivre la largeur du menu déployé : ' + JSON.stringify(expandedMetrics));
+  assert.equal(expandedMetrics.labelVisible, true, 'Les libellés doivent revenir en mode déployé.');
+  assert.equal(expandedMetrics.activeCurrent, 'page', 'Le lien actif doit être exposé par ARIA.');
+  assert.equal(expandedMetrics.overflow, false, 'Le mode déployé ne doit pas provoquer de débordement.');
+  await desktop.screenshot({ path: path.join(OUTPUT_DIR, 'sidebar-expanded-1440.png'), fullPage: true });
+  await desktop.click('#sidebar-collapse-btn');
+  await desktop.waitForFunction(() =>
+    document.querySelector('.app-shell')?.classList.contains('is-sidebar-compact')
+  , { timeout: 5000 });
+  await desktop.close();
+
   const page = await preparePage(browser, baseUrl, fixtures, false);
   const clientRequests = [];
   page.on('request', (request) => {
@@ -628,7 +678,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
     'Le bouton du menu doit refermer le panneau mobile et son voile.');
   await mobile.close();
 
-  return { globalSearch: 'ok', mobileNavigation: 'ok', notifications: 'ok' };
+  return { desktopCompactNavigation: 'ok', desktopExpandedNavigation: 'ok', globalSearch: 'ok', mobileNavigation: 'ok', notifications: 'ok' };
 }
 
 function contrastRatio(foreground, background) {
@@ -824,7 +874,7 @@ async function main() {
       workspaceShell: shell,
       themeAndZoom,
       documentFlows,
-      screenshots: results.length + 2,
+      screenshots: results.length + 4,
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
