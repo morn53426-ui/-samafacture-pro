@@ -76,8 +76,8 @@
         </dl>
         <div class="subscription-checkout-disclosure">
           <strong>À savoir avant de payer</strong>
-          <p>Il n’y a ni renouvellement automatique ni prélèvement ultérieur. Dans la version actuelle, aucune date d’expiration automatique n’est appliquée : le plan reste associé à votre compte jusqu’à un changement manuel de formule.</p>
-          <p>Votre formule sera activée uniquement après confirmation du paiement par le serveur et le fournisseur.</p>
+          <p id="checkout-disclosure-copy">Les conditions de facturation sont vérifiées…</p>
+          <p id="checkout-activation-copy">L’activation est effectuée uniquement après confirmation du paiement par le serveur et le fournisseur.</p>
         </div>
         <label class="subscription-checkout-consent" for="checkout-agreement">
           <input type="checkbox" id="checkout-agreement" onchange="actualiserConfirmationPaiement()" />
@@ -133,6 +133,7 @@
 
   let intentionPaiement = null;
   window.SF_TARIFS_ABONNEMENT = {};
+  window.SF_FACTURATION_ABONNEMENT = null;
 
   const PLANS = [
     {
@@ -261,10 +262,12 @@
     const safeMoyens = {
       wave: !!moyens.wave,
       paydunya: !!moyens.paydunya,
-      tarifs: moyens.tarifs || {}
+      tarifs: moyens.tarifs || {},
+      facturation: moyens.facturation || null
     };
 
     window.SF_TARIFS_ABONNEMENT = safeMoyens.tarifs;
+    window.SF_FACTURATION_ABONNEMENT = safeMoyens.facturation;
 
     document.getElementById('plan-cards').innerHTML = PLANS
       .map(plan => renderPlanCard(plan, user, safeMoyens))
@@ -276,6 +279,17 @@
 
   function preparerPaiement(plan, fournisseur) {
     const montant = Number(window.SF_TARIFS_ABONNEMENT?.[plan]);
+    const facturation = window.SF_FACTURATION_ABONNEMENT;
+    if (!facturation ||
+        facturation.mode !== 'paiement_unique' ||
+        facturation.renouvellement_automatique !== false ||
+        facturation.expiration_automatique !== false ||
+        facturation.acces_jusqua_changement_manuel !== true ||
+        facturation.activation !== 'apres_confirmation') {
+      document.getElementById('plan-msg').innerHTML =
+        '<div class="error-box">Les conditions de facturation ne sont pas disponibles. Le paiement est temporairement bloqué.</div>';
+      return;
+    }
     if (!Number.isSafeInteger(montant) || montant <= 0) {
       document.getElementById('plan-msg').innerHTML =
         '<div class="error-box">Le tarif de cette formule est indisponible. Actualisez la page puis réessayez.</div>';
@@ -287,6 +301,10 @@
     document.getElementById('checkout-amount').textContent = formatMontant(montant, 'FCFA');
     document.getElementById('checkout-provider').textContent =
       fournisseur === 'wave' ? 'Wave' : 'Orange Money / Carte via PayDunya';
+    document.getElementById('checkout-disclosure-copy').textContent =
+      'Le paiement est ponctuel, sans prélèvement ultérieur. Le plan reste associé au compte jusqu’à un changement manuel ; aucune date d’expiration automatique n’est gérée actuellement.';
+    document.getElementById('checkout-activation-copy').textContent =
+      'Le plan est activé uniquement après confirmation du règlement par le fournisseur et validation côté serveur.';
     document.getElementById('checkout-agreement').checked = false;
     document.getElementById('checkout-continue').disabled = true;
     document.getElementById('checkout-message').textContent = '';
