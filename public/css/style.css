@@ -4108,3 +4108,161 @@ thead th { background: #F2F6FD; color: #52627D; }
   .nav-item,
   .sidebar-promo a { transition: none !important; }
 }
+
+
+/* Navigation de travail — compacte par défaut pour libérer la zone de contenu. */
+.app-shell { --sidebar-w: 264px; }
+.app-shell.is-sidebar-compact { --sidebar-w: 78px; }
+@media (min-width: 901px) {
+  .sidebar {
+    width: var(--sidebar-w);
+    overflow-x: visible;
+    transition: width 220ms cubic-bezier(.2,.75,.25,1);
+  }
+  .main-content {
+    margin-left: var(--sidebar-w);
+    min-width: 0;
+    transition: margin-left 220ms cubic-bezier(.2,.75,.25,1);
+  }
+  .sidebar-brand {
+    position: relative;
+    min-height: 82px;
+    padding: 15px 52px 14px 16px;
+    gap: 11px;
+  }
+  .sidebar-brand > div:nth-child(2) { min-width: 0; }
+  .sidebar-brand .name, .sidebar-brand .sub { white-space: nowrap; }
+  .sidebar-collapse-toggle {
+    position: absolute;
+    top: 50%;
+    right: 11px;
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    transform: translateY(-50%);
+    border: 1px solid rgba(219,231,250,.16);
+    border-radius: 9px;
+    background: rgba(255,255,255,.07);
+    color: #DCE7F9;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .sidebar-collapse-toggle:hover { background: rgba(255,255,255,.14); }
+  .sidebar-collapse-toggle:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+  .sidebar-collapse-toggle .icon { width: 17px; height: 17px; }
+  .sidebar-nav {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .sidebar-promo { display: none !important; }
+  .sidebar-foot {
+    flex: 0 0 auto;
+    padding: 11px 14px max(14px, env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(255,255,255,.1);
+  }
+  .sidebar-user-name {
+    overflow: hidden;
+    margin-top: 8px;
+    color: #E0E8F6;
+    font-size: .78rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sidebar-logout {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    gap: 9px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 9px;
+    background: rgba(255,255,255,.045);
+    color: #DCE7F9;
+    font: inherit;
+    font-size: .78rem;
+    text-align: left;
+    cursor: pointer;
+  }
+  .sidebar-logout:hover { background: rgba(255,255,255,.1); }
+  .sidebar-logout .ic { display: grid; width: 20px; place-items: center; }
+  .sidebar-logout .icon { width: 17px; height: 17px; }
+
+  .app-shell.is-sidebar-compact .sidebar-brand {
+    min-height: 88px;
+    justify-content: center;
+    padding: 32px 8px 12px;
+  }
+  .app-shell.is-sidebar-compact .sidebar-brand > div:nth-child(2) { display: none; }
+  .app-shell.is-sidebar-compact .sidebar-brand .mark { width: 38px; height: 38px; }
+  .app-shell.is-sidebar-compact .sidebar-collapse-toggle {
+    top: 6px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    transform: none;
+    border: 0;
+    background: transparent;
+  }
+  .app-shell.is-sidebar-compact .sidebar-nav { padding: 10px 12px 14px; }
+  .app-shell.is-sidebar-compact .nav-group-label { display: none; }
+  .app-shell.is-sidebar-compact .nav-item {
+    display: flex;
+    width: 50px;
+    min-height: 50px;
+    justify-content: center;
+    gap: 0;
+    margin: 0 auto 6px;
+    padding: 6px;
+    border-radius: 13px;
+  }
+  .app-shell.is-sidebar-compact .nav-item .ic {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    place-items: center;
+    margin: 0;
+  }
+  .app-shell.is-sidebar-compact .nav-item .nav-label { display: none; }
+  .app-shell.is-sidebar-compact .sidebar-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 7px max(12px, env(safe-area-inset-bottom));
+  }
+  .app-shell.is-sidebar-compact .sidebar-foot > .install-app-btn,
+  .app-shell.is-sidebar-compact .sidebar-foot > .plan-badge,
+  .app-shell.is-sidebar-compact .sidebar-user-name { display: none !important; }
+  .app-shell.is-sidebar-compact .theme-toggle-btn {
+    display: grid;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    place-items: center;
+    padding: 0;
+  }
+  .app-shell.is-sidebar-compact .theme-toggle-btn .theme-toggle-texte { display: none; }
+  .app-shell.is-sidebar-compact .sidebar-logout {
+    width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    margin-top: 0;
+    padding: 0;
+  }
+  .app-shell.is-sidebar-compact .sidebar-logout > span:last-child { display: none; }
+}
+@media (max-width: 900px) {
+  .app-shell { --sidebar-w: 0px; }
+  .sidebar-collapse-toggle { display: none !important; }
+  .sidebar-promo { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .main-content, .sidebar-collapse-toggle { transition: none !important; }
+}
