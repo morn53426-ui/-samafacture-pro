@@ -22,6 +22,22 @@ describe("Paiements d'abonnement", () => {
     await nettoyerUtilisateur(userId);
   });
 
+  test('les tarifs et les conditions de paiement sont explicites côté serveur', async () => {
+    const res = await request(app)
+      .get('/api/abonnement/moyens-disponibles')
+      .set('Authorization', `Bearer ${token}`);
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.tarifs, { starter: 5000, pro: 15000, entreprise: 35000 });
+    assert.deepEqual(res.body.facturation, {
+      mode: 'paiement_unique',
+      renouvellement_automatique: false,
+      expiration_automatique: false,
+      acces_jusqua_changement_manuel: true,
+      activation: 'apres_confirmation'
+    });
+  });
+
   test('un plan invalide est refusé avant toute création de session', async () => {
     const res = await request(app)
       .post('/api/abonnement/payer')
