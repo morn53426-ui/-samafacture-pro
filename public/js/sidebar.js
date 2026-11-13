@@ -8,24 +8,24 @@ function renderSidebar(activePage) {
       { id: 'factures', icon: 'file-text', label: 'Factures', href: 'factures.html' },
       { id: 'devis', icon: 'file-stack', label: 'Devis', href: 'devis.html' },
       { id: 'clients', icon: 'users', label: 'Clients', href: 'clients.html' },
-      { id: 'crm', icon: 'contact-round', label: 'CRM & suivi client', href: 'crm.html' }
+      { id: 'crm', icon: 'users', label: 'CRM & suivi client', href: 'crm.html' }
     ]},
     { group: 'Catalogue', items: [
       { id: 'produits', icon: 'package', label: 'Produits & services', href: 'produits.html' }
     ]},
     { group: 'Comptabilité', items: [
       { id: 'finances', icon: 'credit-card', label: 'Paiements', href: 'finances.html' },
-      { id: 'paiements-pro', icon: 'wallet-cards', label: 'Paiements en ligne', href: 'paiements-professionnels.html' },
-      { id: 'comptabilite', icon: 'calculator', label: 'Comptabilité OHADA', href: 'comptabilite.html' },
+      { id: 'paiements-pro', icon: 'wallet', label: 'Paiements en ligne', href: 'paiements-professionnels.html' },
+      { id: 'comptabilite', icon: 'bar-chart', label: 'Comptabilité OHADA', href: 'comptabilite.html' },
       { id: 'depenses', icon: 'banknote', label: 'Dépenses', href: 'depenses.html' },
       { id: 'rapports', icon: 'bar-chart', label: 'Rapports', href: 'rapports.html' }
     ]},
     { group: 'Outils professionnels', items: [
       { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
       { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' },
-      { id: 'achats', icon: 'truck', label: 'Achats & stocks', href: 'achats.html' },
+      { id: 'achats', icon: 'package', label: 'Achats & stocks', href: 'achats.html' },
       { id: 'assistant-ia', icon: 'sparkles', label: 'Assistant IA', href: 'assistant-ia.html' },
-      { id: 'automatisations', icon: 'workflow', label: 'Automatisations', href: 'automatisations.html' },
+      { id: 'automatisations', icon: 'repeat', label: 'Automatisations', href: 'automatisations.html' },
       { id: 'facture-ia', icon: 'wand', label: 'Facture par IA', href: 'facture-ia.html' }
     ]},
     { group: 'Compte', items: [
