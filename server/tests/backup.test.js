@@ -61,6 +61,21 @@ describe('Sauvegardes automatiques', () => {
     assert.equal(doublon, false, 'une seule sauvegarde quotidienne doit être enregistrée');
   });
 
+  test('le mode production refuse de créer une sauvegarde non chiffrée sans clé', async () => {
+    const savedMode = process.env.NODE_ENV;
+    const savedKey = process.env.BACKUP_ENCRYPTION_KEY;
+    process.env.NODE_ENV = 'production';
+    delete process.env.BACKUP_ENCRYPTION_KEY;
+    try {
+      await assert.rejects(effectuerSauvegarde(), /obligatoire en production/);
+      assert.equal((await fs.promises.readdir(BACKUP_DIR)).length, 0);
+    } finally {
+      process.env.NODE_ENV = savedMode;
+      if (savedKey === undefined) delete process.env.BACKUP_ENCRYPTION_KEY;
+      else process.env.BACKUP_ENCRYPTION_KEY = savedKey;
+    }
+  });
+
   test('une sauvegarde avec clé est chiffrée et déchiffrable avant restauration', async () => {
     ecrireFauxDump(0);
     process.env.MYSQLDUMP_PATH = fakeDump;
@@ -74,6 +89,12 @@ describe('Sauvegardes automatiques', () => {
       assert.equal(prepared.temporary, true);
       const sql = zlib.gunzipSync(await fs.promises.readFile(prepared.gzipPath)).toString('utf8');
       assert.match(sql, /CREATE TABLE backup_test_fixture/);
+
+      const tamperedPath = path.join(tempRoot, 'tampered.sql.gz.enc');
+      const encrypted = await fs.promises.readFile(result.path);
+      encrypted[encrypted.length - 1] ^= 0x01;
+      await fs.promises.writeFile(tamperedPath, encrypted, { mode: 0o600 });
+      await assert.rejects(preparerFluxGzip(tamperedPath), /Authentification\/déchiffrement/);
     } finally {
       await fs.promises.unlink(prepared.gzipPath).catch(() => {});
       delete process.env.BACKUP_ENCRYPTION_KEY;
