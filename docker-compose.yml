@@ -110,7 +110,7 @@ services:
       app:
         condition: service_healthy
     ports:
-      - "${HTTP_PORT:-4000}:80"
+      - "127.0.0.1:${HTTP_PORT:-4000}:80"
     volumes:
       - ./deploy/nginx.scalable.conf.example:/etc/nginx/nginx.conf:ro
     networks: [samafacture_net]
