@@ -150,6 +150,7 @@ function renderTopbar(title, subtitle) {
     ? 'Administrateur'
     : 'Espace de travail';
   const avatar = typeof initials === 'function' ? initials(displayName) : 'SF';
+  const isLocalizationPage = location.pathname.endsWith('/internationalisation.html');
 
   el.outerHTML = `
     <header class="app-topbar" aria-label="Barre d'outils">
@@ -186,8 +187,8 @@ function renderTopbar(title, subtitle) {
         </div>
         <div class="app-topbar-quick-actions" role="group" aria-label="Accès rapides">
           ${window.SamaTheme ? SamaTheme.boutonHtml('-topbar') : ''}
-          <a href="internationalisation.html" class="app-topbar-localization"
-            aria-label="Pays, langue et devise" title="Pays, langue et devise">
+          <a href="internationalisation.html" class="app-topbar-localization${isLocalizationPage ? ' is-active' : ''}"
+            aria-label="Pays, langue et devise" title="Pays, langue et devise" ${isLocalizationPage ? 'aria-current="page"' : ''}>
             <span class="ic" aria-hidden="true">${Icon('globe')}</span>
             <span class="app-topbar-localization-label">Pays, langue &amp; devise</span>
           </a>
