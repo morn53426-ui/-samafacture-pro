@@ -41,26 +41,27 @@ Toutes les pages publiques et privées de SamaFacture Pro, y compris l'accueil, 
 
 ## Recette finale — 13 novembre 2026
 
-**Pipeline GitHub Actions final : réussi** — run `43433521207`, commit `5f94725248bd3634063b7af5b2c94fdef5dd617c`.
+**Pipeline GitHub Actions final : réussi** — run `43441977236`, commit `3c430f1299774bfbeca72cbccc91db0c4450e9f8`.
 
 - Construction de l'image Docker : réussie.
 - Validation Docker Compose et des chemins de configuration : réussie.
 - Suite fonctionnelle : **194 tests réussis, 0 échec, 0 test ignoré**, 30 suites.
-- Recette visuelle : réussie sur le jeu de données extrême et sur **320, 390, 768 et 1440 px**.
-- Captures : **70 PNG** au total : 15 pages de l'application × 4 largeurs (60), accueil et connexion × 4 largeurs (8), plus 2 captures de contrôle.
-- Contrôle du rail desktop : largeur 76 px, état compact/étendu et préférence persistée.
+- Recette visuelle responsive : réussie sur le jeu de données extrême aux largeurs **320, 390, 768 et 1440 px**.
+- Captures : **70 PNG** : 15 pages de l'application × 4 largeurs (60), accueil et connexion × 4 largeurs (8), et 2 captures de contrôle.
+- Débordement horizontal : **0** sur les 68 combinaisons de pages et de largeurs.
+- Thème sombre : fond `rgb(29, 28, 24)`, carte `rgb(40, 39, 32)`, texte `rgb(243, 239, 230)`, contraste mesuré **14,86:1**, sans débordement.
+- Navigation desktop compacte (rail 76 px), dépliage/repliage et préférence persistée : réussis.
 - Navigation tablette/mobile, recherche globale et notifications : réussies.
-- Graphiques sans animations intrusives ; prise en charge de `prefers-reduced-motion` : réussie.
-- Parcours de création de facture et de devis, calculs de remise/TVA/livraison : réussis.
-- Aucun débordement horizontal détecté dans les pages et largeurs couvertes.
+- Graphiques et respect de `prefers-reduced-motion` : vérifiés.
+- Parcours de création de facture et de devis, calcul de remise, TVA et livraison : réussis ; total de contrôle fictif : 20 380.
 
-Les captures sont générées avec des réponses API fictives de recette ; aucune donnée réelle n'est utilisée. L'archive des captures contient `rapport-recette-visuelle.json`.
+La première recette avait révélé un défaut du sélecteur de mesure qui prenait la barre d'outils pleine largeur pour le premier bloc intérieur. Le sélecteur a été corrigé pour cibler le premier bloc métier ; les captures finales confirment que le contenu reste dégagé du rail.
 
-**Packaging final** : workflow `43433521180` réussi pour le même commit. L'archive source est créée à partir de l'arborescence suivie du dépôt ; les fichiers `.env` réels et secrets sont exclus.
+Les captures utilisent des réponses API fictives de recette ; aucune donnée réelle n'est utilisée. L'artefact `samafacture-recette-visuelle-226` contient les 70 PNG et le fichier `rapport-recette-visuelle.json`.
+
+**Packaging final** : workflow `43441977202` réussi pour le même commit. L'archive source est construite à partir des fichiers suivis par Git ; les fichiers `.env` locaux et secrets sont exclus.
 
 La PR #15 reste ouverte et non fusionnée ; la branche `main` n'a pas été modifiée.
-
-Le thème sombre a été lui aussi harmonisé sur un fond graphite, des surfaces charbon et le même accent émeraude ; la recette vérifie désormais ses valeurs de fond et de carte en plus du contraste.
 
 ## Limites et sécurité
 
