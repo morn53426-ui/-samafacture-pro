@@ -14,7 +14,7 @@ describe('Factures récurrentes : cohérence des calculs avec la création manue
     await setupTestDatabase();
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Récurrentes', email: emailDeTest('recur'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Récurrentes', email: emailDeTest('recur'), password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
 
