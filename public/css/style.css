@@ -4885,3 +4885,99 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
     animation: none !important; transition: none !important;
   }
 }
+
+
+/* Thème sombre cohérent avec la même direction : encre graphite, papier profond,
+   contraste élevé et même accent émeraude (pas de retour au bleu nuit). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --cream: #1D1C18;
+    --paper: #282720;
+    --ink: #F3EFE6;
+    --ink-soft: #C2BAAD;
+    --line: #48443A;
+    --navy-950: #F3EFE6;
+    --navy-900: #E6E0D5;
+    --navy-800: #D3CABC;
+    --structural-dark-1: #171713;
+    --structural-dark-2: #211F1A;
+    --emerald: #087A57;
+    --emerald-light: #18382D;
+    --gold-light: #3A3020;
+    --clay-light: #3D2523;
+    --workspace-blue: #087A57;
+    --workspace-purple: #087A57;
+    --workspace-cyan: #087A57;
+    --workspace-amber: #96713E;
+    --shadow-xs: 0 1px 2px rgba(0,0,0,.22);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.24);
+    --shadow-md: 0 5px 18px rgba(0,0,0,.24);
+    --shadow-lg: 0 10px 28px rgba(0,0,0,.28);
+    --shadow-xl: 0 16px 38px rgba(0,0,0,.32);
+    --shadow-card: 0 1px 2px rgba(0,0,0,.24), 0 4px 14px rgba(0,0,0,.2);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --cream: #1D1C18;
+  --paper: #282720;
+  --ink: #F3EFE6;
+  --ink-soft: #C2BAAD;
+  --line: #48443A;
+  --navy-950: #F3EFE6;
+  --navy-900: #E6E0D5;
+  --navy-800: #D3CABC;
+  --structural-dark-1: #171713;
+  --structural-dark-2: #211F1A;
+  --emerald: #087A57;
+  --emerald-light: #18382D;
+  --gold-light: #3A3020;
+  --clay-light: #3D2523;
+  --workspace-blue: #087A57;
+  --workspace-purple: #087A57;
+  --workspace-cyan: #087A57;
+  --workspace-amber: #96713E;
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.22);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.24);
+  --shadow-md: 0 5px 18px rgba(0,0,0,.24);
+  --shadow-lg: 0 10px 28px rgba(0,0,0,.28);
+  --shadow-xl: 0 16px 38px rgba(0,0,0,.32);
+  --shadow-card: 0 1px 2px rgba(0,0,0,.24), 0 4px 14px rgba(0,0,0,.2);
+}
+:root[data-theme="dark"] .workspace-data-heading,
+:root[data-theme="dark"] .workspace-data-type,
+:root[data-theme="dark"] .dashboard-chip,
+:root[data-theme="dark"] .dashboard-context,
+:root[data-theme="dark"] thead th,
+:root[data-theme="dark"] .workspace-data-card th {
+  background: #302E27 !important;
+  color: #D6CFC3 !important;
+  border-color: var(--line) !important;
+}
+:root[data-theme="dark"] .app-topbar-search {
+  background: #201F1A;
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .app-topbar-search .ic { color: #C2BAAD; }
+:root[data-theme="dark"] .app-topbar-avatar {
+  background: #3A372F !important;
+  color: #F3EFE6 !important;
+}
+:root[data-theme="dark"] .btn-outline,
+:root[data-theme="dark"] .btn-secondary {
+  color: var(--ink);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .lp-header,
+:root[data-theme="dark"] .auth-form-side {
+  background: var(--cream);
+}
+:root[data-theme="dark"] .lp-feature-card,
+:root[data-theme="dark"] .auth-form-card {
+  background: var(--paper);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .sidebar {
+  background: var(--structural-dark-1) !important;
+}
