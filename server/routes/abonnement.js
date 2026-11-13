@@ -243,13 +243,19 @@ async function confirmerPaiement(paiement, montantConfirme) {
       return false;
     }
 
-    const [userUpdate] = await conn.query(
+    // Vérifier l'existence de l'utilisateur séparément : MySQL rapporte affectedRows=0
+    // lorsque le plan est déjà identique. Un renouvellement payé du même plan doit réussir.
+    const [userRows] = await conn.query(
+      'SELECT id FROM users WHERE id = ? FOR UPDATE',
+      [courant.user_id]
+    );
+    if (!userRows.length) {
+      throw new Error(`Utilisateur #${courant.user_id} introuvable après paiement #${courant.id}.`);
+    }
+    await conn.query(
       'UPDATE users SET plan = ? WHERE id = ?',
       [courant.plan, courant.user_id]
     );
-    if (userUpdate.affectedRows !== 1) {
-      throw new Error(`Impossible d'activer le plan ${courant.plan} pour l'utilisateur #${courant.user_id} après paiement #${courant.id}.`);
-    }
 
     await conn.commit();
     return true;
