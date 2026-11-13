@@ -44,12 +44,19 @@ function renderSidebar(activePage) {
   const planLabels = { gratuit: 'Plan Gratuit', starter: 'Plan Starter', pro: 'Plan Pro', entreprise: 'Plan Entreprise' };
 
   const navHtml = nav.map(section => `
-    ${section.group ? `<div class="nav-group-label">${section.group}</div>` : ''}
-    ${section.items.map(item => `
-      <a href="${item.href}" class="nav-item ${(activePage === item.id || (activePage === 'nouvelle-facture' && item.id === 'factures')) ? 'active' : ''}" onclick="closeSidebar()">
-        <span class="ic">${Icon(item.icon)}</span><span>${item.label}</span>
-      </a>
-    `).join('')}
+    ${section.group ? `<div class="nav-group-label" aria-hidden="true">${section.group}</div>` : ''}
+    ${section.items.map(item => {
+      const isActive = activePage === item.id ||
+        (activePage === 'nouvelle-facture' && item.id === 'factures');
+      return `
+        <a href="${item.href}" class="nav-item ${isActive ? 'active' : ''}"
+          data-tooltip="${item.label}" title="${item.label}" aria-label="${item.label}"
+          ${isActive ? 'aria-current="page"' : ''} onclick="closeSidebar()">
+          <span class="ic" aria-hidden="true">${Icon(item.icon)}</span>
+          <span class="nav-label">${item.label}</span>
+        </a>
+      `;
+    }).join('')}
   `).join('');
 
   const html = `
@@ -60,28 +67,70 @@ function renderSidebar(activePage) {
           <div class="name">SamaFacture <span class="brand-pro">Pro</span></div>
           <div class="sub">Facturez • Gérez • Développez</div>
         </div>
+        <button type="button" class="sidebar-collapse-toggle" id="sidebar-collapse-btn"
+          onclick="toggleSidebarCompact()" aria-label="Réduire le menu" aria-controls="app-navigation"
+          aria-expanded="true" title="Réduire le menu">${Icon('arrow-left')}</button>
         <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu" aria-controls="app-navigation" aria-expanded="false">${Icon('menu')}</button>
       </div>
       <nav class="sidebar-nav" id="app-navigation" aria-label="Navigation principale">${navHtml}</nav>
-      <section class="sidebar-promo" aria-label="Présentation de SamaFacture Pro">
-        <div class="promo-icon" aria-hidden="true">✦</div>
-        <strong>SamaFacture Pro</strong>
-        <p>Votre espace pour gérer clients, produits, factures et suivi commercial.</p>
-        <a href="aide.html">Découvrir l'aide ${Icon('arrow-up-right')}</a>
-      </section>
       <div class="sidebar-foot">
         <button type="button" class="install-app-btn" style="display:none;" onclick="installApp()"><span class="ic">${Icon('smartphone')}</span> Installer l'application</button>
-        ${window.SamaTheme ? SamaTheme.boutonHtml() : ''}
+        <div class="sidebar-theme-control">${window.SamaTheme ? SamaTheme.boutonHtml() : ''}</div>
         <div class="plan-badge"><span class="ic">${Icon('star')}</span> ${planLabels[user?.plan] || 'Plan Gratuit'}</div>
-        <div>${escapeHtml(user?.entreprise_nom || user?.nom)}</div>
-        <div style="margin-top:10px; cursor:pointer; color:#B7C0DA; display:flex; align-items:center; gap:6px;" onclick="Api.clearSession(); location.href='login.html';"><span class="ic">${Icon('log-out')}</span> Se déconnecter</div>
+        <div class="sidebar-user-name" title="${escapeHtml(user?.entreprise_nom || user?.nom || '')}">${escapeHtml(user?.entreprise_nom || user?.nom || 'Mon compte')}</div>
+        <button type="button" class="sidebar-logout" onclick="Api.clearSession(); location.href='login.html';"
+          aria-label="Se déconnecter" title="Se déconnecter"><span class="ic" aria-hidden="true">${Icon('log-out')}</span><span>Se déconnecter</span></button>
       </div>
     </aside>
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
   `;
   document.getElementById('sidebar-root').outerHTML = html;
+  initSidebarCompactMode();
   ensureWorkspaceTopbar();
   initRealtime();
+}
+
+const SIDEBAR_COMPACT_KEY = 'sf_sidebar_compact';
+
+function readSidebarCompactPreference() {
+  try {
+    const stored = localStorage.getItem(SIDEBAR_COMPACT_KEY);
+    return stored === null ? true : stored === 'true';
+  } catch (error) {
+    return true;
+  }
+}
+
+function applySidebarCompactMode() {
+  const shell = document.querySelector('.app-shell');
+  const button = document.getElementById('sidebar-collapse-btn');
+  const isDesktop = window.matchMedia('(min-width: 901px)').matches;
+  const isCompact = isDesktop && readSidebarCompactPreference();
+  shell?.classList.toggle('is-sidebar-compact', isCompact);
+  if (button) {
+    button.innerHTML = Icon(isCompact ? 'arrow-right' : 'arrow-left');
+    button.setAttribute('aria-expanded', String(isDesktop && !isCompact));
+    button.setAttribute('aria-label', isCompact ? 'Agrandir le menu' : 'Réduire le menu');
+    button.title = isCompact ? 'Agrandir le menu' : 'Réduire le menu';
+  }
+}
+
+function initSidebarCompactMode() {
+  applySidebarCompactMode();
+  if (!window.__sfSidebarResizeBound) {
+    window.__sfSidebarResizeBound = true;
+    window.addEventListener('resize', applySidebarCompactMode, { passive: true });
+  }
+}
+
+function toggleSidebarCompact() {
+  const next = !readSidebarCompactPreference();
+  try {
+    localStorage.setItem(SIDEBAR_COMPACT_KEY, String(next));
+  } catch (error) {
+    // Le changement visuel reste actif même si le navigateur bloque le stockage local.
+  }
+  applySidebarCompactMode();
 }
 
 function toggleSidebar() {
