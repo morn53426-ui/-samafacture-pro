@@ -12,13 +12,13 @@ describe('Suppression de produit', () => {
     await setupTestDatabase();
     const a = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Produits A', email: emailDeTest('produits-a'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Produits A', email: emailDeTest('produits-a'), password: 'motdepasse123' , acceptTerms: true});
     userIdA = a.body.user.id;
     tokenA = a.body.token;
 
     const b = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Produits B', email: emailDeTest('produits-b'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Produits B', email: emailDeTest('produits-b'), password: 'motdepasse123' , acceptTerms: true});
     userIdB = b.body.user.id;
     tokenB = b.body.token;
   });
