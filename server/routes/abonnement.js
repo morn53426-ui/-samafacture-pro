@@ -212,8 +212,11 @@ async function confirmerPaiement(paiement, montantConfirme) {
     );
     const courant = rows[0];
 
-    // Un webhook rejoué ou une tentative expirée/échouée ne doit pas réactiver un plan.
-    if (!courant || courant.statut !== 'en_attente') {
+    // Un webhook rejoué ou une tentative échouée ne doit pas réactiver un plan.
+    // Une tentative locale expirée peut toutefois avoir été payée juste avant l'expiration :
+    // le statut fournisseur signé et le montant viennent d'être vérifiés, on accepte donc
+    // aussi 'expiree' pour éviter de perdre un règlement dont le callback arrive en retard.
+    if (!courant || !['en_attente', 'expiree'].includes(courant.statut)) {
       await conn.commit();
       return false;
     }
@@ -232,7 +235,7 @@ async function confirmerPaiement(paiement, montantConfirme) {
     }
 
     const [paymentUpdate] = await conn.query(
-      "UPDATE abonnement_paiements SET statut = 'payee', paid_at = NOW() WHERE id = ? AND statut = 'en_attente'",
+      "UPDATE abonnement_paiements SET statut = 'payee', paid_at = NOW() WHERE id = ? AND statut IN ('en_attente', 'expiree')",
       [courant.id]
     );
     if (paymentUpdate.affectedRows !== 1) {
