@@ -769,6 +769,43 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await mobile.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
   await mobile.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await mobile.setViewport({ width: 320, height: 812, deviceScaleFactor: 1 });
+  const narrowToolbar = await mobile.evaluate(() => {
+    const selectors = [
+      '#workspace-notification-toggle',
+      '.app-topbar-quick-actions .theme-toggle-btn',
+      '.app-topbar-localization',
+      '.app-topbar-logout'
+    ];
+    const controls = selectors.map((selector) => {
+      const element = document.querySelector(selector);
+      const rect = element?.getBoundingClientRect();
+      return {
+        selector,
+        width: rect ? Math.round(rect.width) : 0,
+        height: rect ? Math.round(rect.height) : 0,
+        left: rect ? Math.round(rect.left) : -1,
+        right: rect ? Math.round(rect.right) : window.innerWidth + 1
+      };
+    });
+    const logout = document.querySelector('.app-topbar-logout');
+    return {
+      controls,
+      logoutFontSize: logout ? getComputedStyle(logout).fontSize : null,
+      viewport: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth
+    };
+  });
+  assert.equal(narrowToolbar.logoutFontSize, '0px',
+    'Le libellé Déconnexion doit rester masqué sur mobile, sans réduire la cible tactile.');
+  assert.ok(narrowToolbar.controls.every((control) =>
+    control.width >= 42 && control.height >= 42 &&
+    control.left >= 0 && control.right <= narrowToolbar.viewport + 1),
+    'Les quatre commandes de la barre supérieure doivent rester visibles et tactiles à 320 px : ' +
+      JSON.stringify(narrowToolbar));
+  assert.ok(narrowToolbar.documentWidth <= narrowToolbar.viewport + 1,
+    'La barre supérieure ne doit pas élargir le document à 320 px : ' + JSON.stringify(narrowToolbar));
+  await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await mobile.click('#mobile-toggle-btn');
   const opened = await mobile.evaluate(() => ({
     expanded: document.getElementById('mobile-toggle-btn')?.getAttribute('aria-expanded'),
