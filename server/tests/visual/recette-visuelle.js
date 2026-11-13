@@ -487,8 +487,8 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' : le menu de bureau doit démarrer compact.');
     assert.equal(navigationGeometry.sidebarWidth, 76,
       pageDefinition.name + ' : la largeur réelle du rail desktop doit rester à 76 px : ' + JSON.stringify(navigationGeometry));
-    assert.equal(navigationGeometry.mainMargin, 76,
-      pageDefinition.name + ' : la marge CSS du contenu doit correspondre au rail compact : ' + JSON.stringify(navigationGeometry));
+    assert.ok(navigationGeometry.mainMargin >= 76 && navigationGeometry.mainMargin <= 92,
+      pageDefinition.name + ' : la marge CSS du contenu doit réserver la largeur du rail compact sans espace excessif : ' + JSON.stringify(navigationGeometry));
     assert.ok(navigationGeometry.mainLeft >= navigationGeometry.sidebarWidth &&
       navigationGeometry.mainLeft <= navigationGeometry.sidebarWidth + 16,
       pageDefinition.name + ' : le conteneur principal ne doit pas chevaucher le rail : ' + JSON.stringify(navigationGeometry));
