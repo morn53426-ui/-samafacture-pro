@@ -39,9 +39,26 @@ Toutes les pages publiques et privées de SamaFacture Pro, y compris l'accueil, 
 8. **Visuels :** aucune illustration artificielle ajoutée ; graphiques et photographies existants conservés, couleurs du graphique calmées.
 9. **Mouvement :** suppression du Ken Burns et du bandeau animé décoratif ; carrousels et interactions utiles conservés.
 
-## Recette et état connu
+## Recette finale — 13 novembre 2026
 
-Le pipeline précédent, sur le commit de départ, a exécuté **194 tests fonctionnels : 194 succès, 0 échec**. Le job visuel a échoué sur un contrôle qui prenait `.app-topbar`, conçue pour aller jusqu'au bord du conteneur, comme premier élément intérieur. Le test a été modifié pour mesurer `.dashboard-welcome`, `.page-header` ou `.workspace-page-header`. La recette post-transformation doit être confirmée par le nouveau pipeline ; ce rapport ne présume pas de son résultat.
+**Pipeline GitHub Actions final : réussi** — run `43433521207`, commit `5f94725248bd3634063b7af5b2c94fdef5dd617c`.
+
+- Construction de l'image Docker : réussie.
+- Validation Docker Compose et des chemins de configuration : réussie.
+- Suite fonctionnelle : **194 tests réussis, 0 échec, 0 test ignoré**, 30 suites.
+- Recette visuelle : réussie sur le jeu de données extrême et sur **320, 390, 768 et 1440 px**.
+- Captures : **70 PNG** au total : 15 pages de l'application × 4 largeurs (60), accueil et connexion × 4 largeurs (8), plus 2 captures de contrôle.
+- Contrôle du rail desktop : largeur 76 px, état compact/étendu et préférence persistée.
+- Navigation tablette/mobile, recherche globale et notifications : réussies.
+- Graphiques sans animations intrusives ; prise en charge de `prefers-reduced-motion` : réussie.
+- Parcours de création de facture et de devis, calculs de remise/TVA/livraison : réussis.
+- Aucun débordement horizontal détecté dans les pages et largeurs couvertes.
+
+Les captures sont générées avec des réponses API fictives de recette ; aucune donnée réelle n'est utilisée. L'archive des captures contient `rapport-recette-visuelle.json`.
+
+**Packaging final** : workflow `43433521180` réussi pour le même commit. L'archive source est créée à partir de l'arborescence suivie du dépôt ; les fichiers `.env` réels et secrets sont exclus.
+
+La PR #15 reste ouverte et non fusionnée ; la branche `main` n'a pas été modifiée.
 
 ## Limites et sécurité
 
