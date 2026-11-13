@@ -455,10 +455,10 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   if (tableHeadingPages.includes(pageDefinition.name)) {
     assert.equal(layoutAudit.dataHeading, true, pageDefinition.name + ' doit titrer sa zone de données.');
   }
-  assert.ok(layoutAudit.headingFont.toLowerCase().includes('manrope'),
-    pageDefinition.name + ' doit utiliser Manrope pour les titres.');
-  assert.ok(layoutAudit.bodyFont.toLowerCase().includes('inter'),
-    pageDefinition.name + ' doit utiliser Inter pour les textes.');
+  assert.ok(layoutAudit.headingFont.toLowerCase().includes('ibm plex sans'),
+    pageDefinition.name + ' doit utiliser IBM Plex Sans pour les titres.');
+  assert.ok(layoutAudit.bodyFont.toLowerCase().includes('ibm plex sans'),
+    pageDefinition.name + ' doit utiliser IBM Plex Sans pour les textes.');
   if (['clients', 'rapports'].includes(pageDefinition.name)) {
     assert.equal(layoutAudit.filterPanel, true, pageDefinition.name + ' doit séparer les filtres du contenu métier.');
   }
@@ -476,8 +476,8 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       overlayVisible: document.getElementById('sidebar-overlay')?.classList.contains('show') || false,
       mainLeft: main ? Math.round(main.getBoundingClientRect().left) : null,
       mainMargin: main ? Math.round(parseFloat(getComputedStyle(main).marginLeft) || 0) : null,
-      firstContentLeft: main?.querySelector('.app-topbar, .dashboard-welcome, .page-header, .workspace-page-header')
-        ? Math.round(main.querySelector('.app-topbar, .dashboard-welcome, .page-header, .workspace-page-header').getBoundingClientRect().left)
+      firstContentLeft: main?.querySelector('.dashboard-welcome, .page-header, .workspace-page-header')
+        ? Math.round(main.querySelector('.dashboard-welcome, .page-header, .workspace-page-header').getBoundingClientRect().left)
         : null,
       contentPaddingLeft: main ? Math.round(parseFloat(getComputedStyle(main).paddingLeft) || 0) : null,
       expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim()
@@ -738,8 +738,8 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     labelsHidden: true,
     promoRemoved: true,
     toggleExpanded: 'false',
-    headingFont: 'Manrope, sans-serif',
-    bodyFont: 'Inter, sans-serif',
+    headingFont: 'IBM Plex Sans, sans-serif',
+    bodyFont: 'IBM Plex Sans, sans-serif',
     iconsConsistent: true
   }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
 
