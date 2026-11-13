@@ -527,7 +527,16 @@ router.post('/', async (req, res, next) => {
       }
     }
 
-    const { computedLignes, sous_total, total_tva, total, remise: remiseAppliquee, frais_livraison: fraisLivraisonValides } = computeTotals(lignesValidees, remise, frais_livraison);
+    let calculFacture;
+    try {
+      calculFacture = computeTotals(lignesValidees, remise, frais_livraison);
+    } catch (calculationError) {
+      return res.status(400).json({ error: calculationError.message || 'Les montants de la facture sont invalides.' });
+    }
+    const {
+      computedLignes, sous_total, total_tva, total,
+      remise: remiseAppliquee, frais_livraison: fraisLivraisonValides
+    } = calculFacture;
     // Code court utilisé pour la vérification publique de la facture (via QR code) : évite
     // qu'un tiers puisse deviner l'URL de vérification d'une autre facture en changeant l'id.
     const verificationCode = crypto.randomBytes(5).toString('hex');
