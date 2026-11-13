@@ -27,7 +27,7 @@ before(async () => {
       email: emailDeTest('tenant-owner'),
       password: 'motdepasse123',
       entreprise_nom: 'Entreprise propriétaire'
-    });
+    , acceptTerms: true});
   assert.equal(ownerRegistration.status, 201, ownerRegistration.text);
   ownerId = ownerRegistration.body.user.id;
   ownerToken = ownerRegistration.body.token;
@@ -38,7 +38,7 @@ before(async () => {
       nom: 'Membre lecture seule',
       email: emailDeTest('tenant-member'),
       password: 'motdepasse123'
-    });
+    , acceptTerms: true});
   assert.equal(memberRegistration.status, 201, memberRegistration.text);
   memberId = memberRegistration.body.user.id;
   memberToken = memberRegistration.body.token;
