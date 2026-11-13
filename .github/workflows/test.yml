@@ -51,6 +51,10 @@ jobs:
         working-directory: server
         run: npm ci
 
+      - name: Installer le navigateur requis par Puppeteer
+        working-directory: server
+        run: npx puppeteer browsers install chrome
+
       - name: Vérifier le script de recette staging
         working-directory: server
         run: node --check scripts/staging-smoke.js
