@@ -5081,3 +5081,15 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
   }
   .app-topbar-localization-label { display: none; }
 }
+
+
+.app-topbar-localization.is-active {
+  border-color: rgba(8,122,87,.18);
+  background: rgba(8,122,87,.08);
+  color: var(--emerald);
+}
+:root[data-theme="dark"] .app-topbar-localization.is-active {
+  border-color: rgba(145,205,176,.25);
+  background: rgba(8,122,87,.2);
+  color: #91CDB0;
+}
