@@ -17,16 +17,21 @@
 <body>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content">
+  <main class="main-content workspace-page page-depenses">
     <div class="page-header">
       <div>
+        <div class="workspace-page-kicker">PILOTAGE DES COÛTS</div>
         <h1>Dépenses</h1>
         <p>Suivez les sorties d'argent de votre activité</p>
       </div>
       <button class="btn btn-primary" onclick="openModal()"><i class="ic" data-icon="plus"></i> Nouvelle dépense</button>
     </div>
 
-    <div class="card" style="padding:0;">
+    <div class="card workspace-data-card" style="padding:0;">
+      <div class="workspace-data-heading">
+        <div><h2>Journal des dépenses</h2><p>Retrouvez les charges enregistrées et leurs justificatifs</p></div>
+        <span class="workspace-data-type"><i class="ic" data-icon="layers"></i> Données du compte</span>
+      </div>
       <table class="table-stack depenses-table">
         <thead><tr><th>Libellé</th><th>Catégorie</th><th>Date</th><th>Montant</th><th></th></tr></thead>
         <tbody id="depenses-body"></tbody>
