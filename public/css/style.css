@@ -4550,3 +4550,26 @@ button .icon { vertical-align: -.14em; }
   .workspace-page-header h1 { font-size: 1.42rem; }
   .workspace-filter-title > .ic { flex-basis: 34px; width: 34px; height: 34px; }
 }
+
+
+/* Garde-fou desktop : le rail ne doit jamais se transformer en panneau plein écran.
+   Les dimensions sont bornées même si une règle responsive ancienne est réintroduite. */
+@media (min-width: 901px) {
+  body #app-sidebar.sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: var(--sidebar-w) !important;
+    min-width: var(--sidebar-w) !important;
+    max-width: var(--sidebar-w) !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+  }
+  body #app-sidebar.sidebar.is-collapsed {
+    width: var(--sidebar-collapsed-w) !important;
+    min-width: var(--sidebar-collapsed-w) !important;
+    max-width: var(--sidebar-collapsed-w) !important;
+  }
+  body #sidebar-overlay.sidebar-overlay { display: none !important; }
+  body .main-content { margin-left: var(--sidebar-w); }
+  body.sidebar-collapsed .main-content { margin-left: var(--sidebar-collapsed-w); }
+}
