@@ -4072,3 +4072,12 @@ thead th { background: #F2F6FD; color: #52627D; }
   .sidebar.open .sidebar-foot { display: block; }
   .sidebar.open .sidebar-logout { min-height: 44px; }
 }
+
+@media (min-width: 901px) {
+  /* Garder une marque sur une seule ligne malgré le nouveau bouton de réduction. */
+  .sidebar-brand { padding: 14px 12px; gap: 8px; }
+  .sidebar-brand .mark { width: 32px; height: 32px; }
+  .sidebar-brand .name { font-size: .9rem; white-space: nowrap; }
+  .sidebar-brand .sub { font-size: .58rem; letter-spacing: .02em; white-space: nowrap; }
+  .sidebar-collapse-toggle { flex-basis: 32px; width: 32px; height: 32px; }
+}
