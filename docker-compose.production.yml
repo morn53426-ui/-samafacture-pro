@@ -7,6 +7,10 @@ services:
       APP_URL: "https://${APP_DOMAIN:?Définissez APP_DOMAIN dans le fichier .env}"
       ALLOWED_ORIGINS: "https://${APP_DOMAIN:?Définissez APP_DOMAIN dans le fichier .env}"
 
+  pdf-worker:
+    environment:
+      NODE_ENV: production
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
