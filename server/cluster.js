@@ -50,7 +50,7 @@ if (cluster.isPrimary) {
     const available = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length;
     const numWorkers = Math.max(1, Number(process.env.WEB_CONCURRENCY) || available);
     const PORT = process.env.PORT || 4000;
-    console.log(\`🧩 Mode cluster : démarrage de \${numWorkers} worker(s) (processus principal \${process.pid}).\`);
+    console.log(`🧩 Mode cluster : démarrage de ${numWorkers} worker(s) (processus principal ${process.pid}).`);
 
     // Le processus principal ne sert aucune requête lui-même : il se contente de router
     // chaque connexion entrante (HTTP normal ET WebSocket) vers toujours le même worker
@@ -62,7 +62,7 @@ if (cluster.isPrimary) {
     cluster.setupPrimary({ serialization: 'advanced' });
 
     httpServer.listen(PORT, () => {
-      console.log(\`🧩 Routage cluster en écoute sur le port \${PORT}.\`);
+      console.log(`🧩 Routage cluster en écoute sur le port ${PORT}.`);
     });
 
     for (let i = 0; i < numWorkers; i++) {
@@ -71,14 +71,14 @@ if (cluster.isPrimary) {
 
     cluster.on('exit', (worker, code, signal) => {
       if (shuttingDown) return;
-      console.error(\`⚠️  Worker \${worker.process.pid} arrêté (code \${code}\${signal ? \`, signal \${signal}\` : ''}). Redémarrage automatique...\`);
+      console.error(`⚠️  Worker ${worker.process.pid} arrêté (code ${code}${signal ? `, signal ${signal}` : ''}). Redémarrage automatique...`);
       cluster.fork();
     });
 
     async function shutdownPrimary(signal) {
       if (shuttingDown) return;
       shuttingDown = true;
-      console.log(\`\n\${signal} reçu — arrêt du cluster...\`);
+      console.log(`\n${signal} reçu — arrêt du cluster...`);
       httpServer.close();
       const workers = Object.values(cluster.workers || {}).filter(Boolean);
       for (const worker of workers) worker.disconnect();
