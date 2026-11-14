@@ -63,10 +63,10 @@ function ensureRedisConnected() {
       }
       connected = true;
       return redis;
-    })().catch((err) => {
-      connected = false;
+    })().finally(() => {
+      // Ne conserve pas une promesse déjà résolue : après une reconnexion réseau,
+      // un appel ultérieur doit attendre le prochain événement "ready".
       connectionPromise = null;
-      throw err;
     });
   }
 
