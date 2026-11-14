@@ -23,7 +23,7 @@ const cluster = require('cluster');
 
 const { initDatabase, pool } = require('./config/db');
 const { initSocket, closeSocket } = require('./realtime');
-const { initRedis, closeRedis, getRedisClient, isRedisConfigured } = require('./config/redis');
+const { initRedis, closeRedis, getRedisClient, ensureRedisConnected, isRedisConfigured } = require('./config/redis');
 const { closeBrowser } = require('./utils/pdf');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
@@ -227,7 +227,7 @@ const apiLimiter = rateLimit({
     try {
       const { RedisStore } = require('rate-limit-redis');
       const redisClient = getRedisClient();
-      return { store: new RedisStore({ sendCommand: (...args) => redisClient.sendCommand(args) }) };
+      return { store: new RedisStore({ sendCommand: (...args) => ensureRedisConnected().then(() => redisClient.sendCommand(args)) }) };
     } catch (err) {
       console.warn('⚠️ rate-limit-redis indisponible : limitation locale utilisée.', err.message);
       return {};
@@ -472,7 +472,14 @@ async function start() {
     // rate-limit partagé + diffusion Socket.IO entre conteneurs. Sans REDIS_URL, le mode
     // local/cluster reste pleinement fonctionnel sans dépendance externe.
     if (isRedisConfigured()) await initRedis();
-    await initDatabase();
+    // En mode cluster, le processus primaire initialise le schéma une seule fois
+    // avant de créer les workers. Ceux-ci vérifient simplement que MySQL répond :
+    // ils ne se disputent plus le verrou GET_LOCK pendant une migration longue.
+    if (process.env.SAMAFACTURE_SCHEMA_READY === '1') {
+      await pool.query('SELECT 1');
+    } else {
+      await initDatabase();
+    }
     console.log('Connexion MySQL établie et schéma vérifié.');
     // En mode cluster, app.js est chargé indépendamment par CHAQUE worker (voir
     // cluster.js) : sans cette garde, les tâches planifiées (relance des factures
