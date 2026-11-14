@@ -1,0 +1,38 @@
+name: Package complete source ZIP
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  package-source:
+    name: Build complete source archive
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Create complete source ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive --format=zip --prefix=SamaFacture-Pro/ HEAD -o dist/SamaFacture-Pro-Complet.zip
+          test -s dist/SamaFacture-Pro-Complet.zip
+          unzip -t dist/SamaFacture-Pro-Complet.zip
+          sha256sum dist/SamaFacture-Pro-Complet.zip
+
+      - name: Upload source ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: SamaFacture-Pro-Complet-PR-${{ github.event.pull_request.number }}
+          path: dist/SamaFacture-Pro-Complet.zip
+          if-no-files-found: error
+          retention-days: 14

@@ -42,7 +42,7 @@
       card.innerHTML = `
         <div class="stat-icon icon-emerald" style="width:52px;height:52px;font-size:1.6rem;margin:0 auto 14px;">${Icon('check')}</div>
         <h3>Paiement confirmé</h3>
-        <p style="color:var(--ink-soft);">Votre abonnement <strong>${escapeHtml(plan)}</strong> est maintenant actif. Rechargez vos pages pour voir les nouvelles options.</p>
+        <p style="color:var(--ink-soft);">Votre abonnement <strong>${escapeHtml(plan)}</strong> est actif. Votre profil et vos options ont été actualisés.</p>
         <a href="parametres.html" class="btn btn-primary" style="margin-top:10px; display:inline-flex;">Voir mes paramètres</a>
       `;
     } else if (statut === 'echouee' || statut === 'expiree') {
@@ -66,7 +66,23 @@
       return;
     }
     try {
-      const { statut, plan } = await Api.get(`/abonnement/statut/${ref}`);
+      const { statut, plan } = await Api.get(`/abonnement/statut/${encodeURIComponent(ref)}`);
+
+      if (statut === 'payee') {
+        // /auth/me est la source de vérité du profil après confirmation serveur du paiement.
+        // Api.currentUser() lit localStorage uniquement : sans cette synchronisation, les
+        // menus et fonctions Pro peuvent rester affichés comme Gratuit après un paiement réussi.
+        try {
+          const { user } = await Api.get('/auth/me');
+          if (user) Api.setSession(Api.token(), user);
+          renderStatut(statut, user?.plan || plan);
+        } catch (profileError) {
+          console.warn('Paiement confirmé, mais le profil local n’a pas pu être actualisé :', profileError);
+          renderStatut(statut, plan);
+        }
+        return;
+      }
+
       renderStatut(statut, plan);
       if (statut === 'en_attente') setTimeout(verifier, 4000); // repasse vérifier périodiquement
     } catch (err) {

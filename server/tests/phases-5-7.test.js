@@ -11,7 +11,7 @@ const smtpVars = ['SMTP_HOST','SMTP_USER','SMTP_PASSWORD','SMTP_PORT','APP_URL']
 async function register(nom, prefix) {
   const r = await request(app).post('/api/auth/register').send({
     nom, entreprise_nom: nom, email: emailDeTest(prefix), password: 'motdepasse123'
-  });
+  , acceptTerms: true});
   assert.equal(r.status, 201, r.text);
   return { id: r.body.user.id, token: r.body.token };
 }

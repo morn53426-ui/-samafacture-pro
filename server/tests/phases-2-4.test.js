@@ -28,7 +28,7 @@ before(async () => {
   await setupTestDatabase();
   const registration = await request(app)
     .post('/api/auth/register')
-    .send({ nom: 'Entreprise Phases 2-4', entreprise_nom: 'Entreprise Phases 2-4', email: emailDeTest('phases24'), password: 'motdepasse123' });
+    .send({ nom: 'Entreprise Phases 2-4', entreprise_nom: 'Entreprise Phases 2-4', email: emailDeTest('phases24'), password: 'motdepasse123' , acceptTerms: true});
   assert.equal(registration.status, 201, registration.text);
   userId = registration.body.user.id;
   token = registration.body.token;

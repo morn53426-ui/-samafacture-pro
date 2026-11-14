@@ -4,7 +4,6 @@ const QRCode = require('qrcode');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
-const { positiveNumber, percentage } = require('../utils/validation');
 const { FREE_MONTHLY_INVOICE_LIMIT, isPaidPlan } = require('../utils/plans');
 const { sendMail } = require('../config/mailer');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
@@ -72,40 +71,146 @@ async function insererLignesFacture(conn, factureId, lignes) {
   );
 }
 
-function computeTotals(lignes, remise, frais_livraison) {
-  // 1) HT brut de chaque ligne (avant remise globale)
-  const brutLignes = lignes.map((l) => {
-    const qte = positiveNumber(l.quantite, 0);
-    const pu = positiveNumber(l.prix_unitaire, 0);
-    const tvaRate = percentage(l.tva, 0);
-    return { ...l, quantite: qte, prix_unitaire: pu, tva: tvaRate, ligneHT: qte * pu };
-  });
+const MAX_MONEY_CENTS = 99999999999999n;
 
-  const sous_total = brutLignes.reduce((s, l) => s + l.ligneHT, 0);
-  const livraisonVal = positiveNumber(frais_livraison, 0);
-  // La remise ne peut pas dépasser le sous-total (évite une base imposable négative)
-  const remiseVal = Math.min(positiveNumber(remise, 0), sous_total);
+function parseDecimalInput(value, { field, scale, optional = false, maxScaled }) {
+  if ((value === undefined || value === null || value === '') && optional) {
+    return { value: 0, scaled: 0n };
+  }
+  if (typeof value !== 'number' && typeof value !== 'string') {
+    throw new Error(`${field} doit être un nombre positif valide.`);
+  }
 
-  // 2) La remise réduit la base imposable AVANT calcul de la TVA, répartie au prorata de chaque ligne.
-  //    C'est cette base nette qui sert à calculer la TVA réellement due — sinon la TVA affichée
-  //    resterait calculée sur un montant que le client ne paie plus.
-  let total_tva = 0;
-  const computedLignes = brutLignes.map((l) => {
-    const ratio = sous_total > 0 ? l.ligneHT / sous_total : 0;
-    const ligneHT_net = l.ligneHT - remiseVal * ratio;
-    const ligneTVA = ligneHT_net * (l.tva / 100);
-    total_tva += ligneTVA;
-    // Le total affiché par ligne reste le montant brut (qté × prix × (1+TVA%)) : la remise globale
-    // et son effet sur la TVA sont reflétés séparément dans le récapitulatif de la facture.
-    const total_ligne = round2(l.ligneHT + l.ligneHT * (l.tva / 100));
-    return { ...l, total_ligne };
-  });
-
-  total_tva = round2(total_tva);
-  const total = round2(sous_total - remiseVal + total_tva + livraisonVal);
-
-  return { computedLignes, sous_total: round2(sous_total), total_tva, total, remise: remiseVal };
+  const raw = String(value).trim();
+  const match = /^(0|[1-9]\d*)(?:\.(\d+))?$/.exec(raw);
+  if (!match) throw new Error(`${field} doit être un nombre décimal positif valide.`);
+  const decimals = match[2] || '';
+  if (decimals.length > scale) {
+    throw new Error(`${field} accepte au maximum ${scale} décimale(s).`);
+  }
+  const factor = 10n ** BigInt(scale);
+  const scaled = BigInt(match[1]) * factor + BigInt(decimals.padEnd(scale, '0') || '0');
+  if (scaled > maxScaled) throw new Error(`${field} dépasse la limite autorisée.`);
+  return { value: Number(scaled) / Number(factor), scaled };
 }
+
+function roundBigIntDivision(numerator, denominator) {
+  if (denominator <= 0n) return 0n;
+  return (numerator + denominator / 2n) / denominator;
+}
+
+function centsToAmount(cents, field = 'Montant') {
+  if (cents < 0n || cents > MAX_MONEY_CENTS) {
+    throw new Error(`${field} dépasse la limite de précision autorisée.`);
+  }
+  return Number(cents) / 100;
+}
+
+/** Calcule la facture en centimes entiers. Les entrées ont déjà été validées à l'API. */
+function computeTotals(lignes, remise, frais_livraison) {
+  const quantityScale = 100n; // facture_lignes.quantite est stockée en DECIMAL(14,2)
+  const taxScale = 10000n; // taux exprimé en centièmes de pourcentage
+  const brutLignes = lignes.map((ligne) => {
+    const quantite = parseDecimalInput(ligne.quantite, {
+      field: 'Quantité', scale: 2, maxScaled: 99999999999999n
+    });
+    if (quantite.scaled <= 0n) throw new Error('La quantité doit être supérieure à zéro.');
+    const prix = parseDecimalInput(ligne.prix_unitaire, {
+      field: 'Prix unitaire', scale: 2, maxScaled: MAX_MONEY_CENTS
+    });
+    const tva = parseDecimalInput(ligne.tva, {
+      field: 'TVA', scale: 2, optional: true, maxScaled: 10000n
+    });
+    const ligneHTCents = roundBigIntDivision(quantite.scaled * prix.scaled, quantityScale);
+    if (ligneHTCents > MAX_MONEY_CENTS) throw new Error('Le montant de cette ligne dépasse la limite autorisée.');
+    return {
+      ...ligne,
+      quantite: quantite.value,
+      prix_unitaire: prix.value,
+      tva: tva.value,
+      ligneHTCents,
+      tvaHundredths: tva.scaled
+    };
+  });
+
+  const sousTotalCents = brutLignes.reduce((sum, ligne) => sum + ligne.ligneHTCents, 0n);
+  if (sousTotalCents > MAX_MONEY_CENTS) throw new Error('Le sous-total dépasse la limite autorisée.');
+  const frais = parseDecimalInput(frais_livraison, {
+    field: 'Frais de livraison', scale: 2, optional: true, maxScaled: MAX_MONEY_CENTS
+  });
+  const remiseValidee = parseDecimalInput(remiseInputValue(remise), {
+    field: 'Remise', scale: 2, optional: true, maxScaled: MAX_MONEY_CENTS
+  });
+  const remiseCents = remiseValidee.scaled > sousTotalCents ? sousTotalCents : remiseValidee.scaled;
+
+  // Répartir la remise proportionnellement en centimes entiers. On prend d'abord
+  // la partie entière de chaque quote-part, puis on distribue les centimes restants
+  // aux plus grands restes décimaux. Aucune ligne ne reçoit ainsi une remise négative
+  // ou supérieure à son propre montant, même avec beaucoup de lignes à faible valeur.
+  const allocationsRemise = brutLignes.map((ligne, index) => {
+    const numerateur = remiseCents * ligne.ligneHTCents;
+    return {
+      index,
+      part: sousTotalCents > 0n ? numerateur / sousTotalCents : 0n,
+      reste: sousTotalCents > 0n ? numerateur % sousTotalCents : 0n
+    };
+  });
+  let centimesRestants = remiseCents -
+    allocationsRemise.reduce((sum, allocation) => sum + allocation.part, 0n);
+  const ordreAllocation = [...allocationsRemise]
+    .filter(allocation => allocation.part < brutLignes[allocation.index].ligneHTCents)
+    .sort((a, b) => {
+      if (a.reste === b.reste) return a.index - b.index;
+      return a.reste > b.reste ? -1 : 1;
+    });
+  for (const allocation of ordreAllocation) {
+    if (centimesRestants <= 0n) break;
+    allocation.part += 1n;
+    centimesRestants -= 1n;
+  }
+  if (centimesRestants !== 0n) {
+    throw new Error('Impossible de répartir la remise au centime près.');
+  }
+
+  const lignesAvecRemise = brutLignes.map((ligne, index) => ({
+    ...ligne,
+    ligneHTNetteCents: ligne.ligneHTCents - allocationsRemise[index].part
+  }));
+
+  // La TVA est arrondie une seule fois au niveau du document (comme dans le calcul
+  // comptable précédent), plutôt que d'arrondir chaque ligne indépendamment.
+  let totalTVANumerateur = 0n;
+  const computedLignes = lignesAvecRemise.map((ligne) => {
+    totalTVANumerateur += ligne.ligneHTNetteCents * ligne.tvaHundredths;
+    const totalLigneTVACents = roundBigIntDivision(
+      ligne.ligneHTCents * ligne.tvaHundredths,
+      taxScale
+    );
+    const {
+      ligneHTCents, tvaHundredths, ligneHTNetteCents, ...lignePublique
+    } = ligne;
+    return {
+      ...lignePublique,
+      total_ligne: centsToAmount(ligneHTCents + totalLigneTVACents, 'Total de ligne')
+    };
+  });
+
+  const totalTVACents = roundBigIntDivision(totalTVANumerateur, taxScale);
+  const totalCents = sousTotalCents - remiseCents + totalTVACents + frais.scaled;
+  return {
+    computedLignes,
+    sous_total: centsToAmount(sousTotalCents, 'Sous-total'),
+    total_tva: centsToAmount(totalTVACents, 'TVA'),
+    total: centsToAmount(totalCents, 'Total'),
+    remise: centsToAmount(remiseCents, 'Remise appliquée'),
+    frais_livraison: frais.value
+  };
+}
+
+function remiseInputValue(value) {
+  return value === undefined || value === null || value === '' ? 0 : value;
+}
+
 
 /**
  * Applique plusieurs variations de stock en UNE seule requête (UPDATE ... CASE) plutôt qu'une
@@ -363,6 +468,27 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: 'Client invalide.' });
     }
 
+    if (lignes.some((ligne) => !ligne || typeof ligne !== 'object' || Array.isArray(ligne))) {
+      return res.status(400).json({ error: 'Chaque ligne doit être un objet de facture valide.' });
+    }
+
+    let lignesValidees;
+    try {
+      lignesValidees = lignes.map((ligne) => ({
+        ...ligne,
+        quantite: parseDecimalInput(ligne.quantite, { field: 'Quantité', scale: 2, maxScaled: 99999999999999n }).value,
+        prix_unitaire: parseDecimalInput(ligne.prix_unitaire, { field: 'Prix unitaire', scale: 2, maxScaled: MAX_MONEY_CENTS }).value,
+        tva: parseDecimalInput(ligne.tva, { field: 'TVA', scale: 2, optional: true, maxScaled: 10000n }).value
+      }));
+      if (lignesValidees.some((ligne) => ligne.quantite <= 0)) {
+        return res.status(400).json({ error: 'Chaque quantité doit être supérieure à zéro.' });
+      }
+      parseDecimalInput(remise, { field: 'Remise', scale: 2, optional: true, maxScaled: MAX_MONEY_CENTS });
+      parseDecimalInput(frais_livraison, { field: 'Frais de livraison', scale: 2, optional: true, maxScaled: MAX_MONEY_CENTS });
+    } catch (validationErr) {
+      return res.status(400).json({ error: validationErr.message });
+    }
+
     // Isolation des données : un produit référencé sur une ligne doit appartenir à
     // l'utilisateur courant (sinon on ignore le lien, la ligne reste valable en saisie libre).
     const produitIds = [...new Set(lignes.map(l => l.produit_id).filter(Boolean))];
@@ -372,8 +498,13 @@ router.post('/', async (req, res, next) => {
         [req.tenantId, ...produitIds]
       );
       const ownedIds = new Set(ownedRows.map(r => r.id));
-      for (const l of lignes) {
-        if (l.produit_id && !ownedIds.has(l.produit_id)) l.produit_id = null;
+      for (const l of lignesValidees) {
+        const productId = Number(l.produit_id);
+        if (l.produit_id && (!Number.isSafeInteger(productId) || !ownedIds.has(productId))) {
+          l.produit_id = null;
+        } else if (l.produit_id) {
+          l.produit_id = productId;
+        }
       }
     }
 
@@ -417,7 +548,16 @@ router.post('/', async (req, res, next) => {
       }
     }
 
-    const { computedLignes, sous_total, total_tva, total, remise: remiseAppliquee } = computeTotals(lignes, remise, frais_livraison);
+    let calculFacture;
+    try {
+      calculFacture = computeTotals(lignesValidees, remise, frais_livraison);
+    } catch (calculationError) {
+      return res.status(400).json({ error: calculationError.message || 'Les montants de la facture sont invalides.' });
+    }
+    const {
+      computedLignes, sous_total, total_tva, total,
+      remise: remiseAppliquee, frais_livraison: fraisLivraisonValides
+    } = calculFacture;
     // Code court utilisé pour la vérification publique de la facture (via QR code) : évite
     // qu'un tiers puisse deviner l'URL de vérification d'une autre facture en changeant l'id.
     const verificationCode = crypto.randomBytes(5).toString('hex');
@@ -431,7 +571,7 @@ router.post('/', async (req, res, next) => {
       [
         req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
         date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
-        documentCurrency, remiseAppliquee, Number(frais_livraison) || 0, mode_paiement || null,
+        documentCurrency, remiseAppliquee, fraisLivraisonValides, mode_paiement || null,
         commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
       ]
     );

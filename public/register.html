@@ -8,7 +8,6 @@
 <title>Créer un compte — SamaFacture Pro</title>
 <meta name="description" content="Créez votre compte SamaFacture Pro gratuitement et commencez à facturer vos clients en quelques minutes, sans carte bancaire." />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="canonical" href="https://votredomaine.com/register.html" />
 <meta name="robots" content="index, follow" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="manifest" href="manifest.json" />
@@ -36,20 +35,26 @@
 
         <form id="register-form">
           <div class="field">
-            <label>Nom complet</label>
-            <input type="text" id="nom" required placeholder="Aminata Diop" />
+            <label for="nom">Nom complet</label>
+            <input type="text" id="nom" name="nom" autocomplete="name" required placeholder="Aminata Diop" />
           </div>
           <div class="field">
-            <label>Nom de l'entreprise</label>
-            <input type="text" id="entreprise_nom" placeholder="Boutique Aminata" />
+            <label for="entreprise_nom">Nom de l'entreprise</label>
+            <input type="text" id="entreprise_nom" name="entreprise_nom" autocomplete="organization" placeholder="Boutique Aminata" />
           </div>
           <div class="field">
-            <label>Adresse email</label>
-            <input type="email" id="email" required placeholder="vous@entreprise.com" />
+            <label for="email">Adresse email</label>
+            <input type="email" id="email" name="email" autocomplete="email" required placeholder="vous@entreprise.com" />
           </div>
           <div class="field">
-            <label>Mot de passe</label>
-            <input type="password" id="password" required placeholder="6 caractères minimum" />
+            <label for="password">Mot de passe</label>
+            <input type="password" id="password" name="password" autocomplete="new-password" minlength="8" required placeholder="8 caractères minimum" />
+          </div>
+          <div class="field" style="margin:16px 0;">
+            <label style="display:flex; align-items:flex-start; gap:10px; font-weight:500; line-height:1.5;">
+              <input type="checkbox" id="accept-terms" required style="width:18px; height:18px; flex:0 0 18px; margin-top:3px;" />
+              <span>J’accepte les <a href="conditions.html" target="_blank" rel="noopener noreferrer">conditions d’utilisation</a> et confirme avoir pris connaissance de la <a href="confidentialite.html" target="_blank" rel="noopener noreferrer">politique de confidentialité</a>.</span>
+            </label>
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; padding:12px;">Créer mon compte</button>
         </form>
@@ -82,9 +87,10 @@
     const entreprise_nom = document.getElementById('entreprise_nom').value.trim();
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
+    const acceptTerms = document.getElementById('accept-terms').checked;
     const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Création du compte…');
     try {
-      const { token, user } = await Api.post('/auth/register', { nom, email, password, entreprise_nom });
+      const { token, user } = await Api.post('/auth/register', { nom, email, password, entreprise_nom, acceptTerms });
       Api.setSession(token, user);
       redirectAfterLogin();
     } catch (err) {

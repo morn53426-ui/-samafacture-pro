@@ -11,6 +11,10 @@ const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = req
 const { sendMail } = require('../config/mailer');
 
 const router = express.Router();
+
+// Incrémenter ces versions à chaque modification substantielle des documents publics.
+const TERMS_VERSION = '2026-11-13';
+const PRIVACY_VERSION = '2026-11-13';
 const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
 
 // Personnalisation des modèles de facture (couleurs / logo / police) — voir la même liste de clés
@@ -152,12 +156,13 @@ function definirCookieSession(res, token) {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [nom, email, password]
+ *             required: [nom, email, password, acceptTerms]
  *             properties:
  *               nom: { type: string, example: 'Fatou Ndiaye' }
  *               email: { type: string, example: 'fatou@example.com' }
  *               password: { type: string, format: password, minLength: 8 }
  *               entreprise_nom: { type: string, nullable: true }
+ *               acceptTerms: { type: boolean, enum: [true], description: 'Acceptation des conditions et prise de connaissance de la politique de confidentialité.' }
  *     responses:
  *       201:
  *         description: Compte créé.
@@ -172,10 +177,13 @@ function definirCookieSession(res, token) {
  */
 router.post('/register', registerLimiter, async (req, res, next) => {
   try {
-    const { nom, email, password, entreprise_nom } = req.body;
+    const { nom, email, password, entreprise_nom, acceptTerms } = req.body;
 
     if (!nom || !email || !password) {
       return res.status(400).json({ error: 'Nom, email et mot de passe sont obligatoires.' });
+    }
+    if (acceptTerms !== true) {
+      return res.status(400).json({ error: 'Vous devez accepter les conditions d’utilisation et confirmer avoir pris connaissance de la politique de confidentialité.' });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' });
@@ -189,8 +197,8 @@ router.post('/register', registerLimiter, async (req, res, next) => {
 
     const hash = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
-      `INSERT INTO users (nom, email, password_hash, entreprise_nom) VALUES (?, ?, ?, ?)`,
-      [nom, emailLower, hash, entreprise_nom || nom]
+      `INSERT INTO users (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version) VALUES (?, ?, ?, ?, NOW(), ?, ?)`,
+      [nom, emailLower, hash, entreprise_nom || nom, TERMS_VERSION, PRIVACY_VERSION]
     );
 
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
@@ -286,7 +294,7 @@ router.post('/google', async (req, res, next) => {
     if (!googleClient) {
       return res.status(503).json({ error: "La connexion Google n'est pas configurée sur ce serveur." });
     }
-    const { credential } = req.body;
+    const { credential, acceptTerms } = req.body;
     if (!credential) return res.status(400).json({ error: 'Jeton Google manquant.' });
 
     let payload;
@@ -315,11 +323,14 @@ router.post('/google', async (req, res, next) => {
     }
 
     if (!user) {
+      if (acceptTerms !== true) {
+        return res.status(400).json({ error: 'Pour créer un compte avec Google, acceptez d’abord les conditions d’utilisation et confirmez avoir pris connaissance de la politique de confidentialité.' });
+      }
       // Nouveau compte : mot de passe aléatoire inutilisable (la connexion se fera via Google)
       const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
       const [result] = await pool.query(
-        `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id) VALUES (?, ?, ?, ?, ?)`,
-        [name || emailLower, emailLower, randomPassword, name || emailLower, googleId]
+        `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)`,
+        [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION]
       );
       [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
       user = rows[0];
@@ -589,15 +600,15 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Change le plan de l'abonnement. En l'absence de passerelle de paiement réelle connectée
-// (Wave/Orange Money/PayDunya/Stripe — voir la feuille de route du README), ce changement
-// est auto-service et immédiat, pour que vous puissiez tester les fonctionnalités Pro dès
-// maintenant. À remplacer par un vrai flux de paiement avant une mise en production commerciale.
+// Cette route ne peut plus attribuer de plan payant. Les plans Starter, Pro et
+// Entreprise sont activés exclusivement par /abonnement/webhook/* après vérification
+// serveur-à-serveur du paiement. La route reste disponible uniquement pour revenir au
+// plan gratuit ; masquer le bouton dans le frontend ne constitue jamais une protection.
 /**
  * @openapi
  * /auth/plan:
  *   put:
- *     summary: Change le plan d'abonnement (sélecteur manuel gratuit, utilisé quand aucune passerelle de paiement n'est configurée)
+ *     summary: Permet uniquement de revenir au plan Gratuit ; les plans payants exigent un paiement confirmé
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -608,22 +619,28 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  *             required: [plan]
  *             properties: { plan: { type: string, enum: [gratuit, starter, pro, entreprise] } }
  *     responses:
- *       200:
- *         description: Plan mis à jour.
- *         content:
- *           application/json:
- *             schema: { type: object, properties: { user: { $ref: '#/components/schemas/Utilisateur' } } }
+ *       200: { description: Retour au plan Gratuit. }
+ *       403: { description: Un paiement confirmé côté serveur est requis pour activer un plan payant. }
  */
 router.put('/plan', requireAuth, async (req, res, next) => {
   try {
     const { plan } = req.body;
-    const plansValides = ['gratuit', 'starter', 'pro', 'entreprise'];
-    if (!plansValides.includes(plan)) {
+    if (!['gratuit', 'starter', 'pro', 'entreprise'].includes(plan)) {
       return res.status(400).json({ error: 'Plan invalide.' });
     }
-    await pool.query('UPDATE users SET plan = ? WHERE id = ?', [plan, req.user.id]);
+    if (plan !== 'gratuit') {
+      return res.status(403).json({
+        error: 'Un plan payant ne peut être activé qu’après confirmation du paiement par le prestataire.',
+        code: 'PAIEMENT_REQUIS'
+      });
+    }
+    const [result] = await pool.query(
+      "UPDATE users SET plan = 'gratuit' WHERE id = ? AND plan <> 'gratuit'",
+      [req.user.id]
+    );
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
-    res.json({ user: sanitizeUser(rows[0]) });
+    if (!rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+    res.json({ user: sanitizeUser(rows[0]), changed: result.affectedRows > 0 });
   } catch (err) { next(err); }
 });
 

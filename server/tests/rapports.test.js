@@ -11,7 +11,7 @@ describe('Rapports', () => {
     await setupTestDatabase();
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Rapports', email: emailDeTest('rapports'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Rapports', email: emailDeTest('rapports'), password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
 
@@ -71,24 +71,43 @@ describe('Rapports', () => {
   });
 
   test('GET /rapports/export-excel est refusé (403) sur le plan gratuit', async () => {
-    const res = await request(app).get('/api/rapports/export-excel').set('Authorization', `Bearer ${token}`);
+    const res = await request(app)
+      .get('/api/rapports/export-excel')
+      .set('Authorization', `Bearer ${token}`);
     assert.equal(res.status, 403);
     assert.equal(res.body.code, 'FONCTIONNALITE_PRO');
   });
 
   test('GET /rapports/export-excel renvoie un classeur .xlsx pour un compte plan Pro', async () => {
     await pool.query("UPDATE users SET plan = 'pro' WHERE id = ?", [userId]);
-    const res = await request(app).get('/api/rapports/export-excel').set('Authorization', `Bearer ${token}`);
+    const res = await request(app)
+      .get('/api/rapports/export-excel')
+      .set('Authorization', `Bearer ${token}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks = [];
+        response.on('data', chunk => chunks.push(Buffer.from(chunk)));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+        response.on('error', callback);
+      });
     assert.equal(res.status, 200);
     assert.equal(res.headers['content-type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     assert.match(res.headers['content-disposition'] || '', /\.xlsx"?$/);
     assert.ok(Number(res.headers['content-length']) > 0, 'le fichier généré ne doit pas être vide');
+
+    assert.ok(Buffer.isBuffer(res.body), 'la réponse .xlsx doit être un Buffer binaire');
+    const workbook = new (require('exceljs').Workbook)();
+    await workbook.xlsx.load(Buffer.from(res.body));
+    assert.deepEqual(workbook.worksheets.map(sheet => sheet.name), ['Ventes', 'Dépenses']);
+    assert.equal(workbook.getWorksheet('Ventes').getCell('A1').value, 'Période / Client');
+    assert.equal(workbook.getWorksheet('Dépenses').getCell('A1').value, 'Libellé');
+    assert.equal(Number(workbook.getWorksheet('Dépenses').getCell('D2').value), 500);
   });
 
   test('un utilisateur B ne voit jamais les ventes/dépenses de A dans ses rapports', async () => {
     const b = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Rapports B', email: emailDeTest('rapports-b'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Rapports B', email: emailDeTest('rapports-b'), password: 'motdepasse123' , acceptTerms: true});
     const res = await request(app).get('/api/rapports/comptabilite').set('Authorization', `Bearer ${b.body.token}`);
     assert.equal(Number(res.body.recettes), 0);
     assert.equal(Number(res.body.depenses), 0);

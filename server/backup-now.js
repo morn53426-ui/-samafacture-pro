@@ -3,8 +3,13 @@
 require('dotenv').config();
 const { effectuerSauvegarde, BACKUP_DIR } = require('./config/backup');
 
-console.log(`💾 Sauvegarde manuelle en cours vers ${BACKUP_DIR}...`);
-effectuerSauvegarde().then(() => {
-  console.log('Terminé.');
-  process.exit(0);
-});
+(async () => {
+  console.log(`💾 Sauvegarde manuelle en cours vers ${BACKUP_DIR}...`);
+  try {
+    const result = await effectuerSauvegarde();
+    console.log(`Terminé : ${result.path}`);
+  } catch (err) {
+    console.error('Sauvegarde manuelle échouée :', err.message);
+    process.exitCode = 1;
+  }
+})();

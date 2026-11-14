@@ -17,9 +17,10 @@
 <body>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content">
+  <main class="main-content workspace-page page-factures-recurrentes">
     <div class="page-header">
       <div>
+        <div class="workspace-page-kicker">FACTURATION AUTOMATISÉE</div>
         <h1>Factures récurrentes <span class="plan-badge" style="vertical-align:middle;"><i class="ic" data-icon="star"></i> Pro</span></h1>
         <p>Automatisez la facturation de vos abonnements et prestations régulières</p>
       </div>
@@ -28,7 +29,11 @@
 
     <div id="error-box"></div>
 
-    <div class="card" style="padding:0;">
+    <div class="card workspace-data-card" style="padding:0;">
+      <div class="workspace-data-heading">
+        <div><h2>Planning de facturation</h2><p>Cadences, prochaines générations et historique des factures produites</p></div>
+        <span class="workspace-data-type"><i class="ic" data-icon="repeat"></i> Automatisation</span>
+      </div>
       <table class="table-stack">
         <thead><tr><th>Libellé</th><th>Client</th><th>Fréquence</th><th>Prochaine génération</th><th>Générées</th><th>Statut</th><th></th></tr></thead>
         <tbody id="recurrentes-body"></tbody>

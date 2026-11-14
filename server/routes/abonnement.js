@@ -11,8 +11,8 @@ const {
 
 const router = express.Router();
 
-// Tarifs des plans payants (FCFA / mois). À ajuster selon votre marché — ce sont des
-// valeurs de départ raisonnables pour des PME/commerçants d'Afrique de l'Ouest.
+// Montants des achats ponctuels de plans payants (FCFA). Ils sont débités une seule fois
+// par commande ; aucun abonnement récurrent ni prélèvement automatique n'est créé.
 const TARIFS = {
   starter: 5000,
   pro: 15000,
@@ -41,13 +41,20 @@ function baseUrl(req) {
  *               properties:
  *                 wave: { type: boolean }
  *                 paydunya: { type: boolean }
- *                 tarifs: { type: object, properties: { starter: { type: integer }, pro: { type: integer }, entreprise: { type: integer } } }
+ *                 tarifs: { type: object, properties: { starter: { type: integer }, pro: { type: integer }, entreprise: { type: integer } } }\n                 facturation:\n                   type: object\n                   properties:\n                     mode: { type: string, enum: [paiement_unique] }\n                     renouvellement_automatique: { type: boolean }\n                     expiration_automatique: { type: boolean }\n                     acces_jusqua_changement_manuel: { type: boolean }\n                     activation: { type: string, enum: [apres_confirmation] }
  */
 router.get('/moyens-disponibles', requireAuth, (req, res) => {
   res.json({
     wave: waveConfigured(),
     paydunya: paydunyaConfigured(),
-    tarifs: TARIFS
+    tarifs: TARIFS,
+    facturation: {
+      mode: 'paiement_unique',
+      renouvellement_automatique: false,
+      expiration_automatique: false,
+      acces_jusqua_changement_manuel: true,
+      activation: 'apres_confirmation'
+    }
   });
 });
 
@@ -182,32 +189,88 @@ router.get('/statut/:reference', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/** Marque un paiement comme réglé et met à jour le plan de l'utilisateur. Idempotent et
- *  protégé contre les traitements concurrents (deux webhooks/retries simultanés) grâce à
- *  la clause `AND statut != 'payee'` : un seul appel effectue réellement la mise à jour,
- *  même si plusieurs arrivent en même temps pour la même référence. */
+/** Confirme un paiement et active son plan dans une transaction SQL unique.
+ * Le verrou FOR UPDATE sérialise les webhooks concurrents ; le statut et le plan sont
+ * validés ensemble ou aucun des deux n'est enregistré. Le montant doit être fourni par
+ * le fournisseur et correspondre au prix attendu : une absence de montant n'est jamais
+ * considérée comme une confirmation valide. */
 async function confirmerPaiement(paiement, montantConfirme) {
-  if (paiement.statut === 'payee') return;
+  const montantAttendu = Number(paiement?.montant);
+  const montantRecu = montantConfirme === undefined || montantConfirme === null
+    ? NaN
+    : Number(montantConfirme);
 
-  // Vérifie que le montant confirmé par le fournisseur correspond à celui du plan facturé
-  // (défense en profondeur : le montant est déjà fixé côté serveur à la création, mais on
-  // ne fait jamais confiance uniquement à ce que renvoie un tiers). Si le fournisseur ne
-  // transmet pas de montant exploitable, on ne bloque pas (montantConfirme undefined).
-  if (montantConfirme !== undefined && Math.round(montantConfirme) !== Math.round(Number(paiement.montant))) {
-    console.error(`⚠️  Montant du webhook (${montantConfirme}) différent du montant attendu (${paiement.montant}) pour le paiement #${paiement.id} — traitement refusé.`);
-    // Signalé à Sentry : un montant qui ne correspond pas peut indiquer une tentative de
-    // fraude (webhook forgé) ou un changement d'API chez le fournisseur — dans les deux
-    // cas, ça mérite une alerte plutôt qu'une ligne de log qui passe inaperçue.
-    captureException(new Error(`Montant webhook incohérent pour le paiement #${paiement.id} (${paiement.fournisseur}) : reçu ${montantConfirme}, attendu ${paiement.montant}`));
-    return;
+  if (!Number.isFinite(montantRecu) || !Number.isFinite(montantAttendu) ||
+      Math.round(montantRecu) !== Math.round(montantAttendu)) {
+    const erreur = new Error(
+      `Montant de paiement absent ou incohérent pour le paiement #${paiement?.id} (${paiement?.fournisseur}) : reçu ${montantConfirme}, attendu ${paiement?.montant}`
+    );
+    console.error('⚠️ ', erreur.message, '— traitement refusé.');
+    captureException(erreur);
+    return false;
   }
 
-  const [result] = await pool.query(
-    `UPDATE abonnement_paiements SET statut = 'payee', paid_at = NOW() WHERE id = ? AND statut != 'payee'`,
-    [paiement.id]
-  );
-  if (result.affectedRows) {
-    await pool.query('UPDATE users SET plan = ? WHERE id = ?', [paiement.plan, paiement.user_id]);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      'SELECT * FROM abonnement_paiements WHERE id = ? FOR UPDATE',
+      [paiement.id]
+    );
+    const courant = rows[0];
+
+    // Un webhook rejoué ou une tentative échouée ne doit pas réactiver un plan.
+    // Une tentative locale expirée peut toutefois avoir été payée juste avant l'expiration :
+    // le statut fournisseur signé et le montant viennent d'être vérifiés, on accepte donc
+    // aussi 'expiree' pour éviter de perdre un règlement dont le callback arrive en retard.
+    if (!courant || !['en_attente', 'expiree'].includes(courant.statut)) {
+      await conn.commit();
+      return false;
+    }
+
+    const montantEnBase = Number(courant.montant);
+    if (!Number.isFinite(montantEnBase) ||
+        Math.round(montantRecu) !== Math.round(montantEnBase) ||
+        courant.devise !== 'XOF') {
+      await conn.rollback();
+      const erreur = new Error(
+        `Paiement #${courant.id} rejeté : montant ou devise non conforme (reçu ${montantRecu} ${courant.devise}, attendu ${courant.montant} XOF).`
+      );
+      console.error('⚠️ ', erreur.message);
+      captureException(erreur);
+      return false;
+    }
+
+    const [paymentUpdate] = await conn.query(
+      "UPDATE abonnement_paiements SET statut = 'payee', paid_at = NOW() WHERE id = ? AND statut IN ('en_attente', 'expiree')",
+      [courant.id]
+    );
+    if (paymentUpdate.affectedRows !== 1) {
+      await conn.rollback();
+      return false;
+    }
+
+    // Vérifier l'existence de l'utilisateur séparément : MySQL rapporte affectedRows=0
+    // lorsque le plan est déjà identique. Un renouvellement payé du même plan doit réussir.
+    const [userRows] = await conn.query(
+      'SELECT id FROM users WHERE id = ? FOR UPDATE',
+      [courant.user_id]
+    );
+    if (!userRows.length) {
+      throw new Error(`Utilisateur #${courant.user_id} introuvable après paiement #${courant.id}.`);
+    }
+    await conn.query(
+      'UPDATE users SET plan = ? WHERE id = ?',
+      [courant.plan, courant.user_id]
+    );
+
+    await conn.commit();
+    return true;
+  } catch (err) {
+    await conn.rollback().catch(() => {});
+    throw err;
+  } finally {
+    conn.release();
   }
 }
 

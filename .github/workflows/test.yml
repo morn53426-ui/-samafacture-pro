@@ -30,27 +30,64 @@ jobs:
 
     steps:
       - name: Récupérer le dépôt
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Valider Docker Compose et le chemin des variables
         run: |
           cp server/.env.example server/.env
           docker compose --env-file server/.env config --quiet
+          cat > .env <<'ENV'
+          APP_DOMAIN=example.invalid
+          DB_NAME=samafacture
+          DB_USER=samafacture
+          DB_PASSWORD=ci-db-password-not-used
+          DB_ROOT_PASSWORD=ci-root-password-not-used
+          JWT_SECRET=ci-secret-ne-pas-utiliser-en-production
+          APP_URL=https://example.invalid
+          ALLOWED_ORIGINS=https://example.invalid
+          ENV
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml config --quiet
+          rm -f .env
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: server/package-lock.json
 
       - name: Construire l'image Docker sans publication
         run: docker build --tag samafacture-pro:ci .
-
-      - name: Installer Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: server/package-lock.json
 
       - name: Installer les dépendances
         working-directory: server
         run: npm ci
 
+      - name: Détecter le navigateur Chromium du runner CI
+        shell: bash
+        run: |
+          BROWSER_PATH=""
+          for browser in google-chrome-stable google-chrome chromium chromium-browser; do
+            if command -v "$browser" >/dev/null 2>&1; then
+              BROWSER_PATH="$(command -v "$browser")"
+              break
+            fi
+          done
+          if [ -z "$BROWSER_PATH" ]; then
+            echo "Aucun Chrome/Chromium préinstallé sur ce runner." >&2
+            exit 1
+          fi
+          test -x "$BROWSER_PATH"
+          "$BROWSER_PATH" --version
+          echo "PUPPETEER_EXECUTABLE_PATH=$BROWSER_PATH" >> "$GITHUB_ENV"
+
+      - name: Diagnostiquer les avis npm sans modifier les versions
+        working-directory: server
+        run: |
+          npm audit --json > npm-audit.json || true
+          node -e "const a=require('./npm-audit.json'); console.log(JSON.stringify({metadata:a.metadata?.vulnerabilities,packages:Object.entries(a.vulnerabilities||{}).map(([name,v])=>({name,severity:v.severity,isDirect:v.isDirect,range:v.range,fixAvailable:v.fixAvailable,via:(v.via||[]).map(x=>typeof x==='string'?x:{name:x.name,title:x.title,url:x.url,range:x.range})}))},null,2))"
       - name: Vérifier le script de recette staging
         working-directory: server
         run: node --check scripts/staging-smoke.js
@@ -78,7 +115,7 @@ jobs:
 
       - name: Publier les captures de la recette visuelle
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: samafacture-recette-visuelle-${{ github.run_number }}
           path: server/tests/visual/artifacts/

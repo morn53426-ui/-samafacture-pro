@@ -5,13 +5,14 @@
   "main": "app.js",
   "type": "commonjs",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "start": "node app.js",
     "start:cluster": "node cluster.js",
     "dev": "node app.js",
     "backup": "node backup-now.js",
+    "restore": "node restore-backup.js",
     "test": "node --test \"tests/*.test.js\"",
     "smoke:staging": "node scripts/staging-smoke.js",
     "test:visual": "node tests/visual/recette-visuelle.js"
@@ -27,21 +28,32 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express-rate-limit": "^7.4.0",
-    "morgan": "^1.10.0",
+    "morgan": "^1.12.1",
     "google-auth-library": "^9.14.1",
-    "nodemailer": "^6.9.15",
-    "compression": "^1.7.4",
+    "nodemailer": "^10.5.0",
+    "compression": "^1.8.2",
     "qrcode": "^1.5.4",
-    "xlsx": "^0.18.5",
-    "@sentry/node": "^8.42.0",
-    "puppeteer": "^23.9.0",
+    "@sentry/node": "^11.12.0",
+    "puppeteer": "^25.17.0",
     "socket.io": "^4.8.1",
     "@socket.io/sticky": "^1.0.4",
     "@socket.io/cluster-adapter": "^0.2.2",
-    "swagger-jsdoc": "^6.2.8",
+    "swagger-jsdoc": "6.2.8",
     "swagger-ui-express": "^5.0.1",
     "redis": "^4.7.0",
     "@socket.io/redis-adapter": "^8.3.0",
-    "rate-limit-redis": "^4.2.0"
+    "rate-limit-redis": "^4.2.0",
+    "exceljs": "^4.4.0"
+  },
+  "overrides": {
+    "body-parser": "1.20.9",
+    "brace-expansion": "5.0.12",
+    "engine.io": "6.6.10",
+    "fast-uri": "3.1.9",
+    "glob": "14.0.2",
+    "minimatch": "11.0.1",
+    "proxy-addr": "2.0.8",
+    "qs": "6.16.1",
+    "uuid": "11.1.1"
   }
 }

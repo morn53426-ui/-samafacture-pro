@@ -24,14 +24,13 @@ function renderSidebar(activePage) {
       { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
       { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' },
       { id: 'achats', icon: 'truck', label: 'Achats & stocks', href: 'achats.html' },
-      { id: 'assistant-ia', icon: 'sparkles', label: 'Assistant IA', href: 'assistant-ia.html' },
+      { id: 'assistant-ia', icon: 'message-circle', label: 'Assistant IA', href: 'assistant-ia.html' },
       { id: 'automatisations', icon: 'workflow', label: 'Automatisations', href: 'automatisations.html' },
-      { id: 'facture-ia', icon: 'wand', label: 'Facture par IA', href: 'facture-ia.html' }
+      { id: 'facture-ia', icon: 'file-check', label: 'Facture par IA', href: 'facture-ia.html' }
     ]},
     { group: 'Compte', items: [
       { id: 'abonnement', icon: 'gem', label: 'Abonnement', href: 'abonnement.html' },
-      { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' },
-      { id: 'internationalisation', icon: 'globe', label: 'Pays, langue & devise', href: 'internationalisation.html' }
+      { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' }
     ]},
     { group: 'Aide et ressources', items: [
       { id: 'aide', icon: 'help-circle', label: 'Centre d’aide', href: 'aide.html' },
@@ -48,6 +47,9 @@ function renderSidebar(activePage) {
     try { return localStorage.getItem('sf-sidebar-collapsed') !== 'false'; }
     catch { return true; }
   })();
+  // Évite de montrer le menu en position développée pendant son repli initial.
+  // La transition reste disponible après l'initialisation pour les clics utilisateur.
+  document.body.classList.add('sidebar-initializing');
   document.body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
 
   const navHtml = nav.map(section => `
@@ -65,7 +67,7 @@ function renderSidebar(activePage) {
         <div class="mark"><img src="images/icon-192.png" alt="SamaFacture Pro" /></div>
         <div class="sidebar-brand-copy">
           <div class="name">SamaFacture <span class="brand-pro">Pro</span></div>
-          <div class="sub">Facturez • Gérez • Développez</div>
+          <div class="sub">Gestion commerciale</div>
         </div>
         <button type="button" class="sidebar-collapse-toggle" id="sidebar-collapse-toggle" onclick="toggleDesktopSidebar()" aria-label="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}" aria-expanded="${String(!sidebarCollapsed)}" title="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}">${Icon(sidebarCollapsed ? 'arrow-right' : 'arrow-left')}</button>
         <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu" aria-controls="app-navigation" aria-expanded="false">${Icon('menu')}</button>
@@ -73,9 +75,8 @@ function renderSidebar(activePage) {
       <nav class="sidebar-nav" id="app-navigation" aria-label="Navigation principale">${navHtml}</nav>
       <div class="sidebar-foot">
         <button type="button" class="install-app-btn" style="display:none;" onclick="installApp()"><span class="ic">${Icon('smartphone')}</span> Installer l'application</button>
-        <div class="sidebar-theme-control">${window.SamaTheme ? SamaTheme.boutonHtml() : ''}</div>
         <div class="sidebar-user-info">
-          <div class="plan-badge"><span class="ic">${Icon('star')}</span> ${planLabels[user?.plan] || 'Plan Gratuit'}</div>
+          <div class="plan-badge">${planLabels[user?.plan] || 'Plan Gratuit'}</div>
           <div class="sidebar-user-name">${escapeHtml(user?.entreprise_nom || user?.nom || 'Mon compte')}</div>
         </div>
         <button type="button" class="sidebar-logout" onclick="Api.clearSession(); location.href='login.html';" aria-label="Se déconnecter" title="Se déconnecter"><span class="ic" aria-hidden="true">${Icon('log-out')}</span><span class="sidebar-logout-label">Se déconnecter</span></button>
@@ -86,6 +87,9 @@ function renderSidebar(activePage) {
   document.getElementById('sidebar-root').outerHTML = html;
   ensureWorkspaceTopbar();
   initRealtime();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.body.classList.remove('sidebar-initializing');
+  }));
 }
 
 function toggleSidebar() {
@@ -146,6 +150,7 @@ function renderTopbar(title, subtitle) {
     ? 'Administrateur'
     : 'Espace de travail';
   const avatar = typeof initials === 'function' ? initials(displayName) : 'SF';
+  const isLocalizationPage = location.pathname.endsWith('/internationalisation.html');
 
   el.outerHTML = `
     <header class="app-topbar" aria-label="Barre d'outils">
@@ -179,6 +184,14 @@ function renderTopbar(title, subtitle) {
               <div class="app-notification-empty">Aucune notification reçue pendant cette session.</div>
             </div>
           </section>
+        </div>
+        <div class="app-topbar-quick-actions" role="group" aria-label="Accès rapides">
+          ${window.SamaTheme ? SamaTheme.boutonHtml('-topbar') : ''}
+          <a href="internationalisation.html" class="app-topbar-localization${isLocalizationPage ? ' is-active' : ''}"
+            aria-label="Pays, langue et devise" data-tooltip="Pays, langue et devise" ${isLocalizationPage ? 'aria-current="page"' : ''}>
+            <span class="ic" aria-hidden="true">${Icon('globe')}</span>
+            <span class="app-topbar-localization-label">Pays, langue &amp; devise</span>
+          </a>
         </div>
         <button type="button" class="app-topbar-logout"
           onclick="Api.clearSession(); location.href='login.html';"

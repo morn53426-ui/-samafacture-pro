@@ -1,5 +1,5 @@
 const express = require('express');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
@@ -117,18 +117,49 @@ router.get('/export-excel', async (req, res, next) => {
     const venteHeader = isProduit ? ['Produit', 'Quantité', 'Total'] : ['Période / Client', 'Factures', 'Total'];
     const venteRows = ventes.map(r => isProduit ? [r.label, r.quantite, r.total] : [r.label, r.nb_factures, r.total]);
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([venteHeader, ...venteRows]), 'Ventes');
-    XLSX.utils.book_append_sheet(
-      wb,
-      XLSX.utils.aoa_to_sheet([
-        ['Libellé', 'Catégorie', 'Date', 'Montant'],
-        ...depenses.map(d => [d.libelle, d.categorie || '', d.date_depense, d.montant])
-      ]),
-      'Dépenses'
-    );
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'SamaFacture Pro';
+    workbook.created = new Date();
 
-    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const ventesSheet = workbook.addWorksheet('Ventes', {
+      views: [{ state: 'frozen', ySplit: 1 }]
+    });
+    ventesSheet.addRows([venteHeader, ...venteRows]);
+    ventesSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    ventesSheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF176B4D' } };
+    ventesSheet.columns = venteHeader.map((header, index) => ({
+      header,
+      width: index === 0 ? 32 : 18
+    }));
+    ventesSheet.autoFilter = { from: 'A1', to: String.fromCharCode(64 + venteHeader.length) + '1' };
+    for (let rowIndex = 2; rowIndex <= ventesSheet.rowCount; rowIndex++) {
+      const totalCell = ventesSheet.getRow(rowIndex).getCell(venteHeader.length);
+      if (typeof totalCell.value === 'number') totalCell.numFmt = '#,##0.00';
+    }
+
+    const depensesSheet = workbook.addWorksheet('Dépenses', {
+      views: [{ state: 'frozen', ySplit: 1 }]
+    });
+    const depensesHeader = ['Libellé', 'Catégorie', 'Date', 'Montant'];
+    depensesSheet.addRows([
+      depensesHeader,
+      ...depenses.map(d => [d.libelle, d.categorie || '', d.date_depense, Number(d.montant)])
+    ]);
+    depensesSheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    depensesSheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF176B4D' } };
+    depensesSheet.columns = [
+      { header: 'Libellé', width: 36 },
+      { header: 'Catégorie', width: 22 },
+      { header: 'Date', width: 16 },
+      { header: 'Montant', width: 18 }
+    ];
+    depensesSheet.autoFilter = { from: 'A1', to: 'D1' };
+    for (let rowIndex = 2; rowIndex <= depensesSheet.rowCount; rowIndex++) {
+      const cell = depensesSheet.getRow(rowIndex).getCell(4);
+      if (typeof cell.value === 'number') cell.numFmt = '#,##0.00';
+    }
+
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="rapport-samafacture.xlsx"');
     res.send(buffer);

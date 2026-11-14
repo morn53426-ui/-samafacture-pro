@@ -15,7 +15,7 @@ describe('Personnalisation des modèles — PUT /api/auth/entreprise', () => {
     await setupTestDatabase();
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Perso', email, password: 'motdepasse123', entreprise_nom: 'Boutique Perso' });
+      .send({ nom: 'Testeur Perso', email, password: 'motdepasse123', entreprise_nom: 'Boutique Perso' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
   });

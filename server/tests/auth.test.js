@@ -19,7 +19,7 @@ describe('Authentification', () => {
   test('inscription avec des informations valides crée un compte et renvoie un jeton', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Utilisateur Test', email, password, entreprise_nom: 'Boutique Test' });
+      .send({ nom: 'Utilisateur Test', email, password, entreprise_nom: 'Boutique Test', acceptTerms: true });
 
     assert.equal(res.status, 201);
     assert.ok(res.body.token, 'un jeton JWT doit être renvoyé');
@@ -28,10 +28,19 @@ describe('Authentification', () => {
     userId = res.body.user.id;
   });
 
+  test("l'inscription sans acceptation des documents est refusée", async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ nom: 'Sans Consentement', email: emailDeTest('sans-accord'), password, acceptTerms: false });
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /accepter les conditions/i);
+  });
+
   test("l'inscription avec un email déjà utilisé est refusée", async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Autre Utilisateur', email, password: 'autremotdepasse' });
+      .send({ nom: 'Autre Utilisateur', email, password: 'autremotdepasse', acceptTerms: true });
 
     assert.equal(res.status, 409);
   });
@@ -39,15 +48,53 @@ describe('Authentification', () => {
   test('un mot de passe trop court est refusé à l\'inscription', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Test', email: emailDeTest('court'), password: '123' });
+      .send({ nom: 'Test', email: emailDeTest('court'), password: '123', acceptTerms: true });
 
     assert.equal(res.status, 400);
+  });
+
+  test("l'acceptation des documents est enregistrée avec leurs versions", async () => {
+    const [rows] = await require('../config/db').pool.query(
+      'SELECT terms_accepted_at, terms_version, privacy_version FROM users WHERE email = ?',
+      [email]
+    );
+    assert.ok(rows[0].terms_accepted_at);
+    assert.equal(rows[0].terms_version, '2026-11-13');
+    assert.equal(rows[0].privacy_version, '2026-11-13');
   });
 
   test('la connexion avec les bons identifiants réussit', async () => {
     const res = await request(app).post('/api/auth/login').send({ email, password });
     assert.equal(res.status, 200);
     assert.ok(res.body.token);
+  });
+
+  test('un utilisateur ne peut pas attribuer lui-même un plan Starter, Pro ou Entreprise', async () => {
+    const connexion = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(connexion.status, 200);
+    const token = connexion.body.token;
+
+    for (const plan of ['starter', 'pro', 'entreprise']) {
+      const res = await request(app)
+        .put('/api/auth/plan')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ plan });
+      assert.equal(res.status, 403, `le plan ${plan} doit exiger un paiement confirmé`);
+      assert.equal(res.body.code, 'PAIEMENT_REQUIS');
+    }
+
+    const me = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    assert.equal(me.status, 200);
+    assert.equal(me.body.user.plan, 'gratuit');
+  });
+
+  test('le changement vers un plan inconnu est refusé', async () => {
+    const connexion = await request(app).post('/api/auth/login').send({ email, password });
+    const res = await request(app)
+      .put('/api/auth/plan')
+      .set('Authorization', `Bearer ${connexion.body.token}`)
+      .send({ plan: 'enterprise-premium' });
+    assert.equal(res.status, 400);
   });
 
   test('la connexion avec un mauvais mot de passe échoue', async () => {

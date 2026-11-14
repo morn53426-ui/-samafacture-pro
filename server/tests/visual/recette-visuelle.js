@@ -20,6 +20,7 @@ const PAGES = [
   { name: 'clients', file: 'clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
   { name: 'produits', file: 'produits.html', ready: '#produits-body tr:not(.row-skeleton)' },
   { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
+  { name: 'factures-recurrentes', file: 'factures-recurrentes.html', ready: '#recurrentes-body tr' },
   { name: 'devis', file: 'devis.html', ready: '#devis-body tr', responsiveTable: '#devis-body' },
   { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
   { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'], responsiveTable: '#table-body' },
@@ -218,7 +219,7 @@ const CHART_STUB = [
   '      } else {',
   '        context.strokeStyle = "rgba(105,125,160,.16)"; context.lineWidth = 1;',
   '        for (let row = 1; row < 5; row++) { context.beginPath(); context.moveTo(0, row * height / 5); context.lineTo(width, row * height / 5); context.stroke(); }',
-  '        context.strokeStyle = "#1769F5"; context.lineWidth = 3; context.beginPath();',
+  '        context.strokeStyle = "#087A57"; context.lineWidth = 3; context.beginPath();',
   '        const points = [0.85, 0.72, 0.77, 0.55, 0.62, 0.39, 0.48, 0.28, 0.34, 0.12];',
   '        points.forEach((point, index) => { const x = 10 + index * (width - 20) / (points.length - 1); const y = point * (height - 18) + 9; if (index === 0) context.moveTo(x, y); else context.lineTo(x, y); });',
   '        context.stroke();',
@@ -231,6 +232,7 @@ const CHART_STUB = [
 ].join('\n');
 
 function fixtureFor(pathname, fixtures) {
+  if (pathname === '/api/factures-recurrentes') return { recurrentes: [] };
   if (pathname === '/api/dashboard') return fixtures.dashboard;
   if (pathname === '/api/rapports/ventes') return { rows: fixtures.ventes };
   if (pathname === '/api/clients') return {
@@ -409,6 +411,15 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await new Promise((resolve) => setTimeout(resolve, 120));
 
+  if (!pageDefinition.public && viewport.width >= 901) {
+    const geometry = await page.evaluate(() => ({
+      sidebarRight: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().right || 0),
+      headingLeft: Math.round(document.querySelector('main.workspace-page h1')?.getBoundingClientRect().left || 0)
+    }));
+    assert.ok(geometry.headingLeft >= geometry.sidebarRight + 24,
+      pageDefinition.name + ' : le titre ne doit pas passer sous le rail latéral. ' + JSON.stringify(geometry));
+  }
+
   if (!pageDefinition.public) {
     const shell = await page.evaluate(() => ({
       toolbar: Boolean(document.querySelector('.app-topbar')),
@@ -416,7 +427,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       notificationBell: Boolean(document.querySelector('#workspace-notification-toggle .ic svg')),
       notificationPanel: Boolean(document.querySelector('#workspace-notification-panel[hidden]')),
       sidebar: Boolean(document.querySelector('#app-sidebar')),
-      activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active'))
+      activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active') || document.querySelector('.app-topbar-localization[aria-current="page"]'))
     }));
     assert.equal(shell.toolbar, true, pageDefinition.name + ' doit afficher la barre supérieure commune.');
     assert.equal(shell.search, true, pageDefinition.name + ' doit afficher la recherche globale.');
@@ -438,32 +449,110 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       hasKicker,
       dataHeading: Boolean(main?.querySelector('.workspace-data-heading')),
       filterPanel: Boolean(main?.querySelector('.workspace-filter-card')),
-      unhydratedIcons
+      unhydratedIcons,
+      headingFont: getComputedStyle(document.querySelector('h1')).fontFamily,
+      bodyFont: getComputedStyle(document.body).fontFamily
     };
   });
-  const structuredPages = ['dashboard', 'clients', 'produits', 'factures', 'devis', 'depenses', 'rapports', 'finances', 'crm'];
+  const structuredPages = ['dashboard', 'clients', 'produits', 'factures', 'factures-recurrentes', 'devis', 'depenses', 'rapports', 'finances', 'crm', 'internationalisation', 'automatisations', 'nouvelle-facture'];
   if (structuredPages.includes(pageDefinition.name)) {
     assert.equal(layoutAudit.workspacePage, true, pageDefinition.name + ' doit utiliser le cadre de page commun.');
     assert.equal(layoutAudit.hasHeader, true, pageDefinition.name + ' doit présenter un en-tête de page clair.');
     assert.equal(layoutAudit.hasKicker, true, pageDefinition.name + ' doit identifier clairement la section métier.');
   }
-  const tableHeadingPages = ['clients', 'produits', 'devis', 'depenses', 'rapports'];
+  const tableHeadingPages = ['clients', 'produits', 'factures-recurrentes', 'devis', 'depenses', 'rapports'];
   if (tableHeadingPages.includes(pageDefinition.name)) {
     assert.equal(layoutAudit.dataHeading, true, pageDefinition.name + ' doit titrer sa zone de données.');
+  }
+  assert.ok(layoutAudit.headingFont.toLowerCase().includes('ibm plex sans'),
+    pageDefinition.name + ' doit utiliser IBM Plex Sans pour les titres.');
+  assert.ok(layoutAudit.bodyFont.toLowerCase().includes('ibm plex sans'),
+    pageDefinition.name + ' doit utiliser IBM Plex Sans pour les textes.');
+  if (['clients', 'rapports'].includes(pageDefinition.name)) {
+    assert.equal(layoutAudit.filterPanel, true, pageDefinition.name + ' doit séparer les filtres du contenu métier.');
   }
   assert.deepEqual(layoutAudit.unhydratedIcons, [],
     pageDefinition.name + ' contient des icônes statiques non reconnues : ' + JSON.stringify(layoutAudit.unhydratedIcons));
 
-  const metrics = await page.evaluate(() => ({
-    viewport: window.innerWidth,
-    document: document.documentElement.scrollWidth,
-    body: document.body.scrollWidth,
-    page: location.pathname,
-    xssMarker: window.__visualXss || false,
-    paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
-      ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
-      : null
-  }));
+  const navigationGeometry = await page.evaluate(() => {
+    const sidebar = document.getElementById('app-sidebar');
+    const main = document.querySelector('.main-content');
+    return {
+      viewport: window.innerWidth,
+      sidebarWidth: sidebar ? Math.round(sidebar.getBoundingClientRect().width) : null,
+      sidebarCollapsed: Boolean(sidebar?.classList.contains('is-collapsed')),
+      sidebarOpen: Boolean(sidebar?.classList.contains('open')),
+      overlayVisible: document.getElementById('sidebar-overlay')?.classList.contains('show') || false,
+      mainLeft: main ? Math.round(main.getBoundingClientRect().left) : null,
+      mainMargin: main ? Math.round(parseFloat(getComputedStyle(main).marginLeft) || 0) : null,
+      firstContentLeft: main?.querySelector('.dashboard-welcome, .page-header, .workspace-page-header')
+        ? Math.round(main.querySelector('.dashboard-welcome, .page-header, .workspace-page-header').getBoundingClientRect().left)
+        : null,
+      contentPaddingLeft: main ? Math.round(parseFloat(getComputedStyle(main).paddingLeft) || 0) : null,
+      expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim()
+    };
+  });
+  if (!pageDefinition.public && viewport.width >= 901) {
+    assert.equal(navigationGeometry.sidebarCollapsed, true,
+      pageDefinition.name + ' : le menu de bureau doit démarrer compact.');
+    assert.equal(navigationGeometry.sidebarWidth, 76,
+      pageDefinition.name + ' : la largeur réelle du rail desktop doit rester à 76 px : ' + JSON.stringify(navigationGeometry));
+    assert.ok(navigationGeometry.mainMargin >= 76 && navigationGeometry.mainMargin <= 92,
+      pageDefinition.name + ' : la marge CSS du contenu doit réserver la largeur du rail compact sans espace excessif : ' + JSON.stringify(navigationGeometry));
+    assert.ok(navigationGeometry.mainLeft >= navigationGeometry.sidebarWidth &&
+      navigationGeometry.mainLeft <= navigationGeometry.sidebarWidth + 16,
+      pageDefinition.name + ' : le conteneur principal ne doit pas chevaucher le rail : ' + JSON.stringify(navigationGeometry));
+    assert.ok(navigationGeometry.contentPaddingLeft >= 24,
+      pageDefinition.name + ' : la zone de travail doit conserver au moins 24 px de marge intérieure après la navigation : ' + JSON.stringify(navigationGeometry));
+    assert.ok(navigationGeometry.firstContentLeft >= navigationGeometry.sidebarWidth + 24,
+      pageDefinition.name + ' : le premier contenu doit être visuellement séparé du rail : ' + JSON.stringify(navigationGeometry));
+    assert.equal(navigationGeometry.sidebarOpen, false,
+      pageDefinition.name + ' : le tiroir mobile ne doit pas s’ouvrir sur ordinateur.');
+    assert.equal(navigationGeometry.overlayVisible, false,
+      pageDefinition.name + ' : aucun voile de navigation ne doit masquer le contenu desktop.');
+  }
+
+  const metrics = await page.evaluate(() => {
+    const overflowElements = Array.from(document.body.querySelectorAll('*')).map((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const selector = element.tagName.toLowerCase() +
+        (element.id ? '#' + element.id : '') +
+        (typeof element.className === 'string' && element.className.trim()
+          ? '.' + element.className.trim().split(/\\s+/).slice(0, 3).join('.')
+          : '');
+      return {
+        selector,
+        left: Math.round(rect.left * 10) / 10,
+        right: Math.round(rect.right * 10) / 10,
+        width: Math.round(rect.width * 10) / 10,
+        position: style.position,
+        overflowX: style.overflowX
+      };
+    }).filter((item) => item.width > 0 &&
+      (item.right > window.innerWidth + 1 || item.left < -1) &&
+      item.position !== 'fixed' && item.position !== 'sticky')
+      .sort((a, b) => b.right - a.right)
+      .slice(0, 16);
+    return {
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth,
+      page: location.pathname,
+      xssMarker: window.__visualXss || false,
+      paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
+        ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
+        : null,
+      overflowElements
+    };
+  });
+  if (metrics.document > metrics.viewport + 1 || metrics.body > metrics.viewport + 1) {
+    await page.screenshot({
+      path: path.join(screenshots, 'overflow-' + pageDefinition.name + '-' + viewport.name + '.png'),
+      fullPage: true,
+      captureBeyondViewport: true
+    });
+  }
   assert.ok(metrics.document <= metrics.viewport + 1,
     pageDefinition.name + ' déborde horizontalement à ' + viewport.width + 'px: ' + JSON.stringify(metrics));
   assert.ok(metrics.body <= metrics.viewport + 1,
@@ -552,7 +641,13 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   }));
   await normalPage.mouse.up();
   assert.equal(buttonState.active, true, 'Le pointeur doit maintenir le bouton pressé pendant la mesure.');
-  assert.match(buttonState.transform, /matrix\(0\.97,\s*0,\s*0,\s*0\.97/,
+  const pressMatrix = buttonState.transform.match(/^matrix\(([^)]+)\)$/);
+  const pressScale = pressMatrix ? pressMatrix[1].split(',').map(Number) : [];
+  assert.ok(pressScale.length === 6 &&
+    Math.abs(pressScale[0] - 0.97) < 0.002 &&
+    Math.abs(pressScale[3] - 0.97) < 0.002 &&
+    Math.abs(pressScale[1]) < 0.001 &&
+    Math.abs(pressScale[2]) < 0.001,
     'Le bouton doit fournir un retour press scale(0.97). Valeur observée : ' + buttonState.transform);
   await normalPage.close();
 
@@ -606,6 +701,42 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
     expanded: 'false',
     emptyMessage: 'Aucune notification reçue pendant cette session.'
   }, 'Aucun compteur fictif ne doit apparaître sans événement reçu.');
+  const topbarControls = await page.evaluate(() => {
+    const account = document.querySelector('.app-topbar-account');
+    const order = Array.from(account?.children || []).map(element => {
+      if (element.matches('.app-topbar-avatar')) return 'avatar';
+      if (element.matches('.app-notification')) return 'notifications';
+      if (element.matches('.app-topbar-quick-actions')) return 'system-and-localization';
+      if (element.matches('.app-topbar-logout')) return 'logout';
+      return 'identity';
+    });
+    return {
+      order,
+      themeButtonCount: document.querySelectorAll('.theme-toggle-btn').length,
+      themeButtonInTopbar: Boolean(document.querySelector('.app-topbar-quick-actions .theme-toggle-btn')),
+      localizationHref: document.querySelector('.app-topbar-localization')?.getAttribute('href'),
+      localizationLabel: document.querySelector('.app-topbar-localization')?.getAttribute('aria-label'),
+      localizationTooltip: document.querySelector('.app-topbar-localization')?.getAttribute('data-tooltip'),
+      localizationTextVisuallyHidden: (() => {
+        const label = document.querySelector('.app-topbar-localization-label');
+        const style = label ? getComputedStyle(label) : null;
+        return Boolean(style && style.position === 'absolute' && style.width === '1px' && style.height === '1px');
+      })(),
+      themeInSidebar: Boolean(document.querySelector('.sidebar-theme-control .theme-toggle-btn')),
+      localizationInSidebar: Boolean(document.querySelector('#app-navigation a[href="internationalisation.html"]'))
+    };
+  });
+  assert.deepEqual(topbarControls, {
+    order: ['avatar', 'identity', 'notifications', 'system-and-localization', 'logout'],
+    themeButtonCount: 1,
+    themeButtonInTopbar: true,
+    localizationHref: 'internationalisation.html',
+    localizationLabel: 'Pays, langue et devise',
+    localizationTooltip: 'Pays, langue et devise',
+    localizationTextVisuallyHidden: true,
+    themeInSidebar: false,
+    localizationInSidebar: false
+  }, 'Le bouton Système et l’accès Pays, langue & devise doivent être placés entre Notifications et Déconnexion dans la barre supérieure.');
   await page.click('#workspace-notification-toggle');
   assert.equal(await page.$eval('#workspace-notification-panel', element => !element.hidden), true,
     'La cloche doit ouvrir le panneau de notifications.');
@@ -638,6 +769,43 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await mobile.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
   await mobile.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await mobile.setViewport({ width: 320, height: 812, deviceScaleFactor: 1 });
+  const narrowToolbar = await mobile.evaluate(() => {
+    const selectors = [
+      '#workspace-notification-toggle',
+      '.app-topbar-quick-actions .theme-toggle-btn',
+      '.app-topbar-localization',
+      '.app-topbar-logout'
+    ];
+    const controls = selectors.map((selector) => {
+      const element = document.querySelector(selector);
+      const rect = element?.getBoundingClientRect();
+      return {
+        selector,
+        width: rect ? Math.round(rect.width) : 0,
+        height: rect ? Math.round(rect.height) : 0,
+        left: rect ? Math.round(rect.left) : -1,
+        right: rect ? Math.round(rect.right) : window.innerWidth + 1
+      };
+    });
+    const logout = document.querySelector('.app-topbar-logout');
+    return {
+      controls,
+      logoutFontSize: logout ? getComputedStyle(logout).fontSize : null,
+      viewport: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth
+    };
+  });
+  assert.equal(narrowToolbar.logoutFontSize, '0px',
+    'Le libellé Déconnexion doit rester masqué sur mobile, sans réduire la cible tactile.');
+  assert.ok(narrowToolbar.controls.every((control) =>
+    control.width >= 42 && control.height >= 42 &&
+    control.left >= 0 && control.right <= narrowToolbar.viewport + 1),
+    'Les quatre commandes de la barre supérieure doivent rester visibles et tactiles à 320 px : ' +
+      JSON.stringify(narrowToolbar));
+  assert.ok(narrowToolbar.documentWidth <= narrowToolbar.viewport + 1,
+    'La barre supérieure ne doit pas élargir le document à 320 px : ' + JSON.stringify(narrowToolbar));
+  await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await mobile.click('#mobile-toggle-btn');
   const opened = await mobile.evaluate(() => ({
     expanded: document.getElementById('mobile-toggle-btn')?.getAttribute('aria-expanded'),
@@ -679,7 +847,12 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
       [...document.querySelectorAll('.nav-item svg.icon')].every(icon =>
         icon.getAttribute('viewBox') === '0 0 24 24' &&
         icon.getAttribute('stroke-linecap') === 'round' &&
-        icon.getAttribute('stroke-linejoin') === 'round')
+        icon.getAttribute('stroke-linejoin') === 'round'),
+    topbarQuickActionsDoNotOverlap: (() => {
+      const quick = document.querySelector('.app-topbar-quick-actions')?.getBoundingClientRect();
+      const logout = document.querySelector('.app-topbar-logout')?.getBoundingClientRect();
+      return Boolean(quick && logout && quick.right <= logout.left + 1);
+    })()
   }));
   assert.deepEqual(compact, {
     collapsed: true,
@@ -689,9 +862,10 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     labelsHidden: true,
     promoRemoved: true,
     toggleExpanded: 'false',
-    headingFont: 'Manrope, sans-serif',
-    bodyFont: 'Inter, sans-serif',
-    iconsConsistent: true
+    headingFont: '"IBM Plex Sans", sans-serif',
+    bodyFont: '"IBM Plex Sans", sans-serif',
+    iconsConsistent: true,
+    topbarQuickActionsDoNotOverlap: true
   }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
 
   await page.click('#sidebar-collapse-toggle');
@@ -777,6 +951,8 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   }));
   assert.equal(darkMetrics.theme, 'dark', 'Le thème sombre doit être appliqué avant le rendu du tableau de bord.');
   assert.notEqual(darkMetrics.card, 'rgb(255, 255, 255)', 'Les cartes ne doivent pas rester blanches en thème sombre.');
+  assert.equal(darkMetrics.background, 'rgb(29, 28, 24)', 'Le thème sombre doit reprendre le fond graphite de la direction Unslop.');
+  assert.equal(darkMetrics.card, 'rgb(40, 39, 32)', 'Les cartes sombres doivent utiliser la teinte papier profonde.');
   assert.equal(darkMetrics.horizontalOverflow, false, 'Le thème sombre ne doit pas créer de débordement.');
   const darkContrast = contrastRatio(darkMetrics.text, darkMetrics.background);
   assert.ok(darkContrast >= 4.5, 'Le contraste du titre doit atteindre 4,5:1 en thème sombre. Valeur : ' + darkContrast.toFixed(2));
@@ -881,6 +1057,52 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   return { invoiceCreation: 'ok', quoteCreation: 'ok', totalWithDiscountVatAndDelivery: 20380 };
 }
 
+async function capturePublicPages(browser, baseUrl, fixtures, screenshotsDir) {
+  const captures = [];
+  const viewports = [
+    { name: 'mobile-320', width: 320, height: 812 },
+    { name: 'mobile-390', width: 390, height: 844 },
+    { name: 'tablet-768', width: 768, height: 1024 },
+    { name: 'desktop-1440', width: 1440, height: 1000 }
+  ];
+  for (const file of ['index.html', 'login.html']) {
+    const name = file === 'index.html' ? 'accueil' : 'connexion';
+    for (const viewport of viewports) {
+      const page = await preparePage(browser, baseUrl, fixtures, true);
+      const pageErrors = [];
+      page.on('pageerror', error => pageErrors.push(error.message));
+      try {
+        await page.evaluate(() => {
+          localStorage.removeItem('sf_token');
+          localStorage.removeItem('sf_user');
+        });
+        await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
+        await page.goto(baseUrl + '/' + file, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector(file === 'index.html' ? '.lp-hero' : '#login-form', { timeout: 15000 });
+        await page.evaluate(() => document.fonts && document.fonts.ready);
+        await new Promise(resolve => setTimeout(resolve, 120));
+        const metrics = await page.evaluate(() => ({
+          viewport: window.innerWidth,
+          document: document.documentElement.scrollWidth,
+          body: document.body.scrollWidth,
+          title: document.title
+        }));
+        assert.ok(metrics.document <= metrics.viewport + 1,
+          name + ' déborde horizontalement à ' + viewport.width + 'px : ' + JSON.stringify(metrics));
+        assert.ok(metrics.body <= metrics.viewport + 1,
+          name + ' élargit le body à ' + viewport.width + 'px : ' + JSON.stringify(metrics));
+        assert.deepEqual(pageErrors, [], name + ' a généré des erreurs JavaScript : ' + pageErrors.join(' | '));
+        const filename = name + '-' + viewport.name + '-' + DATASET + '.png';
+        await page.screenshot({ path: path.join(screenshotsDir, filename), fullPage: true, captureBeyondViewport: true });
+        captures.push({ page: name, viewport: viewport.name, width: viewport.width, horizontalOverflow: false });
+      } finally {
+        await page.close();
+      }
+    }
+  }
+  return captures;
+}
+
 async function main() {
   if (!['worst', 'normal', 'empty'].includes(DATASET)) {
     throw new Error('VISUAL_DATASET doit valoir worst, normal ou empty.');
@@ -915,6 +1137,7 @@ async function main() {
         await page.close();
       }
     }
+    const publicPages = await capturePublicPages(browser, baseUrl, fixtures, OUTPUT_DIR);
     const compactSidebar = await verifyCompactSidebar(browser, baseUrl, fixtures);
     const shell = await verifyWorkspaceShell(browser, baseUrl, fixtures);
     const motion = await verifyMotion(browser, baseUrl, fixtures);
@@ -924,12 +1147,13 @@ async function main() {
       dataset: DATASET,
       generatedAt: new Date().toISOString(),
       pages: results,
+      publicPages,
       motion,
       compactSidebar,
       workspaceShell: shell,
       themeAndZoom,
       documentFlows,
-      screenshots: results.length + 2,
+      screenshots: results.length + 2 + publicPages.length,
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));

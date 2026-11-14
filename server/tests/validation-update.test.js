@@ -14,7 +14,7 @@ describe('Les champs obligatoires ne peuvent pas être vidés via PUT', () => {
     await setupTestDatabase();
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Validation', email: emailDeTest('validation'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Validation', email: emailDeTest('validation'), password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
 

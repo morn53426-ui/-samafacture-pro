@@ -13,7 +13,7 @@ describe('Décompte et restitution automatique du stock', () => {
     await setupTestDatabase();
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Stock', email: emailDeTest('stock'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Stock', email: emailDeTest('stock'), password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
 

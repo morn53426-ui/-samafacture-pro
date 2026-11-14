@@ -14,7 +14,7 @@ describe('Envoi automatique optionnel des factures récurrentes', () => {
     await setupTestDatabase();
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Auto-Email', email: emailDeTest('autoemail'), password: 'motdepasse123' });
+      .send({ nom: 'Testeur Auto-Email', email: emailDeTest('autoemail'), password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
 

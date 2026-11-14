@@ -39,7 +39,7 @@ Par défaut, WAMPserver expose MySQL sur `localhost:3306` avec l'utilisateur `ro
 
 ### 2. Installer Node.js
 
-Si ce n'est pas déjà fait, installez [Node.js](https://nodejs.org/) (version 18 ou plus récente). WAMPserver ne fournit que MySQL/Apache/PHP ; Node.js s'installe séparément et fait tourner le backend de l'application.
+Installez [Node.js 26 LTS](https://nodejs.org/) (ou une version LTS maintenue compatible avec `engines` dans `server/package.json`). WAMPserver ne fournit que MySQL/Apache/PHP ; Node.js s'installe séparément et fait tourner le backend de l'application.
 
 ### 3. Configurer et lancer le serveur
 
@@ -123,22 +123,14 @@ docker compose --env-file server/.env ps
 docker compose --env-file server/.env logs -f app
 ```
 
-`docker-compose.yml` (à la racine du dépôt) démarre deux services : l'API (`Dockerfile`, basé
-sur `node:20-bookworm-slim` avec Chromium système pour la génération PDF) et une base MySQL
-dédiée dans un réseau Docker privé — jamais exposée directement sur Internet. Si vous préférez
-un MySQL managé externe, supprimez le service `mysql` du fichier et pointez `DB_HOST` vers
-votre base dans `server/.env`.
+`docker-compose.yml` démarre l'API, le worker PDF, MySQL, Redis et le proxy HTTP local. L'image applicative utilise `node:26-bookworm-slim` avec Chromium système pour les PDF. MySQL et Redis restent dans le réseau Docker privé ; MySQL n'est pas publié sur Internet. Pour la configuration complète de production avec HTTPS, consultez [DOCKER_DEPLOIEMENT.md](DOCKER_DEPLOIEMENT.md).
 
 Le conteneur applicatif inclut :
 - une vérification de disponibilité Docker (`HEALTHCHECK`) sur `/api/ready`, qui contrôle MySQL et Redis lorsqu'il est configuré (`/api/health` vérifie seulement que le processus HTTP répond) ;
 - `dumb-init` comme processus n°1, pour que l'arrêt propre déjà implémenté dans `app.js` (fin des requêtes en cours, fermeture du pool MySQL) se déclenche réellement à l'arrêt du conteneur ;
 - un utilisateur système non-root.
 
-**TLS / reverse proxy** : `deploy/nginx.conf.example` fournit une configuration nginx type
-(terminaison TLS, en-têtes `X-Forwarded-*`, support WebSocket pour les notifications temps
-réel). N'oubliez pas `TRUST_PROXY=true` dans `server/.env` lorsque l'app tourne derrière un
-reverse proxy — sinon le rate-limiting et les logs verraient l'IP du proxy au lieu de celle
-du visiteur.
+**TLS / reverse proxy** : le déploiement public recommandé utilise `docker-compose.production.yml` et `deploy/Caddyfile.production`. Caddy obtient et renouvelle les certificats TLS automatiquement. Avant démarrage, faites pointer le DNS du domaine vers le VPS et ouvrez les ports TCP 80/443 et UDP 443. Le serveur refuse de démarrer en mode production si `APP_URL` ou `ALLOWED_ORIGINS` n'utilise pas l'origine HTTPS publique attendue. Voir [DOCKER_DEPLOIEMENT.md](DOCKER_DEPLOIEMENT.md).
 
 **CORS en production** : définissez `ALLOWED_ORIGINS` dans `server/.env` si des clients
 cross-origin doivent être autorisés (ex. `https://votredomaine.com`). En production, si la
@@ -183,7 +175,7 @@ Les points suivants ont été audités et corrigés :
 
 ### Ce qui est automatique dès l'installation
 
-Une sauvegarde complète de la base MySQL se déclenche **chaque nuit à 2h du matin** (heure réglable), compressée (`.sql.gz`) et enregistrée dans `server/backups/`. Les sauvegardes de plus de 14 jours sont supprimées automatiquement pour ne pas remplir le disque. Aucune configuration n'est nécessaire : ça fonctionne dès `npm start`, tant que `mysqldump` est accessible (fourni avec WAMPserver).
+Une sauvegarde complète se déclenche chaque nuit à 2h (heure réglable). En production, le dump est compressé puis chiffré en AES-256-GCM (`.sql.gz.enc`) avant d'être enregistré dans le volume de sauvegarde. La date n'est enregistrée qu'après réussite de `mysqldump` et vérification du fichier ; un échec peut donc être retenté au prochain contrôle. Les sauvegardes plus anciennes que la durée de rétention sont supprimées.
 
 Réglages disponibles dans `.env` (tous facultatifs, voir `.env.example`) :
 ```
@@ -191,6 +183,7 @@ BACKUP_ENABLED=true          # false pour désactiver complètement
 BACKUP_HOUR=2                # heure de déclenchement (0-23)
 BACKUP_RETENTION_DAYS=14     # nombre de jours conservés
 BACKUP_DIR=./backups         # dossier de destination
+BACKUP_ENCRYPTION_KEY=       # production : `openssl rand -hex 32`, à conserver hors du VPS
 MYSQLDUMP_PATH=mysqldump     # chemin complet si mysqldump n'est pas dans le PATH système
 ```
 
@@ -203,16 +196,16 @@ Lancez une sauvegarde immédiate pour tester votre configuration, sans attendre 
 cd server
 npm run backup
 ```
-Un fichier `samafacture-AAAA-MM-JJThh-mm-ss.sql.gz` doit apparaître dans `server/backups/`. En cas d'erreur, le message indique généralement s'il s'agit d'un problème de chemin `mysqldump` ou d'identifiants MySQL.
+En développement, le fichier est `.sql.gz`. En production, il doit se terminer par `.sql.gz.enc` et la clé `BACKUP_ENCRYPTION_KEY` doit être configurée. Une sauvegarde manuelle qui échoue renvoie un code de sortie non nul.
 
 ### Restaurer une sauvegarde
 
+Restaurez dans une base cible vide, après avoir remis la même `BACKUP_ENCRYPTION_KEY` que celle utilisée lors de la sauvegarde :
 ```bash
-cd server/backups
-gunzip -k samafacture-2026-08-01T02-00-00.sql.gz
-mysql -u root -p samafacture < samafacture-2026-08-01T02-00-00.sql
+cd server
+npm run restore -- ./backups/nom-de-sauvegarde.sql.gz.enc
 ```
-*(sous Windows sans `gunzip`, utilisez 7-Zip ou WinRAR pour décompresser le fichier `.sql.gz`, puis importez le `.sql` obtenu via phpMyAdmin, onglet "Importer".)*
+La commande vérifie le tag d'authentification AES-GCM avant d'envoyer le SQL à MySQL. Une ancienne sauvegarde non chiffrée `.sql.gz` peut également être restaurée. Ne perdez jamais la clé : les archives chiffrées deviennent irrécupérables sans elle.
 
 ### ⚠️ Ce que l'automatisation ne fait PAS
 
@@ -312,7 +305,7 @@ Le passage à un plan payant (Starter, Pro, Entreprise) peut se faire réellemen
 - **Wave for Business** — paiement direct
 - **PayDunya** — agrégateur qui gère en une seule intégration Orange Money **et** la carte bancaire (Visa/Mastercard)
 
-Tant que ces identifiants ne sont pas renseignés dans `server/.env`, un simple sélecteur de plan reste disponible dans Paramètres pour tester gratuitement les fonctionnalités en local — aucun bouton de paiement cassé, aucune erreur.
+Les plans payants ne peuvent être activés que par un flux de paiement confirmé côté serveur. Tant qu'aucun prestataire n'est configuré dans `server/.env`, les boutons de paiement restent masqués ; le compte peut seulement revenir au plan Gratuit. Une requête API directe ne permet pas de s'attribuer Starter, Pro ou Entreprise.
 
 ### Configurer Wave
 1. Créez un compte sur [business.wave.com](https://business.wave.com), section "Developers" (validation sous 48–72h, NINEA requis)
@@ -358,7 +351,7 @@ SMTP_PASSWORD=un-mot-de-passe-d-application-google
 
 ## Feuille de route (non inclus dans cette version)
 
-- Intégrations réelles des paiements (Wave, Orange Money, PayDunya, Stripe, PayPal) — actuellement les méthodes sont enregistrées manuellement, sans passerelle de paiement connectée.
+- Extension des moyens de paiement internationaux (Stripe, PayPal et autres prestataires), au-delà des intégrations d'abonnement Wave et PayDunya déjà présentes.
 - Application mobile native (React Native / Flutter) avec scan QR/code-barres et mode hors ligne.
 - Génération de facture par IA à partir d'un texte libre.
 - Signature électronique interactive (dessin/upload de signature).

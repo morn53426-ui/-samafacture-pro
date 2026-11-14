@@ -14,7 +14,7 @@ describe('Factures : calcul et numérotation', () => {
     const email = emailDeTest('factures');
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Factures', email, password: 'motdepasse123' });
+      .send({ nom: 'Testeur Factures', email, password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
     // Ce scénario crée plus de 10 factures au total : utiliser Pro évite le quota
@@ -84,7 +84,7 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(res.body.facture.total, 0); // remise plafonnée à 1000, donc 1000 - 1000 = 0
   });
 
-  test('une quantité ou un prix négatif envoyé directement à l\'API est ramené à zéro', async () => {
+  test("une quantité ou un prix négatif envoyé directement à l'API est refusé", async () => {
     const res = await request(app)
       .post('/api/factures')
       .set('Authorization', `Bearer ${token}`)
@@ -94,9 +94,75 @@ describe('Factures : calcul et numérotation', () => {
         lignes: [{ designation: 'Article négatif', quantite: -5, prix_unitaire: -1000, tva: 18 }]
       });
 
-    assert.equal(res.status, 201);
-    assert.equal(res.body.facture.sous_total, 0);
-    assert.equal(res.body.facture.total, 0);
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /Quantité|Prix unitaire/);
+  });
+
+  test('le calcul financier arrondit chaque montant au centime sans dérive flottante', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        lignes: [{ designation: 'Article décimal', quantite: 3, prix_unitaire: 0.10, tva: 18 }]
+      });
+
+    assert.equal(res.status, 201, res.text);
+    assert.equal(res.body.facture.sous_total, 0.30);
+    assert.equal(res.body.facture.total_tva, 0.05);
+    assert.equal(res.body.facture.total, 0.35);
+  });
+
+  test('la remise répartie entre petites lignes ne crée pas de remise négative et la TVA reste cohérente', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        remise: 0.02,
+        lignes: [
+          { designation: 'Petite ligne 1', quantite: 1, prix_unitaire: 0.10, tva: 0 },
+          { designation: 'Petite ligne 2', quantite: 1, prix_unitaire: 0.10, tva: 0 },
+          { designation: 'Petite ligne 3', quantite: 1, prix_unitaire: 0.10, tva: 0 },
+          { designation: 'Ligne imposable', quantite: 1, prix_unitaire: 0.10, tva: 100 }
+        ]
+      });
+
+    assert.equal(res.status, 201, res.text);
+    assert.equal(res.body.facture.sous_total, 0.40);
+    assert.equal(res.body.facture.remise, 0.02);
+    assert.equal(res.body.facture.total_tva, 0.10);
+    assert.equal(res.body.facture.total, 0.48);
+  });
+
+  test('une quantité avec plus de deux décimales est refusée au lieu d’être tronquée par MySQL', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        lignes: [{ designation: 'Quantité trop précise', quantite: '1.234', prix_unitaire: 1000, tva: 18 }]
+      });
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /Quantité.*décimale/);
+  });
+
+  test('un prix avec plus de deux décimales est refusé et ne crée pas de facture', async () => {
+    const res = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        lignes: [{ designation: 'Prix invalide', quantite: 1, prix_unitaire: '100.001', tva: 18 }]
+      });
+
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /décimale/);
   });
 
   test('une facture sans client est refusée', async () => {
@@ -314,7 +380,7 @@ describe('Factures : idempotence des créations', () => {
     const email = emailDeTest('factures-idem');
     const inscription = await request(app)
       .post('/api/auth/register')
-      .send({ nom: 'Testeur Idempotence', email, password: 'motdepasse123' });
+      .send({ nom: 'Testeur Idempotence', email, password: 'motdepasse123' , acceptTerms: true});
     userId = inscription.body.user.id;
     token = inscription.body.token;
     const client = await request(app)
