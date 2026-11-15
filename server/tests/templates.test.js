@@ -182,6 +182,19 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     }
   });
 
+  test('les quinze modèles identifient clairement les dates de facture', () => {
+    for (const template of TEMPLATES_ATTENDUS) {
+      const html = templates.renderInvoiceHtml({
+        user: userDeTest(),
+        facture: factureDeTest({ date_emission: '2026-08-01', date_echeance: '2026-08-31' }),
+        lignes: lignesDeTest, isDevis: false, qrCode: null, template
+      });
+      assert.match(html, /Date d(?:'|’)émission/, template + ' doit nommer la date d’émission');
+      assert.match(html, /Échéance/, template + ' doit nommer la date limite de paiement');
+      assert.match(html, /31\/08\/2026/, template + ' doit afficher la date d’échéance');
+    }
+  });
+
   test('un devis affiche sa date de validité et ne présente jamais une échéance de paiement', () => {
     for (const template of TEMPLATES_ATTENDUS) {
       const html = templates.renderInvoiceHtml({
