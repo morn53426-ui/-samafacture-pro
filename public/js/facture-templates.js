@@ -881,7 +881,8 @@ function createFactureTemplates(helpers) {
     if (facture.objet) fields.push(['Objet', escapeHtml(facture.objet)]);
     if (facture.reference_externe) fields.push(['Référence client / commande', escapeHtml(facture.reference_externe)]);
     if (includeDates) {
-      fields.push(['Date d’émission', formatDate(facture.date_emission)]);
+      // Les modèles Minimaliste et Saveurs ont déjà la date d'émission dans leur en-tête ;
+      // on ne complète que la date qui leur manquait pour éviter les doublons visuels.
       fields.push([isDevis ? 'Validité du devis' : 'Échéance de paiement', formatDate(isDevis ? facture.date_validite : facture.date_echeance)]);
     }
     if (!fields.length) return '';
