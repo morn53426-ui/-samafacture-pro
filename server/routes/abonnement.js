@@ -39,9 +39,34 @@ function baseUrl(req) {
  *             schema:
  *               type: object
  *               properties:
- *                 wave: { type: boolean }
- *                 paydunya: { type: boolean }
- *                 tarifs: { type: object, properties: { starter: { type: integer }, pro: { type: integer }, entreprise: { type: integer } } }\n                 facturation:\n                   type: object\n                   properties:\n                     mode: { type: string, enum: [paiement_unique] }\n                     renouvellement_automatique: { type: boolean }\n                     expiration_automatique: { type: boolean }\n                     acces_jusqua_changement_manuel: { type: boolean }\n                     activation: { type: string, enum: [apres_confirmation] }
+ *                 wave:
+ *                   type: boolean
+ *                 paydunya:
+ *                   type: boolean
+ *                 tarifs:
+ *                   type: object
+ *                   properties:
+ *                     starter:
+ *                       type: integer
+ *                     pro:
+ *                       type: integer
+ *                     entreprise:
+ *                       type: integer
+ *                 facturation:
+ *                   type: object
+ *                   properties:
+ *                     mode:
+ *                       type: string
+ *                       enum: [paiement_unique]
+ *                     renouvellement_automatique:
+ *                       type: boolean
+ *                     expiration_automatique:
+ *                       type: boolean
+ *                     acces_jusqua_changement_manuel:
+ *                       type: boolean
+ *                     activation:
+ *                       type: string
+ *                       enum: [apres_confirmation]
  */
 router.get('/moyens-disponibles', requireAuth, (req, res) => {
   res.json({
