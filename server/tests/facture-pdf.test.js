@@ -144,6 +144,9 @@ describe('Génération PDF de facture', () => {
 
       // À la fermeture de l'aperçu, le mode système sombre doit être rétabli.
       await page.emulateMediaType('screen');
+      // Puppeteer peut réinitialiser certaines émulations lors du changement screen/print :
+      // réappliquer explicitement la préférence système sombre avant de contrôler la restauration.
+      await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
       await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, null);
@@ -159,6 +162,7 @@ describe('Génération PDF de facture', () => {
       assert.equal(etat.theme, 'light');
       assert.equal(etat.couleurFondApp, couleurPaletteClaire);
       await page.emulateMediaType('screen');
+      await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
       await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, 'dark');
