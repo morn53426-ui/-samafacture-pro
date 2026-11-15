@@ -45,11 +45,12 @@ async function initSocket(httpServer) {
     console.log('📡 Socket.IO : adaptateur Redis activé (multi-instance).');
   }
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
       if (!token) return next(new Error('Authentification requise.'));
       const payload = jwt.verify(token, process.env.JWT_SECRET);
+      if (!(await require('./utils/session').jetonEstValide(payload))) throw new Error('révoqué');
       socket.userId = payload.id;
       next();
     } catch (err) {

@@ -49,6 +49,9 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
+      # LOCAL UNIQUEMENT : ne jamais déployer ce fichier seul sur un serveur public (pas de validation
+      # de config production, cookie non « secure », Swagger actif). Production : ajouter
+      # -f docker-compose.production.yml, qui force NODE_ENV=production.
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       TRUST_PROXY: "1"
