@@ -1,7 +1,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 describe('Factures : calcul et numérotation', () => {
   let userId;
@@ -249,6 +249,8 @@ describe('Factures : calcul et numérotation', () => {
         lignes: [{ designation: 'Maintenance', quantite: 1, prix_unitaire: 25000, tva: 18 }]
       });
     assert.equal(quote.status, 201, quote.text);
+    // Simule un document historique dont la devise diffère de la devise société.
+    await pool.query('UPDATE factures SET devise = ? WHERE id = ?', ['EUR', quote.body.facture.id]);
 
     const duplicate = await request(app)
       .post(`/api/factures/${quote.body.facture.id}/dupliquer`)
@@ -256,7 +258,7 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(duplicate.status, 201, duplicate.text);
     assert.equal(duplicate.body.facture.type, 'devis');
     assert.equal(duplicate.body.facture.date_validite, '2026-12-22');
-    assert.equal(duplicate.body.facture.devise, quote.body.facture.devise);
+    assert.equal(duplicate.body.facture.devise, 'EUR');
     assert.equal(duplicate.body.facture.objet, 'Maintenance annuelle');
     assert.equal(duplicate.body.facture.reference_externe, 'BC-DUP-03');
     assert.equal(duplicate.body.facture.conditions_reglement, 'Offre valable après validation écrite.');
@@ -268,10 +270,11 @@ describe('Factures : calcul et numérotation', () => {
       lignes: [{ designation: 'Facture à dupliquer', quantite: 1, prix_unitaire: 12000, tva: 18 }]
     });
     assert.equal(source.status, 201, source.text);
+    await pool.query('UPDATE factures SET devise = ? WHERE id = ?', ['EUR', source.body.facture.id]);
     const duplicate = await request(app).post(`/api/factures/${source.body.facture.id}/dupliquer`).set('Authorization', `Bearer ${token}`);
     assert.equal(duplicate.status, 201, duplicate.text);
     assert.equal(duplicate.body.facture.date_echeance, '2026-12-29');
-    assert.equal(duplicate.body.facture.devise, source.body.facture.devise);
+    assert.equal(duplicate.body.facture.devise, 'EUR');
   });
   test('une date de validité invalide est refusée pour un devis', async () => {
     const res = await request(app)
