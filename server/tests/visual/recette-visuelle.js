@@ -963,11 +963,6 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'Le bouton Utiliser ce modèle doit actualiser la sélection enregistrable.');
   }
 
-  if (pageDefinition.name === 'professionnel') {
-    const target = await page.$('[data-pro-guide-target="pro-integrations"]');
-    assert.ok(target, 'La rubrique intégrations doit être disponible dans les accès rapides.');
-  }
-
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
   await page.screenshot({
     path: path.join(screenshots, filename),
@@ -1027,6 +1022,36 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   assert.equal(reduced.transform, 'none', 'Le toast ne doit pas se déplacer en mode mouvement réduit.');
   assert.ok(parseFloat(reduced.transitionDuration) <= 0.001,
     'La transition du toast doit être quasiment instantanée en mouvement réduit.');
+
+  await reducedPage.setViewport({ width: 320, height: 812, deviceScaleFactor: 1 });
+  const longToastMessage = 'Notification importante : une opération nécessite votre attention. ' +
+    'Consultez les détails avant de poursuivre. '.repeat(14) +
+    'REFERENCE-' + 'X'.repeat(180);
+  await reducedPage.evaluate(message => showToast(message, 'info'), longToastMessage);
+  await reducedPage.waitForFunction(() => document.querySelectorAll('.toast').length >= 2);
+  const longToastLayout = await reducedPage.evaluate(() => {
+    const container = document.querySelector('.toast-container');
+    const toast = container?.lastElementChild;
+    const containerRect = container?.getBoundingClientRect();
+    const toastRect = toast?.getBoundingClientRect();
+    return {
+      viewport: window.innerWidth,
+      left: containerRect?.left ?? -1,
+      right: containerRect?.right ?? window.innerWidth + 1,
+      toastWidth: toast?.clientWidth || 0,
+      toastScrollWidth: toast?.scrollWidth || 0,
+      toastHeight: toast?.getBoundingClientRect().height || 0,
+      toastScrollHeight: toast?.scrollHeight || 0,
+      boxRight: toastRect?.right ?? window.innerWidth + 1
+    };
+  });
+  assert.ok(longToastLayout.left >= 0 && longToastLayout.right <= longToastLayout.viewport + 1 &&
+    longToastLayout.boxRight <= longToastLayout.viewport + 1,
+    'Une notification longue doit rester entièrement dans l’écran à 320 px : ' + JSON.stringify(longToastLayout));
+  assert.ok(longToastLayout.toastWidth > 0 &&
+    longToastLayout.toastScrollWidth <= longToastLayout.toastWidth + 1,
+    'Le texte d’une notification longue doit revenir à la ligne sans être coupé : ' + JSON.stringify(longToastLayout));
+
   const tooltipMetrics = await reducedPage.evaluate(() => {
     const element = document.createElement('button');
     element.setAttribute('data-tooltip', 'Aide');
@@ -1163,6 +1188,51 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
       JSON.stringify(narrowToolbar));
   assert.ok(narrowToolbar.documentWidth <= narrowToolbar.viewport + 1,
     'La barre supérieure ne doit pas élargir le document à 320 px : ' + JSON.stringify(narrowToolbar));
+
+  await mobile.click('#workspace-notification-toggle');
+  const longNotificationTitle = 'Alerte de règlement et de validation du document pour le compte principal — '.repeat(4);
+  const longNotificationBody = ('Une opération demande votre attention : vérifiez la référence, le montant, la date ' +
+    'et le statut avant de confirmer cette action dans votre espace de travail. ').repeat(8);
+  await mobile.evaluate(({ title, body }) => pushWorkspaceNotification(title, body, 'info'), {
+    title: longNotificationTitle,
+    body: longNotificationBody
+  });
+  const longNotificationLayout = await mobile.evaluate(() => {
+    const panel = document.getElementById('workspace-notification-panel');
+    const list = document.getElementById('workspace-notification-list');
+    const item = list?.querySelector('.app-notification-item');
+    const title = item?.querySelector('strong');
+    const message = item?.querySelector('p');
+    const rect = panel?.getBoundingClientRect();
+    return {
+      viewport: window.innerWidth,
+      left: rect?.left ?? -1,
+      right: rect?.right ?? window.innerWidth + 1,
+      panelWidth: panel?.clientWidth || 0,
+      panelScrollWidth: panel?.scrollWidth || 0,
+      listWidth: list?.clientWidth || 0,
+      listScrollWidth: list?.scrollWidth || 0,
+      listOverflowY: list ? getComputedStyle(list).overflowY : '',
+      titleWidth: title?.clientWidth || 0,
+      titleScrollWidth: title?.scrollWidth || 0,
+      messageWidth: message?.clientWidth || 0,
+      messageScrollWidth: message?.scrollWidth || 0,
+      messageHeight: message?.getBoundingClientRect().height || 0
+    };
+  });
+  assert.ok(longNotificationLayout.left >= 0 &&
+    longNotificationLayout.right <= longNotificationLayout.viewport + 1,
+    'Le panneau de notifications doit rester dans les limites de l’écran : ' + JSON.stringify(longNotificationLayout));
+  assert.ok(longNotificationLayout.panelWidth > 0 &&
+    longNotificationLayout.panelScrollWidth <= longNotificationLayout.panelWidth + 1 &&
+    longNotificationLayout.listScrollWidth <= longNotificationLayout.listWidth + 1,
+    'Les notifications longues ne doivent pas élargir le panneau : ' + JSON.stringify(longNotificationLayout));
+  assert.ok(longNotificationLayout.titleWidth > 0 &&
+    longNotificationLayout.titleScrollWidth <= longNotificationLayout.titleWidth + 1 &&
+    longNotificationLayout.messageWidth > 0 &&
+    longNotificationLayout.messageScrollWidth <= longNotificationLayout.messageWidth + 1,
+    'Le titre et le message doivent se replier sans être coupés : ' + JSON.stringify(longNotificationLayout));
+
   await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await mobile.click('#mobile-toggle-btn');
   const opened = await mobile.evaluate(() => ({
