@@ -1148,9 +1148,17 @@ function createFactureTemplates(helpers) {
       '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
     html = html.replace(/<div style="font-size:0\.85rem;">([^<]+) → ([^<]+)<\/div>/,
       '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
-    if (isDevis) html = html.replace(/Échéance/g, 'Validité du devis');
+    // Uniformiser les intitulés de dates dans tous les en-têtes historiques des 19 modèles.
+    // Les libellés sont remplacés uniquement lorsqu'ils constituent un nœud texte HTML,
+    // afin de ne pas modifier les mentions commerciales ou le texte libre du client.
+    html = html
+      .replace(/>\s*(?:ÉMISSION|Date d’émission|Date d'édition)\s*</gi, '>Date d’émission<')
+      .replace(/>\s*(?:ÉCHÉANCE DE PAIEMENT|ÉCHÉANCE|À régler avant le|Échéance)\s*</gi,
+        '>' + (isDevis ? 'Validité du devis' : 'Échéance de paiement') + '<')
+      .replace(/>\s*(?:VALIDITÉ DU DEVIS|VALIDITÉ|Valable jusqu’au|Validité)\s*</gi,
+        '>' + (isDevis ? 'Validité du devis' : 'Échéance de paiement') + '<');
 
-    // Le bloc de références est partagé par les 19 modèles pour conserver les mêmes
+    // Le bloc de références est partagé par les 19 modèles modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
     const meta = documentMetaHtml(facture, isDevis, template === 'minimaliste' || template === 'saveurs', user, html);
     const firstTable = html.indexOf('<table');
