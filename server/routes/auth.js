@@ -370,9 +370,19 @@ router.post('/google', async (req, res, next) => {
  *     responses:
  *       204: { description: "Cookie effacé." }
  */
-router.post('/logout', (req, res) => {
+router.post('/logout', (req, res, next) => {
+  // Efface toujours le cookie, y compris si le Bearer fourni est expiré ou invalide.
   res.clearCookie('sf_token', { httpOnly: true, sameSite: 'lax', path: '/' });
-  res.status(204).end();
+  next();
+}, requireAuth, async (req, res, next) => {
+  try {
+    // Révoque également les JWT Bearer déjà émis, pas seulement le cookie du navigateur.
+    // Le helper incrémente token_version et invalide le cache local de ce worker.
+    await incrementerTokenVersion(null, req.user.id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Mot de passe oublié ---
