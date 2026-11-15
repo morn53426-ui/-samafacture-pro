@@ -19,6 +19,7 @@ async function creerSessionWave({ amount, reference, successUrl, errorUrl, crede
       Authorization: `Bearer ${credentials.WAVE_API_KEY}`,
       'Content-Type': 'application/json'
     },
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({
       amount: String(Math.round(amount)),
       currency: 'XOF',
@@ -67,7 +68,8 @@ function verifierSignatureWave(rawBody, signatureHeader, signingSecret = process
 /** Consulte l'état d'une session Wave directement auprès de Wave (vérification de secours). */
 async function consulterSessionWave(sessionId, credentials = process.env) {
   const res = await fetch(`https://api.wave.com/v1/checkout/sessions/${sessionId}`, {
-    headers: { Authorization: `Bearer ${credentials.WAVE_API_KEY}` }
+    headers: { Authorization: `Bearer ${credentials.WAVE_API_KEY}` },
+    signal: AbortSignal.timeout(15000)
   });
   if (!res.ok) return null;
   return res.json();
@@ -97,6 +99,7 @@ async function creerFacturePaydunya({ amount, description, reference, storeName,
   const res = await fetch(`${paydunyaBaseUrl(credentials)}/checkout-invoice/create`, {
     method: 'POST',
     headers: paydunyaHeaders(credentials),
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({
       invoice: {
         total_amount: Math.round(amount),
@@ -144,7 +147,8 @@ function verifierHashPaydunya(hash, masterKey = process.env.PAYDUNYA_MASTER_KEY)
  */
 async function confirmerFacturePaydunya(token, credentials = process.env) {
   const res = await fetch(`${paydunyaBaseUrl(credentials)}/checkout-invoice/confirm/${encodeURIComponent(token)}`, {
-    headers: paydunyaHeaders(credentials)
+    headers: paydunyaHeaders(credentials),
+    signal: AbortSignal.timeout(15000)
   });
   if (!res.ok) return null;
   return res.json();
