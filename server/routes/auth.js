@@ -9,6 +9,11 @@ const { requireAuth } = require('../middleware/auth');
 const { isValidImageDataUrl } = require('../utils/validation');
 const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = require('../utils/plans');
 const { sendMail } = require('../config/mailer');
+const { incrementerTokenVersion } = require('../utils/session');
+
+function echapperHtml(valeur) {
+  return String(valeur == null ? '' : valeur).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 const router = express.Router();
 
@@ -106,7 +111,7 @@ const resetLimiter = rateLimit({
 
 function signToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, nom: user.nom },
+    { id: user.id, email: user.email, role: user.role, nom: user.nom, tv: Number(user.token_version || 0) },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -307,6 +312,11 @@ router.post('/google', async (req, res, next) => {
 
     const { sub: googleId, email, name } = payload;
     if (!email) return res.status(400).json({ error: "Votre compte Google n'a pas d'adresse email associée." });
+    // Sans email vérifié par Google, l'email n'est pas une preuve d'identité : refuser la
+    // connexion/liaison évite la prise de contrôle d'un compte existant par simple usurpation d'email.
+    if (payload.email_verified !== true && payload.email_verified !== 'true') {
+      return res.status(403).json({ error: "L'adresse email de votre compte Google n'est pas vérifiée." });
+    }
     const emailLower = email.toLowerCase();
 
     // Cherche d'abord un compte déjà lié à ce Google ID, puis un compte existant avec le
@@ -318,7 +328,15 @@ router.post('/google', async (req, res, next) => {
       [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [emailLower]);
       user = rows[0];
       if (user) {
-        await pool.query('UPDATE users SET google_id = ? WHERE id = ?', [googleId, user.id]);
+        // Liaison d'un compte existant par email : le mot de passe existant est neutralisé et les
+        // sessions déjà ouvertes sont révoquées. Cela empêche un compte créé d'avance par un tiers
+        // avec l'email de la victime (« pre-hijacking ») de rester accessible après la liaison.
+        // L'utilisateur peut redéfinir un mot de passe via « Mot de passe oublié ».
+        const motDePasseInutilisable = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+        await pool.query('UPDATE users SET google_id = ?, password_hash = ?, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ?', [googleId, motDePasseInutilisable, user.id]);
+        await incrementerTokenVersion(null, user.id);
+        [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
+        user = rows[0];
       }
     }
 
@@ -398,7 +416,7 @@ router.post('/mot-de-passe-oublie', resetLimiter, async (req, res, next) => {
         to: user.email,
         subject: 'Réinitialisation de votre mot de passe SamaFacture Pro',
         text: `Bonjour ${user.nom},\n\nVous avez demandé à réinitialiser votre mot de passe. Cliquez sur ce lien (valable 30 minutes) :\n${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
-        html: `<p>Bonjour ${user.nom},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
+        html: `<p>Bonjour ${echapperHtml(user.nom)},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
       });
     }
 
@@ -443,6 +461,7 @@ router.post('/reinitialiser-mot-de-passe', async (req, res, next) => {
 
     const hash = await bcrypt.hash(password, 10);
     await pool.query('UPDATE users SET password_hash = ?, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ?', [hash, user.id]);
+    await incrementerTokenVersion(null, user.id); // révoque toutes les sessions ouvertes
 
     res.json({ message: 'Votre mot de passe a été réinitialisé. Vous pouvez maintenant vous connecter.' });
   } catch (err) { next(err); }

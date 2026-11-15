@@ -36,6 +36,9 @@ function validateProductionConfig() {
   if (!/^[a-fA-F0-9]{64}$/.test(process.env.BACKUP_ENCRYPTION_KEY || '')) {
     errors.push('BACKUP_ENCRYPTION_KEY doit contenir 64 caractères hexadécimaux pour chiffrer les sauvegardes en production.');
   }
+  if (!/^[a-fA-F0-9]{64}$/.test(process.env.DATA_ENCRYPTION_KEY || '')) {
+    errors.push('DATA_ENCRYPTION_KEY doit contenir 64 caractères hexadécimaux (openssl rand -hex 32) pour chiffrer les secrets de webhooks et identifiants de paiement ; elle est distincte de JWT_SECRET.');
+  }
   if (!process.env.ALLOWED_ORIGINS) {
     errors.push('ALLOWED_ORIGINS doit autoriser explicitement le domaine HTTPS public.');
   }

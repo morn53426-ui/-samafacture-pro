@@ -35,6 +35,13 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /app
 
+# Utilisateur non-root créé AVANT les COPY, pour utiliser COPY --chown plus bas : l'ancien
+# `chown -R /app` après `npm ci` parcourait tout node_modules et prenait plusieurs minutes.
+# Seuls les dossiers d'écriture (sauvegardes, jobs PDF) sont explicitement donnés à l'utilisateur.
+RUN groupadd --system samafacture && useradd --system --gid samafacture --home /app samafacture \
+    && mkdir -p /app/server/backups /app/server/pdf-jobs \
+    && chown samafacture:samafacture /app /app/server /app/server/backups /app/server/pdf-jobs
+
 # Manifestes npm copiés seuls d'abord, pour profiter du cache Docker. Si un lockfile est
 # fourni, npm ci garantit des installations reproductibles ; sinon npm install permet au projet
 # de rester buildable (le dépôt actuel ne contient pas encore de package-lock.json).
@@ -43,14 +50,12 @@ ARG REQUIRE_LOCKFILE=false
 RUN cd server && if [ -f package-lock.json ]; then npm ci --omit=dev; elif [ "$REQUIRE_LOCKFILE" = "true" ]; then echo "ERREUR: server/package-lock.json requis pour ce build" >&2; exit 1; else npm install --omit=dev --no-audit --no-fund; fi
 
 # Code serveur, puis frontend statique (servi par Express depuis ../public — voir app.js).
-COPY server ./server
-COPY public ./public
+COPY --chown=samafacture:samafacture server ./server
+COPY --chown=samafacture:samafacture public ./public
 
 # Utilisateur non-root : limite l'impact d'une éventuelle faille dans une dépendance
 # (Chromium/Puppeteer tourne déjà en sandbox limité par --no-sandbox, voir utils/pdf.js —
 # s'exécuter en non-root ici est une couche de défense supplémentaire).
-RUN groupadd --system samafacture && useradd --system --gid samafacture --home /app samafacture \
-    && mkdir -p /app/server/backups && chown -R samafacture:samafacture /app
 USER samafacture
 
 WORKDIR /app/server

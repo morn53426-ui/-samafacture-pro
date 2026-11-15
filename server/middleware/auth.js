@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { jetonEstValide } = require('../utils/session');
 
 // Méthodes qui modifient un état côté serveur — précisément celles qu'une requête intersites
 // forgée (CSRF) chercherait à déclencher. GET/HEAD/OPTIONS ne devraient jamais avoir d'effet de
@@ -12,7 +13,7 @@ const METHODES_SENSIBLES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const EN_TETE_ANTI_CSRF = 'x-requested-with';
 const VALEUR_ANTI_CSRF = 'SamaFacturePro';
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const bearerToken = header.startsWith('Bearer ') ? header.slice(7) : null;
 
@@ -39,13 +40,23 @@ function requireAuth(req, res, next) {
     return res.status(403).json({ error: 'Requête refusée (protection CSRF) — en-tête requis manquant.' });
   }
 
+  let payload;
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload; // { id, email, role, nom }
-    next();
+    payload = jwt.verify(token, process.env.JWT_SECRET);
   } catch (err) {
     return res.status(401).json({ error: 'Session invalide ou expirée. Veuillez vous reconnecter.' });
   }
+
+  // Révocation : le jeton doit correspondre à la version courante du compte (voir utils/session.js).
+  try {
+    if (!(await jetonEstValide(payload))) {
+      return res.status(401).json({ error: 'Session invalide ou expirée. Veuillez vous reconnecter.' });
+    }
+  } catch (err) {
+    return res.status(503).json({ error: 'Service temporairement indisponible.' });
+  }
+  req.user = payload; // { id, email, role, nom, tv }
+  next();
 }
 
 module.exports = { requireAuth };

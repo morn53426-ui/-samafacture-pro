@@ -165,6 +165,7 @@ async function runMigrations(conn) {
     { table: 'users', column: 'facture_template', definition: "VARCHAR(20) NOT NULL DEFAULT 'classique'" },
     { table: 'users', column: 'google_id', definition: 'VARCHAR(255)' },
     { table: 'users', column: 'reset_token_hash', definition: 'VARCHAR(64)' },
+    { table: 'users', column: 'token_version', definition: 'INT NOT NULL DEFAULT 0' },
     { table: 'users', column: 'reset_token_expires', definition: 'DATETIME' },
     { table: 'users', column: 'signature_default', definition: 'MEDIUMTEXT' },
     { table: 'users', column: 'terms_accepted_at', definition: 'DATETIME NULL' },

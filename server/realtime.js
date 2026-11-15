@@ -70,6 +70,7 @@ async function initSocket(httpServer) {
       const token = socket.handshake.auth?.token;
       if (!token) return next(new Error('Authentification requise.'));
       const payload = jwt.verify(token, process.env.JWT_SECRET);
+      if (!(await require('./utils/session').jetonEstValide(payload))) throw new Error('révoqué');
       socket.userId = Number(payload.id);
       socket.tenantId = await resolveSocketTenant(socket.userId, socket.handshake.auth?.companyOwner);
       next();

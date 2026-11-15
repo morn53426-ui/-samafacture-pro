@@ -69,6 +69,24 @@ describe('Authentification', () => {
     assert.ok(res.body.token);
   });
 
+  test("la réinitialisation du mot de passe révoque les sessions déjà ouvertes (token_version)", async () => {
+    const connexion = await request(app).post('/api/auth/login').send({ email, password });
+    const ancienToken = connexion.body.token;
+    assert.equal((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${ancienToken}`)).status, 200);
+
+    const { pool } = require('../config/db');
+    const { incrementerTokenVersion } = require('../utils/session');
+    await incrementerTokenVersion(pool, userId); // même appel que la réinitialisation de mot de passe
+
+    const apres = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${ancienToken}`);
+    assert.equal(apres.status, 401, "l'ancien jeton doit être refusé après révocation");
+
+    const reconnexion = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(reconnexion.status, 200);
+    assert.equal((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${reconnexion.body.token}`)).status, 200,
+      'un nouveau jeton (nouvelle version) doit fonctionner');
+  });
+
   test('un utilisateur ne peut pas attribuer lui-même un plan Starter, Pro ou Entreprise', async () => {
     const connexion = await request(app).post('/api/auth/login').send({ email, password });
     assert.equal(connexion.status, 200);
