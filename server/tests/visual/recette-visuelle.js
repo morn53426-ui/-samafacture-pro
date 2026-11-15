@@ -1217,7 +1217,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.equal(pdf.subarray(0, 5).toString('latin1'), '%PDF-', type + ' : la sortie doit être un vrai fichier PDF.');
     assert.ok(pdf.length > 5000, type + ' : le PDF doit contenir le document complet.');
     const pdfSource = pdf.toString('latin1');
-    const pages = (pdfSource.match(/\\/Type\\s*\\/Page\\b/g) || []).length;
+    const pages = (pdfSource.match(/\/Type\s*\/Page\b/g) || []).length;
     assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
     if (type === 'devis') {
       assert.ok(pages >= 2, 'Le devis long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
