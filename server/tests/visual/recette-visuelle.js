@@ -1201,7 +1201,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     const parseAmount = (value) => Number(String(value || '')
       .replace(/[\s\u00a0\u202f]/g, '')
       .replace(/[^\d,.-]/g, '')
-      .replace(/\\./g, '')
+      .replace(/\./g, '')
       .replace(',', '.'));
     const taxRowsTotal = screenMetrics.taxRowAmounts.reduce((sum, value) => sum + parseAmount(value), 0);
     assert.ok(Math.abs(taxRowsTotal - parseAmount(screenMetrics.taxTotalAmount)) <= 0.011,
