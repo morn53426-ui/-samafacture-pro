@@ -6354,13 +6354,13 @@ a.btn .icon {
     line-height: 1.5;
   }
   .app-notification-panel {
-    position: fixed;
-    top: max(72px, calc(env(safe-area-inset-top, 0px) + 64px));
-    left: max(12px, env(safe-area-inset-left, 0px));
-    right: max(12px, env(safe-area-inset-right, 0px));
-    width: auto;
-    max-width: none;
-    max-height: calc(100dvh - max(88px, calc(env(safe-area-inset-top, 0px) + 80px)) - env(safe-area-inset-bottom, 0px));
+    position: absolute;
+    top: calc(100% + 8px);
+    left: auto;
+    right: 0;
+    width: min(360px, calc(100vw - 24px));
+    max-width: min(360px, calc(100vw - 24px));
+    max-height: min(430px, calc(100dvh - 112px));
     border-radius: 14px;
   }
   .app-notification-panel-head {
