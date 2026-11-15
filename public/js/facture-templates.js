@@ -110,26 +110,29 @@ function createFactureTemplates(helpers) {
   }
 
   function lignesRowsHtml(lignes) {
-    return lignes.map(l => `
-      <tr>
-        <td>${escapeHtml(l.designation)}</td>
-        <td class="mono">${l.quantite}</td>
-        <td class="mono">${formatMontant(l.prix_unitaire)}</td>
-        <td class="mono">${l.tva}%</td>
-        <td class="mono" style="text-align:right;">${formatMontant(l.total_ligne)}</td>
+    return (Array.isArray(lignes) ? lignes : []).map(l => `
+      <tr class="sf-document-line">
+        <td class="sf-doc-description">${escapeHtml(l.designation || '')}</td>
+        <td class="mono sf-doc-qty">${escapeHtml(l.quantite ?? '')}</td>
+        <td class="mono sf-doc-unit-price">${formatMontant(Number(l.prix_unitaire) || 0)}</td>
+        <td class="mono sf-doc-tax-rate">${escapeHtml(l.tva ?? 0)}%</td>
+        <td class="mono sf-doc-line-total">${formatMontant(Number(l.total_ligne) || 0)}</td>
       </tr>
     `).join('');
   }
 
   function totalsRowsHtml(facture, isDevis, borderColor, personnalisation) {
     const accent = accentColor(personnalisation, borderColor);
+    const discount = Math.max(0, Number(facture.remise) || 0);
+    const delivery = Math.max(0, Number(facture.frais_livraison) || 0);
     return `
-      <div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Sous-total</span><span class="mono">${formatMontant(facture.sous_total)}</span></div>
-      <div style="display:flex; justify-content:space-between; padding:6px 0;"><span>TVA</span><span class="mono">${formatMontant(facture.total_tva)}</span></div>
-      <div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Remise</span><span class="mono">- ${formatMontant(facture.remise)}</span></div>
-      <div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Livraison</span><span class="mono">${formatMontant(facture.frais_livraison)}</span></div>
-      <div style="display:flex; justify-content:space-between; padding:10px 0; border-top:2px solid ${accent}; font-weight:700; font-size:1.1rem;"><span>Total</span><span class="mono">${formatMontant(facture.total)}</span></div>
-      ${!isDevis ? `<div style="display:flex; justify-content:space-between; padding:6px 0; color:var(--emerald);"><span>Payé</span><span class="mono">${formatMontant(facture.montant_paye)}</span></div>` : ''}
+      <div class="sf-total-row"><span>Sous-total HT</span><span class="mono">${formatMontant(facture.sous_total)}</span></div>
+      ${discount > 0 ? `<div class="sf-total-row"><span>Remise</span><span class="mono">− ${formatMontant(discount)}</span></div>` : ''}
+      ${delivery > 0 ? `<div class="sf-total-row"><span>Frais de livraison</span><span class="mono">${formatMontant(delivery)}</span></div>` : ''}
+      <div class="sf-total-row"><span>TVA</span><span class="mono">${formatMontant(facture.total_tva)}</span></div>
+      <div class="sf-total-row sf-total-grand" style="border-top:2px solid ${accent};">
+        <span>Total TTC</span><strong class="mono">${formatMontant(facture.total)}</strong>
+      </div>
     `;
   }
 
@@ -877,14 +880,13 @@ function createFactureTemplates(helpers) {
     const fields = [];
     if (facture.objet) fields.push(['Objet', escapeHtml(facture.objet)]);
     if (facture.reference_externe) fields.push(['Référence client / commande', escapeHtml(facture.reference_externe)]);
-    if (isDevis && facture.date_validite) fields.push(['Devis valable jusqu’au', formatDate(facture.date_validite)]);
     if (!fields.length) return '';
     return `
-      <section class="sf-doc-meta" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:0 0 22px; padding:13px 16px; border:1px solid #dce2e8; border-left:4px solid #0F766E; border-radius:8px; background:#f8fafc; break-inside:avoid; page-break-inside:avoid;">
+      <section class="sf-doc-meta" aria-label="Informations du document">
         ${fields.map(([label, value]) => `
-          <div style="min-width:0;">
-            <div style="font-size:0.66rem; text-transform:uppercase; letter-spacing:0.06em; color:#64748b; font-weight:700; margin-bottom:4px;">${label}</div>
-            <div style="font-size:0.88rem; font-weight:600; color:#172033; overflow-wrap:anywhere;">${value}</div>
+          <div class="sf-doc-meta-item">
+            <div class="sf-doc-meta-label">${label}</div>
+            <div class="sf-doc-meta-value">${value}</div>
           </div>
         `).join('')}
       </section>
@@ -907,18 +909,16 @@ function createFactureTemplates(helpers) {
     }
     if (groups.size < 2) return '';
     const rows = [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([rate, values]) => `
-      <div style="display:flex; justify-content:space-between; gap:14px; padding:3px 0;">
-        <span>TVA ${rate}% · base ${formatMontant(Math.round(values.base * 100) / 100)}</span>
+      <div class="sf-doc-tax-row">
+        <span>TVA ${rate}% <span class="sf-doc-tax-base">· base ${formatMontant(Math.round(values.base * 100) / 100)}</span></span>
         <strong class="mono">${formatMontant(Math.round(values.tax * 100) / 100)}</strong>
       </div>
     `).join('');
     return `
-      <section style="margin:14px 0 0 auto; max-width:360px; color:#475569; font-size:0.76rem; break-inside:avoid; page-break-inside:avoid;">
-        <div style="font-weight:700; color:#334155; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:5px;">Détail de la TVA par taux</div>
+      <section class="sf-doc-tax" aria-label="Détail de la TVA par taux">
+        <div class="sf-doc-tax-title">Détail de la TVA par taux</div>
         ${rows}
-        <div style="border-top:1px solid #dce2e8; margin-top:5px; padding-top:5px; display:flex; justify-content:space-between; font-weight:700;">
-          <span>Total TVA</span><span class="mono">${formatMontant(facture.total_tva)}</span>
-        </div>
+        <div class="sf-doc-tax-total"><span>Total TVA</span><strong class="mono">${formatMontant(facture.total_tva)}</strong></div>
       </section>
     `;
   }
@@ -940,54 +940,50 @@ function createFactureTemplates(helpers) {
     const legalMentions = user.entreprise_mentions_legales
       ? escapeHtml(user.entreprise_mentions_legales).replace(/\r?\n/g, '<br/>')
       : '';
-    // La zone Bon pour accord fait partie de tout devis, même sans mentions légales ou coordonnées bancaires configurées.
 
     return `
-      <style>
-        .sf-doc-extras { margin-top:22px; color:#334155; font-size:0.78rem; }
-        .sf-doc-extras section { break-inside:avoid; page-break-inside:avoid; }
-        .sf-doc-extras .sf-extra-panel { border:1px solid #dce2e8; border-radius:8px; padding:12px 14px; background:#fff; margin-top:10px; }
-        .sf-doc-extras .sf-extra-title { font-size:0.68rem; font-weight:800; text-transform:uppercase; letter-spacing:0.07em; color:#64748b; margin-bottom:7px; }
-        .sf-doc-extras .sf-sign-line { display:inline-block; border-bottom:1px solid #94a3b8; min-width:145px; height:22px; vertical-align:bottom; }
-        @media print { .sf-doc-extras { color:#1e293b; } }
-      </style>
       <div class="sf-doc-extras">
         ${!isDevis ? `
-          <section class="sf-extra-panel" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:12px; border-left:4px solid #0F766E; background:#f8fafc;">
-            <div><div class="sf-extra-title">Total TTC</div><strong style="font-size:0.95rem;">${formatMontant(total)}</strong></div>
-            <div><div class="sf-extra-title">Déjà réglé</div><strong style="font-size:0.95rem;">${formatMontant(paid)}</strong></div>
-            <div><div class="sf-extra-title">Reste à payer</div><strong style="font-size:1.05rem; color:${remaining > 0 ? '#B45309' : '#047857'};">${formatMontant(remaining)}</strong></div>
+          <section class="sf-extra-panel sf-payment-summary" aria-label="Situation du règlement">
+            <div class="sf-payment-metric">
+              <span class="sf-extra-title">Déjà réglé</span>
+              <strong class="sf-payment-value">${formatMontant(paid)}</strong>
+            </div>
+            <div class="sf-payment-metric sf-payment-balance">
+              <span class="sf-extra-title">Reste à payer</span>
+              <strong class="sf-payment-value">${formatMontant(remaining)}</strong>
+            </div>
           </section>
         ` : ''}
         ${terms ? `
           <section class="sf-extra-panel">
             <div class="sf-extra-title">${isDevis ? 'Conditions et validité de l’offre' : 'Conditions de règlement'}</div>
-            <div style="line-height:1.55;">${escapeHtml(terms).replace(/\r?\n/g, '<br/>')}</div>
+            <div class="sf-extra-body">${escapeHtml(terms).replace(/\r?\n/g, '<br/>')}</div>
           </section>
         ` : ''}
         ${bankDetails.length ? `
           <section class="sf-extra-panel">
             <div class="sf-extra-title">Coordonnées de règlement</div>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px;">
-              ${bankDetails.map(([label, value]) => `<div><span style="color:#64748b;">${label} :</span> <strong style="overflow-wrap:anywhere;">${value}</strong></div>`).join('')}
+            <div class="sf-bank-grid">
+              ${bankDetails.map(([label, value]) => `<div class="sf-bank-item"><span>${label}</span><strong>${value}</strong></div>`).join('')}
             </div>
           </section>
         ` : ''}
         ${isDevis ? `
-          <section class="sf-extra-panel" style="margin-top:16px;">
-            <div class="sf-extra-title" style="color:#0F766E;">Bon pour accord — acceptation du devis</div>
-            <p style="margin:0 0 12px;">Je confirme accepter le contenu, les quantités, les prix et les conditions indiqués dans le présent devis.</p>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px;">
-              <div>Nom et fonction : <span class="sf-sign-line"></span></div>
-              <div>Date : <span class="sf-sign-line"></span></div>
-              <div>Signature et cachet : <span class="sf-sign-line"></span></div>
+          <section class="sf-extra-panel sf-acceptance-panel">
+            <div class="sf-extra-title">Bon pour accord — acceptation du devis</div>
+            <p class="sf-acceptance-copy">Je confirme accepter le contenu, les quantités, les prix et les conditions indiqués dans le présent devis.</p>
+            <div class="sf-acceptance-grid">
+              <div class="sf-sign-field"><span class="sf-sign-label">Nom et fonction</span><span class="sf-sign-line"></span></div>
+              <div class="sf-sign-field"><span class="sf-sign-label">Date</span><span class="sf-sign-line"></span></div>
+              <div class="sf-sign-field"><span class="sf-sign-label">Signature et cachet</span><span class="sf-sign-line"></span></div>
             </div>
           </section>
         ` : ''}
         ${legalDetails.length || legalMentions ? `
-          <section style="margin-top:14px; padding-top:9px; border-top:1px solid #dce2e8; color:#64748b; font-size:0.68rem; line-height:1.5;">
+          <section class="sf-doc-legal">
             ${legalDetails.length ? `<div>${legalDetails.join(' · ')}</div>` : ''}
-            ${legalMentions ? `<div style="margin-top:3px;">${legalMentions}</div>` : ''}
+            ${legalMentions ? `<div class="sf-doc-legal-mentions">${legalMentions}</div>` : ''}
           </section>
         ` : ''}
       </div>
@@ -1004,7 +1000,13 @@ function createFactureTemplates(helpers) {
 
   function renderInvoiceHtml({ user, facture, lignes, isDevis, qrCode, template, personnalisation }) {
     const render = RENDERERS[template] || renderClassique;
-    let html = render(user, facture, lignes, isDevis, qrCode, personnalisation);
+    // Un devis porte une date de validité, jamais une échéance de paiement.
+    // Les 15 modèles partagent le même champ d'affichage pour garder une présentation cohérente.
+    const facturePourRendu = isDevis
+      ? { ...facture, date_echeance: facture.date_validite || null }
+      : facture;
+    let html = render(user, facturePourRendu, lignes, isDevis, qrCode, personnalisation);
+    if (isDevis) html = html.replace(/Échéance/g, 'Validité du devis');
 
     // Le bloc de références est partagé par les 15 modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
@@ -1026,6 +1028,16 @@ function createFactureTemplates(helpers) {
     }
 
     html += documentSupplementHtml(user, facture, isDevis);
+    // Le même tableau de lignes reçoit une classe stable pour la mise en page écran et A4.
+    html = html.replace(/<table\b([^>]*)>/i, (match, attributes) => {
+      const existingClass = attributes.match(/\bclass=["']([^"']*)["']/i);
+      if (existingClass) {
+        const nextClass = (existingClass[1] + ' sf-document-table').trim();
+        return match.replace(existingClass[0], 'class="' + nextClass + '"').replace(/<table\b/i, '<table aria-label="Détail des lignes du document"');
+      }
+      return '<table class="sf-document-table" aria-label="Détail des lignes du document"' + attributes + '>';
+    });
+
     // Le même moteur sert à l'écran, à l'impression et au PDF serveur.
     return wrapPersonnalisation(html, personnalisation);
   }
