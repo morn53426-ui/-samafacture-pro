@@ -65,6 +65,32 @@
   const id = new URLSearchParams(location.search).get('id');
   let user, templates;
 
+  // L'impression doit conserver la palette papier du modèle choisi, indépendamment du thème
+  // de l'application. Le thème utilisateur est restauré lorsque l'aperçu d'impression se ferme.
+  let themeAvantImpression = null;
+  let impressionEnCours = false;
+
+  function preparerThemeImpression() {
+    if (impressionEnCours) return;
+    impressionEnCours = true;
+    themeAvantImpression = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+
+  function restaurerThemeApresImpression() {
+    if (!impressionEnCours) return;
+    if (themeAvantImpression === null) {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', themeAvantImpression);
+    }
+    themeAvantImpression = null;
+    impressionEnCours = false;
+  }
+
+  window.addEventListener('beforeprint', preparerThemeImpression);
+  window.addEventListener('afterprint', restaurerThemeApresImpression);
+
   async function telechargerPdf(btn) {
     const restore = setButtonLoading(btn, 'Génération du PDF…');
     try {
@@ -76,6 +102,7 @@
         throw new Error(data.error || `Erreur ${res.status} lors de la génération du PDF.`);
       }
       const blob = await res.blob();
+      if (!blob.size) throw new Error('Le PDF généré est vide. Réessayez ou utilisez l’impression du navigateur.');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -83,7 +110,9 @@
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      // Certains navigateurs démarrent la lecture du téléchargement après le clic.
+      // Une révocation immédiate peut produire un PDF vide ou interrompu.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
       alert(err.message);
     } finally {

@@ -6057,3 +6057,55 @@ a.btn .icon {
     max-width: 100%;
   }
 }
+
+
+/* Impression des factures/devis : isoler la palette papier du thème global de l'application.
+   Les couleurs du document restent celles du modèle choisi, que l'interface soit claire ou sombre. */
+@media print {
+  html, body { color-scheme: light !important; }
+  .invoice-doc {
+    color-scheme: light !important;
+    --navy-950: #24211D;
+    --navy-900: #302C26;
+    --navy-800: #403A32;
+    --navy-700: #514A40;
+    --emerald: #087A57;
+    --emerald-light: #E5F1E9;
+    --gold: #96713E;
+    --gold-light: #F1EBDD;
+    --clay: #B64D48;
+    --clay-light: #F6E9E5;
+    --cream: #F7F4EE;
+    --paper: #FFFEFC;
+    --ink: #24211D;
+    --ink-soft: #655E55;
+    --line: #E6DED2;
+    --structural-dark-1: #272722;
+    --structural-dark-2: #302F29;
+    background: #FFFEFC !important;
+    color: #24211D !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .invoice-doc,
+  .invoice-doc * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .invoice-doc .sf-doc-footer,
+  .invoice-doc .sf-doc-extras,
+  .invoice-doc .sf-acceptance-grid,
+  .invoice-doc .sf-doc-tax,
+  .invoice-doc .sf-extra-panel,
+  .invoice-doc .stamp {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .invoice-doc .sf-document-table thead {
+    display: table-header-group !important;
+  }
+  .invoice-doc .sf-document-table tbody tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}

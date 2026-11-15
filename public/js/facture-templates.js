@@ -158,7 +158,7 @@ function createFactureTemplates(helpers) {
 
   function footerHtml(user, facture, isDevis, stampClass, qrCode, personnalisation) {
     return `
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
+      <div class="sf-doc-footer" style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
         <div style="max-width:55%; color:var(--ink-soft); font-size:0.85rem;">
           ${facture.commentaires ? `<div>${escapeHtml(facture.commentaires)}</div>` : ''}
           ${facture.mode_paiement ? `<div style="margin-top:6px;">Mode de paiement : ${escapeHtml(facture.mode_paiement)}</div>` : ''}

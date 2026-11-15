@@ -268,3 +268,35 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     assert.match(html, /FA-2026-0042/);
   });
 });
+
+
+describe('Impression et génération PDF', () => {
+  const pageSource = fs.readFileSync(path.resolve(__dirname, '../../public/facture-detail.html'), 'utf8');
+  const pdfSource = fs.readFileSync(path.resolve(__dirname, '../utils/pdf.js'), 'utf8');
+  const cssSource = fs.readFileSync(path.resolve(__dirname, '../../public/css/style.css'), 'utf8');
+  const rendererSource = fs.readFileSync(path.resolve(__dirname, '../../public/js/facture-templates.js'), 'utf8');
+
+  test("l'impression force temporairement la palette papier puis restaure le thème utilisateur", () => {
+    assert.match(pageSource, /window\.addEventListener\('beforeprint', preparerThemeImpression\)/);
+    assert.match(pageSource, /window\.addEventListener\('afterprint', restaurerThemeApresImpression\)/);
+    assert.match(pageSource, /setAttribute\('data-theme', 'light'\)/);
+    assert.match(pageSource, /removeAttribute\('data-theme'\)/,
+      "Le thème système doit être restauré lorsqu'aucun thème explicite n'était mémorisé.");
+    assert.match(pdfSource, /setAttribute\('data-theme', 'light'\)/,
+      'La génération PDF serveur doit aussi ignorer le thème sombre mémorisé.');
+  });
+
+  test("l'impression conserve les couleurs des modèles et évite de couper le pied de page", () => {
+    assert.match(cssSource, /@media print[\s\S]*?\.invoice-doc[\s\S]*?--navy-950:\s*#24211D/);
+    assert.match(cssSource, /print-color-adjust:\s*exact !important/);
+    assert.match(cssSource, /\.invoice-doc \.sf-document-table thead\s*\{\s*display:\s*table-header-group !important;/);
+    assert.match(rendererSource, /class="sf-doc-footer"/,
+      'Le pied de facture doit rester groupé lors des sauts de page.');
+  });
+
+  test('le téléchargement laisse au navigateur le temps de lire le fichier PDF', () => {
+    assert.match(pageSource, /setTimeout\(\(\) => URL\.revokeObjectURL\(url\), 60_000\)/);
+    assert.match(pageSource, /if \(!blob\.size\)/,
+      'Un fichier vide ne doit pas être présenté comme un téléchargement réussi.');
+  });
+});
