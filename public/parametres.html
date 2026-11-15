@@ -331,7 +331,7 @@
               <label id="invoice-template-title">Choisissez le modèle de vos factures</label>
               <p>Visualisez chaque présentation avant de la sélectionner. L’aperçu utilise l’identité de votre entreprise et des données fictives.</p>
             </div>
-            <span class="invoice-template-count"><i class="ic" data-icon="layout-grid" aria-hidden="true"></i> 15 modèles</span>
+            <span class="invoice-template-count"><i class="ic" data-icon="file-stack" aria-hidden="true"></i> 15 modèles</span>
           </div>
           <div id="invoice-template-gallery" class="invoice-template-gallery"
                role="group" aria-labelledby="invoice-template-title" aria-describedby="invoice-template-help"></div>
@@ -478,38 +478,6 @@
 
   // Déclarée avant toute fonction d'initialisation qui l'utilise.
   const PERSO_COULEURS = ['couleur_principale', 'couleur_secondaire', 'couleur_texte'];
-
-  function fill() {
-    const u = Api.currentUser();
-    if (!u) {
-      if (Api.token()) Api.clearSession();
-      location.href = 'login.html';
-      return;
-    }
-    document.getElementById('entreprise_nom').value = u.entreprise_nom || '';
-    document.getElementById('entreprise_adresse').value = u.entreprise_adresse || '';
-    document.getElementById('entreprise_telephone').value = u.entreprise_telephone || '';
-    document.getElementById('entreprise_email').value = u.entreprise_email || '';
-    document.getElementById('entreprise_ninea').value = u.entreprise_ninea || '';
-    document.getElementById('entreprise_rccm').value = u.entreprise_rccm || '';
-    document.getElementById('entreprise_site_web').value = u.entreprise_site_web || '';
-    document.getElementById('entreprise_banque').value = u.entreprise_banque || '';
-    document.getElementById('entreprise_rib').value = u.entreprise_rib || '';
-    document.getElementById('entreprise_conditions_reglement').value = u.entreprise_conditions_reglement || '';
-    document.getElementById('entreprise_mentions_legales').value = u.entreprise_mentions_legales || '';
-    document.getElementById('devise').value = u.devise || 'FCFA';
-    document.getElementById('facture_template').value = u.facture_template || 'classique';
-    fillPersonnalisation(u.facture_personnalisation || null);
-    const planLabels = { gratuit: 'Gratuit', starter: 'Starter', pro: 'Pro', entreprise: 'Entreprise' };
-    document.getElementById('plan-actuel-label').textContent = planLabels[u.plan] || 'Gratuit';
-    currentLogo = u.entreprise_logo || null;
-    currentSignature = u.signature_default || null;
-    renderLogoPreview();
-    renderSignaturePreview();
-    updateLivePreviewName();
-    renderInvoiceTemplateGallery(u, u.facture_template || 'classique');
-  }
-  fill();
 
   // --- Galerie visuelle des 15 modèles ----------------------------------------------
   const INVOICE_TEMPLATE_META = [
@@ -670,6 +638,39 @@
   });
   window.addEventListener('resize', updateInvoiceTemplatePreviewScales);
   // -------------------------------------------------------------------------------
+
+
+  function fill() {
+    const u = Api.currentUser();
+    if (!u) {
+      if (Api.token()) Api.clearSession();
+      location.href = 'login.html';
+      return;
+    }
+    document.getElementById('entreprise_nom').value = u.entreprise_nom || '';
+    document.getElementById('entreprise_adresse').value = u.entreprise_adresse || '';
+    document.getElementById('entreprise_telephone').value = u.entreprise_telephone || '';
+    document.getElementById('entreprise_email').value = u.entreprise_email || '';
+    document.getElementById('entreprise_ninea').value = u.entreprise_ninea || '';
+    document.getElementById('entreprise_rccm').value = u.entreprise_rccm || '';
+    document.getElementById('entreprise_site_web').value = u.entreprise_site_web || '';
+    document.getElementById('entreprise_banque').value = u.entreprise_banque || '';
+    document.getElementById('entreprise_rib').value = u.entreprise_rib || '';
+    document.getElementById('entreprise_conditions_reglement').value = u.entreprise_conditions_reglement || '';
+    document.getElementById('entreprise_mentions_legales').value = u.entreprise_mentions_legales || '';
+    document.getElementById('devise').value = u.devise || 'FCFA';
+    document.getElementById('facture_template').value = u.facture_template || 'classique';
+    fillPersonnalisation(u.facture_personnalisation || null);
+    const planLabels = { gratuit: 'Gratuit', starter: 'Starter', pro: 'Pro', entreprise: 'Entreprise' };
+    document.getElementById('plan-actuel-label').textContent = planLabels[u.plan] || 'Gratuit';
+    currentLogo = u.entreprise_logo || null;
+    currentSignature = u.signature_default || null;
+    renderLogoPreview();
+    renderSignaturePreview();
+    updateLivePreviewName();
+    renderInvoiceTemplateGallery(u, u.facture_template || 'classique');
+  }
+  fill();
 
   // --- Personnalisation du modèle (couleurs / logo / police) ---------------------------------
   // Clés reconnues par le serveur (server/routes/auth.js) et le moteur de rendu
