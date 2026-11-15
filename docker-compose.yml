@@ -78,6 +78,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      app:
+        condition: service_healthy
     env_file:
       - ./server/.env
     environment:
