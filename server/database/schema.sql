@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS factures (
   KEY idx_factures_user (user_id),
   KEY idx_factures_client (client_id),
   KEY idx_factures_user_type_statut (user_id, type, statut),
+  KEY idx_factures_user_type_created_at (user_id, type, created_at),
   KEY idx_factures_user_type_date (user_id, type, date_emission),
   KEY idx_factures_user_date (user_id, date_emission),
   KEY idx_factures_user_type_client (user_id, type, client_id),
@@ -122,6 +123,16 @@ CREATE TABLE IF NOT EXISTS factures (
 -- ---------------------------------------------------------------------------
 -- Lignes de facture / devis
 -- ---------------------------------------------------------------------------
+-- Registre mensuel : une facture supprimée ne rend pas une unité de quota.
+CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
+  user_id INT UNSIGNED NOT NULL,
+  periode DATE NOT NULL,
+  nombre_factures INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, periode),
+  CONSTRAINT fk_facture_usage_mensuelle_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS facture_lignes (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   facture_id INT UNSIGNED NOT NULL,
