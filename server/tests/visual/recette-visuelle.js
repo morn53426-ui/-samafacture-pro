@@ -1205,14 +1205,18 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   const longNotificationLayout = await mobile.evaluate(() => {
     const panel = document.getElementById('workspace-notification-panel');
     const list = document.getElementById('workspace-notification-list');
+    const toggle = document.getElementById('workspace-notification-toggle');
     const item = list?.querySelector('.app-notification-item');
     const title = item?.querySelector('strong');
     const message = item?.querySelector('p');
     const rect = panel?.getBoundingClientRect();
+    const toggleRect = toggle?.getBoundingClientRect();
     return {
       viewport: window.innerWidth,
       left: rect?.left ?? -1,
       right: rect?.right ?? window.innerWidth + 1,
+      top: rect?.top ?? -1,
+      toggleBottom: toggleRect?.bottom ?? 0,
       panelWidth: panel?.clientWidth || 0,
       panelScrollWidth: panel?.scrollWidth || 0,
       listWidth: list?.clientWidth || 0,
@@ -1228,6 +1232,8 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   assert.ok(longNotificationLayout.left >= 0 &&
     longNotificationLayout.right <= longNotificationLayout.viewport + 1,
     'Le panneau de notifications doit rester dans les limites de l’écran : ' + JSON.stringify(longNotificationLayout));
+  assert.ok(longNotificationLayout.top >= longNotificationLayout.toggleBottom + 4,
+    'Le panneau ne doit pas recouvrir la cloche qui sert à le fermer : ' + JSON.stringify(longNotificationLayout));
   assert.ok(longNotificationLayout.panelWidth > 0 &&
     longNotificationLayout.panelScrollWidth <= longNotificationLayout.panelWidth + 1 &&
     longNotificationLayout.listScrollWidth <= longNotificationLayout.listWidth + 1,
