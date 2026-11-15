@@ -22,11 +22,11 @@ function renderSidebar(activePage) {
     ]},
     { group: 'Outils professionnels', items: [
       { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
-      { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' },
+      { id: 'professionnel', icon: 'building', label: 'Espace professionnel', href: 'professionnel.html' },
       { id: 'achats', icon: 'truck', label: 'Achats & stocks', href: 'achats.html' },
       { id: 'assistant-ia', icon: 'message-circle', label: 'Assistant IA', href: 'assistant-ia.html' },
       { id: 'automatisations', icon: 'workflow', label: 'Automatisations', href: 'automatisations.html' },
-      { id: 'facture-ia', icon: 'file-check', label: 'Facture par IA', href: 'facture-ia.html' }
+      { id: 'facture-ia', icon: 'wand', label: 'Facture par IA', href: 'facture-ia.html' }
     ]},
     { group: 'Compte', items: [
       { id: 'abonnement', icon: 'wallet-cards', label: 'Abonnement', href: 'abonnement.html' },
