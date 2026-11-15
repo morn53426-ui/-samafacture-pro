@@ -138,6 +138,27 @@ test('conversion devis : le compteur historique est conservé après refus', asy
   );
 });
 
+
+test('supprimer une ancienne facture après un refus ne libère pas de quota', async () => {
+  const deleted = await request(app)
+    .delete(`/api/factures/${invoiceIds[0]}`)
+    .set('Authorization', `Bearer ${token}`);
+  assert.equal(deleted.status, 200, deleted.text);
+
+  const blocked = await request(app)
+    .post('/api/factures')
+    .set('Authorization', `Bearer ${token}`)
+    .send(invoicePayload());
+  assert.equal(blocked.status, 403, blocked.text);
+  assert.equal(blocked.body.code, 'QUOTA_DEPASSE');
+
+  const [[usage]] = await pool.query(
+    "SELECT nombre_factures FROM facture_usage_mensuelle WHERE user_id = ? AND periode = DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')",
+    [userId]
+  );
+  assert.equal(Number(usage.nombre_factures), FREE_MONTHLY_INVOICE_LIMIT);
+});
+
 after(async () => {
   await nettoyerUtilisateur(userId);
 });
