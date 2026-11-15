@@ -1,6 +1,11 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+// Ces scénarios valident l'absence de SMTP : ne jamais utiliser les identifiants éventuels
+// du .env local et ne jamais envoyer de vrais emails pendant les tests.
+process.env.SMTP_HOST = '';
+process.env.SMTP_USER = '';
+process.env.SMTP_PASSWORD = '';
 const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 const { verifierFacturesRecurrentes } = require('../config/scheduler');
 
@@ -65,9 +70,8 @@ describe('Envoi automatique optionnel des factures récurrentes', () => {
       });
     assert.equal(Number(modele.body.recurrente.envoi_auto_email), 1);
 
-    // Pas de SMTP configuré en environnement de test : sendMail() se contente de logger
-    // (voir config/mailer.js), donc ceci vérifie surtout que le flux ne plante jamais et
-    // que la facture est bien générée, même quand l'envoi est demandé.
+    // Sans SMTP, la facture récurrente est générée mais l'envoi est signalé comme échoué.
+    // Le planificateur ne doit jamais annoncer un email envoyé si aucun transport ne l'a transmis.
     await assert.doesNotReject(verifierFacturesRecurrentes());
 
     const [[recurrente]] = await pool.query(

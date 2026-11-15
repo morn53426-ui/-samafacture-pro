@@ -24,10 +24,11 @@ Pour configurer et utiliser les modèles complets de factures et devis, consulte
   - Vue facture imprimable → export PDF via l'impression du navigateur (Ctrl/Cmd+P → "Enregistrer en PDF")
   - Dépenses (CRUD) pour suivre les sorties d'argent
   - Rapports : ventes par jour/semaine/mois/année/client/produit, export CSV, résumé comptable (recettes, dépenses, bénéfice net, TVA collectée)
-  - Paramètres entreprise : identité, coordonnées légales, banque/RIB, conditions de règlement, logo et personnalisation visuelle ; **15 modèles de facture/devis** partagés entre aperçu, impression et PDF
+  - Paramètres entreprise : identité, coordonnées légales, banque/RIB, conditions de règlement, logo et personnalisation visuelle ; **19 modèles de facture/devis** partagés entre aperçu, impression et PDF
   - Centre d'aide (FAQ), Support technique (formulaire de contact) et Politique de confidentialité
   - Interface responsive : menu latéral escamotable sur mobile/tablette, tableaux et grilles adaptatifs
   - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature électronique, factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle)
+  - **Partage WhatsApp manuel** des factures et devis depuis les listes et le détail : message prérempli et lien sécurisé de consultation ; l'utilisateur vérifie puis confirme l'envoi dans WhatsApp
 
 ## Installation avec WAMPserver
 
@@ -340,7 +341,7 @@ Sans cette configuration, le bouton reste simplement masqué — la connexion cl
 
 ### Mot de passe oublié
 
-Fonctionne dès l'installation, même sans configuration : si aucun SMTP n'est renseigné dans `.env`, le lien de réinitialisation s'affiche directement dans la console du serveur (pratique pour tester en local). Pour un envoi par email réel, renseignez dans `server/.env` :
+Le parcours répond toujours avec un message générique pour ne pas révéler si une adresse est enregistrée. Sans SMTP, aucun email ne part et aucun lien/token sensible n'est affiché dans les journaux. Pour un envoi réel, renseignez dans `server/.env` :
 ```
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -358,7 +359,7 @@ SMTP_PASSWORD=un-mot-de-passe-d-application-google
 - Authentification à deux facteurs (2FA), chiffrement AES avancé.
 - Multi-utilisateurs avec rôles et permissions personnalisées par entreprise.
 - Espace administrateur SaaS (gestion des abonnements, statistiques globales, support).
-- Notifications par SMS/WhatsApp (les relances et envois par **email** sont déjà disponibles, voir factures.html/devis.html).
+- Envoi automatique par WhatsApp Business et notifications SMS (le partage WhatsApp manuel via un message `wa.me` prérempli est déjà disponible dans les listes Factures/Devis et le détail ; l'envoi reste confirmé par l'utilisateur dans WhatsApp).
 - Comptabilité avancée (journal, balance détaillée) — l'export Excel et le résumé comptable (recettes/dépenses/bénéfice/TVA) sont déjà disponibles dans Rapports.
 - Marketing site complet (tarifs, blog...) — la page d'accueil existe déjà (`index.html`).
 

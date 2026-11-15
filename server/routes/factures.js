@@ -5,7 +5,8 @@ const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { FREE_MONTHLY_INVOICE_LIMIT, isPaidPlan } = require('../utils/plans');
-const { sendMail } = require('../config/mailer');
+const { sendMail, isSmtpConfigured } = require('../config/mailer');
+const { escapeHtmlEmail, sanitizeEmailHeader } = require('../utils/email-escape');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 const { genererPdfFacture } = require('../utils/pdf');
 const { notifierUtilisateur } = require('../realtime');
@@ -336,7 +337,9 @@ router.get('/', async (req, res, next) => {
 
     const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM factures f${whereSql}`, params);
     const [rows] = await pool.query(
-      `SELECT f.*, c.nom as client_nom, c.email as client_email FROM factures f JOIN clients c ON c.id = f.client_id${whereSql}
+      `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone,
+              c.whatsapp as client_whatsapp, 'SN' as client_pays_code
+       FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id${whereSql}
        ORDER BY f.date_emission DESC, f.id DESC LIMIT ? OFFSET ?`,
       [...params, limite, offset]
     );
@@ -373,8 +376,10 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone, c.adresse as client_adresse
-       FROM factures f JOIN clients c ON c.id = f.client_id WHERE f.id = ? AND f.user_id = ?`,
+      `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone,
+              c.whatsapp as client_whatsapp, c.adresse as client_adresse, 'SN' as client_pays_code
+       FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
+       WHERE f.id = ? AND f.user_id = ?`,
       [req.params.id, req.tenantId]
     );
     const facture = rows[0];
@@ -590,7 +595,10 @@ router.post('/', async (req, res, next) => {
     }
 
     await conn.commit();
-    const [factureRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [factureId]);
+    // Réutiliser la connexion déjà acquise jusqu'au finally : si 10 requêtes concurrentes
+    // gardent chacune une connexion du pool puis en redemandent une pour ce SELECT, le pool
+    // (10 connexions par défaut) est entièrement occupé et toutes les réponses se bloquent.
+    const [factureRows] = await conn.query('SELECT * FROM factures WHERE id = ?', [factureId]);
     res.status(201).json({ facture: factureRows[0] });
     if (docType === 'facture') {
       queueWebhookEvent(req.tenantId, 'invoice.created', { invoice_id: factureId, numero, total }).catch(err => console.warn('Webhook invoice.created ignoré :', err.message));
@@ -599,7 +607,7 @@ router.post('/', async (req, res, next) => {
     if (conn) await conn.rollback();
     if (err?.code === 'ER_DUP_ENTRY' && req.get('Idempotency-Key')) {
       try {
-        const [existing] = await pool.query(
+        const [existing] = await conn.query(
           'SELECT * FROM factures WHERE user_id = ? AND idempotency_key = ?',
           [req.tenantId, req.get('Idempotency-Key').trim()]
         );
@@ -660,7 +668,7 @@ router.put('/:id/statut', async (req, res, next) => {
     }
 
     await conn.commit();
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    const [rows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     res.json({ facture: rows[0] });
   } catch (err) {
     await conn.rollback();
@@ -704,7 +712,7 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
 
     await conn.commit();
 
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [devis.id, req.tenantId]);
+    const [rows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [devis.id, req.tenantId]);
     res.json({ facture: rows[0] });
   } catch (err) {
     await conn.rollback();
@@ -743,12 +751,13 @@ router.post('/:id/dupliquer', async (req, res, next) => {
     await conn.beginTransaction();
     const numero = await nextNumero(conn, req.tenantId, source.type);
     const [result] = await conn.query(
-      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
-       VALUES (?, ?, ?, ?, CURDATE(), NULL, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
+       VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
       [
-        req.tenantId, source.client_id, numero, source.type, source.date_validite || null,
-        source.objet || null, source.reference_externe || null, source.conditions_reglement || null,
-        source.remise, source.frais_livraison, source.mode_paiement, source.commentaires,
+        req.tenantId, source.client_id, numero, source.type, source.date_echeance || null,
+        source.date_validite || null, source.objet || null, source.reference_externe || null,
+        source.conditions_reglement || null, source.devise || 'FCFA', source.remise,
+        source.frais_livraison, source.mode_paiement, source.commentaires,
         source.sous_total, source.total_tva, source.total
       ]
     );
@@ -757,7 +766,7 @@ router.post('/:id/dupliquer', async (req, res, next) => {
     await insererLignesFacture(conn, nouvelId, lignesSource);
 
     await conn.commit();
-    const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [nouvelId, req.tenantId]);
+    const [rows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [nouvelId, req.tenantId]);
     res.status(201).json({ facture: rows[0] });
   } catch (err) {
     await conn.rollback();
@@ -900,6 +909,15 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
   const emetteur = facture.entreprise_nom || facture.user_nom;
   const isDevis = facture.type === 'devis';
   const label = isDevis ? 'devis' : 'facture';
+  if (!isSmtpConfigured()) {
+    const error = new Error('SMTP non configuré : email non envoyé.');
+    error.code = 'SMTP_NOT_CONFIGURED';
+    throw error;
+  }
+  const safeClientNom = escapeHtmlEmail(facture.client_nom);
+  const safeEmetteur = escapeHtmlEmail(emetteur);
+  const safeNumero = escapeHtmlEmail(facture.numero);
+  const safeConsultUrl = escapeHtmlEmail(consultUrl);
 
   let attachments;
   try {
@@ -914,13 +932,18 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
     console.error('PDF joint à l\'email échoué (email envoyé sans pièce jointe) :', pdfErr.message);
   }
 
-  await sendMail({
+  const mailResult = await sendMail({
     to: destinataire,
-    subject: `${emetteur} vous a envoyé un ${label} — ${facture.numero}`,
+    subject: sanitizeEmailHeader(`${emetteur} vous a envoyé un ${label} — ${facture.numero}`),
     text: `Bonjour ${facture.client_nom},\n\n${emetteur} vous a envoyé un ${label} d'un montant de ${facture.total} FCFA.\n\nConsultez-le en ligne : ${consultUrl}\n\nMerci de votre confiance.`,
-    html: `<p>Bonjour ${facture.client_nom},</p><p><strong>${emetteur}</strong> vous a envoyé un ${label} (${facture.numero}) d'un montant de <strong>${facture.total} FCFA</strong>.</p><p><a href="${consultUrl}" style="display:inline-block;padding:10px 18px;background:#0FA980;color:#fff;border-radius:8px;text-decoration:none;">Consulter le ${label}</a></p><p>Ou copiez ce lien : ${consultUrl}</p>`,
+    html: `<p>Bonjour ${safeClientNom},</p><p><strong>${safeEmetteur}</strong> vous a envoyé un ${label} (${safeNumero}) d'un montant de <strong>${facture.total} FCFA</strong>.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#0FA980;color:#fff;border-radius:8px;text-decoration:none;">Consulter le ${label}</a></p><p>Ou copiez ce lien : ${safeConsultUrl}</p>`,
     attachments
   });
+  if (!mailResult?.sent) {
+    const error = new Error('SMTP non configuré : email non envoyé.');
+    error.code = 'SMTP_NOT_CONFIGURED';
+    throw error;
+  }
 
   return { success: true, sent_to: destinataire };
 }
@@ -935,6 +958,7 @@ router.post('/:id/envoyer', async (req, res, next) => {
     if (err.message === "Aucune adresse email pour ce client.") {
       return res.status(400).json({ error: "Aucune adresse email pour ce client. Ajoutez-en une dans sa fiche, ou précisez-en une." });
     }
+    if (err.code === 'SMTP_NOT_CONFIGURED') return res.status(503).json({ error: err.message });
     next(err);
   }
 });
@@ -977,6 +1001,7 @@ router.post('/:id/relancer', async (req, res, next) => {
 
     const destinataire = (req.body && req.body.email) || facture.client_email;
     if (!destinataire) return res.status(400).json({ error: "Aucune adresse email pour ce client." });
+    if (!isSmtpConfigured()) return res.status(503).json({ error: 'SMTP non configuré : email non envoyé.' });
 
     if (!facture.verification_code) {
       facture.verification_code = crypto.randomBytes(5).toString('hex');
@@ -988,6 +1013,10 @@ router.post('/:id/relancer', async (req, res, next) => {
     const emetteur = facture.entreprise_nom || facture.user_nom;
     const resteAPayer = Number(facture.total) - Number(facture.montant_paye);
 
+    const safeClientNom = escapeHtmlEmail(facture.client_nom);
+    const safeEmetteur = escapeHtmlEmail(emetteur);
+    const safeNumero = escapeHtmlEmail(facture.numero);
+    const safeConsultUrl = escapeHtmlEmail(consultUrl);
     let attachments;
     try {
       const pdfBuffer = await genererPdfFacture(facture.id, { ...req.user, id: req.tenantId });
@@ -996,16 +1025,20 @@ router.post('/:id/relancer', async (req, res, next) => {
       console.error('PDF joint à la relance échoué (email envoyé sans pièce jointe) :', pdfErr.message);
     }
 
-    await sendMail({
+    const mailResult = await sendMail({
       to: destinataire,
-      subject: `Rappel : facture ${facture.numero} en attente de paiement`,
+      subject: sanitizeEmailHeader(`Rappel : facture ${facture.numero} en attente de paiement`),
       text: `Bonjour ${facture.client_nom},\n\nNous vous rappelons que la facture ${facture.numero} d'un montant de ${resteAPayer} FCFA est toujours en attente de règlement.\n\nConsultez-la ici : ${consultUrl}\n\nMerci de régulariser dans les meilleurs délais.`,
-      html: `<p>Bonjour ${facture.client_nom},</p><p>Nous vous rappelons que la facture <strong>${facture.numero}</strong> d'un montant restant dû de <strong>${resteAPayer} FCFA</strong> est toujours en attente de règlement.</p><p><a href="${consultUrl}" style="display:inline-block;padding:10px 18px;background:#E8A33D;color:#0F1B33;border-radius:8px;text-decoration:none;font-weight:600;">Consulter la facture</a></p><p>Merci de régulariser dans les meilleurs délais.</p>`,
+      html: `<p>Bonjour ${safeClientNom},</p><p>Nous vous rappelons que la facture <strong>${safeNumero}</strong> d'un montant restant dû de <strong>${resteAPayer} FCFA</strong> est toujours en attente de règlement par ${safeEmetteur}.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#E8A33D;color:#0F1B33;border-radius:8px;text-decoration:none;font-weight:600;">Consulter la facture</a></p><p>Merci de régulariser dans les meilleurs délais.</p>`,
       attachments
     });
+    if (!mailResult?.sent) return res.status(503).json({ error: 'SMTP non configuré : email non envoyé.' });
 
     res.json({ success: true, sent_to: destinataire });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.code === 'SMTP_NOT_CONFIGURED') return res.status(503).json({ error: err.message });
+    next(err);
+  }
 });
 
 /**
@@ -1095,7 +1128,7 @@ router.post('/:id/paiements', async (req, res, next) => {
         [req.tenantId, idempotencyKey]
       );
       if (existingPayment.length) {
-        const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.tenantId]);
+        const [existingFacture] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.tenantId]);
         return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
       }
     }
@@ -1157,7 +1190,7 @@ router.post('/:id/paiements', async (req, res, next) => {
     await conn.commit();
     queueWebhookEvent(req.tenantId, 'payment.received', { facture_id: facture.id, montant: montantNum, methode }).catch(err => console.warn('Webhook payment.received ignoré :', err.message));
 
-    const [updatedRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [facture.id]);
+    const [updatedRows] = await conn.query('SELECT * FROM factures WHERE id = ?', [facture.id]);
     res.status(201).json({ facture: updatedRows[0] });
 
     if (nouveauStatut === 'payee' && facture.statut !== 'payee') {
@@ -1168,12 +1201,12 @@ router.post('/:id/paiements', async (req, res, next) => {
     if (err?.code === 'ER_DUP_ENTRY' && req.get('Idempotency-Key')) {
       try {
         const key = req.get('Idempotency-Key').trim();
-        const [existingPayment] = await pool.query(
+        const [existingPayment] = await conn.query(
           'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ?',
           [req.tenantId, key]
         );
         if (existingPayment.length) {
-          const [existingFacture] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.tenantId]);
+          const [existingFacture] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ?', [existingPayment[0].facture_id, req.tenantId]);
           return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
         }
       } catch (replayErr) { return next(replayErr); }

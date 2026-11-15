@@ -1,6 +1,11 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+// Ces scénarios valident l'absence de SMTP : ne jamais utiliser les identifiants éventuels
+// du .env local et ne jamais envoyer de vrais emails pendant les tests.
+process.env.SMTP_HOST = '';
+process.env.SMTP_USER = '';
+process.env.SMTP_PASSWORD = '';
 const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 // Vérifie que la route POST /factures/:id/envoyer se comporte toujours à l'identique après
@@ -45,25 +50,31 @@ describe('Envoi de facture par email (POST /factures/:id/envoyer)', () => {
     await nettoyerUtilisateur(userId);
   });
 
-  test("envoie avec succès à l'email du client (SMTP non configuré en test → journalisé, pas d'erreur)", async () => {
+  test("refuse de confirmer un envoi lorsque le SMTP n'est pas configuré", async () => {
     const res = await request(app)
       .post(`/api/factures/${factureId}/envoyer`)
       .set('Authorization', `Bearer ${token}`)
       .send({});
-    assert.equal(res.status, 200);
-    assert.equal(res.body.success, true);
-    assert.equal(res.body.sent_to, 'client-destinataire@exemple-test.com');
+    assert.equal(res.status, 503);
+    assert.equal(res.body.success, undefined);
+    assert.match(res.body.error, /SMTP non configuré/);
   });
 
-  test('un email explicite dans le corps de la requête a la priorité sur celui du client', async () => {
+  test('un email explicite ne contourne pas l’absence de SMTP et ne produit pas de faux succès', async () => {
     const res = await request(app)
       .post(`/api/factures/${factureId}/envoyer`)
       .set('Authorization', `Bearer ${token}`)
       .send({ email: 'autre-adresse@exemple-test.com' });
-    assert.equal(res.status, 200);
-    assert.equal(res.body.sent_to, 'autre-adresse@exemple-test.com');
+    assert.equal(res.status, 503);
+    assert.equal(res.body.sent_to, undefined);
   });
 
+  test('une relance de facture renvoie 503 si aucun SMTP n’est configuré', async () => {
+    const res = await request(app).post(`/api/factures/${factureId}/relancer`).set('Authorization', `Bearer ${token}`).send({});
+    assert.equal(res.status, 503);
+    assert.match(res.body.error, /SMTP non configuré/);
+    assert.equal(res.body.success, undefined);
+  });
   test("400 si le client n'a pas d'email et qu'aucun n'est fourni", async () => {
     const res = await request(app)
       .post(`/api/factures/${factureSansEmailId}/envoyer`)

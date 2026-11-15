@@ -57,6 +57,7 @@
 </div>
 
 <script src="js/api.js"></script>
+<script src="js/whatsapp-share.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/sidebar.js"></script>
 <script>
@@ -67,6 +68,7 @@
   async function load(page) {
     if (page !== undefined) currentPage = page;
     const { factures, pagination } = await Api.get(`/factures?type=devis&page=${currentPage}`);
+    window.__sfBillingQuotes = factures;
     document.getElementById('devis-body').innerHTML = factures.length ? factures.map(f => `
       <tr>
         <td data-label="N°" class="mono">${escapeHtml(f.numero)}</td>
@@ -76,7 +78,8 @@
         <td data-label="Statut">${statutBadge(f.statut)}</td>
         <td data-label="Actions" class="devis-actions-cell">
           <button class="btn btn-sm btn-outline" onclick="printFacture(${f.id})">${Icon('printer')} Imprimer</button>
-          <button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))})'>${Icon('mail')} Envoyer</button>
+          <button class="btn btn-sm btn-outline" onclick='openSendModal(${f.id}, ${escapeHtml(JSON.stringify(f.client_email || ""))})'>${Icon('mail')} Email</button>
+          <button class="btn btn-sm btn-outline is-whatsapp" title="Partager par WhatsApp" onclick="partagerDocumentWhatsApp(window.__sfBillingQuotes.find(item => Number(item.id) === ${Number(f.id)}))">${Icon('message-circle')} WhatsApp</button>
           <button class="btn btn-sm btn-outline" onclick="dupliquerDevis(${f.id})">${Icon('copy')} Dupliquer</button>
           <button class="btn btn-sm btn-primary" onclick="transformer(${f.id})">${Icon('arrow-right')} Facture</button>
         </td>

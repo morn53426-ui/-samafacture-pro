@@ -322,29 +322,39 @@ function initRealtime() {
   script.src = 'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js';
   script.onload = () => {
     if (typeof io === 'undefined') return;
-    const socket = io({ auth: { token } });
+    let socket = null;
+    const connecterNotifications = () => {
+      // La page Professionnel peut changer d'entreprise sans rechargement complet.
+      // Recréer le socket force une nouvelle validation d'adhésion et un changement de salle.
+      if (socket) socket.disconnect();
+      const companyOwner = localStorage.getItem('sf_company_owner');
+      socket = io({ auth: { token, companyOwner: companyOwner || null } });
 
-    socket.on('facture_payee', (data) => {
-      const numero = data.facture?.numero || '';
-      pushWorkspaceNotification('Paiement reçu', numero ? 'La facture ' + numero + ' a été marquée payée.' : 'Une facture a été marquée payée.', 'success');
-      showToast(`Facture ${numero} marquée payée ✓`, 'success');
-    });
-    socket.on('nouveau_client', (data) => {
-      const nom = data.client?.nom || 'Nouveau client';
-      pushWorkspaceNotification('Nouveau client', nom + ' a été ajouté à votre portefeuille clients.', 'info');
-      showToast(`Nouveau client ajouté : ${nom}`, 'success');
-    });
-    socket.on('alerte_quota', (data) => {
-      const message = data.message || 'Une limite de votre abonnement approche.';
-      pushWorkspaceNotification('Alerte de quota', message, 'warning');
-      showToast(message, 'error');
-    });
-    socket.on('connect_error', (err) => {
-      // Ne bloque jamais l'utilisation de l'application si les notifications temps réel
-      // sont indisponibles (réseau restrictif, serveur sans WebSocket...) — dégradation
-      // silencieuse, l'app continue de fonctionner normalement sans elles.
-      console.warn('Notifications temps réel indisponibles :', err.message);
-    });
+      socket.on('facture_payee', (data) => {
+        const numero = data.facture?.numero || '';
+        pushWorkspaceNotification('Paiement reçu', numero ? 'La facture ' + numero + ' a été marquée payée.' : 'Une facture a été marquée payée.', 'success');
+        showToast(`Facture ${numero} marquée payée ✓`, 'success');
+      });
+      socket.on('nouveau_client', (data) => {
+        const nom = data.client?.nom || 'Nouveau client';
+        pushWorkspaceNotification('Nouveau client', nom + ' a été ajouté à votre portefeuille clients.', 'info');
+        showToast(`Nouveau client ajouté : ${nom}`, 'success');
+      });
+      socket.on('alerte_quota', (data) => {
+        const message = data.message || 'Une limite de votre abonnement approche.';
+        pushWorkspaceNotification('Alerte de quota', message, 'warning');
+        showToast(message, 'error');
+      });
+      socket.on('connect_error', (err) => {
+        // Ne bloque jamais l'utilisation de l'application si les notifications temps réel
+        // sont indisponibles (réseau restrictif, serveur sans WebSocket...) — dégradation
+        // silencieuse, l'app continue de fonctionner normalement sans elles.
+        console.warn('Notifications temps réel indisponibles :', err.message);
+      });
+    };
+
+    connecterNotifications();
+    window.addEventListener('sf-company-changed', connecterNotifications);
   };
   script.onerror = () => { window.__samafactureSocketLoading = false; };
   document.head.appendChild(script);

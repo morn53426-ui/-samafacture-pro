@@ -121,7 +121,7 @@ function createFactureTemplates(helpers) {
     `).join('');
   }
 
-  function totalsRowsHtml(facture, isDevis, borderColor, personnalisation) {
+  function totalsRowsHtml(facture, borderColor, personnalisation) {
     const accent = accentColor(personnalisation, borderColor);
     const discount = Math.max(0, Number(facture.remise) || 0);
     const delivery = Math.max(0, Number(facture.frais_livraison) || 0);
@@ -158,7 +158,7 @@ function createFactureTemplates(helpers) {
 
   function footerHtml(user, facture, isDevis, stampClass, qrCode, personnalisation) {
     return `
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
+      <div class="sf-doc-footer" style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
         <div style="max-width:55%; color:var(--ink-soft); font-size:0.85rem;">
           ${facture.commentaires ? `<div>${escapeHtml(facture.commentaires)}</div>` : ''}
           ${facture.mode_paiement ? `<div style="margin-top:6px;">Mode de paiement : ${escapeHtml(facture.mode_paiement)}</div>` : ''}
@@ -212,7 +212,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--navy-950)', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, 'var(--navy-950)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -256,7 +256,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:290px; background:var(--emerald-light); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, 'var(--emerald)', personnalisation)}</div>
+        <div style="width:290px; background:var(--emerald-light); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, 'var(--emerald)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -293,7 +293,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:260px;">${totalsRowsHtml(facture, isDevis, '#111', personnalisation)}</div>
+        <div style="width:260px;">${totalsRowsHtml(facture, '#111', personnalisation)}</div>
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; padding-top:14px; border-top:1px solid #ccc; gap:16px;">
@@ -339,7 +339,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -389,7 +389,7 @@ function createFactureTemplates(helpers) {
           ${facture.mode_paiement ? `<div style="margin-top:6px;"><strong style="color:var(--navy-900);">Paiement :</strong> ${escapeHtml(facture.mode_paiement)}</div>` : ''}
           ${signatureHtml(user, 180)}
         </div>
-        <div style="width:280px; border:1px solid var(--line); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, 'var(--navy-950)', personnalisation)}</div>
+        <div style="width:280px; border:1px solid var(--line); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, 'var(--navy-950)', personnalisation)}</div>
       </div>
     `;
   }
@@ -429,7 +429,7 @@ function createFactureTemplates(helpers) {
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
         <div class="sf-total-panel-dark" style="width:290px; background:var(--navy-950); color:#fff; border-radius:14px; padding:14px 18px;">
-          ${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}
+          ${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}
         </div>
       </div>
 
@@ -494,7 +494,7 @@ function createFactureTemplates(helpers) {
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
         <div class="sf-total-panel-dark" style="width:290px; background:var(--navy-950); border:1px solid var(--gold); border-radius:8px; padding:14px 18px; color:#fff;">
-          ${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}
+          ${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}
         </div>
       </div>
 
@@ -536,7 +536,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -578,7 +578,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:20px;">
-        <div style="width:270px;">${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}</div>
+        <div style="width:270px;">${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -631,7 +631,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, '#111', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, '#111', personnalisation)}</div>
       </div>
 
       ${facture.commentaires ? `
@@ -744,7 +744,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--emerald)', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, 'var(--emerald)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -784,7 +784,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:290px; border:1px solid var(--navy-950); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, 'var(--navy-950)', personnalisation)}</div>
+        <div style="width:290px; border:1px solid var(--navy-950); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, 'var(--navy-950)', personnalisation)}</div>
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
@@ -838,7 +838,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px; border:2px solid #C1622B; border-radius:8px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, '#8A3F16', personnalisation)}</div>
+        <div style="width:280px; border:2px solid #C1622B; border-radius:8px; padding:14px 18px;">${totalsRowsHtml(facture, '#8A3F16', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -872,7 +872,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:270px; border-top:2px dashed var(--clay); padding-top:10px;">${totalsRowsHtml(facture, isDevis, 'var(--clay)', personnalisation)}</div>
+        <div style="width:270px; border-top:2px dashed var(--clay); padding-top:10px;">${totalsRowsHtml(facture, 'var(--clay)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -1011,18 +1011,132 @@ function createFactureTemplates(helpers) {
     `;
   }
 
+
+  // --- Collection Entreprise : quatre mises en page exclusives supplémentaires. ---
+  // Les données, calculs, blocs TVA et mentions restent communs aux autres modèles.
+
+  function renderExecutive(user, facture, lignes, isDevis, qrCode, personnalisation) {
+    return `
+      <div style="margin:-40px -40px 28px; padding:28px 40px 25px; background:#172840; border-bottom:4px solid #C8A96B; color:#fff; display:flex; justify-content:space-between; align-items:center; gap:18px;">
+        <div style="display:flex; align-items:center; gap:15px; min-width:0;">
+          ${user.entreprise_logo ? `<div style="width:58px;height:58px;display:grid;place-items:center;padding:5px;border-radius:8px;background:#fff;">${logoHtml(user,48,personnalisation)}</div>` : ''}
+          <div><div style="font-family:var(--font-display);font-size:1.14rem;font-weight:800;">${escapeHtml(user.entreprise_nom || user.nom)}</div>
+            <div style="margin-top:5px;color:#C8D2DF;font-size:.76rem;">${escapeHtml(user.entreprise_adresse || '')}</div>
+            <div style="color:#C8D2DF;font-size:.72rem;">${escapeHtml(user.entreprise_telephone || '')} ${user.entreprise_email ? '· ' + escapeHtml(user.entreprise_email) : ''}</div></div>
+        </div>
+        <div style="text-align:right;flex:0 0 auto;"><div style="color:#D9BF8A;font-size:.65rem;font-weight:800;letter-spacing:.2em;">SÉRIE EXÉCUTIVE</div>
+          <div style="margin-top:7px;font-family:var(--font-display);font-size:1.42rem;font-weight:800;letter-spacing:.08em;">${isDevis ? 'DEVIS' : 'FACTURE'}</div>
+          <div style="margin-top:3px;color:#DCE4EF;font-size:.78rem;">N° ${escapeHtml(facture.numero)}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-bottom:25px;">
+        <div style="padding:15px 17px;border-left:3px solid #C8A96B;background:#F6F7F9;">
+          <div style="color:#7A8492;font-size:.66rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin-bottom:8px;">Destinataire</div>${clientBlockHtml(facture)}
+        </div>
+        <div style="padding:14px 16px;border:1px solid #E1E5EA;border-radius:8px;">
+          <div style="color:#7A8492;font-size:.66rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin-bottom:8px;">Références du document</div>
+          <div style="font-size:.8rem;line-height:1.9;"><span style="color:#7A8492;">Date d’émission</span> ${formatDate(facture.date_emission)}</div>
+          <div style="font-size:.8rem;line-height:1.9;"><span style="color:#7A8492;">${isDevis ? 'Validité du devis' : 'Échéance de paiement'}</span> ${formatDate(isDevis ? facture.date_validite : facture.date_echeance)}</div>
+          <div style="margin-top:7px;">${statutBadge(facture.statut)}</div>
+        </div>
+      </div>
+      <table><thead><tr><th style="background:#172840;color:#fff;">Désignation</th><th style="background:#172840;color:#fff;">Qté</th><th style="background:#172840;color:#fff;">Prix U.</th><th style="background:#172840;color:#fff;">TVA</th><th style="background:#172840;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
+      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:300px;padding:15px 18px;border-top:3px solid #C8A96B;background:#F5F6F8;">${totalsRowsHtml(facture,'#172840',personnalisation)}</div></div>
+      ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
+    `;
+  }
+
+  function renderInstitution(user, facture, lignes, isDevis, qrCode, personnalisation) {
+    return `
+      <div style="padding-bottom:20px;margin-bottom:24px;border-top:5px solid #315A78;border-bottom:1px solid #C9D4DE;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding:19px 0 16px;">
+          <div style="display:flex;align-items:center;gap:13px;min-width:0;">${user.entreprise_logo ? `<div style="width:54px;height:54px;display:grid;place-items:center;">${logoHtml(user,48,personnalisation)}</div>` : ''}
+            <div><div style="font-family:var(--font-display);font-size:1.04rem;font-weight:800;color:#24465F;">${escapeHtml(user.entreprise_nom || user.nom)}</div>
+              <div style="margin-top:4px;color:#66798A;font-size:.76rem;">${escapeHtml(user.entreprise_adresse || '')}</div>
+              <div style="color:#66798A;font-size:.72rem;">${escapeHtml(user.entreprise_telephone || '')} ${user.entreprise_email ? '· ' + escapeHtml(user.entreprise_email) : ''}</div></div>
+          </div>
+          <div style="min-width:145px;text-align:right;"><div style="color:#315A78;font-size:.64rem;font-weight:800;letter-spacing:.16em;">DOCUMENT COMMERCIAL</div>
+            <div style="margin-top:7px;color:#203C54;font-family:var(--font-display);font-size:1.28rem;font-weight:800;">${isDevis ? 'DEVIS' : 'FACTURE'}</div>
+            <div style="font-size:.76rem;color:#66798A;">${escapeHtml(facture.numero)}</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #DCE3E9;">
+          <div style="padding:10px 12px;border-right:1px solid #DCE3E9;"><div style="color:#718293;font-size:.62rem;text-transform:uppercase;">Date d’émission</div><strong style="display:block;margin-top:3px;color:#263F55;font-size:.78rem;">${formatDate(facture.date_emission)}</strong></div>
+          <div style="padding:10px 12px;border-right:1px solid #DCE3E9;"><div style="color:#718293;font-size:.62rem;text-transform:uppercase;">${isDevis ? 'Validité' : 'Échéance'}</div><strong style="display:block;margin-top:3px;color:#263F55;font-size:.78rem;">${formatDate(isDevis ? facture.date_validite : facture.date_echeance)}</strong></div>
+          <div style="padding:10px 12px;"><div style="color:#718293;font-size:.62rem;text-transform:uppercase;">Statut</div><div style="margin-top:3px;">${statutBadge(facture.statut)}</div></div>
+        </div>
+      </div>
+      <div style="margin-bottom:23px;padding:14px 17px;border:1px solid #DCE3E9;border-radius:4px;"><div style="color:#315A78;font-size:.66rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin-bottom:7px;">À l’attention de</div>${clientBlockHtml(facture)}</div>
+      <table><thead><tr><th style="background:#315A78;color:#fff;">Désignation</th><th style="background:#315A78;color:#fff;">Qté</th><th style="background:#315A78;color:#fff;">Prix U.</th><th style="background:#315A78;color:#fff;">TVA</th><th style="background:#315A78;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
+      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:285px;padding:14px 16px;border:1px solid #CAD5DF;border-top:3px solid #315A78;background:#F7F9FB;">${totalsRowsHtml(facture,'#315A78',personnalisation)}</div></div>
+      ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
+    `;
+  }
+
+  function renderSignature(user, facture, lignes, isDevis, qrCode, personnalisation) {
+    return `
+      <div style="margin:-40px -40px 28px;padding:27px 40px 24px;border-top:7px solid #174D46;background:#F4F6F1;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;">
+          <div style="max-width:65%;"><div style="color:#9A7B4F;font-size:.64rem;font-weight:800;letter-spacing:.2em;">SÉLECTION SIGNATURE</div>
+            <div style="margin-top:8px;color:#173D38;font-family:var(--font-display);font-size:1.48rem;font-weight:800;letter-spacing:-.035em;">${escapeHtml(user.entreprise_nom || user.nom)}</div>
+            <div style="margin-top:5px;color:#64756F;font-size:.76rem;line-height:1.55;">${escapeHtml(user.entreprise_adresse || '')}<br/>${escapeHtml(user.entreprise_telephone || '')} ${user.entreprise_email ? '· ' + escapeHtml(user.entreprise_email) : ''}</div></div>
+          <div style="width:76px;height:76px;display:grid;place-items:center;padding:7px;border:1px solid #C7B18A;border-radius:50%;background:#fff;">${logoHtml(user,58,personnalisation)}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:15px;margin-top:21px;padding-top:14px;border-top:1px solid #D8DED6;">
+          <div style="color:#174D46;font-family:var(--font-display);font-size:1.15rem;font-weight:800;letter-spacing:.12em;">${isDevis ? 'PROPOSITION' : 'FACTURE'}</div>
+          <div style="color:#9A7B4F;font-size:.75rem;font-weight:800;letter-spacing:.1em;">N° ${escapeHtml(facture.numero)}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:25px;">
+        <div><div style="color:#9A7B4F;font-size:.64rem;font-weight:800;letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px;">Destinataire</div>${clientBlockHtml(facture)}</div>
+        <div style="padding:12px 15px;border-left:2px solid #C7B18A;background:#F8F8F5;font-size:.8rem;line-height:1.9;">
+          <div><span style="color:#718078;">Date d’émission :</span> ${formatDate(facture.date_emission)}</div>
+          <div><span style="color:#718078;">${isDevis ? 'Validité du devis :' : 'Échéance de paiement :'}</span> ${formatDate(isDevis ? facture.date_validite : facture.date_echeance)}</div>
+          <div style="margin-top:5px;">${statutBadge(facture.statut)}</div>
+        </div>
+      </div>
+      <table><thead><tr><th style="background:#174D46;color:#fff;">Désignation</th><th style="background:#174D46;color:#fff;">Qté</th><th style="background:#174D46;color:#fff;">Prix U.</th><th style="background:#174D46;color:#fff;">TVA</th><th style="background:#174D46;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
+      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:295px;padding:14px 17px;border-top:2px solid #C7B18A;background:#F5F6F1;">${totalsRowsHtml(facture,'#174D46',personnalisation)}</div></div>
+      ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
+    `;
+  }
+
+  function renderConsolide(user, facture, lignes, isDevis, qrCode, personnalisation) {
+    return `
+      <div style="margin:-40px -40px 27px;padding:25px 40px 23px;background:#202E43;color:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px;">
+          <div><div style="color:#A9B8CA;font-size:.62rem;font-weight:800;letter-spacing:.2em;">ESPACE FINANCE & GESTION</div>
+            <div style="margin-top:7px;font-family:var(--font-display);font-size:1.22rem;font-weight:800;">${escapeHtml(user.entreprise_nom || user.nom)}</div>
+            <div style="margin-top:4px;color:#C6D0DD;font-size:.74rem;">${escapeHtml(user.entreprise_adresse || '')}</div></div>
+          <div style="text-align:right;">${user.entreprise_logo ? `<div style="margin-bottom:8px;">${logoHtml(user,45,personnalisation)}</div>` : ''}
+            <div style="color:#D8BF8D;font-size:.65rem;font-weight:800;letter-spacing:.16em;">${isDevis ? 'DEVIS' : 'FACTURE'}</div>
+            <div style="margin-top:4px;font-size:.86rem;font-weight:700;">${escapeHtml(facture.numero)}</div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:23px;">
+        <div style="padding:10px;border:1px solid #DCE2E9;background:#F7F8FA;"><div style="color:#7A8797;font-size:.59rem;font-weight:800;letter-spacing:.08em;">ÉMISSION</div><strong style="display:block;margin-top:5px;color:#24364D;font-size:.72rem;">${formatDate(facture.date_emission)}</strong></div>
+        <div style="padding:10px;border:1px solid #DCE2E9;background:#F7F8FA;"><div style="color:#7A8797;font-size:.59rem;font-weight:800;letter-spacing:.08em;">${isDevis ? 'VALIDITÉ' : 'ÉCHÉANCE'}</div><strong style="display:block;margin-top:5px;color:#24364D;font-size:.72rem;">${formatDate(isDevis ? facture.date_validite : facture.date_echeance)}</strong></div>
+        <div style="padding:10px;border:1px solid #DCE2E9;background:#F7F8FA;"><div style="color:#7A8797;font-size:.59rem;font-weight:800;letter-spacing:.08em;">CLIENT</div><strong style="display:block;margin-top:5px;color:#24364D;font-size:.72rem;">${escapeHtml(facture.client_nom)}</strong></div>
+        <div style="padding:10px;border:1px solid #DCE2E9;background:#F7F8FA;"><div style="color:#7A8797;font-size:.59rem;font-weight:800;letter-spacing:.08em;">STATUT</div><div style="margin-top:4px;">${statutBadge(facture.statut)}</div></div>
+      </div>
+      <div style="margin-bottom:22px;padding:13px 16px;border-left:3px solid #5C789A;background:#F4F6F8;"><div style="color:#6C7D91;font-size:.64rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Coordonnées du client</div>${clientBlockHtml(facture)}</div>
+      <table><thead><tr><th style="background:#202E43;color:#fff;">Désignation</th><th style="background:#202E43;color:#fff;">Qté</th><th style="background:#202E43;color:#fff;">Prix U.</th><th style="background:#202E43;color:#fff;">TVA</th><th style="background:#202E43;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
+      <div style="display:flex;justify-content:flex-end;margin-top:19px;"><div style="width:300px;padding:14px 17px;border:1px solid #C9D2DE;border-radius:7px;background:#F7F8FA;">${totalsRowsHtml(facture,'#202E43',personnalisation)}</div></div>
+      ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
+    `;
+  }
+
   const RENDERERS = {
     classique: renderClassique, moderne: renderModerne, minimaliste: renderMinimaliste,
     elegant: renderElegant, corporate: renderCorporate, creatif: renderCreatif,
     prestige: renderPrestige, heritage: renderHeritage, diamant: renderDiamant,
     epure: renderEpure, azur: renderAzur, circuit: renderCircuit,
-    platine: renderPlatine, atelier: renderAtelier, saveurs: renderSaveurs
+    platine: renderPlatine, atelier: renderAtelier, saveurs: renderSaveurs,
+    executive: renderExecutive, institution: renderInstitution, signature: renderSignature, consolide: renderConsolide
   };
 
   function renderInvoiceHtml({ user, facture, lignes, isDevis, qrCode, template, personnalisation }) {
     const render = RENDERERS[template] || renderClassique;
     // Un devis porte une date de validité, jamais une échéance de paiement.
-    // Les 15 modèles partagent le même champ d'affichage pour garder une présentation cohérente.
+    // Les 19 modèles partagent le même champ d'affichage pour garder une présentation cohérente.
     const facturePourRendu = isDevis
       ? { ...facture, date_echeance: facture.date_validite || null }
       : facture;
@@ -1034,9 +1148,25 @@ function createFactureTemplates(helpers) {
       '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
     html = html.replace(/<div style="font-size:0\.85rem;">([^<]+) → ([^<]+)<\/div>/,
       '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
-    if (isDevis) html = html.replace(/Échéance/g, 'Validité du devis');
+    // Uniformiser les intitulés de dates dans tous les en-têtes historiques des 19 modèles.
+    // Certains anciens modèles emploient un libellé court ou ajoutent un deux-points.
+    // On remplace uniquement le texte du nœud HTML, jamais les commentaires ni les conditions libres.
+    const dateEmissionLabel = 'Date d’émission :';
+    const dateLimiteLabel = isDevis ? 'Validité du devis :' : 'Échéance de paiement :';
+    html = html
+      .replace(/>\s*(?:ÉMISSION|Émis le|Date d’émission|Date d'émission|Date d’édition|Date d'édition)\s*:?\s*</gi,
+        '>' + dateEmissionLabel + '<')
+      .replace(/>\s*(?:ÉCHÉANCE DE PAIEMENT|ÉCHÉANCE|À régler avant le|Échéance|DATE LIMITE)\s*:?\s*</gi,
+        '>' + dateLimiteLabel + '<')
+      .replace(/>\s*(?:VALIDITÉ DU DEVIS|VALIDITÉ|Valable jusqu’au|Valable jusqu'au|Validité)\s*:?\s*</gi,
+        '>' + dateLimiteLabel + '<');
+    if (isDevis) {
+      // Le modèle Corporate possède aussi un titre composite "Émission / Échéance".
+      // Le corriger pour ne laisser aucune notion de règlement sur un devis.
+      html = html.replace(/Émission\s*\/\s*Échéance/gi, 'Émission / Validité du devis');
+    }
 
-    // Le bloc de références est partagé par les 15 modèles pour conserver les mêmes
+    // Le bloc de références est partagé par les 19 modèles modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
     const meta = documentMetaHtml(facture, isDevis, template === 'minimaliste' || template === 'saveurs', user, html);
     const firstTable = html.indexOf('<table');

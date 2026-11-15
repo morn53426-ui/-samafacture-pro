@@ -116,11 +116,16 @@ router.get('/consulter/:id/:code', verifyLimiter, async (req, res, next) => {
     // `client_id`. Chaque champ ci-dessous a été vérifié comme effectivement utilisé par
     // public/consulter.html avant d'être gardé.
     const [rows] = await pool.query(
-      `SELECT f.numero, f.type, f.date_emission, f.date_echeance, f.statut, f.remise,
+      `SELECT f.numero, f.type, f.date_emission, f.date_echeance, f.date_validite,
+              f.objet, f.reference_externe, f.conditions_reglement, f.devise, f.statut, f.remise,
               f.frais_livraison, f.mode_paiement, f.commentaires, f.sous_total, f.total_tva,
               f.total, f.montant_paye,
               c.nom as client_nom, c.email as client_email, c.telephone as client_telephone, c.adresse as client_adresse,
-              u.entreprise_nom, u.nom as user_nom, u.entreprise_adresse, u.entreprise_telephone, u.entreprise_email, u.entreprise_logo, u.devise
+              u.entreprise_nom, u.nom as user_nom, u.entreprise_adresse, u.entreprise_telephone,
+              u.entreprise_email, u.entreprise_logo, u.entreprise_ninea, u.entreprise_rccm,
+              u.entreprise_site_web, u.entreprise_banque, u.entreprise_rib,
+              u.entreprise_conditions_reglement, u.entreprise_mentions_legales,
+              u.signature_default, u.facture_template, u.facture_personnalisation
        FROM factures f
        JOIN clients c ON c.id = f.client_id
        JOIN users u ON u.id = f.user_id
@@ -129,6 +134,13 @@ router.get('/consulter/:id/:code', verifyLimiter, async (req, res, next) => {
     );
     const facture = rows[0];
     if (!facture) return res.status(404).json({ error: 'Document introuvable ou lien invalide.' });
+    try {
+      facture.facture_personnalisation = facture.facture_personnalisation
+        ? JSON.parse(facture.facture_personnalisation)
+        : null;
+    } catch (_) {
+      facture.facture_personnalisation = null;
+    }
 
     // req.params.id reste un identifiant sûr pour cette deuxième requête : on ne l'utilise que
     // parce que la première a déjà confirmé la correspondance id+code ci-dessus.

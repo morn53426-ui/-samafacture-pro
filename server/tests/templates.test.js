@@ -1,5 +1,7 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { createFactureTemplates } = require('../../public/js/facture-templates.js');
 
 // Test unitaire pur : ne touche ni la base de test ni le serveur HTTP, contrairement aux
@@ -14,8 +16,39 @@ const { createFactureTemplates } = require('../../public/js/facture-templates.js
 // dans un sens ou dans l'autre fait échouer 'tous les modèles connus du serveur sont rendables'.
 const TEMPLATES_ATTENDUS = [
   'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
-  'prestige', 'heritage', 'diamant', 'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs'
+  'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
+  'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs'
 ];
+
+describe('Galerie de sélection des modèles (public/parametres.html)', () => {
+  test('présente les dix-neuf rendus réels et affiche clairement les restrictions de formule', () => {
+    const settingsPath = path.resolve(__dirname, '../../public/parametres.html');
+    const source = fs.readFileSync(settingsPath, 'utf8');
+    const declaration = source.match(/const INVOICE_TEMPLATE_META = \[([\s\S]*?)\n  \];/);
+
+    assert.ok(declaration, 'La page Paramètres doit déclarer son catalogue visuel de modèles.');
+    const galleryIds = Array.from(declaration[1].matchAll(/id: '([^']+)'/g), match => match[1]);
+    assert.deepEqual([...galleryIds].sort(), [...TEMPLATES_ATTENDUS].sort(),
+      'La galerie doit rester synchronisée avec les dix-neuf modèles rendus par le moteur.');
+
+    assert.match(source, /id="invoice-template-gallery"/,
+      'La page doit offrir une zone de galerie dédiée.');
+    assert.match(source, /renderer\.renderInvoiceHtml\(/,
+      'Les vignettes doivent utiliser le véritable moteur de rendu des factures.');
+    assert.match(source, /invoice-template-preview-canvas/,
+      'Chaque modèle doit être présenté dans un aperçu visuel.');
+    assert.match(source, /data-select-template/,
+      'Un modèle disponible doit pouvoir être sélectionné depuis sa vignette.');
+    assert.match(source, /aria-pressed/,
+      'La sélection doit être annoncée correctement aux technologies d’assistance.');
+    assert.match(source, /PRO_TEMPLATE_IDS = new Set\(\['elegant', 'corporate', 'creatif'\]\)/,
+      'Les modèles Pro doivent être clairement identifiés comme réservés au plan Pro.');
+    assert.match(source, /ENTERPRISE_TEMPLATE_IDS = new Set\(\['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide'\]\)/,
+      'Les modèles Entreprise doivent être clairement identifiés comme réservés au plan Entreprise.');
+    assert.match(source, /invoice-template-native-select/,
+      'La valeur choisie dans la galerie doit rester synchronisée avec le champ enregistré.');
+  });
+});
 
 function helpersDeTest() {
   return {
@@ -79,6 +112,18 @@ const lignesDeTest = [
   { designation: 'Document exonéré', quantite: 1, prix_unitaire: 5000, tva: 0, total_ligne: 5000 }
 ];
 
+describe('Consultation publique des factures et devis', () => {
+  test('la page publique utilise le moteur partagé et la personnalisation enregistrée', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../public/consulter.html'), 'utf8');
+    const route = fs.readFileSync(path.resolve(__dirname, '../routes/public.js'), 'utf8');
+    assert.match(source, /js\/facture-templates\.js/);
+    assert.match(source, /templates\.renderInvoiceHtml\(/);
+    assert.match(source, /facture\.facture_personnalisation/);
+    assert.match(route, /f\.date_validite/);
+    assert.match(route, /f\.devise/);
+    assert.match(route, /u\.facture_template/);
+  });
+});
 describe('Modèles de facture (public/js/facture-templates.js)', () => {
   const templates = createFactureTemplates(helpersDeTest());
 
@@ -233,5 +278,37 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       isDevis: false, qrCode: null, template: 'ce-modele-nexiste-pas'
     });
     assert.match(html, /FA-2026-0042/);
+  });
+});
+
+
+describe('Impression et génération PDF', () => {
+  const pageSource = fs.readFileSync(path.resolve(__dirname, '../../public/facture-detail.html'), 'utf8');
+  const pdfSource = fs.readFileSync(path.resolve(__dirname, '../utils/pdf.js'), 'utf8');
+  const cssSource = fs.readFileSync(path.resolve(__dirname, '../../public/css/style.css'), 'utf8');
+  const rendererSource = fs.readFileSync(path.resolve(__dirname, '../../public/js/facture-templates.js'), 'utf8');
+
+  test("l'impression force temporairement la palette papier puis restaure le thème utilisateur", () => {
+    assert.match(pageSource, /window\.addEventListener\('beforeprint', preparerThemeImpression\)/);
+    assert.match(pageSource, /window\.addEventListener\('afterprint', restaurerThemeApresImpression\)/);
+    assert.match(pageSource, /setAttribute\('data-theme', 'light'\)/);
+    assert.match(pageSource, /removeAttribute\('data-theme'\)/,
+      "Le thème système doit être restauré lorsqu'aucun thème explicite n'était mémorisé.");
+    assert.match(pdfSource, /setAttribute\('data-theme', 'light'\)/,
+      'La génération PDF serveur doit aussi ignorer le thème sombre mémorisé.');
+  });
+
+  test("l'impression conserve les couleurs des modèles et évite de couper le pied de page", () => {
+    assert.match(cssSource, /@media print[\s\S]*?\.invoice-doc[\s\S]*?--navy-950:\s*#24211D/);
+    assert.match(cssSource, /print-color-adjust:\s*exact !important/);
+    assert.match(cssSource, /\.invoice-doc \.sf-document-table thead\s*\{\s*display:\s*table-header-group !important;/);
+    assert.match(rendererSource, /class="sf-doc-footer"/,
+      'Le pied de facture doit rester groupé lors des sauts de page.');
+  });
+
+  test('le téléchargement laisse au navigateur le temps de lire le fichier PDF', () => {
+    assert.match(pageSource, /setTimeout\(\(\) => URL\.revokeObjectURL\(url\), 60_000\)/);
+    assert.match(pageSource, /if \(!blob\.size\)/,
+      'Un fichier vide ne doit pas être présenté comme un téléchargement réussi.');
   });
 });

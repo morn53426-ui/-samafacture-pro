@@ -3,10 +3,8 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
-// Couvre les nouveaux modèles ajoutés au lot 2026-08 (voir public/js/facture-templates.js et
-// RAPPORT_MODELES.md) côté PUT /api/auth/entreprise : un modèle gratuit doit s'enregistrer
-// pour n'importe quel plan, et le modèle "platine" (exclusif Entreprise, comme
-// prestige/heritage/diamant) doit suivre exactement la même règle qu'eux.
+// Vérifie côté PUT /api/auth/entreprise que les modèles gratuits s'enregistrent et que
+// les huit modèles Entreprise restent interdits hors du plan Entreprise.
 describe('Nouveaux modèles de facture — PUT /api/auth/entreprise', () => {
   let userId, token;
   const email = emailDeTest('modeles');
@@ -36,25 +34,34 @@ describe('Nouveaux modèles de facture — PUT /api/auth/entreprise', () => {
     });
   }
 
-  test('le modèle "platine" est refusé (403) sur le plan gratuit, avec le même code que prestige/heritage/diamant', async () => {
-    const res = await request(app)
-      .put('/api/auth/entreprise')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: 'platine' });
+  const enterpriseTemplates = ['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide'];
 
-    assert.equal(res.status, 403);
-    assert.equal(res.body.code, 'FONCTIONNALITE_ENTREPRISE');
-  });
+  for (const plan of ['gratuit', 'starter', 'pro']) {
+    test(`les modèles Entreprise sont refusés sur le plan ${plan}`, async () => {
+      await pool.query("UPDATE users SET plan = ? WHERE id = ?", [plan, userId]);
+      for (const template of enterpriseTemplates) {
+        const res = await request(app)
+          .put('/api/auth/entreprise')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: template });
 
-  test('le modèle "platine" s\'enregistre une fois le compte passé au plan Entreprise', async () => {
+        assert.equal(res.status, 403, `${template} doit être réservé au plan Entreprise`);
+        assert.equal(res.body.code, 'FONCTIONNALITE_ENTREPRISE');
+      }
+    });
+  }
+
+  test('les huit modèles exclusifs s’enregistrent après le passage au plan Entreprise', async () => {
     await pool.query("UPDATE users SET plan = 'entreprise' WHERE id = ?", [userId]);
-    const res = await request(app)
-      .put('/api/auth/entreprise')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: 'platine' });
+    for (const template of enterpriseTemplates) {
+      const res = await request(app)
+        .put('/api/auth/entreprise')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: template });
 
-    assert.equal(res.status, 200);
-    assert.equal(res.body.user.facture_template, 'platine');
+      assert.equal(res.status, 200);
+      assert.equal(res.body.user.facture_template, template);
+    }
   });
 
   test('un identifiant de modèle invalide retombe sur "classique" plutôt que de faire échouer la requête', async () => {

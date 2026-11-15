@@ -97,7 +97,7 @@ Créer un compte propriétaire de test et un second compte membre. Utiliser uniq
 
 - **Authentification** : inscription, déconnexion, connexion, réinitialisation de session et accès refusé sans authentification.
 - **Catalogue et clients** : créer, modifier, consulter et supprimer un client et un produit fictifs.
-- **Facturation** : établir un devis, le convertir en facture, générer le PDF, consulter la version publique avec code/QR et vérifier les montants et la TVA.
+- **Facturation** : établir un devis, le convertir en facture, générer le PDF, consulter la version publique avec code/QR et vérifier les montants, la TVA, la devise et la date de validité du devis. Le client doit voir le modèle choisi par l'entreprise.
 - **Encaissements** : enregistrer un paiement manuel de test, contrôler le solde restant et l'historique. Les liens/QR de cette extension sont des demandes de paiement ; ils ne déclenchent pas un débit Wave/Orange Money/PayDunya.
 - **Équipe** : inviter le second compte, accepter l'invitation, ouvrir l'espace entreprise, attribuer le rôle lecture seule et vérifier qu'une création/modification est refusée.
 - **Séparation des entreprises** : tester deux espaces distincts et confirmer qu'un utilisateur ne voit ni ne modifie les clients, factures, documents et caisses de l'autre entreprise.
@@ -111,11 +111,13 @@ Créer un compte propriétaire de test et un second compte membre. Utiliser uniq
 
 - Les invitations et relances doivent arriver uniquement dans la boîte de test configurée.
 - Contrôler le contenu des liens, l'expiration des invitations et l'absence de secrets dans les emails et journaux.
+- Sans SMTP configuré, vérifier que l'API refuse de confirmer un envoi facture/relance (HTTP 503) et que les journaux ne contiennent ni destinataire, ni objet, ni lien/token.
 - Pour un webhook, vérifier la signature HMAC-SHA256, le statut de livraison et le comportement après réponse HTTP en erreur.
 - Ne pas tester avec un compte marchand réel ni effectuer de transactions réelles.
 - Les nouveaux liens et QR codes de la zone professionnelle sont des demandes de paiement, pas une intégration d'encaissement automatique.
 - Les demandes de remboursement restent un suivi interne : la restitution effective auprès du prestataire doit être manuelle tant qu'un connecteur dédié n'est pas réalisé.
-- WhatsApp automatique, antivirus des pièces jointes et signature qualifiée/certifiée ne sont pas disponibles dans cette version.
+- Le partage WhatsApp manuel ouvre un message prérempli via `wa.me` depuis les listes Factures/Devis et le détail : tester le champ WhatsApp enregistré (prioritaire au téléphone), un numéro sénégalais local et un numéro international explicite, puis confirmer manuellement l'envoi dans WhatsApp. Il ne s'agit pas d'un envoi automatique WhatsApp Business.
+- L'envoi WhatsApp Business automatique, l'antivirus des pièces jointes et la signature qualifiée/certifiée ne sont pas disponibles dans cette version.
 
 ## 7. Vérifier sauvegarde et restauration
 

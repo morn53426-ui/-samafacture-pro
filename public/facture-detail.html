@@ -51,6 +51,7 @@
   <div class="wrap">
     <div class="toolbar">
       <button class="btn btn-outline" onclick="window.close()">Fermer</button>
+      <button class="btn btn-outline is-whatsapp" onclick="partagerDocumentWhatsApp(window.__sfCurrentInvoice)"><i class="ic" data-icon="message-circle"></i> WhatsApp</button>
       <button class="btn btn-outline" onclick="telechargerPdf(this)"><i class="ic" data-icon="download"></i> Télécharger le PDF</button>
       <button class="btn btn-primary" onclick="window.print()"><i class="ic" data-icon="printer"></i> Imprimer / Exporter en PDF</button>
     </div>
@@ -58,12 +59,39 @@
   </div>
 
 <script src="js/api.js"></script>
+<script src="js/whatsapp-share.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/facture-templates.js"></script>
 <script>
   requireAuthPage();
   const id = new URLSearchParams(location.search).get('id');
   let user, templates;
+
+  // L'impression doit conserver la palette papier du modèle choisi, indépendamment du thème
+  // de l'application. Le thème utilisateur est restauré lorsque l'aperçu d'impression se ferme.
+  let themeAvantImpression = null;
+  let impressionEnCours = false;
+
+  function preparerThemeImpression() {
+    if (impressionEnCours) return;
+    impressionEnCours = true;
+    themeAvantImpression = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+
+  function restaurerThemeApresImpression() {
+    if (!impressionEnCours) return;
+    if (themeAvantImpression === null) {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', themeAvantImpression);
+    }
+    themeAvantImpression = null;
+    impressionEnCours = false;
+  }
+
+  window.addEventListener('beforeprint', preparerThemeImpression);
+  window.addEventListener('afterprint', restaurerThemeApresImpression);
 
   async function telechargerPdf(btn) {
     const restore = setButtonLoading(btn, 'Génération du PDF…');
@@ -76,6 +104,7 @@
         throw new Error(data.error || `Erreur ${res.status} lors de la génération du PDF.`);
       }
       const blob = await res.blob();
+      if (!blob.size) throw new Error('Le PDF généré est vide. Réessayez ou utilisez l’impression du navigateur.');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -83,7 +112,9 @@
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      // Certains navigateurs démarrent la lecture du téléchargement après le clic.
+      // Une révocation immédiate peut produire un PDF vide ou interrompu.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -108,6 +139,7 @@
       Api.get(`/factures/${id}`)
     ]);
     user = freshUser;
+    window.__sfCurrentInvoice = facture;
     templates = createFactureTemplates({
       escapeHtml, formatDate, statutBadge,
       formatMontant: (n) => formatMontant(n, user.devise)

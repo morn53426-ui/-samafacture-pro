@@ -19,20 +19,15 @@ function getTransporter() {
 }
 
 /**
- * Envoie un email si le SMTP est configuré (.env). Sinon, affiche le contenu dans la
- * console du serveur — utile pour tester la réinitialisation de mot de passe en local
- * sans avoir à configurer un vrai service d'email.
+ * Envoie un email si le SMTP est configuré (.env). En son absence, ne journalise jamais
+ * le destinataire, l'objet, le corps, les liens ni les jetons, qui peuvent contenir des
+ * données personnelles ou des secrets de réinitialisation/consultation.
  */
 async function sendMail({ to, subject, html, text, attachments }) {
   const t = getTransporter();
   if (!t) {
-    console.log('\n📧 SMTP non configuré — email non envoyé, contenu affiché ci-dessous :');
-    console.log(`   À : ${to}`);
-    console.log(`   Sujet : ${subject}`);
-    console.log(`   ${text || html}`);
-    if (attachments?.length) console.log(`   Pièce(s) jointe(s) : ${attachments.map(a => a.filename).join(', ')}`);
-    console.log('');
-    return { sent: false };
+    console.warn('SMTP non configuré : email non envoyé. Aucun contenu ni lien sensible n’a été journalisé.');
+    return { sent: false, reason: 'smtp_not_configured' };
   }
 
   await t.sendMail({

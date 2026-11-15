@@ -139,6 +139,10 @@ async function genererPdfFacture(factureId, user) {
     // bouton "Imprimer / Exporter en PDF" existant, pas de style dupliqué ici.
     // Capturer le document dans son état final : polices, logo, QR code et autres images
     // doivent être décodés avant l'impression pour éviter les blocs vides ou les sauts tardifs.
+    // Le PDF doit conserver la palette papier, indépendamment du thème de l'interface.
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-theme', 'light');
+    });
     await page.emulateMediaType('print');
     await page.evaluate(async () => {
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
