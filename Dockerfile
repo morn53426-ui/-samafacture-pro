@@ -42,12 +42,11 @@ RUN groupadd --system samafacture && useradd --system --gid samafacture --home /
     && mkdir -p /app/server/backups /app/server/pdf-jobs \
     && chown samafacture:samafacture /app /app/server /app/server/backups /app/server/pdf-jobs
 
-# Manifestes npm copiés seuls d'abord, pour profiter du cache Docker. Si un lockfile est
-# fourni, npm ci garantit des installations reproductibles ; sinon npm install permet au projet
-# de rester buildable (le dépôt actuel ne contient pas encore de package-lock.json).
-COPY server/package*.json ./server/
-ARG REQUIRE_LOCKFILE=false
-RUN cd server && if [ -f package-lock.json ]; then npm ci --omit=dev; elif [ "$REQUIRE_LOCKFILE" = "true" ]; then echo "ERREUR: server/package-lock.json requis pour ce build" >&2; exit 1; else npm install --omit=dev --no-audit --no-fund; fi
+# Le lockfile est versionné : le copier avant le code permet de profiter du cache Docker,
+# et npm ci garantit que toutes les images de production utilisent exactement les versions
+# validées par la CI. Le build échoue explicitement si le lockfile est absent ou incohérent.
+COPY server/package.json server/package-lock.json ./server/
+RUN cd server && npm ci --omit=dev --no-audit --no-fund
 
 # Code serveur, puis frontend statique (servi par Express depuis ../public — voir app.js).
 COPY --chown=samafacture:samafacture server ./server
