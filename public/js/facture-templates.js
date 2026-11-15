@@ -871,7 +871,7 @@ function createFactureTemplates(helpers) {
     `;
   }
 
-  function documentMetaHtml(facture, isDevis, includeDates = false) {
+  function documentMetaHtml(facture, isDevis, includeDates = false, user = null, renderedHtml = '') {
     const fields = [];
     if (facture.objet) fields.push(['Objet', escapeHtml(facture.objet)]);
     if (facture.reference_externe) fields.push(['Référence client / commande', escapeHtml(facture.reference_externe)]);
@@ -879,6 +879,17 @@ function createFactureTemplates(helpers) {
       // Les modèles Minimaliste et Saveurs ont déjà la date d'émission dans leur en-tête ;
       // on ne complète que la date qui leur manquait pour éviter les doublons visuels.
       fields.push([isDevis ? 'Validité du devis' : 'Échéance de paiement', formatDate(isDevis ? facture.date_validite : facture.date_echeance)]);
+    }
+    // Certains modèles privilégient un en-tête graphique plus compact. Les coordonnées
+    // manquantes sont ajoutées ici, sans dupliquer celles déjà présentes dans l'en-tête.
+    const rendered = String(renderedHtml || '');
+    if (user?.entreprise_telephone) {
+      const phone = escapeHtml(user.entreprise_telephone);
+      if (!rendered.includes(phone)) fields.push(['Téléphone de l’entreprise', phone]);
+    }
+    if (user?.entreprise_email) {
+      const email = escapeHtml(user.entreprise_email);
+      if (!rendered.includes(email)) fields.push(['Email de l’entreprise', email]);
     }
     if (!fields.length) return '';
     return `
@@ -1022,7 +1033,7 @@ function createFactureTemplates(helpers) {
 
     // Le bloc de références est partagé par les 15 modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
-    const meta = documentMetaHtml(facture, isDevis, template === 'minimaliste' || template === 'saveurs');
+    const meta = documentMetaHtml(facture, isDevis, template === 'minimaliste' || template === 'saveurs', user, html);
     const firstTable = html.indexOf('<table');
     if (meta && firstTable >= 0) html = html.slice(0, firstTable) + meta + html.slice(firstTable);
 
