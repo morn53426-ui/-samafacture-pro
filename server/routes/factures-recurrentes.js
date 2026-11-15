@@ -227,6 +227,7 @@ router.post('/:id/generer', async (req, res, next) => {
  */
 async function genererFactureDepuisModele(id, userId) {
   const conn = await pool.getConnection();
+  let transactionCommitted = false;
   try {
     await conn.beginTransaction();
     // Même ordre de verrouillage que les autres créations : compte, puis modèle.
@@ -245,6 +246,9 @@ async function genererFactureDepuisModele(id, userId) {
 
     const quota = await reserveMonthlyInvoiceQuota(conn, userId);
     if (!quota.allowed) {
+      // Le compteur reconstitué est une donnée de quota, pas la facture refusée.
+      await conn.commit();
+      transactionCommitted = true;
       const error = new Error(`Le plan Gratuit est limité à ${quota.limit} factures par mois.`);
       error.code = 'QUOTA_DEPASSE';
       throw error;
@@ -289,10 +293,11 @@ async function genererFactureDepuisModele(id, userId) {
     );
 
     await conn.commit();
+    transactionCommitted = true;
     const [factureRows] = await pool.query('SELECT * FROM factures WHERE id = ?', [factureId]);
     return factureRows[0];
   } catch (err) {
-    await conn.rollback();
+    if (!transactionCommitted) await conn.rollback();
     throw err;
   } finally {
     conn.release();

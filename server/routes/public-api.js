@@ -89,7 +89,8 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
     await conn.beginTransaction();
     const quota = await reserveMonthlyInvoiceQuota(conn, uid);
     if (!quota.allowed) {
-      await conn.rollback();
+      // Conserver le registre reconstitué, même si la facture est refusée.
+      await conn.commit();
       return res.status(403).json({
         error: `Le quota mensuel de ${quota.limit} factures gratuites est atteint.`,
         code: 'QUOTA_DEPASSE'
