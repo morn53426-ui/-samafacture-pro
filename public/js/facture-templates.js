@@ -1124,19 +1124,144 @@ function createFactureTemplates(helpers) {
     `;
   }
 
+  // --- Nouveaux modèles : cinq compositions distinctes, compatibles facture et devis ---
+
+  function renderNova(user, facture, lignes, isDevis, qrCode, personnalisation) {
+    return [
+      '<div style="margin:-40px -40px 25px;padding:27px 40px 24px;background:#142B3B;color:#fff;border-bottom:5px solid #20B89A;">',
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:18px;">',
+          '<div style="display:flex;align-items:center;gap:14px;min-width:0;">' + logoHtml(user,58,personnalisation) +
+            '<div><div style="font-size:1.2rem;font-weight:800;letter-spacing:-.02em;">' + escapeHtml(user.entreprise_nom || user.nom) + '</div>' +
+            '<div style="margin-top:5px;color:#C6D8DF;font-size:.76rem;line-height:1.6;">' + escapeHtml(user.entreprise_adresse || '') + '<br/>' + escapeHtml(user.entreprise_telephone || '') + (user.entreprise_email ? ' · ' + escapeHtml(user.entreprise_email) : '') + '</div></div>',
+          '</div>',
+          '<div style="text-align:right;flex-shrink:0;"><div style="color:#70E0C7;font-size:.62rem;font-weight:800;letter-spacing:.2em;">NOVA / DOCUMENT</div>' +
+            '<div style="margin-top:5px;font-size:1.35rem;font-weight:850;letter-spacing:.04em;">' + (isDevis ? 'DEVIS' : 'FACTURE') + '</div>' +
+            '<div style="margin-top:4px;color:#C6D8DF;font-size:.78rem;">' + escapeHtml(facture.numero) + '</div></div>',
+        '</div>',
+      '</div>',
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:23px;">',
+        '<div style="padding:14px 16px;border:1px solid #D8E6E6;border-left:4px solid #20B89A;border-radius:7px;background:#F5FBF9;"><div style="color:#16866E;font-size:.65rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Facturé à</div>' + clientBlockHtml(facture) + '</div>',
+        '<div style="padding:14px 16px;border:1px solid #DCE5EA;border-radius:7px;background:#F7F9FA;font-size:.78rem;line-height:1.9;">' +
+          '<div><span style="color:#718391;">Date d’émission :</span> ' + formatDate(facture.date_emission) + '</div>' +
+          '<div><span style="color:#718391;">Échéance :</span> ' + formatDate(facture.date_echeance) + '</div><div style="margin-top:5px;">' + statutBadge(facture.statut) + '</div></div>',
+      '</div>',
+      '<table><thead><tr><th style="background:#142B3B;color:#fff;">Désignation</th><th style="background:#142B3B;color:#fff;">Qté</th><th style="background:#142B3B;color:#fff;">Prix U.</th><th style="background:#142B3B;color:#fff;">TVA</th><th style="background:#142B3B;color:#fff;text-align:right;">Total</th></tr></thead><tbody>' + lignesRowsHtml(lignes) + '</tbody></table>',
+      '<div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:300px;padding:15px 17px;border:1px solid #B9DED4;border-left:4px solid #20B89A;border-radius:7px;background:#F5FBF9;">' + totalsRowsHtml(facture,'#142B3B',personnalisation) + '</div></div>',
+      footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)
+    ].join('');
+  }
+
+  function renderNordique(user, facture, lignes, isDevis, qrCode, personnalisation) {
+    return [
+      '<div style="margin-bottom:26px;padding:0 0 20px;border-top:4px solid #71816C;border-bottom:1px solid #DCE2D8;">',
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding-top:21px;">',
+          '<div style="max-width:65%;">' + logoHtml(user,54,personnalisation) +
+            '<div style="margin-top:12px;color:#25362B;font-size:1.35rem;font-weight:750;letter-spacing:-.035em;">' + escapeHtml(user.entreprise_nom || user.nom) + '</div>' +
+            '<div style="margin-top:5px;color:#718071;font-size:.76rem;line-height:1.65;">' + escapeHtml(user.entreprise_adresse || '') + '<br/>' + escapeHtml(user.entreprise_telephone || '') + (user.entreprise_email ? ' · ' + escapeHtml(user.entreprise_email) : '') + '</div></div>',
+          '<div style="min-width:145px;text-align:right;"><div style="color:#7B8B75;font-size:.63rem;font-weight:800;letter-spacing:.22em;">DOCUMENT</div>' +
+            '<div style="margin-top:8px;color:#25362B;font-family:Georgia,serif;font-size:1.55rem;font-weight:700;">' + (isDevis ? 'DEVIS' : 'FACTURE') + '</div>' +
+            '<div style="margin-top:5px;color:#7B8B75;font-size:.78rem;">' + escapeHtml(facture.numero) + '</div></div>',
+        '</div>',
+      '</div>',
+      '<div style="display:grid;grid-template-columns:1.15fr .85fr;gap:22px;margin-bottom:26px;">',
+        '<div><div style="margin-bottom:7px;color:#71816C;font-size:.65rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;">Votre client</div>' + clientBlockHtml(facture) + '</div>',
+        '<div style="padding:12px 15px;border-left:2px solid #A7B49F;background:#F6F8F4;color:#526151;font-size:.78rem;line-height:2;">' +
+          '<div><strong style="color:#344537;">Date d’émission :</strong> ' + formatDate(facture.date_emission) + '</div>' +
+          '<div><strong style="color:#344537;">Échéance :</strong> ' + formatDate(facture.date_echeance) + '</div><div style="margin-top:4px;">' + statutBadge(facture.statut) + '</div></div>',
+      '</div>',
+      '<table><thead><tr><th style="background:#E8EEE5;color:#354638;border-bottom:2px solid #A7B49F;">Désignation</th><th style="background:#E8EEE5;color:#354638;border-bottom:2px solid #A7B49F;">Qté</th><th style="background:#E8EEE5;color:#354638;border-bottom:2px solid #A7B49F;">Prix U.</th><th style="background:#E8EEE5;color:#354638;border-bottom:2px solid #A7B49F;">TVA</th><th style="background:#E8EEE5;color:#354638;border-bottom:2px solid #A7B49F;text-align:right;">Total</th></tr></thead><tbody>' + lignesRowsHtml(lignes) + '</tbody></table>',
+      '<div style="display:flex;justify-content:flex-end;margin-top:22px;"><div style="width:285px;padding:13px 16px;border-top:2px solid #71816C;background:#F6F8F4;">' + totalsRowsHtml(facture,'#354638',personnalisation) + '</div></div>',
+      footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)
+    ].join('');
+  }
+
+  function renderLuxe(user, facture, lignes, isDevis, qrCode, personnalisation) {
+    return [
+      '<div style="margin:-40px -40px 26px;padding:28px 40px 25px;background:#252321;color:#F9F5ED;border-bottom:3px solid #B99A62;">',
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:18px;">',
+          '<div><div style="color:#C9AE7B;font-size:.62rem;font-weight:800;letter-spacing:.24em;">COLLECTION LUXE</div>' +
+            '<div style="margin-top:9px;font-family:Georgia,serif;font-size:1.42rem;font-weight:700;letter-spacing:.01em;">' + escapeHtml(user.entreprise_nom || user.nom) + '</div>' +
+            '<div style="margin-top:5px;color:#D3CBBE;font-size:.74rem;line-height:1.65;">' + escapeHtml(user.entreprise_adresse || '') + '<br/>' + escapeHtml(user.entreprise_telephone || '') + (user.entreprise_email ? ' · ' + escapeHtml(user.entreprise_email) : '') + '</div></div>',
+          '<div style="width:74px;height:74px;display:grid;place-items:center;flex-shrink:0;border:1px solid #B99A62;border-radius:50%;background:#fff;">' + logoHtml(user,58,personnalisation) + '</div>',
+        '</div>',
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin-top:23px;padding-top:13px;border-top:1px solid rgba(201,174,123,.4);">' +
+          '<div style="color:#D8BF8A;font-family:Georgia,serif;font-size:1.18rem;letter-spacing:.12em;">' + (isDevis ? 'PROPOSITION' : 'FACTURE') + '</div>' +
+          '<div style="color:#F9F5ED;font-size:.78rem;font-weight:700;">N° ' + escapeHtml(facture.numero) + '</div></div>',
+      '</div>',
+      '<div style="display:grid;grid-template-columns:1.15fr .85fr;gap:20px;margin-bottom:25px;">',
+        '<div style="padding:14px 16px;border:1px solid #E6DDCC;background:#FCFAF6;"><div style="color:#A18453;font-size:.63rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;margin-bottom:8px;">Client</div>' + clientBlockHtml(facture) + '</div>',
+        '<div style="padding:13px 15px;background:#F5F1E9;color:#5E5649;font-size:.78rem;line-height:1.95;">' +
+          '<div><span style="color:#96815F;">Date d’émission :</span> ' + formatDate(facture.date_emission) + '</div>' +
+          '<div><span style="color:#96815F;">Échéance :</span> ' + formatDate(facture.date_echeance) + '</div><div style="margin-top:4px;">' + statutBadge(facture.statut) + '</div></div>',
+      '</div>',
+      '<table><thead><tr><th style="background:#3B3934;color:#F9F5ED;">Désignation</th><th style="background:#3B3934;color:#F9F5ED;">Qté</th><th style="background:#3B3934;color:#F9F5ED;">Prix U.</th><th style="background:#3B3934;color:#F9F5ED;">TVA</th><th style="background:#3B3934;color:#F9F5ED;text-align:right;">Total</th></tr></thead><tbody>' + lignesRowsHtml(lignes) + '</tbody></table>',
+      '<div style="display:flex;justify-content:flex-end;margin-top:22px;"><div style="width:300px;padding:15px 18px;border:1px solid #D8C59F;border-top:3px solid #B99A62;background:#FCFAF6;">' + totalsRowsHtml(facture,'#3B3934',personnalisation) + '</div></div>',
+      footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)
+    ].join('');
+  }
+
+  function renderTech(user, facture, lignes, isDevis, qrCode, personnalisation) {
+    return [
+      '<div style="margin:-40px -40px 25px;padding:24px 40px 23px;background:#10253F;color:#fff;border-left:8px solid #31B8D4;">',
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px;">',
+          '<div><div style="color:#74D8E8;font-size:.62rem;font-weight:800;letter-spacing:.2em;">TECH / BUSINESS</div>' +
+            '<div style="margin-top:8px;font-size:1.23rem;font-weight:800;">' + escapeHtml(user.entreprise_nom || user.nom) + '</div>' +
+            '<div style="margin-top:5px;color:#BCD0E1;font-size:.73rem;line-height:1.65;">' + escapeHtml(user.entreprise_adresse || '') + '<br/>' + escapeHtml(user.entreprise_telephone || '') + (user.entreprise_email ? ' · ' + escapeHtml(user.entreprise_email) : '') + '</div></div>',
+          '<div style="min-width:145px;text-align:right;">' + logoHtml(user,52,personnalisation) +
+            '<div style="margin-top:10px;color:#74D8E8;font-size:.62rem;font-weight:800;letter-spacing:.15em;">' + (isDevis ? 'DEVIS' : 'FACTURE') + '</div>' +
+            '<div style="margin-top:4px;font-family:monospace;font-size:.82rem;">' + escapeHtml(facture.numero) + '</div></div>',
+        '</div>',
+      '</div>',
+      '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:22px;">',
+        '<div style="padding:11px 12px;border:1px solid #D7E4EE;background:#F4F8FB;"><div style="color:#648099;font-size:.59rem;font-weight:800;letter-spacing:.1em;">ÉMISSION</div><strong style="display:block;margin-top:5px;color:#183A57;font-size:.78rem;">' + formatDate(facture.date_emission) + '</strong></div>',
+        '<div style="padding:11px 12px;border:1px solid #D7E4EE;background:#F4F8FB;"><div style="color:#648099;font-size:.59rem;font-weight:800;letter-spacing:.1em;">' + (isDevis ? 'VALIDITÉ' : 'ÉCHÉANCE') + '</div><strong style="display:block;margin-top:5px;color:#183A57;font-size:.78rem;">' + formatDate(facture.date_echeance) + '</strong></div>',
+        '<div style="padding:11px 12px;border:1px solid #D7E4EE;background:#F4F8FB;"><div style="color:#648099;font-size:.59rem;font-weight:800;letter-spacing:.1em;">STATUT</div><div style="margin-top:4px;">' + statutBadge(facture.statut) + '</div></div>',
+      '</div>',
+      '<div style="margin-bottom:22px;padding:13px 16px;border:1px solid #D7E4EE;border-left:4px solid #31B8D4;border-radius:6px;"><div style="color:#3289A4;font-size:.63rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:7px;">Destinataire</div>' + clientBlockHtml(facture) + '</div>',
+      '<table><thead><tr><th style="background:#183A57;color:#fff;">Désignation</th><th style="background:#183A57;color:#fff;">Qté</th><th style="background:#183A57;color:#fff;">Prix U.</th><th style="background:#183A57;color:#fff;">TVA</th><th style="background:#183A57;color:#fff;text-align:right;">Total</th></tr></thead><tbody>' + lignesRowsHtml(lignes) + '</tbody></table>',
+      '<div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:300px;padding:14px 17px;border:1px solid #C6DDE8;border-radius:6px;background:#F4F8FB;">' + totalsRowsHtml(facture,'#183A57',personnalisation) + '</div></div>',
+      footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)
+    ].join('');
+  }
+
+  function renderHorizon(user, facture, lignes, isDevis, qrCode, personnalisation) {
+    return [
+      '<div style="margin:-40px -40px 26px;padding:25px 40px 24px;background:#EAF2F8;border-top:6px solid #2C6592;">',
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px;">',
+          '<div><div style="color:#2C6592;font-size:.62rem;font-weight:800;letter-spacing:.2em;">HORIZON / GESTION</div>' +
+            '<div style="margin-top:8px;color:#173B59;font-size:1.34rem;font-weight:800;letter-spacing:-.03em;">' + escapeHtml(user.entreprise_nom || user.nom) + '</div>' +
+            '<div style="margin-top:5px;color:#61778A;font-size:.76rem;line-height:1.65;">' + escapeHtml(user.entreprise_adresse || '') + '<br/>' + escapeHtml(user.entreprise_telephone || '') + (user.entreprise_email ? ' · ' + escapeHtml(user.entreprise_email) : '') + '</div></div>',
+          '<div style="text-align:right;">' + logoHtml(user,58,personnalisation) +
+            '<div style="margin-top:11px;color:#2C6592;font-size:1.1rem;font-weight:850;letter-spacing:.08em;">' + (isDevis ? 'DEVIS' : 'FACTURE') + '</div>' +
+            '<div style="margin-top:4px;color:#496982;font-size:.78rem;">' + escapeHtml(facture.numero) + '</div></div>',
+        '</div>',
+      '</div>',
+      '<div style="display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-bottom:24px;">',
+        '<div><div style="color:#2C6592;font-size:.64rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin-bottom:8px;">Pour</div>' + clientBlockHtml(facture) + '</div>',
+        '<div style="padding:14px 16px;border-radius:8px;background:#F4F7FA;color:#455F73;font-size:.78rem;line-height:1.95;">' +
+          '<div><strong style="color:#173B59;">Date d’émission :</strong> ' + formatDate(facture.date_emission) + '</div>' +
+          '<div><strong style="color:#173B59;">Échéance :</strong> ' + formatDate(facture.date_echeance) + '</div><div style="margin-top:5px;">' + statutBadge(facture.statut) + '</div></div>',
+      '</div>',
+      '<table><thead><tr><th style="background:#2C6592;color:#fff;">Désignation</th><th style="background:#2C6592;color:#fff;">Qté</th><th style="background:#2C6592;color:#fff;">Prix U.</th><th style="background:#2C6592;color:#fff;">TVA</th><th style="background:#2C6592;color:#fff;text-align:right;">Total</th></tr></thead><tbody>' + lignesRowsHtml(lignes) + '</tbody></table>',
+      '<div style="display:flex;justify-content:flex-end;margin-top:21px;"><div style="width:290px;padding:14px 17px;border-radius:8px;border-top:3px solid #2C6592;background:#F4F7FA;">' + totalsRowsHtml(facture,'#173B59',personnalisation) + '</div></div>',
+      footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)
+    ].join('');
+  }
+
   const RENDERERS = {
     classique: renderClassique, moderne: renderModerne, minimaliste: renderMinimaliste,
     elegant: renderElegant, corporate: renderCorporate, creatif: renderCreatif,
     prestige: renderPrestige, heritage: renderHeritage, diamant: renderDiamant,
     epure: renderEpure, azur: renderAzur, circuit: renderCircuit,
     platine: renderPlatine, atelier: renderAtelier, saveurs: renderSaveurs,
-    executive: renderExecutive, institution: renderInstitution, signature: renderSignature, consolide: renderConsolide
+    executive: renderExecutive, institution: renderInstitution, signature: renderSignature, consolide: renderConsolide,
+    nova: renderNova, nordique: renderNordique, luxe: renderLuxe, tech: renderTech, horizon: renderHorizon
   };
 
   function renderInvoiceHtml({ user, facture, lignes, isDevis, qrCode, template, personnalisation }) {
     const render = RENDERERS[template] || renderClassique;
     // Un devis porte une date de validité, jamais une échéance de paiement.
-    // Les 19 modèles partagent le même champ d'affichage pour garder une présentation cohérente.
+    // Les 24 modèles partagent le même champ d'affichage pour garder une présentation cohérente.
     const facturePourRendu = isDevis
       ? { ...facture, date_echeance: facture.date_validite || null }
       : facture;
@@ -1148,7 +1273,7 @@ function createFactureTemplates(helpers) {
       '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
     html = html.replace(/<div style="font-size:0\.85rem;">([^<]+) → ([^<]+)<\/div>/,
       '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
-    // Uniformiser les intitulés de dates dans tous les en-têtes historiques des 19 modèles.
+    // Uniformiser les intitulés de dates dans tous les en-têtes historiques des 24 modèles.
     // Certains anciens modèles emploient un libellé court ou ajoutent un deux-points.
     // On remplace uniquement le texte du nœud HTML, jamais les commentaires ni les conditions libres.
     const dateEmissionLabel = 'Date d’émission :';
@@ -1166,7 +1291,7 @@ function createFactureTemplates(helpers) {
       html = html.replace(/Émission\s*\/\s*Échéance/gi, 'Émission / Validité du devis');
     }
 
-    // Le bloc de références est partagé par les 19 modèles modèles pour conserver les mêmes
+    // Le bloc de références est partagé par les 24 modèles modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
     const meta = documentMetaHtml(facture, isDevis, template === 'minimaliste' || template === 'saveurs', user, html);
     const firstTable = html.indexOf('<table');

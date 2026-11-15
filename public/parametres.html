@@ -478,7 +478,7 @@
               <label id="invoice-template-title">Choisissez le modèle de vos factures</label>
               <p>Visualisez chaque présentation avant de la sélectionner. L’aperçu utilise l’identité de votre entreprise et des données fictives.</p>
             </div>
-            <span class="invoice-template-count"><i class="ic" data-icon="file-stack" aria-hidden="true"></i> 19 modèles</span>
+            <span class="invoice-template-count"><i class="ic" data-icon="file-stack" aria-hidden="true"></i> 24 modèles</span>
           </div>
           <div id="invoice-template-gallery" class="invoice-template-gallery"
                role="group" aria-labelledby="invoice-template-title" aria-describedby="invoice-template-help"></div>
@@ -502,6 +502,11 @@
             <option value="institution">◆ Entreprise — Institution — présentation formelle et structurée</option>
             <option value="signature">◆ Entreprise — Signature — style éditorial vert profond et bronze</option>
             <option value="consolide">◆ Entreprise — Consolidé — synthèse de gestion</option>
+            <option value="nova">Nova — bleu profond et turquoise</option>
+            <option value="nordique">Nordique — tons sauge, mise en page aérée</option>
+            <option value="luxe">Luxe — graphite et or champagne</option>
+            <option value="tech">Tech — style digital bleu cyan</option>
+            <option value="horizon">Horizon — bleu professionnel et moderne</option>
           </select>
           <div id="invoice-template-help" class="helper invoice-template-help">Le modèle choisi s’applique à toutes vos factures et à vos devis imprimés. Les modèles Pro et Entreprise restent visibles pour vous permettre de les comparer ; leur activation dépend de votre formule.</div>
         </div>
@@ -630,7 +635,7 @@
   // Déclarée avant toute fonction d'initialisation qui l'utilise.
   const PERSO_COULEURS = ['couleur_principale', 'couleur_secondaire', 'couleur_texte'];
 
-  // --- Galerie visuelle des 19 modèles ----------------------------------------------
+  // --- Galerie visuelle des 24 modèles ----------------------------------------------
   const INVOICE_TEMPLATE_META = [
     { id: 'classique', name: 'Classique', description: 'Sobre, clair et professionnel.', tier: 'all' },
     { id: 'moderne', name: 'Moderne', description: 'Bandeau graphique et logo mis en avant.', tier: 'all' },
@@ -650,7 +655,12 @@
     { id: 'circuit', name: 'Circuit', description: 'Identité verte, idéale pour les métiers IT.', tier: 'all' },
     { id: 'atelier', name: 'Atelier', description: 'Tons terre et orange, esprit artisanal.', tier: 'all' },
     { id: 'saveurs', name: 'Saveurs', description: 'Style chaleureux pour commerces et restaurants.', tier: 'all' },
-    { id: 'platine', name: 'Platine', description: 'Logo, vérification QR et signature numérique.', tier: 'enterprise' }
+    { id: 'platine', name: 'Platine', description: 'Logo, vérification QR et signature numérique.', tier: 'enterprise' },
+    { id: 'nova', name: 'Nova', description: 'Bandeau bleu profond et accent turquoise contemporain.', tier: 'all' },
+    { id: 'nordique', name: 'Nordique', description: 'Mise en page aérée, tons sauge et typographie douce.', tier: 'all' },
+    { id: 'luxe', name: 'Luxe', description: 'Noir graphite, or champagne et présentation premium.', tier: 'all' },
+    { id: 'tech', name: 'Tech', description: 'Style digital, repères structurés et bleu cyan.', tier: 'all' },
+    { id: 'horizon', name: 'Horizon', description: 'Bleu professionnel, blocs lisibles et équilibre moderne.', tier: 'all' }
   ];
   const PRO_TEMPLATE_IDS = new Set(['elegant', 'corporate', 'creatif']);
   const ENTERPRISE_TEMPLATE_IDS = new Set(['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide']);

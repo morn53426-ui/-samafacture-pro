@@ -1,6 +1,6 @@
 # Modèles de factures et devis — guide
 
-Cette évolution enrichit les 19 thèmes existants sans remplacer leur identité graphique. Le rendu est partagé entre la page de détail, l'impression du navigateur et la génération PDF par Puppeteer.
+Cette évolution enrichit les 24 thèmes existants sans remplacer leur identité graphique. Le rendu est partagé entre la page de détail, l'impression du navigateur et la génération PDF par Puppeteer.
 
 ## 1. Informations de l'entreprise
 
@@ -29,6 +29,8 @@ Les champs texte sont limités côté serveur : objet 190 caractères, référen
 
 ## 3. Éléments rendus sur les factures
 
+Les cinq nouveaux modèles Nova, Nordique, Luxe, Tech et Horizon proposent des compositions visuelles distinctes. Ils sont disponibles sur tous les plans et utilisent les mêmes données et calculs que les autres thèmes.
+
 Les modèles indiquent maintenant explicitement le prix unitaire **HT** et le montant de chaque ligne **TTC**. Quand plusieurs taux de TVA sont présents, un détail par taux affiche la base et la TVA correspondantes.
 
 La synthèse de la facture affiche également :
@@ -52,7 +54,7 @@ Cette zone est une zone d'acceptation à compléter par le client. Elle ne const
 
 ## 5. Modèles concernés
 
-Les ajouts sont communs aux 19 thèmes : Classique, Moderne, Minimaliste, Élégant, Corporate, Créatif, Prestige, Héritage, Diamant, Exécutif, Institution, Signature, Consolidé, Épuré, Azur, Circuit, Platine, Atelier et Saveurs.
+Les ajouts sont communs aux 24 thèmes : Classique, Moderne, Minimaliste, Élégant, Corporate, Créatif, Prestige, Héritage, Diamant, Exécutif, Institution, Signature, Consolidé, Épuré, Azur, Circuit, Platine, Atelier, Saveurs, Nova, Nordique, Luxe, Tech et Horizon. Les cinq nouveaux modèles (Nova, Nordique, Luxe, Tech et Horizon) sont disponibles sur tous les plans.
 
 Les huit modèles Entreprise exclusifs sont Prestige, Héritage, Diamant, Platine, Exécutif, Institution, Signature et Consolidé. Ils apparaissent dans la galerie pour comparaison, mais ne peuvent être sélectionnés et enregistrés que par un compte au plan Entreprise.
 

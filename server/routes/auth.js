@@ -596,7 +596,9 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
       'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
       'prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide',
       // Les modèles de spécialité gratuits restent disponibles pour tous les plans.
-      'epure', 'azur', 'circuit', 'atelier', 'saveurs'
+      'epure', 'azur', 'circuit', 'atelier', 'saveurs',
+      // Cinq nouveaux thèmes modernes sont inclus dans tous les plans.
+      'nova', 'nordique', 'luxe', 'tech', 'horizon'
     ];
     let template = templatesValides.includes(facture_template) ? facture_template : 'classique';
     if (PRO_TEMPLATES.includes(template) && !proActif) {
