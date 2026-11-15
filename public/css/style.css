@@ -6014,3 +6014,12 @@ a.btn .icon {
     print-color-adjust: exact;
   }
 }
+
+@media print {
+  .invoice-doc > div:first-child,
+  .invoice-doc .grid,
+  .invoice-doc .sf-totals {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
