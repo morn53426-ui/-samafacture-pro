@@ -9,7 +9,7 @@ const { requireAuth } = require('../middleware/auth');
 const { isValidImageDataUrl } = require('../utils/validation');
 const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = require('../utils/plans');
 const { sendMail } = require('../config/mailer');
-const { incrementerTokenVersion } = require('../utils/session');
+const { incrementerTokenVersion, invaliderCacheVersion } = require('../utils/session');
 
 function echapperHtml(valeur) {
   return String(valeur == null ? '' : valeur).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -370,9 +370,19 @@ router.post('/google', async (req, res, next) => {
  *     responses:
  *       204: { description: "Cookie effacé." }
  */
-router.post('/logout', (req, res) => {
+router.post('/logout', (req, res, next) => {
+  // Le cookie est effacé même si le jeton est expiré : le navigateur ne doit pas
+  // conserver une session cookie inutilisable après la déconnexion.
   res.clearCookie('sf_token', { httpOnly: true, sameSite: 'lax', path: '/' });
-  res.status(204).end();
+  next();
+}, requireAuth, async (req, res, next) => {
+  try {
+    // Invalide aussi les anciens jetons Bearer conservés sur les autres appareils.
+    await incrementerTokenVersion(null, req.user.id);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });
 
 // --- Mot de passe oublié ---
@@ -460,8 +470,16 @@ router.post('/reinitialiser-mot-de-passe', async (req, res, next) => {
     if (!user) return res.status(400).json({ error: 'Ce lien de réinitialisation est invalide ou a expiré.' });
 
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE users SET password_hash = ?, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ?', [hash, user.id]);
-    await incrementerTokenVersion(null, user.id); // révoque toutes les sessions ouvertes
+    // Consommation atomique : si deux demandes utilisent le même lien en parallèle,
+    // une seule peut mettre à jour le compte et incrémenter la version de session.
+    const [updated] = await pool.query(
+      'UPDATE users SET password_hash = ?, token_version = token_version + 1, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ? AND reset_token_hash = ? AND reset_token_expires > NOW()',
+      [hash, user.id, tokenHash]
+    );
+    if (updated.affectedRows !== 1) {
+      return res.status(400).json({ error: 'Ce lien de réinitialisation est invalide ou a expiré.' });
+    }
+    invaliderCacheVersion(user.id);
 
     res.json({ message: 'Votre mot de passe a été réinitialisé. Vous pouvez maintenant vous connecter.' });
   } catch (err) { next(err); }

@@ -7,6 +7,7 @@ describe('Authentification', () => {
   let userId;
   const email = emailDeTest('auth');
   const password = 'motdepasse123';
+  let currentPassword = password;
 
   before(async () => {
     await setupTestDatabase();
@@ -190,7 +191,61 @@ describe('Authentification', () => {
     assert.equal(savedAgain.body.user.entreprise_rccm, payload.entreprise_rccm);
     assert.equal(savedAgain.body.user.entreprise_rib, payload.entreprise_rib);
   });
+
+  test('un lien de réinitialisation ne peut être utilisé qu’une fois, même en concurrence', async () => {
+    const crypto = require('node:crypto');
+    const { pool } = require('../config/db');
+    const connexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
+    assert.equal(connexion.status, 200);
+    const ancienToken = connexion.body.token;
+    assert.equal((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${ancienToken}`)).status, 200);
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    await pool.query(
+      'UPDATE users SET reset_token_hash = ?, reset_token_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = ?',
+      [tokenHash, userId]
+    );
+
+    const attempts = await Promise.all([
+      request(app).post('/api/auth/reinitialiser-mot-de-passe').send({ token: rawToken, password: 'nouveau-mot-de-passe-A' }),
+      request(app).post('/api/auth/reinitialiser-mot-de-passe').send({ token: rawToken, password: 'nouveau-mot-de-passe-B' })
+    ]);
+    assert.equal(attempts.filter(res => res.status === 200).length, 1,
+      'une seule requête concurrente doit consommer le lien');
+    assert.equal(attempts.filter(res => res.status === 400).length, 1,
+      'la seconde requête doit voir le lien déjà consommé');
+
+    const afterReset = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${ancienToken}`);
+    assert.equal(afterReset.status, 401, 'les anciennes sessions sont révoquées par la même mise à jour atomique');
+
+    currentPassword = attempts[0].status === 200 ? 'nouveau-mot-de-passe-A' : 'nouveau-mot-de-passe-B';
+    const reconnexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
+    assert.equal(reconnexion.status, 200, reconnexion.text);
+    assert.equal((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${reconnexion.body.token}`)).status, 200);
+  });
+
+  test('la déconnexion invalide aussi le jeton Bearer courant', async () => {
+    const connexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
+    assert.equal(connexion.status, 200, connexion.text);
+    const token = connexion.body.token;
+
+    const logout = await request(app)
+      .post('/api/auth/logout')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(logout.status, 204, logout.text);
+
+    const ancienneSession = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(ancienneSession.status, 401, 'le jeton doit être refusé après logout');
+
+    const nouvelleConnexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
+    assert.equal(nouvelleConnexion.status, 200);
+    assert.equal((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${nouvelleConnexion.body.token}`)).status, 200);
+  });
 });
+
 
 // Fermeture des ressources après les hooks de nettoyage métier de ce fichier.
 after(teardownTestEnvironment);
