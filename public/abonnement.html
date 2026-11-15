@@ -20,14 +20,14 @@
   <main class="main-content workspace-page page-abonnement">
     <div class="page-header subscription-page-header workspace-page-header">
       <div>
-        <div class="subscription-eyebrow"><span class="ic">${Icon('gem')}</span> OFFRES & ABONNEMENTS</div>
-        <h1>Un plan adapté à votre activité</h1>
-        <p>Choisissez les outils qui vous aident à gérer et développer votre entreprise.</p>
+        <div class="subscription-eyebrow"><span class="ic" aria-hidden="true"><i data-icon="wallet-cards"></i></span> VOTRE FORMULE SAMAFACTURE PRO</div>
+        <h1>La formule adaptée à votre activité</h1>
+        <p>Comparez les fonctionnalités et les tarifs pour choisir les outils adaptés à votre entreprise.</p>
       </div>
     </div>
 
     <section class="subscription-current card" aria-labelledby="current-plan-title">
-      <div class="subscription-current-icon"><span class="ic">${Icon('shield-check')}</span></div>
+      <div class="subscription-current-icon"><span class="ic" aria-hidden="true"><i data-icon="check-circle"></i></span></div>
       <div class="subscription-current-copy">
         <span class="subscription-overline">VOTRE ESPACE</span>
         <h2 id="current-plan-title">Votre abonnement actuel</h2>
@@ -49,7 +49,7 @@
           <h2 id="offers-title">Comparez les offres</h2>
           <p>Les montants affichés correspondent à un paiement unique. Le détail est présenté avant chaque redirection.</p>
         </div>
-        <div class="subscription-billing-note"><span class="ic">${Icon('credit-card')}</span> Paiement ponctuel en FCFA</div>
+        <div class="subscription-billing-note"><span class="ic" aria-hidden="true"><i data-icon="credit-card"></i></span> Paiement ponctuel en FCFA</div>
       </div>
       <div id="plan-cards" class="subscription-plan-grid">
         <div class="subscription-loading card"><span class="loading-spinner"></span> Chargement des offres…</div>
@@ -57,14 +57,14 @@
     </section>
 
     <section class="subscription-trust">
-      <div><span class="ic">${Icon('lock')}</span><span><strong>Paiement sécurisé</strong><small>Redirection vers le fournisseur configuré.</small></span></div>
-      <div><span class="ic">${Icon('smartphone')}</span><span><strong>Paiements locaux</strong><small>Wave et PayDunya selon la configuration du serveur.</small></span></div>
-      <div><span class="ic">${Icon('help-circle')}</span><span><strong>Accompagnement</strong><small>Un espace de facturation pensé pour les professionnels.</small></span></div>
+      <div><span class="ic" aria-hidden="true"><i data-icon="lock"></i></span><span><strong>Paiement sécurisé</strong><small>Redirection vers le fournisseur configuré.</small></span></div>
+      <div><span class="ic" aria-hidden="true"><i data-icon="smartphone"></i></span><span><strong>Paiements locaux</strong><small>Wave et PayDunya selon la configuration du serveur.</small></span></div>
+      <div><span class="ic" aria-hidden="true"><i data-icon="help-circle"></i></span><span><strong>Accompagnement</strong><small>Un espace de facturation pensé pour les professionnels.</small></span></div>
     </section>
 
     <dialog id="checkout-dialog" class="subscription-checkout-dialog" aria-labelledby="checkout-title" aria-describedby="checkout-description">
       <div class="subscription-checkout-panel">
-        <button type="button" class="subscription-checkout-close" aria-label="Fermer la fenêtre" onclick="fermerPaiement()">${Icon('x')}</button>
+        <button type="button" class="subscription-checkout-close" aria-label="Fermer la fenêtre" onclick="fermerPaiement()"><span class="ic" aria-hidden="true"><i data-icon="x"></i></span></button>
         <span class="subscription-overline">RÉCAPITULATIF AVANT PAIEMENT</span>
         <h2 id="checkout-title">Vérifiez votre commande</h2>
         <p id="checkout-description">Contrôlez le montant et le moyen de paiement avant de continuer.</p>
@@ -94,7 +94,7 @@
 
     <section id="plan-fallback" class="subscription-test card" style="display:none;">
       <div class="subscription-test-heading">
-        <span class="ic">${Icon('info')}</span>
+        <span class="ic" aria-hidden="true"><i data-icon="info"></i></span>
         <div><strong>Mode sans paiement</strong><p>Aucun prestataire n’est configuré sur ce serveur. Les formules payantes restent verrouillées jusqu’à l’activation d’un paiement vérifié. Vous pouvez toujours revenir à la formule Gratuit.</p></div>
       </div>
       <div class="subscription-test-controls">

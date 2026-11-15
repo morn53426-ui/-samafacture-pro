@@ -33,6 +33,7 @@ const PAGES = [
   { name: 'crm', file: 'crm.html', ready: '#activity-form' },
   { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
   { name: 'automatisations', file: 'automatisations.html', ready: '#automation-form' },
+  { name: 'abonnement', file: 'abonnement.html', ready: '#plan-cards .subscription-plan-card' },
   { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true }
 ];
 
@@ -313,6 +314,18 @@ function fixtureFor(pathname, fixtures) {
       tva_collectee: DATASET === 'empty' ? 0 : (DATASET === 'normal' ? 36000 : 777777777777.77)
     };
   }
+  if (pathname === '/api/abonnement/moyens-disponibles') return {
+    wave: true,
+    paydunya: true,
+    tarifs: { starter: 5000, pro: 15000, entreprise: 35000 },
+    facturation: {
+      mode: 'paiement_unique',
+      renouvellement_automatique: false,
+      expiration_automatique: false,
+      acces_jusqua_changement_manuel: true,
+      activation: 'apres_confirmation'
+    }
+  };
   if (pathname === '/api/auth/me') return {
     user: {
       id: 1, nom: 'Compte de recette SamaFacture', entreprise_nom: 'SamaFacture — Société de test',
@@ -468,6 +481,44 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await new Promise((resolve) => setTimeout(resolve, 120));
 
+  if (pageDefinition.name === 'abonnement') {
+    const subscriptionUi = await page.evaluate(() => ({
+      planCards: document.querySelectorAll('#plan-cards .subscription-plan-card').length,
+      planIcons: document.querySelectorAll('#plan-cards .plan-icon svg.icon').length,
+      headerIcon: Boolean(document.querySelector('.subscription-eyebrow .ic > svg.icon')),
+      currentPlanIcon: Boolean(document.querySelector('.subscription-current-icon .ic > svg.icon')),
+      billingIcon: Boolean(document.querySelector('.subscription-billing-note .ic > svg.icon')),
+      trustIcons: document.querySelectorAll('.subscription-trust > div > .ic > svg.icon').length,
+      checkoutCloseIcon: Boolean(document.querySelector('.subscription-checkout-close .ic > svg.icon')),
+      fallbackInfoIcon: Boolean(document.querySelector('.subscription-test-heading .ic > svg.icon')),
+      activeMenuIcon: Boolean(document.querySelector('#app-navigation .nav-item.active[href="abonnement.html"] .ic svg.icon')),
+      unhydratedIcons: document.querySelectorAll('.page-abonnement i[data-icon]').length,
+      rawPlaceholders: (document.querySelector('.page-abonnement')?.innerText || '').includes('${Icon(')
+    }));
+    assert.equal(subscriptionUi.planCards, 4,
+      'La page Abonnement doit afficher les quatre formules : ' + JSON.stringify(subscriptionUi));
+    assert.equal(subscriptionUi.planIcons, 4,
+      'Chaque formule doit afficher son icône SVG.');
+    assert.equal(subscriptionUi.headerIcon, true,
+      'Le titre Abonnement doit afficher une icône SVG.');
+    assert.equal(subscriptionUi.currentPlanIcon, true,
+      'La formule active doit afficher une icône SVG valide.');
+    assert.equal(subscriptionUi.billingIcon, true,
+      'Le mode de paiement doit afficher son icône SVG.');
+    assert.equal(subscriptionUi.trustIcons, 3,
+      'Les trois garanties doivent afficher leurs icônes SVG.');
+    assert.equal(subscriptionUi.checkoutCloseIcon, true,
+      'La fenêtre de paiement doit afficher une icône de fermeture.');
+    assert.equal(subscriptionUi.fallbackInfoIcon, true,
+      'Le mode sans paiement doit afficher son icône d’information.');
+    assert.equal(subscriptionUi.activeMenuIcon, true,
+      'L’entrée Abonnement du menu doit afficher son icône portefeuille.');
+    assert.equal(subscriptionUi.unhydratedIcons, 0,
+      'Toutes les icônes statiques doivent être hydratées en SVG.');
+    assert.equal(subscriptionUi.rawPlaceholders, false,
+      'Aucun placeholder JavaScript brut ne doit apparaître dans la page.');
+  }
+
   if (!pageDefinition.public && viewport.width >= 901) {
     const geometry = await page.evaluate(() => ({
       sidebarRight: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().right || 0),
@@ -519,7 +570,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       bodyFont: getComputedStyle(document.body).fontFamily
     };
   });
-  const structuredPages = ['dashboard', 'clients', 'produits', 'factures', 'factures-recurrentes', 'devis', 'depenses', 'rapports', 'finances', 'crm', 'internationalisation', 'automatisations', 'nouvelle-facture'];
+  const structuredPages = ['dashboard', 'clients', 'produits', 'factures', 'factures-recurrentes', 'devis', 'depenses', 'rapports', 'finances', 'crm', 'internationalisation', 'automatisations', 'nouvelle-facture', 'abonnement'];
   if (structuredPages.includes(pageDefinition.name)) {
     assert.equal(layoutAudit.workspacePage, true, pageDefinition.name + ' doit utiliser le cadre de page commun.');
     assert.equal(layoutAudit.hasHeader, true, pageDefinition.name + ' doit présenter un en-tête de page clair.');
