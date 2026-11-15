@@ -418,11 +418,8 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:290px; background:var(--navy-950); color:#fff; border-radius:14px; padding:14px 18px;">
-          <div style="display:flex; justify-content:space-between; padding:5px 0;"><span style="opacity:0.75;">Sous-total</span><span class="mono">${formatMontant(facture.sous_total)}</span></div>
-          <div style="display:flex; justify-content:space-between; padding:5px 0;"><span style="opacity:0.75;">TVA</span><span class="mono">${formatMontant(facture.total_tva)}</span></div>
-          <div style="display:flex; justify-content:space-between; padding:5px 0;"><span style="opacity:0.75;">Remise</span><span class="mono">- ${formatMontant(facture.remise)}</span></div>
-          <div style="display:flex; justify-content:space-between; padding:10px 0; border-top:1px solid rgba(255,255,255,0.2); font-weight:700; font-size:1.1rem; color:var(--gold);"><span>Total TTC</span><span class="mono">${formatMontant(facture.total)}</span></div>
+        <div class="sf-total-panel-dark" style="width:290px; background:var(--navy-950); color:#fff; border-radius:14px; padding:14px 18px;">
+          ${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}
         </div>
       </div>
 
@@ -486,12 +483,8 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:290px; background:var(--navy-950); border:1px solid var(--gold); border-radius:8px; padding:14px 18px; color:#fff;">
-          <div style="display:flex; justify-content:space-between; padding:5px 0; opacity:0.8;"><span>Sous-total HT</span><span class="mono">${formatMontant(facture.sous_total)}</span></div>
-          <div style="display:flex; justify-content:space-between; padding:5px 0; opacity:0.8;"><span>Frais de livraison</span><span class="mono">${formatMontant(facture.frais_livraison)}</span></div>
-          <div style="display:flex; justify-content:space-between; padding:5px 0; opacity:0.8;"><span>TVA</span><span class="mono">${formatMontant(facture.total_tva)}</span></div>
-          <div style="display:flex; justify-content:space-between; padding:5px 0; opacity:0.8;"><span>Remise</span><span class="mono">- ${formatMontant(facture.remise)}</span></div>
-          <div style="display:flex; justify-content:space-between; padding:10px 0; border-top:1px solid var(--gold); font-weight:700; font-size:1.15rem; color:var(--gold);"><span>Total TTC</span><span class="mono">${formatMontant(facture.total)}</span></div>
+        <div class="sf-total-panel-dark" style="width:290px; background:var(--navy-950); border:1px solid var(--gold); border-radius:8px; padding:14px 18px; color:#fff;">
+          ${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}
         </div>
       </div>
 
