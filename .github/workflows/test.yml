@@ -13,6 +13,7 @@ jobs:
   tests:
     name: Tests Node.js et MySQL
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     services:
       mysql:
         image: mysql:8.0
@@ -93,6 +94,7 @@ jobs:
         run: node --check scripts/staging-smoke.js
 
       - name: Exécuter les tests
+        timeout-minutes: 15
         working-directory: server
         env:
           NODE_ENV: test
@@ -104,9 +106,21 @@ jobs:
           TEST_DB_NAME: samafacture_test
           JWT_SECRET: ci-secret-ne-pas-utiliser-en-production
           APP_URL: http://127.0.0.1:4000
-        run: npm test
+        run: |
+          mkdir -p tests/diagnostics
+          node --process-timeout=12m --report-on-process-timeout --report-exclude-env --report-directory=tests/diagnostics --test --test-timeout=300000 "tests/*.test.js"
+
+      - name: Archiver les diagnostics des tests bloqués
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: samafacture-diagnostics-${{ github.run_number }}
+          path: server/tests/diagnostics/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Recette visuelle responsive avec données extrêmes
+        timeout-minutes: 20
         working-directory: server
         env:
           VISUAL_DATASET: worst
