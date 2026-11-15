@@ -6033,3 +6033,26 @@ a.btn .icon {
   flex: 0 0 21px;
   stroke-width: 1.9;
 }
+
+
+/* Tablette large / petit ordinateur : séparer la recherche des commandes du compte.
+   Le rail compact et les boutons conservent leur taille sans pousser la page hors écran. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .app-topbar {
+    flex-wrap: wrap;
+    justify-content: stretch;
+    gap: 12px;
+    margin: -24px -24px 22px;
+    padding: 12px 24px;
+    min-height: 0;
+  }
+  .app-topbar-search {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+  }
+  .app-topbar-account {
+    margin-left: auto;
+    max-width: 100%;
+  }
+}
