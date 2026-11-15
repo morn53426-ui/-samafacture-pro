@@ -102,6 +102,8 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       assert.match(html, /Reste à payer/, 'le solde restant dû doit apparaître');
       assert.match(html, /Détail de la TVA par taux/, 'les taux de TVA multiples doivent être détaillés');
       assert.match(html, /SN-DKR-2026-B-1234/, 'le RCCM de l’entreprise doit apparaître');
+      assert.match(html, /\+221 33 000 00 00/, 'le téléphone de l’entreprise doit apparaître');
+      assert.match(html, /contact@entreprise-test\.sn/, 'l’email de l’entreprise doit apparaître');
       assert.match(html, /Banque de Test/, 'les coordonnées bancaires doivent apparaître');
       assert.match(html, /Acompte de 30 % à la commande/, 'les conditions du document doivent apparaître');
       assert.doesNotMatch(html, /undefined|NaN/, 'aucune valeur non définie ne doit fuiter dans le HTML');
