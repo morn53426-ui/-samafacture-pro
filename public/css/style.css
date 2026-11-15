@@ -6171,3 +6171,69 @@ a.btn .icon {
   }
 }
 
+
+
+/* Création de facture/devis : garder les colonnes des articles distinctes sur mobile.
+   Le tableau défile dans sa propre zone au lieu de comprimer les champs les uns sur les autres. */
+.invoice-builder-grid,
+.invoice-editor-card,
+.invoice-lines-scroll {
+  min-width: 0;
+}
+.invoice-lines-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+.invoice-lines-scroll:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 3px;
+}
+.invoice-lines-scroll-hint {
+  display: none;
+  margin: 7px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+@media (max-width: 640px) {
+  .invoice-editor-card .invoice-lines-scroll > .invoice-lines-table {
+    width: 730px !important;
+    min-width: 730px !important;
+    table-layout: fixed !important;
+    margin: 0;
+  }
+  .invoice-editor-card .invoice-lines-table th:nth-child(1),
+  .invoice-editor-card .invoice-lines-table td:nth-child(1) { width: 250px !important; }
+  .invoice-editor-card .invoice-lines-table th:nth-child(2),
+  .invoice-editor-card .invoice-lines-table td:nth-child(2) { width: 90px !important; }
+  .invoice-editor-card .invoice-lines-table th:nth-child(3),
+  .invoice-editor-card .invoice-lines-table td:nth-child(3) { width: 120px !important; }
+  .invoice-editor-card .invoice-lines-table th:nth-child(4),
+  .invoice-editor-card .invoice-lines-table td:nth-child(4) { width: 80px !important; }
+  .invoice-editor-card .invoice-lines-table th:nth-child(5),
+  .invoice-editor-card .invoice-lines-table td:nth-child(5) { width: 130px !important; }
+  .invoice-editor-card .invoice-lines-table th:nth-child(6),
+  .invoice-editor-card .invoice-lines-table td:nth-child(6) { width: 60px !important; }
+  .invoice-editor-card .invoice-lines-table td:first-child {
+    white-space: normal;
+  }
+  .invoice-editor-card .invoice-lines-table .ligne-produit,
+  .invoice-editor-card .invoice-lines-table .ligne-designation {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .invoice-editor-card .invoice-lines-table td:last-child {
+    padding-left: 6px;
+    padding-right: 6px;
+    text-align: center;
+  }
+  .invoice-lines-scroll-hint {
+    display: block;
+  }
+}
