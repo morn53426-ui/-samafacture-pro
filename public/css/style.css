@@ -5921,6 +5921,12 @@ a.btn .icon {
 .invoice-doc .sf-doc-legal-mentions { margin-top: 3px; }
 
 @media (max-width: 640px) {
+  /* Le tableau reste lisible dans un défilement interne sur téléphone ; l'impression
+     A4 repasse à 100 % de largeur dans le bloc @media print ci-dessous. */
+  .invoice-doc .sf-document-table {
+    min-width: 520px;
+    table-layout: fixed;
+  }
   .invoice-doc .sf-doc-meta,
   .invoice-doc .sf-payment-summary,
   .invoice-doc .sf-bank-grid { grid-template-columns: minmax(0, 1fr); }
