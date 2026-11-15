@@ -10,7 +10,7 @@ const PRO_TEMPLATES = ['elegant', 'corporate', 'creatif'];
 // Modèles réservés exclusivement au plan Entreprise (Pro n'y a pas accès, contrairement à
 // PRO_TEMPLATES ci-dessus qui est partagé par Pro et Entreprise) — avantage propre au plan
 // le plus élevé plutôt qu'un simple palier supplémentaire du plan Pro.
-const ENTERPRISE_TEMPLATES = ['prestige', 'heritage', 'diamant', 'platine'];
+const ENTERPRISE_TEMPLATES = ['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide'];
 
 /** Un plan payant quel qu'il soit (débloque les factures illimitées). */
 function isPaidPlan(plan) {
