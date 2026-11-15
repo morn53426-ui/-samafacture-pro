@@ -29,6 +29,7 @@ const PAGES = [
   { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'], responsiveTable: '#table-body' },
   { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
   { name: 'parametres', file: 'parametres.html', ready: '#entreprise_nom' },
+  { name: 'professionnel', file: 'professionnel.html', ready: '#pro-sales' },
   { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' },
   { name: 'crm', file: 'crm.html', ready: '#activity-form' },
   { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
@@ -716,6 +717,40 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
         ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
         : null,
+      proWorkspaceNavigation: location.pathname.includes('professionnel')
+        ? (() => {
+            const guide = document.querySelector('.pro-workspace-guide');
+            const rect = guide?.getBoundingClientRect();
+            const links = Array.from(document.querySelectorAll('.pro-workspace-guide a[href^="#"]'));
+            return {
+              found: Boolean(guide),
+              left: rect ? rect.left : -1,
+              right: rect ? rect.right : window.innerWidth + 1,
+              width: rect ? rect.width : 0,
+              linkCount: links.length,
+              missingTargets: links.filter(link => !document.getElementById(link.getAttribute('href').slice(1)))
+                .map(link => link.getAttribute('href')),
+              groupCount: document.querySelectorAll('.pro-workspace-guide-group').length
+            };
+          })()
+        : null,
+      invoiceTemplateGallery: location.pathname.includes('parametres')
+        ? (() => {
+            const gallery = document.getElementById('invoice-template-gallery');
+            const rect = gallery?.getBoundingClientRect();
+            const cards = Array.from(document.querySelectorAll('[data-template-card]'));
+            const triggers = Array.from(document.querySelectorAll('[data-open-template-preview]'));
+            return {
+              found: Boolean(gallery),
+              count: cards.length,
+              triggers: triggers.length,
+              width: rect ? rect.width : 0,
+              left: rect ? rect.left : -1,
+              right: rect ? rect.right : window.innerWidth + 1,
+              cardWidths: cards.slice(0, 3).map(card => Math.round(card.getBoundingClientRect().width))
+            };
+          })()
+        : null,
       invoiceLineLayout: location.pathname.includes('nouvelle-facture') && window.innerWidth <= 640
         ? (() => {
             const table = document.querySelector('.invoice-lines-table');
@@ -769,6 +804,32 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   assert.deepEqual(metrics.missingNavigationIcons, [],
     pageDefinition.name + ' : toutes les entrées du menu doivent afficher une icône SVG reconnue : ' +
     JSON.stringify(metrics.missingNavigationIcons));
+  if (pageDefinition.name === 'professionnel') {
+    const nav = metrics.proWorkspaceNavigation;
+    assert.equal(nav?.found, true, 'L’espace professionnel doit présenter une navigation par activité.');
+    assert.equal(nav.groupCount, 4, 'Les outils professionnels doivent être rangés en quatre rubriques.');
+    assert.equal(nav.linkCount, 9, 'Les neuf modules professionnels doivent être accessibles depuis la navigation.');
+    assert.deepEqual(nav.missingTargets, [], 'Chaque accès rapide doit pointer vers un module existant.');
+    assert.ok(nav.left >= -1 && nav.right <= metrics.viewport + 1,
+      'La navigation professionnelle ne doit pas sortir de l’écran : ' + JSON.stringify(nav));
+    if (viewport.width <= 560) {
+      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
+      assert.equal(gridColumns.split(' ').length, 1,
+        'Les rubriques professionnelles doivent s’empiler sur téléphone : ' + gridColumns);
+    }
+  }
+  if (pageDefinition.name === 'parametres') {
+    const gallery = metrics.invoiceTemplateGallery;
+    assert.equal(gallery?.found, true, 'La galerie de modèles doit être présente dans les paramètres.');
+    assert.equal(gallery.count, 24, 'Les 24 modèles de facture doivent être visibles.');
+    assert.equal(gallery.triggers, 24, 'Chaque modèle doit proposer un aperçu A4 cliquable.');
+    assert.ok(gallery.left >= -1 && gallery.right <= metrics.viewport + 1,
+      'La galerie des modèles ne doit pas déborder de l’écran : ' + JSON.stringify(gallery));
+    if (viewport.width <= 640) {
+      assert.ok(gallery.cardWidths.every(width => width >= Math.min(260, metrics.viewport - 36)),
+        'Les aperçus de modèles doivent rester assez larges sur mobile : ' + JSON.stringify(gallery));
+    }
+  }
   if (pageDefinition.name === 'nouvelle-facture' && viewport.width <= 640) {
     const layout = metrics.invoiceLineLayout;
     assert.equal(layout?.found, true,
