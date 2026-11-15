@@ -108,7 +108,7 @@ jobs:
           APP_URL: http://127.0.0.1:4000
         run: |
           mkdir -p tests/diagnostics
-          node --process-timeout=12m --report-on-process-timeout --report-exclude-env --report-directory=tests/diagnostics --test --test-timeout=300000 "tests/*.test.js"
+          node --process-timeout=12m --report-on-process-timeout --report-exclude-env --report-directory=tests/diagnostics --test --test-concurrency=1 --test-timeout=300000 --test-reporter=spec "tests/*.test.js"
 
       - name: Archiver les diagnostics des tests bloqués
         if: always()
