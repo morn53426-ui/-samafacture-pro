@@ -5989,3 +5989,22 @@ a.btn .icon {
   .invoice-doc .sf-total-row.sf-total-grand { padding-top: 8px; }
   .invoice-doc img { max-width: 100% !important; }
 }
+
+
+/* Totaux des modèles Créatif et Prestige : conserver le contraste du bloc sombre. */
+.invoice-doc .sf-total-panel-dark .sf-total-row {
+  color: rgba(255,255,255,.78);
+}
+.invoice-doc .sf-total-panel-dark .sf-total-row.sf-total-grand {
+  color: var(--gold);
+  border-top-color: var(--gold) !important;
+}
+.invoice-doc .sf-total-panel-dark .sf-total-row.sf-total-grand strong {
+  color: inherit;
+}
+@media print {
+  .invoice-doc .sf-total-panel-dark {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
