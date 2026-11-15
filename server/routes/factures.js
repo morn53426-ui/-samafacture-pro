@@ -549,7 +549,8 @@ router.post('/', async (req, res, next) => {
     if (docType === 'facture') {
       const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
       if (!quota.allowed) {
-        await conn.rollback();
+        // Préserver le registre reconstitué malgré le refus de la facture.
+        await conn.commit();
         notifierUtilisateur(req.tenantId, 'alerte_quota', {
           message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
         });
@@ -723,7 +724,8 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
     // Une conversion crée une facture ce mois-ci, même si le devis est ancien.
     const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
     if (!quota.allowed) {
-      await conn.rollback();
+      // Préserver le registre reconstitué malgré le refus de la facture.
+      await conn.commit();
       notifierUtilisateur(req.tenantId, 'alerte_quota', {
         message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
       });
@@ -796,7 +798,8 @@ router.post('/:id/dupliquer', async (req, res, next) => {
     if (source.type === 'facture') {
       const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
       if (!quota.allowed) {
-        await conn.rollback();
+        // Préserver le registre reconstitué malgré le refus de la facture.
+        await conn.commit();
         notifierUtilisateur(req.tenantId, 'alerte_quota', {
           message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
         });
