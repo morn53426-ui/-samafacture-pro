@@ -11,9 +11,12 @@ const OUTPUT_DIR = path.resolve(process.env.VISUAL_ARTIFACTS_DIR || path.join(__
 const DATASET = process.env.VISUAL_DATASET || 'worst';
 const VIEWPORTS = [
   { name: 'mobile-320', width: 320, height: 812 },
+  { name: 'mobile-360', width: 360, height: 800 },
   { name: 'mobile-390', width: 390, height: 844 },
   { name: 'tablet-768', width: 768, height: 1024 },
-  { name: 'desktop-1440', width: 1440, height: 1000 }
+  { name: 'laptop-1024', width: 1024, height: 900 },
+  { name: 'desktop-1440', width: 1440, height: 1000 },
+  { name: 'wide-1920', width: 1920, height: 1080 }
 ];
 const PAGES = [
   { name: 'dashboard', file: 'dashboard.html', ready: '#paiements-body tr:not(.row-skeleton)', charts: ['chart-evolution', 'chart-repartition'] },
@@ -500,6 +503,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       firstContentLeft: main?.querySelector('.dashboard-welcome, .page-header, .workspace-page-header')
         ? Math.round(main.querySelector('.dashboard-welcome, .page-header, .workspace-page-header').getBoundingClientRect().left)
         : null,
+      firstContentWidth: main?.querySelector('.dashboard-welcome, .page-header, .workspace-page-header')
+        ? Math.round(main.querySelector('.dashboard-welcome, .page-header, .workspace-page-header').getBoundingClientRect().width)
+        : null,
       contentPaddingLeft: main ? Math.round(parseFloat(getComputedStyle(main).paddingLeft) || 0) : null,
       expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim()
     };
@@ -524,7 +530,28 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' : aucun voile de navigation ne doit masquer le contenu desktop.');
   }
 
+  if (!pageDefinition.public && viewport.width >= 1900) {
+    assert.ok(navigationGeometry.firstContentWidth <= 1721,
+      pageDefinition.name + ' : le contenu métier doit être borné à 1 720 px sur écran ultra-large : ' +
+      JSON.stringify(navigationGeometry));
+    assert.ok(navigationGeometry.firstContentLeft > navigationGeometry.mainLeft + 40,
+      pageDefinition.name + ' : les blocs doivent être centrés dans la zone de travail ultra-large : ' +
+      JSON.stringify(navigationGeometry));
+  }
+
   const metrics = await page.evaluate(() => {
+    const uncontainedTables = Array.from(document.querySelectorAll('table')).filter((table) => {
+      if (table.getBoundingClientRect().width <= (table.parentElement?.getBoundingClientRect().width || 0) + 1) return false;
+      let ancestor = table.parentElement;
+      while (ancestor && ancestor !== document.body) {
+        const style = getComputedStyle(ancestor);
+        if (ancestor.scrollWidth > ancestor.clientWidth + 1 &&
+            /^(auto|scroll|overlay)$/.test(style.overflowX)) return false;
+        ancestor = ancestor.parentElement;
+      }
+      return true;
+    }).map((table) => table.getAttribute('aria-label') || table.id || table.className || 'table')
+      .slice(0, 12);
     const overflowElements = Array.from(document.body.querySelectorAll('*')).map((element) => {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
@@ -555,6 +582,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
         ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
         : null,
+      uncontainedTables,
       overflowElements
     };
   });
@@ -569,6 +597,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     pageDefinition.name + ' déborde horizontalement à ' + viewport.width + 'px: ' + JSON.stringify(metrics));
   assert.ok(metrics.body <= metrics.viewport + 1,
     pageDefinition.name + ' élargit le body à ' + viewport.width + 'px: ' + JSON.stringify(metrics));
+  assert.deepEqual(metrics.uncontainedTables, [],
+    pageDefinition.name + ' : un tableau trop large doit défiler dans sa carte, sans élargir la page : ' +
+    JSON.stringify(metrics.uncontainedTables));
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
@@ -1078,12 +1109,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
 
 async function capturePublicPages(browser, baseUrl, fixtures, screenshotsDir) {
   const captures = [];
-  const viewports = [
-    { name: 'mobile-320', width: 320, height: 812 },
-    { name: 'mobile-390', width: 390, height: 844 },
-    { name: 'tablet-768', width: 768, height: 1024 },
-    { name: 'desktop-1440', width: 1440, height: 1000 }
-  ];
+  const viewports = VIEWPORTS;
   for (const file of ['index.html', 'login.html']) {
     const name = file === 'index.html' ? 'accueil' : 'connexion';
     for (const viewport of viewports) {
