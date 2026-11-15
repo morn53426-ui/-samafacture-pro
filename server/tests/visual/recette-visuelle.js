@@ -719,24 +719,28 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       invoiceLineLayout: location.pathname.includes('nouvelle-facture') && window.innerWidth <= 640
         ? (() => {
             const table = document.querySelector('.invoice-lines-table');
-            const wrapper = table?.closest('.invoice-lines-scroll');
+            const wrapper = table?.closest('.invoice-lines-container');
             const row = table?.querySelector('tbody tr');
             const designation = row?.querySelector('.ligne-designation');
             const quantity = row?.querySelector('.ligne-qte');
-            if (!table || !wrapper || !designation || !quantity) return { found: false };
+            if (!table || !wrapper || !row || !designation || !quantity) return { found: false };
             const designationRect = designation.getBoundingClientRect();
             const quantityRect = quantity.getBoundingClientRect();
+            const overlaps = !(designationRect.right <= quantityRect.left ||
+              designationRect.left >= quantityRect.right ||
+              designationRect.bottom <= quantityRect.top ||
+              designationRect.top >= quantityRect.bottom);
             return {
               found: true,
               tableWidth: table.getBoundingClientRect().width,
               wrapperWidth: wrapper.getBoundingClientRect().width,
               scrollWidth: wrapper.scrollWidth,
               clientWidth: wrapper.clientWidth,
-              overflowX: getComputedStyle(wrapper).overflowX,
-              designationRight: designationRect.right,
-              quantityLeft: quantityRect.left,
+              overlaps,
+              sameCell: designation.closest('td') === quantity.closest('td'),
               designationColumnWidth: designation.closest('td').getBoundingClientRect().width,
-              quantityColumnWidth: quantity.closest('td').getBoundingClientRect().width
+              quantityColumnWidth: quantity.closest('td').getBoundingClientRect().width,
+              quantityLabel: quantity.closest('td').dataset.label || ''
             };
           })()
         : null,
@@ -768,15 +772,19 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   if (pageDefinition.name === 'nouvelle-facture' && viewport.width <= 640) {
     const layout = metrics.invoiceLineLayout;
     assert.equal(layout?.found, true,
-      'Le tableau des articles doit afficher la désignation et la quantité à ' + viewport.width + 'px.');
-    assert.ok(layout.designationColumnWidth >= 240 && layout.quantityColumnWidth >= 85,
-      'Les colonnes désignation et quantité doivent conserver leur largeur minimale : ' +
-      JSON.stringify(layout));
-    assert.ok(layout.designationRight <= layout.quantityLeft,
+      'La ligne d’article doit afficher ses champs à ' + viewport.width + 'px.');
+    assert.equal(layout.sameCell, false,
+      'La désignation et la quantité doivent rester dans deux cellules distinctes : ' + JSON.stringify(layout));
+    assert.equal(layout.overlaps, false,
       'Les champs désignation et quantité ne doivent jamais se chevaucher : ' + JSON.stringify(layout));
-    assert.ok(layout.scrollWidth > layout.clientWidth &&
-      /^(auto|scroll|overlay)$/.test(layout.overflowX),
-      'Le tableau doit défiler dans sa zone dédiée sur mobile : ' + JSON.stringify(layout));
+    assert.ok(layout.designationColumnWidth >= 180 && layout.quantityColumnWidth >= 75,
+      'Les champs doivent conserver une largeur utilisable dans la fiche mobile : ' + JSON.stringify(layout));
+    assert.equal(layout.quantityLabel, 'Quantité',
+      'Le champ quantité doit garder son libellé sur mobile : ' + JSON.stringify(layout));
+    assert.ok(layout.tableWidth <= layout.wrapperWidth + 1 &&
+      layout.scrollWidth <= layout.clientWidth + 1,
+      'La fiche article doit tenir sur la largeur du téléphone, sans défilement latéral : ' +
+      JSON.stringify(layout));
   }
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
