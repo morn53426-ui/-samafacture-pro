@@ -5559,3 +5559,14 @@ a.btn .icon {
     height: 20px;
   }
 }
+
+/* Écrans ultra-larges : les blocs métier gardent une largeur de lecture maîtrisée.
+   La barre supérieure reste pleine largeur ; le rail latéral conserve son espace. */
+@media (min-width: 1900px) {
+  body .main-content.workspace-page > :not(.app-topbar):not(#topbar-root) {
+    width: min(100%, 1720px) !important;
+    max-width: 1720px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
