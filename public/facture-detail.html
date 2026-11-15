@@ -14,15 +14,36 @@
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 <style>
+  @page {
+    size: A4 portrait;
+    margin: 12mm 12mm 14mm;
+  }
   body { background: #EDEAE2; }
-  .wrap { max-width: 800px; margin: 30px auto; }
+  .wrap {
+    width: min(210mm, calc(100% - 32px));
+    max-width: 210mm;
+    margin: 30px auto;
+  }
   .toolbar { display:flex; justify-content:flex-end; gap:10px; margin-bottom:16px; }
   .invoice-doc, .invoice-doc * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .invoice-doc { min-height: 297mm; box-sizing: border-box; }
+  @media (max-width: 640px) {
+    .wrap { width: calc(100% - 16px); margin: 12px auto; }
+    .invoice-doc { min-height: 0; }
+    .toolbar { flex-wrap: wrap; }
+  }
   @media print {
-    body { background: #fff; }
-    .toolbar { display: none; }
-    .wrap { margin: 0; max-width: none; }
-    .invoice-doc { border: none; }
+    html, body { width: auto !important; min-width: 0 !important; background: #fff !important; }
+    body { margin: 0 !important; padding: 0 !important; }
+    .toolbar { display: none !important; }
+    .wrap { width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
+    .invoice-doc {
+      min-height: 0 !important;
+      padding: 40px !important;
+      border: none !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
   }
 </style>
 </head>
