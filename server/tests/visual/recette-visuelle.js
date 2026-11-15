@@ -28,7 +28,7 @@ const PAGES = [
   { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
   { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'], responsiveTable: '#table-body' },
   { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
-  { name: 'parametres', file: 'parametres.html', ready: '#entreprise_nom' },
+  { name: 'parametres', file: 'parametres.html', ready: '#invoice-template-gallery .invoice-template-card' },
   { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' },
   { name: 'crm', file: 'crm.html', ready: '#activity-form' },
   { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
@@ -651,6 +651,30 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     pageDefinition.name + ' : toutes les entrées du menu doivent afficher une icône SVG reconnue : ' +
     JSON.stringify(metrics.missingNavigationIcons));
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
+  if (pageDefinition.name === 'parametres') {
+    const gallery = await page.evaluate(() => {
+      const cards = Array.from(document.querySelectorAll('#invoice-template-gallery .invoice-template-card'));
+      const grid = document.querySelector('#invoice-template-gallery');
+      return {
+        cards: cards.length,
+        realPreviews: document.querySelectorAll('#invoice-template-gallery .invoice-doc').length,
+        visibleNames: cards.filter(card => card.querySelector('.invoice-template-card-heading h3')?.textContent.trim()).length,
+        unlockedChoices: document.querySelectorAll('#invoice-template-gallery [data-select-template]').length,
+        lockedCards: document.querySelectorAll('#invoice-template-gallery .is-locked').length,
+        selectedCards: document.querySelectorAll('#invoice-template-gallery .is-selected').length,
+        selectedValue: document.getElementById('facture_template')?.value,
+        columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length
+      };
+    });
+    assert.equal(gallery.cards, 15, 'La galerie doit présenter les quinze modèles de facture : ' + JSON.stringify(gallery));
+    assert.equal(gallery.realPreviews, 15, 'Chaque modèle doit afficher un aperçu du vrai rendu de facture : ' + JSON.stringify(gallery));
+    assert.equal(gallery.visibleNames, 15, 'Chaque aperçu doit porter le nom de son modèle.');
+    assert.equal(gallery.unlockedChoices, 11, 'Le plan Pro doit pouvoir sélectionner les huit modèles communs et les trois modèles Pro.');
+    assert.equal(gallery.lockedCards, 4, 'Les quatre modèles Entreprise doivent rester identifiables comme réservés.');
+    assert.equal(gallery.selectedCards, 1, 'La formule enregistrée doit être visuellement mise en évidence.');
+    assert.equal(gallery.selectedValue, 'classique', 'Le modèle sélectionné doit rester synchronisé avec le champ enregistré.');
+    assert.ok(gallery.columns >= 1, 'La galerie doit conserver une grille responsive.');
+  }
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
       'Chaque information d’un encaissement doit rester nommée et visible sur mobile.');
