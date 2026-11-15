@@ -1149,14 +1149,17 @@ function createFactureTemplates(helpers) {
     html = html.replace(/<div style="font-size:0\.85rem;">([^<]+) → ([^<]+)<\/div>/,
       '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
     // Uniformiser les intitulés de dates dans tous les en-têtes historiques des 19 modèles.
-    // Les libellés sont remplacés uniquement lorsqu'ils constituent un nœud texte HTML,
-    // afin de ne pas modifier les mentions commerciales ou le texte libre du client.
+    // Certains anciens modèles emploient un libellé court ou ajoutent un deux-points.
+    // On remplace uniquement le texte du nœud HTML, jamais les commentaires ni les conditions libres.
+    const dateEmissionLabel = 'Date d’émission :';
+    const dateLimiteLabel = isDevis ? 'Validité du devis :' : 'Échéance de paiement :';
     html = html
-      .replace(/>\s*(?:ÉMISSION|Date d’émission|Date d'édition)\s*</gi, '>Date d’émission<')
-      .replace(/>\s*(?:ÉCHÉANCE DE PAIEMENT|ÉCHÉANCE|À régler avant le|Échéance)\s*</gi,
-        '>' + (isDevis ? 'Validité du devis' : 'Échéance de paiement') + '<')
-      .replace(/>\s*(?:VALIDITÉ DU DEVIS|VALIDITÉ|Valable jusqu’au|Validité)\s*</gi,
-        '>' + (isDevis ? 'Validité du devis' : 'Échéance de paiement') + '<');
+      .replace(/>\s*(?:ÉMISSION|Émis le|Date d’émission|Date d'émission|Date d’édition|Date d'édition)\s*:?\s*</gi,
+        '>' + dateEmissionLabel + '<')
+      .replace(/>\s*(?:ÉCHÉANCE DE PAIEMENT|ÉCHÉANCE|À régler avant le|Échéance|DATE LIMITE)\s*:?\s*</gi,
+        '>' + dateLimiteLabel + '<')
+      .replace(/>\s*(?:VALIDITÉ DU DEVIS|VALIDITÉ|Valable jusqu’au|Valable jusqu'au|Validité)\s*:?\s*</gi,
+        '>' + dateLimiteLabel + '<');
 
     // Le bloc de références est partagé par les 19 modèles modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
