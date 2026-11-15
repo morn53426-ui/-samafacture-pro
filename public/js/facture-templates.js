@@ -1019,17 +1019,14 @@ function createFactureTemplates(helpers) {
       ? { ...facture, date_echeance: facture.date_validite || null }
       : facture;
     let html = render(user, facturePourRendu, lignes, isDevis, qrCode, personnalisation);
-    if (isDevis) {
-      html = html.replace(/Échéance/g, 'Validité du devis');
-      // Le modèle Créatif utilisait deux dates avec une simple flèche, sans préciser
-      // explicitement qu'il s'agit de la validité du devis.
-      html = html.replace(/<div>📅 ([^<]+) → ([^<]+)<\/div>/g,
-        '<div><span>Date d’émission :</span> $1<br/><span>Validité du devis :</span> $2</div>');
-      // Le modèle Corporate utilise une grille de métadonnées avec deux dates séparées
-      // par une flèche : remplacer celle-ci par des libellés explicites dans les devis.
-      html = html.replace(/<div style="font-size:0\.85rem;">([^<]+) → ([^<]+)<\/div>/,
-        '<div><span>Date d’émission :</span> $1<br/><span>Validité du devis :</span> $2</div>');
-    }
+    // Les modèles Créatif et Corporate avaient deux dates séparées par une flèche,
+    // sans en préciser la nature. Nommer explicitement émission et échéance/validité.
+    const secondDateLabel = isDevis ? 'Validité du devis' : 'Échéance de paiement';
+    html = html.replace(/<div>📅 ([^<]+) → ([^<]+)<\/div>/g,
+      '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
+    html = html.replace(/<div style="font-size:0\.85rem;">([^<]+) → ([^<]+)<\/div>/,
+      '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
+    if (isDevis) html = html.replace(/Échéance/g, 'Validité du devis');
 
     // Le bloc de références est partagé par les 15 modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
