@@ -583,6 +583,10 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
         ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
         : null,
       uncontainedTables,
+      missingNavigationIcons: Array.from(document.querySelectorAll('.sidebar .nav-item')).filter((item) => {
+        const svg = item.querySelector('.ic svg');
+        return !svg || svg.getAttribute('viewBox') !== '0 0 24 24';
+      }).map((item) => item.getAttribute('aria-label') || item.textContent.trim()).slice(0, 20),
       overflowElements
     };
   });
@@ -600,6 +604,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   assert.deepEqual(metrics.uncontainedTables, [],
     pageDefinition.name + ' : un tableau trop large doit défiler dans sa carte, sans élargir la page : ' +
     JSON.stringify(metrics.uncontainedTables));
+  assert.deepEqual(metrics.missingNavigationIcons, [],
+    pageDefinition.name + ' : toutes les entrées du menu doivent afficher une icône SVG reconnue : ' +
+    JSON.stringify(metrics.missingNavigationIcons));
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
