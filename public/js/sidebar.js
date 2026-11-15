@@ -55,7 +55,7 @@ function renderSidebar(activePage) {
   const navHtml = nav.map(section => `
     ${section.group ? `<div class="nav-group-label">${section.group}</div>` : ''}
     ${section.items.map(item => `
-      <a href="${item.href}" class="nav-item ${(activePage === item.id || (activePage === 'nouvelle-facture' && item.id === 'factures')) ? 'active' : ''}" title="${item.label}" aria-label="${item.label}" onclick="closeSidebar()">
+      <a href="${item.href}" class="nav-item ${(activePage === item.id || (activePage === 'nouvelle-facture' && item.id === 'factures')) ? 'active' : ''}" title="${item.label}" aria-label="${item.label}" ${(activePage === item.id || (activePage === 'nouvelle-facture' && item.id === 'factures')) ? 'aria-current="page"' : ''} onclick="closeSidebar()">
         <span class="ic" aria-hidden="true">${Icon(item.icon)}</span><span class="nav-label">${item.label}</span>
       </a>
     `).join('')}
@@ -69,7 +69,7 @@ function renderSidebar(activePage) {
           <div class="name">SamaFacture <span class="brand-pro">Pro</span></div>
           <div class="sub">Gestion commerciale</div>
         </div>
-        <button type="button" class="sidebar-collapse-toggle" id="sidebar-collapse-toggle" onclick="toggleDesktopSidebar()" aria-label="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}" aria-expanded="${String(!sidebarCollapsed)}" title="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}">${Icon(sidebarCollapsed ? 'arrow-right' : 'arrow-left')}</button>
+        <button type="button" class="sidebar-collapse-toggle" id="sidebar-collapse-toggle" onclick="toggleDesktopSidebar()" aria-controls="app-navigation" aria-label="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}" aria-expanded="${String(!sidebarCollapsed)}" title="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}">${Icon(sidebarCollapsed ? 'arrow-right' : 'arrow-left')}</button>
         <button type="button" class="mobile-toggle" id="mobile-toggle-btn" onclick="toggleSidebar()" aria-label="Ouvrir le menu" aria-controls="app-navigation" aria-expanded="false">${Icon('menu')}</button>
       </div>
       <nav class="sidebar-nav" id="app-navigation" aria-label="Navigation principale">${navHtml}</nav>
