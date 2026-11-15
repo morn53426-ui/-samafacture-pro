@@ -6023,3 +6023,13 @@ a.btn .icon {
     page-break-inside: avoid !important;
   }
 }
+
+
+/* Icônes de navigation : rester au seuil de lisibilité testé sur chaque viewport. */
+.nav-item .ic svg.icon,
+.nav-item .ic svg {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
+  stroke-width: 1.9;
+}
