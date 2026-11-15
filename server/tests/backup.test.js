@@ -49,6 +49,8 @@ describe('Sauvegardes automatiques', () => {
     const [[apresEchec]] = await pool.query('SELECT derniere_sauvegarde FROM backup_meta WHERE id = 1');
     assert.equal(String(apresEchec.derniere_sauvegarde).slice(0, 10), hier);
     assert.equal((await fs.promises.readdir(BACKUP_DIR)).filter(name => name.endsWith('.sql.gz')).length, 0);
+    assert.equal((await fs.promises.readdir(BACKUP_DIR)).filter(name => name.endsWith('.tmp')).length, 0,
+      'une sauvegarde échouée ne doit laisser aucun fichier temporaire visible');
 
     ecrireFauxDump(0);
     const success = await executerSauvegardeQuotidienne();
@@ -56,6 +58,8 @@ describe('Sauvegardes automatiques', () => {
     const [[apresSucces]] = await pool.query('SELECT derniere_sauvegarde FROM backup_meta WHERE id = 1');
     assert.equal(String(apresSucces.derniere_sauvegarde).slice(0, 10), aujourdHui);
     assert.equal((await fs.promises.readdir(BACKUP_DIR)).filter(name => name.endsWith('.sql.gz')).length, 1);
+    assert.equal((await fs.promises.readdir(BACKUP_DIR)).filter(name => name.endsWith('.tmp')).length, 0,
+      'le fichier temporaire doit être renommé, jamais conservé');
 
     const doublon = await executerSauvegardeQuotidienne();
     assert.equal(doublon, false, 'une seule sauvegarde quotidienne doit être enregistrée');
@@ -84,6 +88,8 @@ describe('Sauvegardes automatiques', () => {
 
     const result = await effectuerSauvegarde();
     assert.ok(result.path.endsWith('.sql.gz.enc'));
+    assert.equal((await fs.promises.readdir(BACKUP_DIR)).some(name => name.endsWith('.tmp')), false,
+      'l’archive chiffrée finale ne doit être visible qu’après le renommage atomique');
 
     const prepared = await preparerFluxGzip(result.path);
     try {
