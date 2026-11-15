@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
 const { computeTotals, insererLignesFacture } = require('./factures');
+const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -213,7 +214,10 @@ router.post('/:id/generer', async (req, res, next) => {
     const facture = await genererFactureDepuisModele(req.params.id, req.tenantId);
     if (!facture) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
     res.status(201).json({ facture });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err?.code === 'QUOTA_DEPASSE') return res.status(403).json({ error: err.message, code: 'QUOTA_DEPASSE' });
+    next(err);
+  }
 });
 
 /**
@@ -225,6 +229,8 @@ async function genererFactureDepuisModele(id, userId) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
+    // Même ordre de verrouillage que les autres créations : compte, puis modèle.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
 
     // SELECT ... FOR UPDATE verrouille la ligne le temps de la transaction : si le
     // vérificateur périodique et un appel manuel (ou deux workers en mode cluster)
@@ -235,6 +241,13 @@ async function genererFactureDepuisModele(id, userId) {
     if (!modele) {
       await conn.rollback();
       return null;
+    }
+
+    const quota = await reserveMonthlyInvoiceQuota(conn, userId);
+    if (!quota.allowed) {
+      const error = new Error(`Le plan Gratuit est limité à ${quota.limit} factures par mois.`);
+      error.code = 'QUOTA_DEPASSE';
+      throw error;
     }
 
     const [[company]] = await conn.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [userId]);
