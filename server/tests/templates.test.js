@@ -16,11 +16,12 @@ const { createFactureTemplates } = require('../../public/js/facture-templates.js
 // dans un sens ou dans l'autre fait échouer 'tous les modèles connus du serveur sont rendables'.
 const TEMPLATES_ATTENDUS = [
   'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
-  'prestige', 'heritage', 'diamant', 'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs'
+  'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
+  'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs'
 ];
 
 describe('Galerie de sélection des modèles (public/parametres.html)', () => {
-  test('présente les quinze rendus réels et affiche clairement les restrictions de formule', () => {
+  test('présente les dix-neuf rendus réels et affiche clairement les restrictions de formule', () => {
     const settingsPath = path.resolve(__dirname, '../../public/parametres.html');
     const source = fs.readFileSync(settingsPath, 'utf8');
     const declaration = source.match(/const INVOICE_TEMPLATE_META = \[([\s\S]*?)\n  \];/);
@@ -28,7 +29,7 @@ describe('Galerie de sélection des modèles (public/parametres.html)', () => {
     assert.ok(declaration, 'La page Paramètres doit déclarer son catalogue visuel de modèles.');
     const galleryIds = Array.from(declaration[1].matchAll(/id: '([^']+)'/g), match => match[1]);
     assert.deepEqual([...galleryIds].sort(), [...TEMPLATES_ATTENDUS].sort(),
-      'La galerie doit rester synchronisée avec les quinze modèles rendus par le moteur.');
+      'La galerie doit rester synchronisée avec les dix-neuf modèles rendus par le moteur.');
 
     assert.match(source, /id="invoice-template-gallery"/,
       'La page doit offrir une zone de galerie dédiée.');
@@ -42,7 +43,7 @@ describe('Galerie de sélection des modèles (public/parametres.html)', () => {
       'La sélection doit être annoncée correctement aux technologies d’assistance.');
     assert.match(source, /PRO_TEMPLATE_IDS = new Set\(\['elegant', 'corporate', 'creatif'\]\)/,
       'Les modèles Pro doivent être clairement identifiés comme réservés au plan Pro.');
-    assert.match(source, /ENTERPRISE_TEMPLATE_IDS = new Set\(\['prestige', 'heritage', 'diamant', 'platine'\]\)/,
+    assert.match(source, /ENTERPRISE_TEMPLATE_IDS = new Set\(\['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide'\]\)/,
       'Les modèles Entreprise doivent être clairement identifiés comme réservés au plan Entreprise.');
     assert.match(source, /invoice-template-native-select/,
       'La valeur choisie dans la galerie doit rester synchronisée avec le champ enregistré.');
