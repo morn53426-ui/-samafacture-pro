@@ -108,11 +108,18 @@ async function effectuerSauvegarde() {
   const suffixe = require('crypto').randomBytes(3).toString('hex');
   const extension = encryptionKey ? '.sql.gz.enc' : '.sql.gz';
   const fichier = path.join(BACKUP_DIR, `samafacture-${horodatage}-${suffixe}${extension}`);
+  const fichierTemporaire = `${fichier}.tmp`;
 
   try {
-    await runMysqldump(fichier, encryptionKey);
+    // Le fichier définitif n'apparaît qu'après un dump, gzip et chiffrement terminés.
+    await runMysqldump(fichierTemporaire, encryptionKey);
+    const temporaireStat = await fs.promises.stat(fichierTemporaire);
+    if (!temporaireStat.size) throw new Error('mysqldump a produit un fichier vide.');
+
+    // Renommage atomique sur le même volume : les outils de sauvegarde ne voient jamais
+    // une archive partielle sous son nom définitif.
+    await fs.promises.rename(fichierTemporaire, fichier);
     const stat = await fs.promises.stat(fichier);
-    if (!stat.size) throw new Error('mysqldump a produit un fichier vide.');
     console.log(`💾 Sauvegarde de la base effectuée : ${fichier} (${(stat.size / 1024).toFixed(0)} Ko)${encryptionKey ? ' — chiffrée AES-256-GCM' : ' — non chiffrée (développement uniquement)'}`);
     await nettoyerAnciennesSauvegardes().catch((err) => {
       console.warn('Nettoyage des anciennes sauvegardes ignoré :', err.message);
@@ -121,6 +128,7 @@ async function effectuerSauvegarde() {
   } catch (err) {
     console.error('⚠️  Échec de la sauvegarde :', err.message);
     captureException(err);
+    await fs.promises.unlink(fichierTemporaire).catch(() => {});
     await fs.promises.unlink(fichier).catch(() => {});
     throw err;
   }
