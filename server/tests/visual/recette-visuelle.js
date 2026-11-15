@@ -817,6 +817,11 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       assert.equal(gridColumns.split(' ').length, 1,
         'Les rubriques professionnelles doivent s’empiler sur téléphone : ' + gridColumns);
     }
+    if (viewport.width === 1440) {
+      await page.click('.pro-workspace-guide a[href="#pro-integrations"]');
+      assert.equal(await page.evaluate(() => location.hash), '#pro-integrations',
+        'Les accès rapides doivent naviguer jusqu’au module choisi.');
+    }
   }
   if (pageDefinition.name === 'parametres') {
     const gallery = metrics.invoiceTemplateGallery;
