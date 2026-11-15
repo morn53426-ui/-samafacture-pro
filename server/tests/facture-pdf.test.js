@@ -101,7 +101,12 @@ describe('Génération PDF de facture', () => {
 
     try {
       const page = await browser.newPage();
-      await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+      const mediaSession = await page.createCDPSession();
+      const appliquerMedia = (media) => mediaSession.send('Emulation.setEmulatedMedia', {
+        media,
+        features: [{ name: 'prefers-color-scheme', value: 'dark' }]
+      });
+      await appliquerMedia('screen');
       await page.evaluateOnNewDocument((token, apiBaseUrl) => {
         localStorage.setItem('sf_token', token);
         localStorage.setItem('sf_theme', 'auto');
@@ -116,6 +121,7 @@ describe('Génération PDF de facture', () => {
 
       const lireEtatTheme = () => page.evaluate(() => ({
         theme: document.documentElement.getAttribute('data-theme'),
+        prefersDark: window.matchMedia('(prefers-color-scheme: dark)').matches,
         couleurFondApp: getComputedStyle(document.documentElement).getPropertyValue('--cream').trim(),
         toolbar: getComputedStyle(document.querySelector('.toolbar')).display,
         fondDocument: getComputedStyle(document.querySelector('.invoice-doc')).backgroundColor
@@ -124,6 +130,7 @@ describe('Génération PDF de facture', () => {
       // En mode système sombre, la page suit la préférence du navigateur.
       let etat = await lireEtatTheme();
       assert.equal(etat.theme, null);
+      assert.equal(etat.prefersDark, true);
       const couleurSystemeSombre = etat.couleurFondApp;
 
       // La palette claire de référence est lue depuis le vrai CSS, sans figer ses hexadécimaux.
@@ -134,7 +141,7 @@ describe('Génération PDF de facture', () => {
       await page.evaluate(() => window.SamaTheme.definir('auto'));
 
       // L'aperçu imprimé doit reprendre exactement la palette claire de l'application.
-      await page.emulateMediaType('print');
+      await appliquerMedia('print');
       await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, 'light');
@@ -143,29 +150,27 @@ describe('Génération PDF de facture', () => {
       assert.equal(etat.fondDocument, 'rgb(255, 254, 252)', 'le fond papier doit rester blanc cassé en impression');
 
       // À la fermeture de l'aperçu, le mode système sombre doit être rétabli.
-      await page.emulateMediaType('screen');
-      // Puppeteer peut réinitialiser certaines émulations lors du changement screen/print :
-      // réappliquer explicitement la préférence système sombre avant de contrôler la restauration.
-      await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+      await appliquerMedia('screen');
       await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, null);
+      assert.equal(etat.prefersDark, true);
       assert.equal(etat.couleurFondApp, couleurSystemeSombre);
 
       // Le même cycle doit préserver un choix sombre explicite de l'utilisateur.
       await page.evaluate(() => window.SamaTheme.definir('dark'));
       const couleurThemeSombreManuel = (await lireEtatTheme()).couleurFondApp;
       assert.notEqual(couleurThemeSombreManuel, couleurPaletteClaire);
-      await page.emulateMediaType('print');
+      await appliquerMedia('print');
       await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, 'light');
       assert.equal(etat.couleurFondApp, couleurPaletteClaire);
-      await page.emulateMediaType('screen');
-      await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+      await appliquerMedia('screen');
       await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, 'dark');
+      assert.equal(etat.prefersDark, true);
       assert.equal(etat.couleurFondApp, couleurThemeSombreManuel);
     } finally {
       await browser.close().catch(() => {});
