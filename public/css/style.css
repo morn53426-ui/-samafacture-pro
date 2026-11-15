@@ -6121,3 +6121,19 @@ a.btn .icon {
     page-break-inside: avoid !important;
   }
 }
+
+/* Finition demandée : renforcer légèrement la présence du logo et des pictogrammes
+   sans élargir le rail compact ni modifier les dimensions des boutons. */
+.sidebar-brand .mark,
+.sidebar.is-collapsed .sidebar-brand .mark {
+  width: 52px !important;
+  height: 52px !important;
+  flex: 0 0 52px;
+}
+.nav-item .ic svg.icon,
+.nav-item .ic svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  stroke-width: 1.9;
+}

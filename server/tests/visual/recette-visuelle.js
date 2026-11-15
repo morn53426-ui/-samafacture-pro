@@ -562,10 +562,14 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     const navigationIcons = Array.from(document.querySelectorAll('#app-navigation .nav-item > .ic > svg.icon'));
     const navigationIconsLegible = navigationIcons.length > 0 && navigationIcons.every(icon => {
       const style = getComputedStyle(icon);
-      return Number.parseFloat(style.width) >= 20 &&
-        Number.parseFloat(style.height) >= 20 &&
+      return Number.parseFloat(style.width) >= 23 &&
+        Number.parseFloat(style.height) >= 23 &&
         Number.parseFloat(style.strokeWidth) >= 1.8;
     });
+    const navigationLogo = document.querySelector('#app-sidebar .sidebar-brand .mark');
+    const navigationLogoSize = navigationLogo
+      ? Math.min(navigationLogo.getBoundingClientRect().width, navigationLogo.getBoundingClientRect().height)
+      : 0;
     return {
       workspacePage: Boolean(main),
       hasHeader,
@@ -579,6 +583,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
         .filter(item => !item.querySelector(':scope > .ic > svg.icon'))
         .map(item => item.textContent.trim()),
       navigationIconsLegible,
+      navigationLogoSize,
       headingFont: getComputedStyle(document.querySelector('h1')).fontFamily,
       bodyFont: getComputedStyle(document.body).fontFamily
     };
@@ -612,7 +617,10 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' contient des entrées sans icône : ' +
       JSON.stringify(layoutAudit.navigationItemsWithoutIcon));
     assert.equal(layoutAudit.navigationIconsLegible, true,
-      pageDefinition.name + ' : les icônes de navigation doivent mesurer au moins 20 px avec un trait de 1,8.'); 
+      pageDefinition.name + ' : les icônes de navigation doivent mesurer au moins 23 px avec un trait de 1,8.');
+    assert.ok(layoutAudit.navigationLogoSize >= 50,
+      pageDefinition.name + ' : le logo de navigation doit mesurer au moins 50 px. Taille mesurée : ' +
+      layoutAudit.navigationLogoSize); 
   }
 
   const navigationGeometry = await page.evaluate(() => {
