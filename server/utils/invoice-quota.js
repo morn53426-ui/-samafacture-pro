@@ -25,24 +25,38 @@ async function reserveMonthlyInvoiceQuota(conn, userId) {
   const periodStart = periodRow?.period_start;
   if (!periodStart) throw new Error('Impossible de déterminer la période du quota de facturation.');
 
-  // Migration transparente : reprendre les factures déjà créées ce mois avant le registre v8.
-  // created_at (et non date_emission) empêche de contourner le quota en choisissant une date passée.
-  await conn.query(
-    `INSERT IGNORE INTO facture_usage_mensuelle (user_id, periode, nombre_factures)
-     SELECT ?, ?, COUNT(*)
-     FROM factures
-     WHERE user_id = ?
-       AND type = 'facture'
-       AND created_at >= ?
-       AND created_at < DATE_ADD(?, INTERVAL 1 MONTH)`,
-    [userId, periodStart, userId, periodStart, periodStart]
-  );
-
+  // Le compte est déjà verrouillé avec SELECT ... FOR UPDATE ci-dessus : une seule
+  // transaction peut initialiser ce compteur pour cet utilisateur/mois à la fois.
+  // On fait une lecture explicite, puis un comptage et un INSERT si le registre n'existe
+  // pas encore. Cela évite de dépendre du comportement d'un INSERT IGNORE ... SELECT agrégé
+  // et garantit qu'une ligne est toujours créée avant l'incrément.
   const [[usage]] = await conn.query(
     'SELECT nombre_factures FROM facture_usage_mensuelle WHERE user_id = ? AND periode = ? FOR UPDATE',
     [userId, periodStart]
   );
-  const used = Number(usage?.nombre_factures || 0);
+
+  let used;
+  if (usage) {
+    used = Number(usage.nombre_factures || 0);
+  } else {
+    // Initialisation rétrocompatible : reprendre les factures créées ce mois avant la v8.
+    // created_at (et non date_emission) empêche de choisir une date passée pour contourner
+    // le quota. Une facture supprimée ensuite reste comptabilisée dans le registre.
+    const [[historique]] = await conn.query(
+      `SELECT COUNT(*) AS nombre_factures
+       FROM factures
+       WHERE user_id = ?
+         AND type = 'facture'
+         AND created_at >= ?
+         AND created_at < DATE_ADD(?, INTERVAL 1 MONTH)`,
+      [userId, periodStart, periodStart]
+    );
+    used = Number(historique?.nombre_factures || 0);
+    await conn.query(
+      'INSERT INTO facture_usage_mensuelle (user_id, periode, nombre_factures) VALUES (?, ?, ?)',
+      [userId, periodStart, used]
+    );
+  }
   if (!paidPlan && used >= FREE_MONTHLY_INVOICE_LIMIT) {
     return { allowed: false, unlimited: false, used, limit: FREE_MONTHLY_INVOICE_LIMIT, period_start: periodStart };
   }
