@@ -176,6 +176,8 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       assert.match(html, /Montant TTC/, template + ' doit identifier le total TTC des lignes');
       assert.match(html, /Sous-total HT/, template + ' doit séparer le sous-total HT');
       assert.match(html, /Déjà réglé/, template + ' doit présenter les sommes reçues');
+      assert.match(html, /Paiement partiel/, template + ' doit signaler un règlement partiel');
+      assert.doesNotMatch(html, /Non payée/, template + ' ne doit pas qualifier de non payée une facture avec acompte');
       assert.match(html, /Reste à payer/, template + ' doit afficher le solde dû');
       assert.match(html, /Coordonnées de règlement/, template + ' doit présenter les informations bancaires configurées');
       assert.doesNotMatch(html, /undefined|NaN/);
@@ -222,6 +224,7 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     });
     assert.match(html, /sf-payment-balance[\s\S]*?0 FCFA/,
       'le solde restant dû ne doit jamais devenir négatif après règlement intégral');
+    assert.match(html, /Payée/, 'une facture dont le montant reçu couvre le total doit être estampillée Payée');
   });
 
   test('un identifiant de modèle inconnu retombe sur le modèle "classique" (comportement déjà existant, non modifié)', () => {
