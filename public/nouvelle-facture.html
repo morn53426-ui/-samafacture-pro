@@ -153,18 +153,24 @@
     const row = document.createElement('tr');
     row.id = id;
     row.innerHTML = `
-      <td>
-        <select class="ligne-produit" style="margin-bottom:4px;" onchange="applyProduit('${id}', this)">
-          <option value="">Produit du catalogue (optionnel)</option>
-          ${produitOptions}
-        </select>
-        <input type="text" class="ligne-designation" placeholder="Désignation" />
+      <td class="ligne-designation-cell">
+        <div class="ligne-mobile-field">
+          <label class="ligne-mobile-label" for="${id}-produit">Produit du catalogue</label>
+          <select id="${id}-produit" class="ligne-produit" style="margin-bottom:4px;" onchange="applyProduit('${id}', this)">
+            <option value="">Produit du catalogue (optionnel)</option>
+            ${produitOptions}
+          </select>
+        </div>
+        <div class="ligne-mobile-field">
+          <label class="ligne-mobile-label" for="${id}-designation">Désignation</label>
+          <input id="${id}-designation" type="text" class="ligne-designation" placeholder="Désignation" />
+        </div>
       </td>
-      <td><input type="number" class="ligne-qte ligne-input-sm" value="1" min="0" step="1" oninput="recalc()" /></td>
-      <td><input type="number" class="ligne-pu ligne-input-sm" value="0" min="0" step="1" oninput="recalc()" /></td>
-      <td><input type="number" class="ligne-tva ligne-input-sm" value="0" min="0" max="100" step="1" oninput="recalc()" /></td>
-      <td class="mono ligne-total">0</td>
-      <td><button type="button" class="btn btn-sm btn-danger" onclick="removeLigne('${id}')">${Icon('x')}</button></td>
+      <td data-label="Quantité"><input type="number" class="ligne-qte ligne-input-sm" value="1" min="0" step="1" oninput="recalc()" /></td>
+      <td data-label="Prix unitaire"><input type="number" class="ligne-pu ligne-input-sm" value="0" min="0" step="1" oninput="recalc()" /></td>
+      <td data-label="TVA (%)"><input type="number" class="ligne-tva ligne-input-sm" value="0" min="0" max="100" step="1" oninput="recalc()" /></td>
+      <td data-label="Total" class="mono ligne-total">0</td>
+      <td data-label="Actions"><button type="button" class="btn btn-sm btn-danger" onclick="removeLigne('${id}')">${Icon('x')}</button></td>
     `;
     document.getElementById('lignes-body').appendChild(row);
   }
