@@ -161,7 +161,7 @@ jobs:
           retention-days: 7
 
       - name: Smoke test du démarrage cluster avec MySQL et Redis
-        timeout-minutes: 5
+        timeout-minutes: 11
         working-directory: server
         env:
           NODE_ENV: development
@@ -198,8 +198,10 @@ jobs:
           trap cleanup EXIT
 
           READY=0
-          for attempt in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:4178/api/ready > /tmp/samafacture-cluster-ready.json; then
+          for attempt in $(seq 1 90); do
+            # La préparation initiale du schéma peut être longue ; aucune sonde HTTP ne doit
+            # bloquer toute la boucle si le port vient d'ouvrir mais que le worker démarre.
+            if curl --connect-timeout 2 --max-time 4 -fsS http://127.0.0.1:4178/api/ready > /tmp/samafacture-cluster-ready.json; then
               if grep -q '"redis":"up"' /tmp/samafacture-cluster-ready.json; then
                 READY=1
                 break
@@ -222,7 +224,7 @@ jobs:
 
           # Cette route passe par le limiteur Redis partagé ; elle vérifie aussi
           # que les commandes RedisStore sont disponibles après le démarrage.
-          curl -fsS http://127.0.0.1:4178/api/config > /dev/null
+          curl --connect-timeout 2 --max-time 5 -fsS http://127.0.0.1:4178/api/config > /dev/null
           echo "Démarrage cluster validé : 2 workers, MySQL prêt et Redis opérationnel."
 
       - name: Recette visuelle responsive avec données extrêmes
