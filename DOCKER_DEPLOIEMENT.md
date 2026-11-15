@@ -60,6 +60,35 @@ L'URL publique est `https://APP_DOMAIN`. En mode production, le serveur refuse d
 
 Ne publiez jamais le port MySQL. N'exposez pas le port HTTP local 4000. Gardez les volumes Docker et ne lancez pas `docker compose down -v`.
 
+## Montée en charge horizontale
+
+Le chemin de production est **Caddy (HTTPS) → Nginx (répartition) → réplicas API**. Nginx restaure l'adresse client transmise par Caddy avant le routage persistant `ip_hash`; Redis reste partagé pour Socket.IO et les limites de requêtes.
+
+Profil de départ à mesurer sur votre VPS :
+
+- `WEB_CONCURRENCY=2` : deux processus Node par conteneur API.
+- `DB_POOL_SIZE=10` : dix connexions MySQL au maximum par processus.
+- `DB_QUEUE_LIMIT=200` : file d'attente locale bornée par processus.
+- `DB_POOL_SIZE=10` est également appliqué à chaque worker PDF.
+
+Exemple pour trois conteneurs API et deux workers PDF :
+
+```bash
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml up -d --build --scale app=3 --scale pdf-worker=2
+```
+
+Budget de connexions à vérifier avant d'augmenter les réplicas :
+
+```text
+(conteneurs API × WEB_CONCURRENCY × DB_POOL_SIZE)
++ (workers PDF × DB_POOL_SIZE)
++ connexions réservées à l'administration et aux tâches système
+```
+
+Avec le profil ci-dessus, les pools applicatifs peuvent ouvrir jusqu'à **80 connexions MySQL** (3 × 2 × 10 + 2 × 10), avant les connexions réservées. Ajustez `max_connections` et la mémoire MySQL en fonction du VPS ; augmenter le pool sans dimensionner MySQL déplace simplement le goulot d'étranglement. Mesurez le temps de réponse p95/p99, les connexions actives, la file d'attente et la mémoire avant chaque augmentation.
+
+La génération PDF reste asynchrone et isolée de l'API. Augmentez le nombre de workers PDF séparément avec `--scale pdf-worker=N`, en gardant un budget MySQL et mémoire adapté à chaque worker. Les tests à forte charge doivent être exécutés sur un environnement de staging dédié, avec une machine de génération de charge séparée ; une configuration multi-instance n'est pas une garantie de capacité sans mesure sur l'infrastructure cible.
+
 ## Sauvegardes et restauration
 
 Les sauvegardes quotidiennes utilisent un verrou MySQL partagé entre les workers. La date de dernière sauvegarde n'est mise à jour qu'après réussite de `mysqldump`, vérification du fichier et fermeture du flux ; un échec laisse donc la possibilité de réessayer au contrôle horaire suivant.
@@ -87,4 +116,4 @@ docker compose --env-file .env -f docker-compose.yml -f docker-compose.productio
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml down
 ```
 
-Pour augmenter le nombre d'instances API, utiliser un hôte dimensionné en conséquence, Redis partagé et le proxy Caddy configuré vers le service app. Ne supprimez jamais le volume `mysql_data` si vous souhaitez conserver les données.
+Pour augmenter le nombre d'instances API, utiliser la commande de montée en charge ci-dessus : Caddy transmet le trafic à Nginx, qui répartit les requêtes entre les réplicas app. Ne supprimez jamais le volume `mysql_data` si vous souhaitez conserver les données.
