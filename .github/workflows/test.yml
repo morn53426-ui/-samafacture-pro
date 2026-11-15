@@ -82,8 +82,26 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
 
-      - name: Construire l'image Docker sans publication
-        run: docker build --tag samafacture-pro:ci .
+      - name: Construire l'image Docker et vérifier l'absence de secrets locaux
+        shell: bash
+        run: |
+          # Simule les deux fichiers locaux les plus sensibles avant la construction.
+          cp server/.env /tmp/server.env.ci
+          cleanup() {
+            if [ -f /tmp/server.env.ci ]; then mv /tmp/server.env.ci server/.env; fi
+            rm -f .env
+          }
+          trap cleanup EXIT
+          printf 'CI_SERVER_SECRET_SENTINEL=must-not-enter-image\n' > server/.env
+          printf 'CI_ROOT_SECRET_SENTINEL=must-not-enter-image\n' > .env
+          docker build --tag samafacture-pro:ci .
+
+          # Inspecte le contenu réel de l'image, pas seulement les motifs du .dockerignore.
+          docker run --rm --entrypoint /bin/sh samafacture-pro:ci -ec '
+            test ! -e /app/server/.env
+            test ! -e /app/.env
+            test -f /app/server/.env.example
+          '
 
       - name: Installer les dépendances
         working-directory: server
