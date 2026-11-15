@@ -1,0 +1,32 @@
+# Secrets and local environment files must never enter the Docker build context.
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+server/.env
+server/.env.*
+!server/.env.example
+
+# Source control metadata and local dependencies.
+.git
+.git/**
+**/.git
+node_modules
+**/node_modules
+
+# Runtime data, generated files and local diagnostics.
+**/backups
+**/pdf-jobs
+**/logs
+**/*.log
+coverage
+dist
+tmp
+temp
+
+# Operating system files.
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
