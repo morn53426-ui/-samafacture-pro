@@ -1,6 +1,6 @@
 # Modèles de factures et devis — guide
 
-Cette évolution enrichit les 15 thèmes existants sans remplacer leur identité graphique. Le rendu est partagé entre la page de détail, l'impression du navigateur et la génération PDF par Puppeteer.
+Cette évolution enrichit les 19 thèmes existants sans remplacer leur identité graphique. Le rendu est partagé entre la page de détail, l'impression du navigateur et la génération PDF par Puppeteer.
 
 ## 1. Informations de l'entreprise
 
@@ -52,7 +52,9 @@ Cette zone est une zone d'acceptation à compléter par le client. Elle ne const
 
 ## 5. Modèles concernés
 
-Les ajouts sont communs aux 15 thèmes : Classique, Moderne, Minimaliste, Élégant, Corporate, Créatif, Prestige, Héritage, Diamant, Épuré, Azur, Circuit, Platine, Atelier et Saveurs.
+Les ajouts sont communs aux 19 thèmes : Classique, Moderne, Minimaliste, Élégant, Corporate, Créatif, Prestige, Héritage, Diamant, Exécutif, Institution, Signature, Consolidé, Épuré, Azur, Circuit, Platine, Atelier et Saveurs.
+
+Les huit modèles Entreprise exclusifs sont Prestige, Héritage, Diamant, Platine, Exécutif, Institution, Signature et Consolidé. Ils apparaissent dans la galerie pour comparaison, mais ne peuvent être sélectionnés et enregistrés que par un compte au plan Entreprise.
 
 Les préférences de thème, couleurs, polices et logo déjà configurées restent prises en charge. Les données utilisateur sont échappées avant leur insertion dans le HTML.
 
