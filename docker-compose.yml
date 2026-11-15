@@ -53,8 +53,8 @@ services:
       REDIS_URL: redis://redis:6379
       TRUST_PROXY: "1"
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
-      DB_QUEUE_LIMIT: ${DB_QUEUE_LIMIT:-2000}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_QUEUE_LIMIT: ${DB_QUEUE_LIMIT:-200}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       APP_URL: ${APP_URL}
       JWT_SECRET: ${JWT_SECRET}
@@ -94,8 +94,8 @@ services:
       # est prioritaire sur APP_URL dans utils/pdf.js — cette valeur ne change donc rien à
       # APP_URL utilisé ailleurs (emails, sitemap, etc.) qui doit rester le vrai domaine public.
       PDF_BASE_URL: http://app:4000
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
-      DB_QUEUE_LIMIT: ${DB_QUEUE_LIMIT:-2000}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_QUEUE_LIMIT: ${DB_QUEUE_LIMIT:-200}
     volumes:
       - pdf_jobs:/app/server/pdf-jobs
     command: ["node", "workers/pdf-worker.js"]
@@ -113,6 +113,12 @@ services:
       - "127.0.0.1:${HTTP_PORT:-4000}:80"
     volumes:
       - ./deploy/nginx.scalable.conf.example:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/api/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
     networks: [samafacture_net]
 
 networks:
