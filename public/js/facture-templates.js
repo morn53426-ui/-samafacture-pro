@@ -269,7 +269,7 @@ function createFactureTemplates(helpers) {
         </div>
         <div style="text-align:right;">
           <div style="font-family:var(--font-display); font-weight:700; letter-spacing:0.1em; font-size:0.95rem;">${isDevis ? 'DEVIS' : 'FACTURE'} · ${escapeHtml(facture.numero)}</div>
-          <div style="color:#555; font-size:0.78rem; margin-top:2px;">${formatDate(facture.date_emission)} — ${statutLabel}</div>
+          <div style="color:#555; font-size:0.78rem; margin-top:2px;">Date d’émission : ${formatDate(facture.date_emission)} — ${statutLabel}</div>
         </div>
       </div>
 
@@ -319,7 +319,7 @@ function createFactureTemplates(helpers) {
           ${clientBlockHtml(facture)}
         </div>
         <div style="text-align:right;">
-          <div><span style="color:var(--ink-soft);">Émise le</span> ${formatDate(facture.date_emission)}</div>
+          <div><span style="color:var(--ink-soft);">Date d’émission :</span> ${formatDate(facture.date_emission)}</div>
           <div><span style="color:var(--ink-soft);">Échéance</span> ${formatDate(facture.date_echeance)}</div>
           <div style="margin-top:6px;">${statutBadge(facture.statut)}</div>
         </div>
@@ -516,7 +516,7 @@ function createFactureTemplates(helpers) {
           ${clientBlockHtml(facture)}
         </div>
         <div style="text-align:right;">
-          <div><span style="color:var(--ink-soft);">Émise le</span> ${formatDate(facture.date_emission)}</div>
+          <div><span style="color:var(--ink-soft);">Date d’émission :</span> ${formatDate(facture.date_emission)}</div>
           <div><span style="color:var(--ink-soft);">Échéance</span> ${formatDate(facture.date_echeance)}</div>
           <div style="margin-top:6px;">${statutBadge(facture.statut)}</div>
         </div>
@@ -764,7 +764,7 @@ function createFactureTemplates(helpers) {
           ${clientBlockHtml(facture)}
         </div>
         <div style="text-align:right;">
-          <div><span style="color:var(--ink-soft);">Émise le</span> ${formatDate(facture.date_emission)}</div>
+          <div><span style="color:var(--ink-soft);">Date d’émission :</span> ${formatDate(facture.date_emission)}</div>
           <div><span style="color:var(--ink-soft);">Échéance</span> ${formatDate(facture.date_echeance)}</div>
           <div style="margin-top:6px;">${statutBadge(facture.statut)}</div>
         </div>
@@ -853,7 +853,7 @@ function createFactureTemplates(helpers) {
           ${clientBlockHtml(facture)}
         </div>
         <div style="text-align:right;">
-          <div>${formatDate(facture.date_emission)}</div>
+          <div>Date d’émission : ${formatDate(facture.date_emission)}</div>
           <div style="margin-top:6px;">${statutBadge(facture.statut)}</div>
         </div>
       </div>
