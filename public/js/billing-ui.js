@@ -45,6 +45,12 @@
         Icon('mail') + '</button>'
       );
 
+      actions.push(
+        '<button type="button" class="billing-icon-action is-whatsapp" aria-label="Partager la facture ' + numero + ' par WhatsApp" ' +
+        'title="Partager par WhatsApp" onclick="event.stopPropagation(); partagerDocumentWhatsApp(window.__sfBillingInvoices.find(item => Number(item.id) === ' + id + '))">' +
+        Icon('message-circle') + '</button>'
+      );
+
       if (f.statut === 'en_attente' || f.statut === 'en_retard') {
         actions.push(
           '<button type="button" class="billing-icon-action" aria-label="Relancer la facture ' + numero +

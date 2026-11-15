@@ -336,7 +336,7 @@ router.get('/', async (req, res, next) => {
 
     const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM factures f${whereSql}`, params);
     const [rows] = await pool.query(
-      `SELECT f.*, c.nom as client_nom, c.email as client_email FROM factures f JOIN clients c ON c.id = f.client_id${whereSql}
+      `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone FROM factures f JOIN clients c ON c.id = f.client_id${whereSql}
        ORDER BY f.date_emission DESC, f.id DESC LIMIT ? OFFSET ?`,
       [...params, limite, offset]
     );
