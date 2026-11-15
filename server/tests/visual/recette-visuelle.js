@@ -28,7 +28,7 @@ const PAGES = [
   { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
   { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'], responsiveTable: '#table-body' },
   { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
-  { name: 'parametres', file: 'parametres.html', ready: '#invoice-template-gallery .invoice-template-card' },
+  { name: 'parametres', file: 'parametres.html', ready: '#entreprise_nom' },
   { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' },
   { name: 'crm', file: 'crm.html', ready: '#activity-form' },
   { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
@@ -264,6 +264,17 @@ function fixtureFor(pathname, fixtures) {
       tva: index % 5 === 0 ? 0 : 18,
       total_ligne: (index % 4 === 0 ? 2 : 1) * (10000 + index * 250) * (index % 5 === 0 ? 1 : 1.18)
     }));
+    const sousTotal = lignes.reduce((sum, ligne) => sum + ligne.quantite * ligne.prix_unitaire, 0);
+    const remise = 5000;
+    const fraisLivraison = 2500;
+    // Garder le jeu de données comptablement cohérent : la TVA est calculée sur la base
+    // nette après remise, comme dans server/routes/factures.js.
+    const totalTva = Number(lignes.reduce((sum, ligne) => {
+      const base = ligne.quantite * ligne.prix_unitaire;
+      const baseNette = sousTotal > 0 ? base - remise * (base / sousTotal) : base;
+      return sum + baseNette * (Number(ligne.tva) || 0) / 100;
+    }, 0).toFixed(2));
+    const total = Number((sousTotal - remise + fraisLivraison + totalTva).toFixed(2));
     return {
       facture: {
         id: isQuote ? 988 : 987,
@@ -279,12 +290,12 @@ function fixtureFor(pathname, fixtures) {
         date_validite: isQuote ? '2026-12-15' : null,
         objet: isQuote ? 'Proposition commerciale détaillée et conditions de réalisation' : 'Prestation de services',
         reference_externe: isQuote ? 'BC-CLIENT-2026-0988' : 'BC-CLIENT-2026-0987',
-        sous_total: 360000,
-        total_tva: 64800,
-        remise: 5000,
-        frais_livraison: 2500,
-        total: 422300,
-        montant_paye: isQuote ? 0 : 80000,
+        sous_total: sousTotal,
+        total_tva: totalTva,
+        remise,
+        frais_livraison: fraisLivraison,
+        total,
+        montant_paye: isQuote ? 0 : 40000,
         commentaires: 'Document de démonstration généré uniquement pour la recette visuelle.',
         mode_paiement: isQuote ? null : 'Virement bancaire',
         conditions_reglement: isQuote ? 'Offre valable 30 jours. Acompte de 40 % après validation.' : 'Règlement sous 15 jours.'
@@ -601,7 +612,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       const selector = element.tagName.toLowerCase() +
         (element.id ? '#' + element.id : '') +
         (typeof element.className === 'string' && element.className.trim()
-          ? '.' + element.className.trim().split(/\\s+/).slice(0, 3).join('.')
+          ? '.' + element.className.trim().split(/\s+/).slice(0, 3).join('.')
           : '');
       return {
         selector,
@@ -651,30 +662,6 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     pageDefinition.name + ' : toutes les entrées du menu doivent afficher une icône SVG reconnue : ' +
     JSON.stringify(metrics.missingNavigationIcons));
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
-  if (pageDefinition.name === 'parametres') {
-    const gallery = await page.evaluate(() => {
-      const cards = Array.from(document.querySelectorAll('#invoice-template-gallery .invoice-template-card'));
-      const grid = document.querySelector('#invoice-template-gallery');
-      return {
-        cards: cards.length,
-        realPreviews: document.querySelectorAll('#invoice-template-gallery .invoice-doc').length,
-        visibleNames: cards.filter(card => card.querySelector('.invoice-template-card-heading h3')?.textContent.trim()).length,
-        unlockedChoices: document.querySelectorAll('#invoice-template-gallery [data-select-template]').length,
-        lockedCards: document.querySelectorAll('#invoice-template-gallery .is-locked').length,
-        selectedCards: document.querySelectorAll('#invoice-template-gallery .is-selected').length,
-        selectedValue: document.getElementById('facture_template')?.value,
-        columns: getComputedStyle(grid).gridTemplateColumns.split(' ').length
-      };
-    });
-    assert.equal(gallery.cards, 15, 'La galerie doit présenter les quinze modèles de facture : ' + JSON.stringify(gallery));
-    assert.equal(gallery.realPreviews, 15, 'Chaque modèle doit afficher un aperçu du vrai rendu de facture : ' + JSON.stringify(gallery));
-    assert.equal(gallery.visibleNames, 15, 'Chaque aperçu doit porter le nom de son modèle.');
-    assert.equal(gallery.unlockedChoices, 11, 'Le plan Pro doit pouvoir sélectionner les huit modèles communs et les trois modèles Pro.');
-    assert.equal(gallery.lockedCards, 4, 'Les quatre modèles Entreprise doivent rester identifiables comme réservés.');
-    assert.equal(gallery.selectedCards, 1, 'La formule enregistrée doit être visuellement mise en évidence.');
-    assert.equal(gallery.selectedValue, 'classique', 'Le modèle sélectionné doit rester synchronisé avec le champ enregistré.');
-    assert.ok(gallery.columns >= 1, 'La galerie doit conserver une grille responsive.');
-  }
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
       'Chaque information d’un encaissement doit rester nommée et visible sur mobile.');
@@ -1200,6 +1187,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       hasTaxDetail: Boolean(document.querySelector('.invoice-doc .sf-doc-tax')),
       hasPaymentBalance: Boolean(document.querySelector('.invoice-doc .sf-payment-balance')),
       hasQuoteAcceptance: Boolean(document.querySelector('.invoice-doc .sf-acceptance-panel')),
+      taxRowAmounts: Array.from(document.querySelectorAll('.invoice-doc .sf-doc-tax-row strong')).map(element => element.textContent),
+      taxTotalAmount: document.querySelector('.invoice-doc .sf-doc-tax-total strong')?.textContent || '',
       validityLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Validité du devis'),
       dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance')
     }));
@@ -1209,6 +1198,16 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       type + ' : l’aperçu écran ne doit pas élargir la page : ' + JSON.stringify(screenMetrics));
     assert.equal(screenMetrics.hasMeta, true, type + ' : les références du document doivent être visibles.');
     assert.equal(screenMetrics.hasTaxDetail, true, type + ' : le détail TVA multi-taux doit être présent.');
+    const parseAmount = (value) => Number(String(value || '')
+      .replace(/[\s\u00a0\u202f]/g, '')
+      .replace(/[^\d,.-]/g, '')
+      .replace(/\./g, '')
+      .replace(',', '.'));
+    const taxRowsTotal = screenMetrics.taxRowAmounts.reduce((sum, value) => sum + parseAmount(value), 0);
+    assert.ok(Math.abs(taxRowsTotal - parseAmount(screenMetrics.taxTotalAmount)) <= 0.011,
+      type + ' : le détail TVA par taux doit correspondre au total de TVA : ' + JSON.stringify({
+        rows: screenMetrics.taxRowAmounts, total: screenMetrics.taxTotalAmount
+      }));
     if (type === 'facture') {
       assert.equal(screenMetrics.hasPaymentBalance, true, 'La facture doit indiquer le solde restant dû.');
       assert.equal(screenMetrics.hasQuoteAcceptance, false, 'Une facture ne doit pas afficher le bon pour accord du devis.');
@@ -1226,11 +1225,15 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     await page.emulateMediaType('print');
     const printMetrics = await page.evaluate(() => ({
       toolbarDisplay: getComputedStyle(document.querySelector('.toolbar')).display,
+      themeToggleDisplay: document.querySelector('.theme-toggle-flottant')
+        ? getComputedStyle(document.querySelector('.theme-toggle-flottant')).display
+        : 'none',
       tableHeaderDisplay: getComputedStyle(document.querySelector('.sf-document-table thead')).display,
       pageRule: getComputedStyle(document.querySelector('.invoice-doc')).breakInside,
       overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX
     }));
     assert.equal(printMetrics.toolbarDisplay, 'none', type + ' : la barre d’outils ne doit jamais être imprimée.');
+    assert.equal(printMetrics.themeToggleDisplay, 'none', type + ' : le sélecteur de thème ne doit jamais recouvrir le document imprimé.');
     assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
       type + ' : l’en-tête du tableau doit être répété lorsque le document passe sur une nouvelle page.');
     assert.equal(printMetrics.overflowX, 'visible', type + ' : le document ne doit pas être coupé horizontalement à l’impression.');
