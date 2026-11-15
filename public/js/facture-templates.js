@@ -374,7 +374,7 @@ function createFactureTemplates(helpers) {
         </div>
         <div style="padding:14px 16px;">
           <div style="font-size:0.68rem; text-transform:uppercase; color:var(--ink-soft); margin-bottom:4px;">Statut</div>
-          ${statutBadge(facture.statut)}
+          ${!isDevis && paymentStampLabel(facture, false) === 'Paiement partiel' ? '<span class="badge">Paiement partiel</span>' : statutBadge(facture.statut)}
         </div>
       </div>
 
