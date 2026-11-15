@@ -28,7 +28,7 @@ const PAGES = [
   { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
   { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'], responsiveTable: '#table-body' },
   { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
-  { name: 'parametres', file: 'parametres.html', ready: '#entreprise_nom' },
+  { name: 'parametres', file: 'parametres.html', ready: '[data-template-card="classique"]' },
   { name: 'professionnel', file: 'professionnel.html', ready: '#pro-sales' },
   { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' },
   { name: 'crm', file: 'crm.html', ready: '#activity-form' },
@@ -898,6 +898,74 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.ok(labels.length > 0 && labels.every(Boolean),
       pageDefinition.name + ' : toutes les cellules du tableau mobile doivent avoir un libellé. Labels : ' +
       JSON.stringify(labels));
+  }
+
+  if (pageDefinition.name === 'parametres' && [320, 1440].includes(viewport.width)) {
+    await page.waitForSelector('[data-open-template-preview="nova"]', { timeout: 15000 });
+    await page.click('[data-open-template-preview="nova"]');
+    await page.waitForFunction(() => {
+      const modal = document.getElementById('invoice-template-preview-modal');
+      return modal && getComputedStyle(modal).display !== 'none';
+    }, { timeout: 5000 });
+    const fittedPreview = await page.evaluate(() => {
+      const modal = document.getElementById('invoice-template-preview-modal');
+      const stage = document.getElementById('invoice-template-preview-stage');
+      const wrapper = document.getElementById('invoice-template-preview-scaled');
+      const page = document.getElementById('invoice-template-preview-document');
+      const modalRect = modal.getBoundingClientRect();
+      return {
+        modalLeft: modalRect.left,
+        modalRight: modalRect.right,
+        modalTop: modalRect.top,
+        modalBottom: modalRect.bottom,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        stageWidth: stage.clientWidth,
+        wrapperWidth: wrapper.getBoundingClientRect().width,
+        wrapperHeight: wrapper.getBoundingClientRect().height,
+        pageWidth: page.offsetWidth,
+        pageHeight: page.offsetHeight,
+        zoom: document.getElementById('invoice-template-preview-zoom-level').textContent
+      };
+    });
+    assert.ok(fittedPreview.modalLeft >= -1 && fittedPreview.modalRight <= fittedPreview.viewportWidth + 1 &&
+      fittedPreview.modalTop >= -1 && fittedPreview.modalBottom <= fittedPreview.viewportHeight + 1,
+      'La fenêtre d’aperçu A4 doit rester dans l’écran : ' + JSON.stringify(fittedPreview));
+    assert.ok(fittedPreview.wrapperWidth <= fittedPreview.stageWidth + 1 &&
+      fittedPreview.pageWidth === 794 && fittedPreview.pageHeight >= 1123,
+      'L’aperçu doit afficher la vraie feuille A4 à une échelle adaptée : ' + JSON.stringify(fittedPreview));
+
+    await page.click('#invoice-template-preview-quote');
+    const quotePreview = await page.evaluate(() => ({
+      heading: document.getElementById('invoice-template-preview-name').textContent,
+      numberVisible: document.getElementById('invoice-template-preview-document').textContent.includes('DEV-APERÇU-001'),
+      quoteSelected: document.getElementById('invoice-template-preview-quote').getAttribute('aria-pressed')
+    }));
+    assert.ok(quotePreview.heading.includes('Devis') && quotePreview.numberVisible &&
+      quotePreview.quoteSelected === 'true',
+      'Le bouton Devis doit afficher un vrai aperçu de devis : ' + JSON.stringify(quotePreview));
+
+    const zoomBefore = await page.$eval('#invoice-template-preview-scaled', element => element.getBoundingClientRect().width);
+    await page.click('#invoice-template-preview-zoom-in');
+    const zoomAfter = await page.$eval('#invoice-template-preview-scaled', element => element.getBoundingClientRect().width);
+    assert.ok(zoomAfter > zoomBefore + 20,
+      'Le contrôle + doit agrandir la feuille A4 : ' + JSON.stringify({ zoomBefore, zoomAfter }));
+    await page.click('#invoice-template-preview-zoom-fit');
+    await page.click('#invoice-template-preview-use');
+    await page.waitForFunction(() =>
+      getComputedStyle(document.getElementById('invoice-template-preview-modal')).display === 'none'
+    );
+    const selection = await page.evaluate(() => ({
+      value: document.getElementById('facture_template').value,
+      selected: document.querySelector('[data-template-card="nova"]')?.classList.contains('is-selected')
+    }));
+    assert.deepEqual(selection, { value: 'nova', selected: true },
+      'Le bouton Utiliser ce modèle doit actualiser la sélection enregistrable.');
+  }
+
+  if (pageDefinition.name === 'professionnel') {
+    const target = await page.$('[data-pro-guide-target="pro-integrations"]');
+    assert.ok(target, 'La rubrique intégrations doit être disponible dans les accès rapides.');
   }
 
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
