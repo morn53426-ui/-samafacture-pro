@@ -126,12 +126,14 @@ function createFactureTemplates(helpers) {
     const discount = Math.max(0, Number(facture.remise) || 0);
     const delivery = Math.max(0, Number(facture.frais_livraison) || 0);
     return `
-      <div class="sf-total-row"><span>Sous-total HT</span><span class="mono">${formatMontant(facture.sous_total)}</span></div>
-      ${discount > 0 ? `<div class="sf-total-row"><span>Remise</span><span class="mono">− ${formatMontant(discount)}</span></div>` : ''}
-      ${delivery > 0 ? `<div class="sf-total-row"><span>Frais de livraison</span><span class="mono">${formatMontant(delivery)}</span></div>` : ''}
-      <div class="sf-total-row"><span>TVA</span><span class="mono">${formatMontant(facture.total_tva)}</span></div>
-      <div class="sf-total-row sf-total-grand" style="border-top:2px solid ${accent};">
-        <span>Total TTC</span><strong class="mono">${formatMontant(facture.total)}</strong>
+      <div class="sf-totals">
+        <div class="sf-total-row"><span>Sous-total HT</span><span class="mono">${formatMontant(facture.sous_total)}</span></div>
+        ${discount > 0 ? `<div class="sf-total-row"><span>Remise</span><span class="mono">− ${formatMontant(discount)}</span></div>` : ''}
+        ${delivery > 0 ? `<div class="sf-total-row"><span>Frais de livraison</span><span class="mono">${formatMontant(delivery)}</span></div>` : ''}
+        <div class="sf-total-row"><span>TVA</span><span class="mono">${formatMontant(facture.total_tva)}</span></div>
+        <div class="sf-total-row sf-total-grand" style="border-top:2px solid ${accent};">
+          <span>Total TTC</span><strong class="mono">${formatMontant(facture.total)}</strong>
+        </div>
       </div>
     `;
   }
