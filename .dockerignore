@@ -1,0 +1,32 @@
+# Ne jamais intégrer les secrets ou fichiers locaux dans l'image.
+.git
+.git/**
+**/.git
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+server/.env
+server/.env.*
+!server/.env.example
+
+# Dépendances locales : l'image fait son propre npm ci avec le lockfile.
+node_modules
+**/node_modules
+
+# Données d'exécution, fichiers générés et sauvegardes.
+**/backups
+**/pdf-jobs
+**/logs
+**/*.log
+coverage
+dist
+tmp
+temp
+
+# Fichiers propres aux systèmes de développement.
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
