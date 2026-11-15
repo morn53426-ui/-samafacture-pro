@@ -36,25 +36,29 @@ describe('Nouveaux modèles de facture — PUT /api/auth/entreprise', () => {
     });
   }
 
-  test('le modèle "platine" est refusé (403) sur le plan gratuit, avec le même code que prestige/heritage/diamant', async () => {
-    const res = await request(app)
-      .put('/api/auth/entreprise')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: 'platine' });
+  for (const template of ['platine', 'executive', 'institution', 'signature', 'consolide']) {
+    test(`le modèle Entreprise "${template}" est refusé (403) sur le plan gratuit`, async () => {
+      const res = await request(app)
+        .put('/api/auth/entreprise')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: template });
 
-    assert.equal(res.status, 403);
-    assert.equal(res.body.code, 'FONCTIONNALITE_ENTREPRISE');
-  });
+      assert.equal(res.status, 403);
+      assert.equal(res.body.code, 'FONCTIONNALITE_ENTREPRISE');
+    });
+  }
 
-  test('le modèle "platine" s\'enregistre une fois le compte passé au plan Entreprise', async () => {
+  test('tous les modèles exclusifs s’enregistrent après le passage au plan Entreprise', async () => {
     await pool.query("UPDATE users SET plan = 'entreprise' WHERE id = ?", [userId]);
-    const res = await request(app)
-      .put('/api/auth/entreprise')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: 'platine' });
+    for (const template of ['platine', 'executive', 'institution', 'signature', 'consolide']) {
+      const res = await request(app)
+        .put('/api/auth/entreprise')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: template });
 
-    assert.equal(res.status, 200);
-    assert.equal(res.body.user.facture_template, 'platine');
+      assert.equal(res.status, 200);
+      assert.equal(res.body.user.facture_template, template);
+    }
   });
 
   test('un identifiant de modèle invalide retombe sur "classique" plutôt que de faire échouer la requête', async () => {
