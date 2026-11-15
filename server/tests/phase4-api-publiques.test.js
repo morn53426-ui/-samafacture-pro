@@ -7,7 +7,7 @@ const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardown
 // schéma que les autres fichiers d'intégration : nécessite une vraie base MySQL, donc non
 // exécuté dans cet environnement — à lancer avec `npm test`.
 describe('Phase 4 — API publiques : plus de fuite de données internes', () => {
-  let userId, token, clientId, factureId, factureCode;
+  let userId, token, clientId, factureId, factureCode, devisId, devisCode;
   const email = emailDeTest('phase4');
 
   before(async () => {
@@ -37,6 +37,17 @@ describe('Phase 4 — API publiques : plus de fuite de données internes', () =>
     factureId = facture.body.facture.id;
     factureCode = facture.body.facture.verification_code;
     assert.ok(factureCode, 'la facture de test doit avoir un verification_code (généré à la création)');
+    await pool.query('UPDATE factures SET devise = ? WHERE id = ?', ['EUR', factureId]);
+
+    const devis = await request(app).post('/api/factures').set('Authorization', `Bearer ${token}`).send({
+      client_id: clientId, type: 'devis', date_validite: '2026-12-31',
+      conditions_reglement: 'Offre valable jusqu’à la date indiquée.',
+      lignes: [{ designation: 'Devis public test', quantite: 1, prix_unitaire: 25000, tva: 18 }]
+    });
+    assert.equal(devis.status, 201, devis.text);
+    devisId = devis.body.facture.id;
+    devisCode = devis.body.facture.verification_code;
+    await pool.query('UPDATE factures SET devise = ? WHERE id = ?', ['USD', devisId]);
   });
 
   after(async () => {
@@ -56,11 +67,21 @@ describe('Phase 4 — API publiques : plus de fuite de données internes', () =>
     assert.ok(res.body.facture.client_nom, 'client_nom doit toujours être présent');
     assert.equal(res.body.facture.client_nom, 'Client Public Test');
     assert.equal(Number(res.body.facture.total), 11800);
+    assert.equal(res.body.facture.devise, 'EUR', 'la devise retournée doit être celle du document');
+    assert.equal(res.body.facture.facture_template, 'classique');
     assert.equal(res.body.lignes.length, 1);
     assert.equal(res.body.lignes[0].designation, 'Prestation test');
     assert.equal(res.body.lignes[0].id, undefined, 'les colonnes id/facture_id des lignes ne sont plus exposées non plus');
   });
 
+  test('la consultation publique d’un devis expose sa validité et sa devise', async () => {
+    const res = await request(app).get(`/api/public/consulter/${devisId}/${devisCode}`);
+    assert.equal(res.status, 200, res.text);
+    assert.equal(res.body.facture.type, 'devis');
+    assert.equal(String(res.body.facture.date_validite).slice(0, 10), '2026-12-31');
+    assert.equal(res.body.facture.devise, 'USD');
+    assert.equal(res.body.facture.conditions_reglement, 'Offre valable jusqu’à la date indiquée.');
+  });
   test('GET /public/consulter avec un mauvais code renvoie toujours 404 (comportement inchangé)', async () => {
     const res = await request(app).get(`/api/public/consulter/${factureId}/mauvais-code`);
     assert.equal(res.status, 404);

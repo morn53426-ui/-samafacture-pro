@@ -1,11 +1,17 @@
 (function (root) {
   'use strict';
 
-  function normaliserTelephoneWhatsApp(telephone) {
-    let digits = String(telephone || '').replace(/\D/g, '');
+  function normaliserTelephoneWhatsApp(telephone, paysCode) {
+    const raw = String(telephone || '').trim();
+    const prefixeInternational = raw.startsWith('+') || raw.startsWith('00');
+    let digits = raw.replace(/\D/g, '');
     if (digits.startsWith('00')) digits = digits.slice(2);
-    // Les numéros sénégalais saisis au format local comportent neuf chiffres.
-    if (digits.length === 9) digits = '221' + digits;
+    // Seul un numéro local sénégalais de neuf chiffres peut être préfixé automatiquement.
+    // Pour les autres pays, un numéro international (+... ou 00...) doit être saisi explicitement.
+    if (digits.length === 9 && !prefixeInternational) {
+      if (String(paysCode || '').toUpperCase() !== 'SN') return '';
+      digits = '221' + digits;
+    }
     return digits.length >= 8 && digits.length <= 15 ? digits : '';
   }
 
@@ -43,7 +49,7 @@
       'Merci pour votre confiance.'
     ].join('\n');
 
-    const telephone = normaliserTelephoneWhatsApp(doc.client_telephone);
+    const telephone = normaliserTelephoneWhatsApp(doc.client_whatsapp || doc.client_telephone, doc.client_pays_code);
     const destination = telephone ? 'https://wa.me/' + telephone : 'https://wa.me/';
     return {
       telephone,

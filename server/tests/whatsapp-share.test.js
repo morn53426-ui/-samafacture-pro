@@ -7,12 +7,13 @@ const {
 
 describe('Partage de factures et devis par WhatsApp', () => {
   test('normalise un numéro sénégalais local vers le format international', () => {
-    assert.equal(normaliserTelephoneWhatsApp('77 123 45 67'), '221771234567');
+    assert.equal(normaliserTelephoneWhatsApp('77 123 45 67', 'SN'), '221771234567');
   });
 
   test('conserve un numéro international et retire le préfixe 00', () => {
     assert.equal(normaliserTelephoneWhatsApp('+33 6 12 34 56 78'), '33612345678');
     assert.equal(normaliserTelephoneWhatsApp('00 221 77 123 45 67'), '221771234567');
+    assert.equal(normaliserTelephoneWhatsApp('77 123 45 67', 'GH'), '', 'un numéro local étranger ne doit pas être traité comme sénégalais');
   });
 
   test('prépare un message de facture avec un lien de consultation protégé', () => {
@@ -24,7 +25,9 @@ describe('Partage de factures et devis par WhatsApp', () => {
       total: 177000,
       devise: 'FCFA',
       client_nom: 'Client Démo',
-      client_telephone: '77 123 45 67'
+      client_telephone: '78 123 45 67',
+      client_whatsapp: '77 123 45 67',
+      client_pays_code: 'SN'
     }, { baseUrl: 'https://samafacture.example/factures.html', entreprise: 'Entreprise Test' });
 
     assert.equal(share.telephone, '221771234567');

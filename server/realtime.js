@@ -6,6 +6,25 @@ const { getRedisClient, isRedisConfigured, isRedisReady } = require('./config/re
 let io = null;
 let redisSub = null;
 
+/** Résout l'espace temps réel demandé en vérifiant l'adhésion active du membre. */
+async function resolveSocketTenant(userId, requestedOwner, query = pool.query.bind(pool)) {
+  const actorId = Number(userId);
+  if (!Number.isSafeInteger(actorId) || actorId <= 0) throw new Error('Utilisateur Socket.IO invalide.');
+  if (requestedOwner === undefined || requestedOwner === null || requestedOwner === '') return actorId;
+  if (!/^\d+$/.test(String(requestedOwner))) throw new Error('Sélection d’entreprise invalide.');
+
+  const selectedOwner = Number(requestedOwner);
+  if (!Number.isSafeInteger(selectedOwner) || selectedOwner <= 0) throw new Error('Sélection d’entreprise invalide.');
+  if (selectedOwner === actorId) return actorId;
+
+  const [rows] = await query(
+    'SELECT owner_user_id FROM pro_team_members WHERE member_user_id = ? AND owner_user_id = ? AND active = 1 LIMIT 1',
+    [actorId, selectedOwner]
+  );
+  if (!rows.length) throw new Error('Adhésion à cette entreprise absente ou inactive.');
+  return Number(rows[0].owner_user_id);
+}
+
 async function initSocket(httpServer) {
   const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.APP_URL || '')
     .split(',').map(o => o.trim()).filter(Boolean);
@@ -45,20 +64,24 @@ async function initSocket(httpServer) {
     console.log('📡 Socket.IO : adaptateur Redis activé (multi-instance).');
   }
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
       if (!token) return next(new Error('Authentification requise.'));
       const payload = jwt.verify(token, process.env.JWT_SECRET);
-      socket.userId = payload.id;
+      socket.userId = Number(payload.id);
+      socket.tenantId = await resolveSocketTenant(socket.userId, socket.handshake.auth?.companyOwner);
       next();
     } catch (err) {
-      next(new Error('Session invalide ou expirée.'));
+      next(new Error('Session invalide ou sélection d’entreprise non autorisée.'));
     }
   });
 
   io.on('connection', (socket) => {
+    // La salle personnelle reste disponible ; le membre rejoint celle du propriétaire
+    // uniquement après contrôle de son adhésion active dans resolveSocketTenant().
     socket.join(`user:${socket.userId}`);
+    if (socket.tenantId !== socket.userId) socket.join(`user:${socket.tenantId}`);
   });
 
   return io;
@@ -76,4 +99,4 @@ function notifierUtilisateur(userId, event, payload) {
   io.to(`user:${userId}`).emit(event, payload);
 }
 
-module.exports = { initSocket, closeSocket, notifierUtilisateur };
+module.exports = { initSocket, closeSocket, notifierUtilisateur, resolveSocketTenant };

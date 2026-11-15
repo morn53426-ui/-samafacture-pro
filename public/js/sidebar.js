@@ -322,7 +322,8 @@ function initRealtime() {
   script.src = 'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js';
   script.onload = () => {
     if (typeof io === 'undefined') return;
-    const socket = io({ auth: { token } });
+    const companyOwner = localStorage.getItem('sf_company_owner');
+    const socket = io({ auth: { token, companyOwner: companyOwner || null } });
 
     socket.on('facture_payee', (data) => {
       const numero = data.facture?.numero || '';

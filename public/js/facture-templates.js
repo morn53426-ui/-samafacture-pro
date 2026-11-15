@@ -121,7 +121,7 @@ function createFactureTemplates(helpers) {
     `).join('');
   }
 
-  function totalsRowsHtml(facture, isDevis, borderColor, personnalisation) {
+  function totalsRowsHtml(facture, borderColor, personnalisation) {
     const accent = accentColor(personnalisation, borderColor);
     const discount = Math.max(0, Number(facture.remise) || 0);
     const delivery = Math.max(0, Number(facture.frais_livraison) || 0);
@@ -212,7 +212,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--navy-950)', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, 'var(--navy-950)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -256,7 +256,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:290px; background:var(--emerald-light); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, 'var(--emerald)', personnalisation)}</div>
+        <div style="width:290px; background:var(--emerald-light); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, 'var(--emerald)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -293,7 +293,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:260px;">${totalsRowsHtml(facture, isDevis, '#111', personnalisation)}</div>
+        <div style="width:260px;">${totalsRowsHtml(facture, '#111', personnalisation)}</div>
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; padding-top:14px; border-top:1px solid #ccc; gap:16px;">
@@ -339,7 +339,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -389,7 +389,7 @@ function createFactureTemplates(helpers) {
           ${facture.mode_paiement ? `<div style="margin-top:6px;"><strong style="color:var(--navy-900);">Paiement :</strong> ${escapeHtml(facture.mode_paiement)}</div>` : ''}
           ${signatureHtml(user, 180)}
         </div>
-        <div style="width:280px; border:1px solid var(--line); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, 'var(--navy-950)', personnalisation)}</div>
+        <div style="width:280px; border:1px solid var(--line); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, 'var(--navy-950)', personnalisation)}</div>
       </div>
     `;
   }
@@ -429,7 +429,7 @@ function createFactureTemplates(helpers) {
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
         <div class="sf-total-panel-dark" style="width:290px; background:var(--navy-950); color:#fff; border-radius:14px; padding:14px 18px;">
-          ${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}
+          ${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}
         </div>
       </div>
 
@@ -494,7 +494,7 @@ function createFactureTemplates(helpers) {
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
         <div class="sf-total-panel-dark" style="width:290px; background:var(--navy-950); border:1px solid var(--gold); border-radius:8px; padding:14px 18px; color:#fff;">
-          ${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}
+          ${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}
         </div>
       </div>
 
@@ -536,7 +536,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -578,7 +578,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:20px;">
-        <div style="width:270px;">${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}</div>
+        <div style="width:270px;">${totalsRowsHtml(facture, 'var(--gold)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -631,7 +631,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, '#111', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, '#111', personnalisation)}</div>
       </div>
 
       ${facture.commentaires ? `
@@ -744,7 +744,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--emerald)', personnalisation)}</div>
+        <div style="width:280px;">${totalsRowsHtml(facture, 'var(--emerald)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -784,7 +784,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:290px; border:1px solid var(--navy-950); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, 'var(--navy-950)', personnalisation)}</div>
+        <div style="width:290px; border:1px solid var(--navy-950); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, 'var(--navy-950)', personnalisation)}</div>
       </div>
 
       <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
@@ -838,7 +838,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:280px; border:2px solid #C1622B; border-radius:8px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, '#8A3F16', personnalisation)}</div>
+        <div style="width:280px; border:2px solid #C1622B; border-radius:8px; padding:14px 18px;">${totalsRowsHtml(facture, '#8A3F16', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -872,7 +872,7 @@ function createFactureTemplates(helpers) {
       </table>
 
       <div style="display:flex; justify-content:flex-end; margin-top:18px;">
-        <div style="width:270px; border-top:2px dashed var(--clay); padding-top:10px;">${totalsRowsHtml(facture, isDevis, 'var(--clay)', personnalisation)}</div>
+        <div style="width:270px; border-top:2px dashed var(--clay); padding-top:10px;">${totalsRowsHtml(facture, 'var(--clay)', personnalisation)}</div>
       </div>
 
       ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
@@ -1040,7 +1040,7 @@ function createFactureTemplates(helpers) {
         </div>
       </div>
       <table><thead><tr><th style="background:#172840;color:#fff;">Désignation</th><th style="background:#172840;color:#fff;">Qté</th><th style="background:#172840;color:#fff;">Prix U.</th><th style="background:#172840;color:#fff;">TVA</th><th style="background:#172840;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
-      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:300px;padding:15px 18px;border-top:3px solid #C8A96B;background:#F5F6F8;">${totalsRowsHtml(facture,isDevis,'#172840',personnalisation)}</div></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:300px;padding:15px 18px;border-top:3px solid #C8A96B;background:#F5F6F8;">${totalsRowsHtml(facture,'#172840',personnalisation)}</div></div>
       ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
     `;
   }
@@ -1066,7 +1066,7 @@ function createFactureTemplates(helpers) {
       </div>
       <div style="margin-bottom:23px;padding:14px 17px;border:1px solid #DCE3E9;border-radius:4px;"><div style="color:#315A78;font-size:.66rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin-bottom:7px;">À l’attention de</div>${clientBlockHtml(facture)}</div>
       <table><thead><tr><th style="background:#315A78;color:#fff;">Désignation</th><th style="background:#315A78;color:#fff;">Qté</th><th style="background:#315A78;color:#fff;">Prix U.</th><th style="background:#315A78;color:#fff;">TVA</th><th style="background:#315A78;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
-      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:285px;padding:14px 16px;border:1px solid #CAD5DF;border-top:3px solid #315A78;background:#F7F9FB;">${totalsRowsHtml(facture,isDevis,'#315A78',personnalisation)}</div></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:285px;padding:14px 16px;border:1px solid #CAD5DF;border-top:3px solid #315A78;background:#F7F9FB;">${totalsRowsHtml(facture,'#315A78',personnalisation)}</div></div>
       ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
     `;
   }
@@ -1094,7 +1094,7 @@ function createFactureTemplates(helpers) {
         </div>
       </div>
       <table><thead><tr><th style="background:#174D46;color:#fff;">Désignation</th><th style="background:#174D46;color:#fff;">Qté</th><th style="background:#174D46;color:#fff;">Prix U.</th><th style="background:#174D46;color:#fff;">TVA</th><th style="background:#174D46;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
-      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:295px;padding:14px 17px;border-top:2px solid #C7B18A;background:#F5F6F1;">${totalsRowsHtml(facture,isDevis,'#174D46',personnalisation)}</div></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:295px;padding:14px 17px;border-top:2px solid #C7B18A;background:#F5F6F1;">${totalsRowsHtml(facture,'#174D46',personnalisation)}</div></div>
       ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
     `;
   }
@@ -1119,7 +1119,7 @@ function createFactureTemplates(helpers) {
       </div>
       <div style="margin-bottom:22px;padding:13px 16px;border-left:3px solid #5C789A;background:#F4F6F8;"><div style="color:#6C7D91;font-size:.64rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Coordonnées du client</div>${clientBlockHtml(facture)}</div>
       <table><thead><tr><th style="background:#202E43;color:#fff;">Désignation</th><th style="background:#202E43;color:#fff;">Qté</th><th style="background:#202E43;color:#fff;">Prix U.</th><th style="background:#202E43;color:#fff;">TVA</th><th style="background:#202E43;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
-      <div style="display:flex;justify-content:flex-end;margin-top:19px;"><div style="width:300px;padding:14px 17px;border:1px solid #C9D2DE;border-radius:7px;background:#F7F8FA;">${totalsRowsHtml(facture,isDevis,'#202E43',personnalisation)}</div></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:19px;"><div style="width:300px;padding:14px 17px;border:1px solid #C9D2DE;border-radius:7px;background:#F7F8FA;">${totalsRowsHtml(facture,'#202E43',personnalisation)}</div></div>
       ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
     `;
   }
@@ -1136,7 +1136,7 @@ function createFactureTemplates(helpers) {
   function renderInvoiceHtml({ user, facture, lignes, isDevis, qrCode, template, personnalisation }) {
     const render = RENDERERS[template] || renderClassique;
     // Un devis porte une date de validité, jamais une échéance de paiement.
-    // Les 15 modèles partagent le même champ d'affichage pour garder une présentation cohérente.
+    // Les 19 modèles partagent le même champ d'affichage pour garder une présentation cohérente.
     const facturePourRendu = isDevis
       ? { ...facture, date_echeance: facture.date_validite || null }
       : facture;
@@ -1150,7 +1150,7 @@ function createFactureTemplates(helpers) {
       '<div><span>Date d’émission :</span> $1<br/><span>' + secondDateLabel + ' :</span> $2</div>');
     if (isDevis) html = html.replace(/Échéance/g, 'Validité du devis');
 
-    // Le bloc de références est partagé par les 15 modèles pour conserver les mêmes
+    // Le bloc de références est partagé par les 19 modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
     const meta = documentMetaHtml(facture, isDevis, template === 'minimaliste' || template === 'saveurs', user, html);
     const firstTable = html.indexOf('<table');

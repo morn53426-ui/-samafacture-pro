@@ -124,3 +124,16 @@ Aucun fichier entier nouvellement introduit par la fonctionnalité WhatsApp n'es
 La base contient plusieurs protections utiles (requêtes SQL paramétrées, cloisonnement tenant des routes principales, jetons signés, PDF testés, liens publics par code, verrouillages MySQL sur plusieurs tâches). Toutefois, les défauts P1 ci-dessus, les anomalies de devis/WhatsApp/multi-entreprise et l'absence de résultat CI final sur la tête auditée empêchent de qualifier cette branche de prête pour la production.
 
 **État au moment de l'audit :** PR #23 ouverte, non fusionnée, non déployée ; workflow de tests de la tête auditée en cours.
+
+## Mise à jour — correctifs appliqués après l'audit
+
+Les points ci-dessous sont corrigés dans le commit de suivi ; leur validation finale dépend des workflows et de la recette de préproduction sur cette nouvelle tête.
+
+- **Emails (P1)** : `mailer.js` ne journalise plus destinataire, sujet, corps, pièces jointes ou liens. L'envoi manuel et les relances renvoient HTTP 503 si SMTP est absent. Les champs HTML utilisateur sont échappés et les en-têtes sont débarrassés des CR/LF. La réponse générique de réinitialisation du mot de passe est conservée.
+- **Consultation publique (P2)** : le DTO renvoie la devise du document, sa date de validité et les métadonnées visuelles ; la page utilise maintenant le même moteur que le détail/PDF.
+- **WhatsApp (P2)** : le champ `clients.whatsapp` est prioritaire. Les numéros locaux de neuf chiffres ne reçoivent +221 que si le pays société est SN ; ailleurs le format international explicite est exigé.
+- **Notifications multi-entreprises (P2)** : le navigateur transmet l'entreprise choisie ; Socket.IO vérifie une adhésion active avant de rejoindre la salle de notifications du propriétaire.
+- **Timeout CI (P1)** : la cause a été identifiée. Dix POST concurrents occupaient les dix connexions du pool ; après commit, chaque requête demandait une deuxième connexion pour relire son document avant de libérer la première. Le SELECT post-commit utilise maintenant la connexion déjà acquise.
+- **Qualité (P3)** : le paramètre inutilisé `isDevis` a été retiré de `totalsRowsHtml` et les références à 15 modèles ont été mises à jour en 19.
+
+Les tests de régression ajoutés couvrent duplication facture, consultation publique (devise/validité), échappement HTML et non-divulgation des logs, réponses SMTP, pays du numéro WhatsApp et autorisation des salles Socket.IO. **La réussite finale CI et visuelle n'est pas présumée : elle doit être observée sur le nouveau commit.**

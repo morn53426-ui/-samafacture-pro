@@ -65,9 +65,8 @@ describe('Envoi automatique optionnel des factures récurrentes', () => {
       });
     assert.equal(Number(modele.body.recurrente.envoi_auto_email), 1);
 
-    // Pas de SMTP configuré en environnement de test : sendMail() se contente de logger
-    // (voir config/mailer.js), donc ceci vérifie surtout que le flux ne plante jamais et
-    // que la facture est bien générée, même quand l'envoi est demandé.
+    // Sans SMTP, la facture récurrente est générée mais l'envoi est signalé comme échoué.
+    // Le planificateur ne doit jamais annoncer un email envoyé si aucun transport ne l'a transmis.
     await assert.doesNotReject(verifierFacturesRecurrentes());
 
     const [[recurrente]] = await pool.query(

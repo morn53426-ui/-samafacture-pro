@@ -256,11 +256,23 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(duplicate.status, 201, duplicate.text);
     assert.equal(duplicate.body.facture.type, 'devis');
     assert.equal(duplicate.body.facture.date_validite, '2026-12-22');
+    assert.equal(duplicate.body.facture.devise, quote.body.facture.devise);
     assert.equal(duplicate.body.facture.objet, 'Maintenance annuelle');
     assert.equal(duplicate.body.facture.reference_externe, 'BC-DUP-03');
     assert.equal(duplicate.body.facture.conditions_reglement, 'Offre valable après validation écrite.');
   });
 
+  test('la duplication d’une facture conserve sa date d’échéance et sa devise', async () => {
+    const source = await request(app).post('/api/factures').set('Authorization', `Bearer ${token}`).send({
+      client_id: clientId, type: 'facture', date_echeance: '2026-12-29', devise: 'FCFA',
+      lignes: [{ designation: 'Facture à dupliquer', quantite: 1, prix_unitaire: 12000, tva: 18 }]
+    });
+    assert.equal(source.status, 201, source.text);
+    const duplicate = await request(app).post(`/api/factures/${source.body.facture.id}/dupliquer`).set('Authorization', `Bearer ${token}`);
+    assert.equal(duplicate.status, 201, duplicate.text);
+    assert.equal(duplicate.body.facture.date_echeance, '2026-12-29');
+    assert.equal(duplicate.body.facture.devise, source.body.facture.devise);
+  });
   test('une date de validité invalide est refusée pour un devis', async () => {
     const res = await request(app)
       .post('/api/factures')

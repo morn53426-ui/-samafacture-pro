@@ -112,6 +112,18 @@ const lignesDeTest = [
   { designation: 'Document exonéré', quantite: 1, prix_unitaire: 5000, tva: 0, total_ligne: 5000 }
 ];
 
+describe('Consultation publique des factures et devis', () => {
+  test('la page publique utilise le moteur partagé et la personnalisation enregistrée', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../public/consulter.html'), 'utf8');
+    const route = fs.readFileSync(path.resolve(__dirname, '../routes/public.js'), 'utf8');
+    assert.match(source, /js\/facture-templates\.js/);
+    assert.match(source, /templates\.renderInvoiceHtml\(/);
+    assert.match(source, /facture\.facture_personnalisation/);
+    assert.match(route, /f\.date_validite/);
+    assert.match(route, /f\.devise/);
+    assert.match(route, /u\.facture_template/);
+  });
+});
 describe('Modèles de facture (public/js/facture-templates.js)', () => {
   const templates = createFactureTemplates(helpersDeTest());
 
