@@ -1,7 +1,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 // GET /api/factures/:id/pdf (génération via Puppeteer, utils/pdf.js) n'était pas testé.
 // Nécessite un Chromium installé/téléchargeable (voir npm postinstall de puppeteer) — pas
