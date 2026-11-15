@@ -5475,3 +5475,87 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
   .subscription-checkout-actions { flex-direction: column-reverse; }
   .subscription-checkout-actions button { width: 100%; }
 }
+
+/* ==========================================================================
+   Finition des icônes — meilleure lisibilité sur toutes les pages
+   Le SVG reste basé sur currentColor ; seules la taille et l'épaisseur du trait
+   sont harmonisées. Les dimensions du menu et des barres d'outils sont préservées.
+   ========================================================================== */
+svg.icon,
+.ic > svg.icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-opacity: 1;
+  opacity: 1;
+  flex: 0 0 auto;
+}
+
+.nav-item > .ic {
+  display: inline-flex;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+}
+.nav-item > .ic > svg.icon,
+.sidebar-logout > .ic > svg.icon {
+  width: 21px;
+  height: 21px;
+  stroke-width: 1.9;
+}
+
+.btn .icon,
+button .icon,
+a.btn .icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.85;
+}
+.stat-icon > .icon,
+.stat-icon .ic > .icon {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.9;
+}
+.dashboard-kpi-icon > .icon,
+.dashboard-kpi-icon .ic > .icon {
+  width: 23px;
+  height: 23px;
+  stroke-width: 1.9;
+}
+.workspace-filter-title > .ic > .icon,
+.workspace-data-heading .ic > .icon {
+  width: 21px;
+  height: 21px;
+}
+.workspace-data-type .icon {
+  width: 17px;
+  height: 17px;
+}
+.empty-state .icon {
+  width: 28px;
+  height: 28px;
+}
+.lp-feature-card .icon {
+  width: 21px;
+  height: 21px;
+}
+
+@media (max-width: 640px) {
+  .nav-item > .ic > svg.icon,
+  .sidebar-logout > .ic > svg.icon {
+    width: 22px;
+    height: 22px;
+  }
+  .btn .icon,
+  button .icon,
+  a.btn .icon {
+    width: 20px;
+    height: 20px;
+  }
+}
