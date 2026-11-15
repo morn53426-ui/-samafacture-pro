@@ -265,8 +265,8 @@
     border: 0 !important;
   }
   .invoice-template-gallery {
-    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-    align-items: stretch; gap: 18px;
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch; gap: 20px;
   }
   .invoice-template-card {
     display: flex; min-width: 0; flex-direction: column; padding: 13px;
@@ -306,9 +306,31 @@
     background: var(--emerald-light); color: var(--emerald);
   }
   .invoice-template-preview-window {
-    position: relative; width: 100%; height: 300px; overflow: hidden;
-    border: 1px solid #dfe3e9; border-radius: 10px;
+    position: relative; width: 100%; min-height: 300px; overflow: hidden;
+    border: 1px solid #dfe3e9; border-radius: 12px;
     background: #eef1f4; isolation: isolate;
+  }
+  .invoice-template-preview-trigger {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; align-items: flex-end; justify-content: center;
+    width: 100%; height: 100%; padding: 12px;
+    border: 0; border-radius: inherit;
+    background: linear-gradient(180deg, transparent 58%, rgba(15,27,51,.22));
+    cursor: zoom-in;
+  }
+  .invoice-template-preview-trigger span {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 12px; border: 1px solid rgba(15,27,51,.12);
+    border-radius: 999px; background: rgba(255,255,255,.96);
+    color: #17314e; font-size: .72rem; font-weight: 800;
+    box-shadow: 0 4px 14px rgba(15,27,51,.14);
+  }
+  .invoice-template-preview-trigger:hover span,
+  .invoice-template-preview-trigger:focus-visible span {
+    background: #fff; box-shadow: 0 7px 20px rgba(15,27,51,.2);
+  }
+  .invoice-template-preview-trigger:focus-visible {
+    outline: 3px solid var(--emerald); outline-offset: -4px;
   }
   .invoice-template-preview-canvas {
     position: absolute; top: 8px; left: 50%; width: 794px; height: 1123px;
@@ -355,11 +377,10 @@
     }
   }
   @media (max-width: 1180px) {
-    .invoice-template-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .invoice-template-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 900px) {
     .page-parametres .settings-main-card { width: 100%; padding: 22px; }
-    .invoice-template-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 560px) {
     .page-parametres .settings-main-card { padding: 16px; }
@@ -367,10 +388,108 @@
     .invoice-template-gallery { grid-template-columns: minmax(0, 1fr); gap: 14px; }
     .invoice-template-card { padding: 12px; }
     .invoice-template-card.is-selected { padding: 11px; }
-    .invoice-template-preview-window { height: 315px; }
+    .invoice-template-preview-window { min-height: 300px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .invoice-template-card { transition: none; }
+  }
+
+
+  .invoice-template-preview-modal {
+    position: fixed; inset: 0; z-index: 320;
+    display: flex; align-items: center; justify-content: center;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    background: rgba(9, 18, 32, .74);
+    backdrop-filter: blur(6px);
+  }
+  .invoice-template-preview-dialog {
+    display: flex; flex-direction: column;
+    width: min(1160px, 100%); max-height: 94dvh; min-height: 0;
+    overflow: hidden; border: 1px solid rgba(255,255,255,.28);
+    border-radius: 18px; background: var(--paper); color: var(--ink);
+    box-shadow: 0 24px 75px rgba(0,0,0,.35);
+  }
+  .invoice-template-preview-dialog-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; padding: 17px 20px 13px; border-bottom: 1px solid var(--line);
+  }
+  .invoice-template-preview-dialog-head small {
+    display: block; margin-bottom: 4px; color: var(--emerald);
+    font-size: .67rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase;
+  }
+  .invoice-template-preview-dialog-head h2 {
+    margin: 0; font: 800 1.1rem var(--font-display); letter-spacing: -.025em;
+  }
+  .invoice-template-preview-dialog-head p {
+    margin: 4px 0 0; color: var(--ink-soft); font-size: .76rem; line-height: 1.45;
+  }
+  .invoice-template-preview-close {
+    flex: 0 0 40px; width: 40px; height: 40px; padding: 0;
+    border: 1px solid var(--line); border-radius: 11px;
+    background: var(--surface-muted); color: var(--ink); cursor: pointer;
+  }
+  .invoice-template-preview-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px; padding: 11px 18px;
+    border-bottom: 1px solid var(--line); background: var(--surface-muted);
+  }
+  .invoice-template-preview-types,
+  .invoice-template-preview-zoom {
+    display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .invoice-template-preview-types button,
+  .invoice-template-preview-zoom button {
+    min-height: 36px; padding: 7px 11px; border: 1px solid var(--line);
+    border-radius: 9px; background: var(--paper); color: var(--ink);
+    font-size: .75rem; font-weight: 750; cursor: pointer;
+  }
+  .invoice-template-preview-types button[aria-pressed="true"] {
+    border-color: var(--emerald); background: var(--emerald-light); color: var(--emerald);
+  }
+  .invoice-template-preview-zoom output {
+    min-width: 62px; color: var(--ink-soft); font-size: .72rem;
+    font-weight: 750; text-align: center; font-variant-numeric: tabular-nums;
+  }
+  .invoice-template-preview-stage {
+    flex: 1 1 auto; min-height: 200px; overflow: auto;
+    padding: 18px; background: #e9edf2;
+    overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  }
+  .invoice-template-preview-scaled {
+    position: relative; margin: 0 auto;
+  }
+  .invoice-template-preview-full-page {
+    position: absolute; top: 0; left: 0;
+    width: 794px; min-height: 1123px; box-sizing: border-box;
+    padding: 40px; overflow: hidden; border: 1px solid #dfe3e9;
+    border-radius: 0; background: #fff; color: #243044;
+    box-shadow: 0 12px 35px rgba(15,27,51,.18);
+    transform-origin: top left; font-size: 14px; line-height: 1.5;
+  }
+  .invoice-template-preview-full-page table { max-width: 100%; table-layout: fixed; }
+  .invoice-template-preview-full-page img { max-width: 100%; object-fit: contain; }
+  .invoice-template-preview-dialog-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 12px 18px; border-top: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .invoice-template-preview-dialog-foot p {
+    margin: 0; color: var(--ink-soft); font-size: .72rem; line-height: 1.45;
+  }
+  .invoice-template-preview-use { flex: 0 0 auto; min-height: 42px; }
+  @media (max-width: 640px) {
+    .invoice-template-preview-modal { padding: max(8px, env(safe-area-inset-top, 0px)) 8px max(8px, env(safe-area-inset-bottom, 0px)); }
+    .invoice-template-preview-dialog { width: 100%; max-height: 96dvh; border-radius: 13px; }
+    .invoice-template-preview-dialog-head { padding: 13px 14px 11px; }
+    .invoice-template-preview-dialog-head h2 { font-size: 1rem; }
+    .invoice-template-preview-toolbar { align-items: flex-start; flex-direction: column; padding: 10px 12px; }
+    .invoice-template-preview-stage { padding: 10px; min-height: 180px; }
+    .invoice-template-preview-dialog-foot { align-items: stretch; flex-direction: column; padding: 12px; }
+    .invoice-template-preview-use { width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .invoice-template-preview-trigger span { transition: none; }
   }
 
 </style>
@@ -619,6 +738,41 @@
       <button type="button" class="btn btn-danger" onclick="confirmReset()">Confirmer</button>
     </div>
   </div>
+</div>
+
+
+<div id="invoice-template-preview-modal" class="invoice-template-preview-modal" style="display:none;" aria-label="Aperçu détaillé du modèle de facture">
+  <section class="invoice-template-preview-dialog" role="document">
+    <header class="invoice-template-preview-dialog-head">
+      <div>
+        <small>Aperçu A4 détaillé</small>
+        <h2 id="invoice-template-preview-name">Modèle de facture</h2>
+        <p id="invoice-template-preview-description">Exemple avec les informations de votre entreprise.</p>
+      </div>
+      <button type="button" class="invoice-template-preview-close" id="invoice-template-preview-close" aria-label="Fermer l’aperçu">✕</button>
+    </header>
+    <div class="invoice-template-preview-toolbar">
+      <div class="invoice-template-preview-types" role="group" aria-label="Type de document à prévisualiser">
+        <button type="button" id="invoice-template-preview-invoice" aria-pressed="true">Facture</button>
+        <button type="button" id="invoice-template-preview-quote" aria-pressed="false">Devis</button>
+      </div>
+      <div class="invoice-template-preview-zoom" role="group" aria-label="Zoom de l’aperçu">
+        <button type="button" id="invoice-template-preview-zoom-out" aria-label="Réduire le zoom">−</button>
+        <output id="invoice-template-preview-zoom-level">Adapter</output>
+        <button type="button" id="invoice-template-preview-zoom-in" aria-label="Agrandir le zoom">+</button>
+        <button type="button" id="invoice-template-preview-zoom-fit">Adapter à l’écran</button>
+      </div>
+    </div>
+    <div class="invoice-template-preview-stage" id="invoice-template-preview-stage" tabindex="0" aria-label="Document A4 en aperçu, défilement disponible">
+      <div class="invoice-template-preview-scaled" id="invoice-template-preview-scaled">
+        <div class="invoice-template-preview-full-page invoice-doc tpl-classique" id="invoice-template-preview-document"></div>
+      </div>
+    </div>
+    <footer class="invoice-template-preview-dialog-foot">
+      <p>Exemple fictif rendu avec le même moteur que vos factures PDF. Pensez à enregistrer vos paramètres après sélection.</p>
+      <button type="button" class="btn btn-primary invoice-template-preview-use" id="invoice-template-preview-use">Utiliser ce modèle</button>
+    </footer>
+  </section>
 </div>
 
 <script src="js/api.js"></script>
