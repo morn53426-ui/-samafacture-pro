@@ -556,10 +556,10 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
     }
 
     const templatesValides = [
-      'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif', 'prestige', 'heritage', 'diamant',
-      // Lot 2026-08 : epure/azur/circuit/atelier/saveurs sont gratuits comme classique/moderne/minimaliste ;
-      // platine est Entreprise, au même titre que prestige/heritage/diamant (voir ENTERPRISE_TEMPLATES).
-      'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs'
+      'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
+      'prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide',
+      // Les modèles de spécialité gratuits restent disponibles pour tous les plans.
+      'epure', 'azur', 'circuit', 'atelier', 'saveurs'
     ];
     let template = templatesValides.includes(facture_template) ? facture_template : 'classique';
     if (PRO_TEMPLATES.includes(template) && !proActif) {
