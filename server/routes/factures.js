@@ -711,7 +711,7 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
     // Ordre commun de verrouillage : compte, puis document métier.
     await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
     const [devisRows] = await conn.query(
-      \`SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis' FOR UPDATE\`,
+      `SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis' FOR UPDATE`,
       [req.params.id, req.tenantId]
     );
     const devis = devisRows[0];
@@ -725,17 +725,17 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
     if (!quota.allowed) {
       await conn.rollback();
       notifierUtilisateur(req.tenantId, 'alerte_quota', {
-        message: \`Vous avez atteint la limite de \${quota.limit} factures du plan Gratuit ce mois-ci.\`
+        message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
       });
       return res.status(403).json({
-        error: \`Le plan Gratuit est limité à \${quota.limit} factures par mois. Passez à un plan payant dans Paramètres pour continuer.\`,
+        error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant dans Paramètres pour continuer.`,
         code: 'QUOTA_DEPASSE'
       });
     }
 
     const numero = await nextNumero(conn, req.tenantId, 'facture');
     await conn.query(
-      \`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente', date_validite = NULL WHERE id = ? AND user_id = ? AND type = 'devis'\`,
+      `UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente', date_validite = NULL WHERE id = ? AND user_id = ? AND type = 'devis'`,
       [numero, devis.id, req.tenantId]
     );
     const [lignesDevis] = await conn.query(
@@ -798,10 +798,10 @@ router.post('/:id/dupliquer', async (req, res, next) => {
       if (!quota.allowed) {
         await conn.rollback();
         notifierUtilisateur(req.tenantId, 'alerte_quota', {
-          message: \`Vous avez atteint la limite de \${quota.limit} factures du plan Gratuit ce mois-ci.\`
+          message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
         });
         return res.status(403).json({
-          error: \`Le plan Gratuit est limité à \${quota.limit} factures par mois. Passez à un plan payant dans Paramètres pour continuer.\`,
+          error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant dans Paramètres pour continuer.`,
           code: 'QUOTA_DEPASSE'
         });
       }
@@ -813,8 +813,8 @@ router.post('/:id/dupliquer', async (req, res, next) => {
     );
     const numero = await nextNumero(conn, req.tenantId, source.type);
     const [result] = await conn.query(
-      \`INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
-       VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)\`,
+      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
+       VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.tenantId, source.client_id, numero, source.type, source.date_echeance || null,
         source.date_validite || null, source.objet || null, source.reference_externe || null,
