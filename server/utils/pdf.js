@@ -113,12 +113,31 @@ async function genererPdfFacture(factureId, user) {
     // Réutilise le bloc @media print déjà présent dans facture-detail.html (masque la
     // barre d'outils "Fermer / Imprimer", ajuste les marges) — même mécanisme que le
     // bouton "Imprimer / Exporter en PDF" existant, pas de style dupliqué ici.
+    // Capturer le document dans son état final : polices, logo, QR code et autres images
+    // doivent être décodés avant l'impression pour éviter les blocs vides ou les sauts tardifs.
     await page.emulateMediaType('print');
+    await page.evaluate(async () => {
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      const images = Array.from(document.querySelectorAll('#doc img'));
+      await Promise.all(images.map(image => {
+        if (typeof image.decode === 'function') return image.decode().catch(() => {});
+        if (image.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          image.addEventListener('load', resolve, { once: true });
+          image.addEventListener('error', resolve, { once: true });
+        });
+      }));
+    });
+    await page.evaluate(() => new Promise(resolve =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))
+    ));
 
     const pdfData = await page.pdf({
       format: 'A4',
+      preferCSSPageSize: true,
       printBackground: true,
-      margin: { top: '14mm', bottom: '14mm', left: '10mm', right: '10mm' }
+      margin: { top: '12mm', bottom: '14mm', left: '12mm', right: '12mm' },
+      scale: 1
     });
     // Puppeteer récent renvoie un Uint8Array. Express traite un Uint8Array simple
     // comme un objet JSON (clés 0, 1, 2...) au lieu d'un contenu binaire ; Buffer.from
