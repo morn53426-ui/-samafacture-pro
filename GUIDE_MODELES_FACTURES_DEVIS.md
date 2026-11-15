@@ -1,6 +1,6 @@
 # Modèles de factures et devis — guide
 
-Cette évolution enrichit les 19 thèmes existants sans remplacer leur identité graphique. Le rendu est partagé entre la page de détail, l'impression du navigateur et la génération PDF par Puppeteer.
+Cette évolution enrichit les 24 thèmes existants sans remplacer leur identité graphique. Le rendu est partagé entre la page de détail, l'impression du navigateur et la génération PDF par Puppeteer.
 
 ## 1. Informations de l'entreprise
 
@@ -28,6 +28,8 @@ Lors de la création d'un document, les champs suivants sont disponibles :
 Les champs texte sont limités côté serveur : objet 190 caractères, référence 100 caractères et conditions 5 000 caractères. La date de validité accepte une date réelle au format ISO `YYYY-MM-DD`. La date de validité du devis est retirée lors de sa conversion en facture.
 
 ## 3. Éléments rendus sur les factures
+
+Les cinq nouveaux modèles Nova, Nordique, Luxe, Tech et Horizon proposent des compositions visuelles distinctes. Ils sont disponibles sur tous les plans et utilisent les mêmes données et calculs que les autres thèmes.
 
 Les modèles indiquent maintenant explicitement le prix unitaire **HT** et le montant de chaque ligne **TTC**. Quand plusieurs taux de TVA sont présents, un détail par taux affiche la base et la TVA correspondantes.
 
