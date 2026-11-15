@@ -1017,6 +1017,10 @@ function createFactureTemplates(helpers) {
       // explicitement qu'il s'agit de la validité du devis.
       html = html.replace(/<div>📅 ([^<]+) → ([^<]+)<\/div>/g,
         '<div><span>Date d’émission :</span> $1<br/><span>Validité du devis :</span> $2</div>');
+      // Le modèle Corporate utilise une grille de métadonnées avec deux dates séparées
+      // par une flèche : remplacer celle-ci par des libellés explicites dans les devis.
+      html = html.replace(/<div style="font-size:0\.85rem;">([^<]+) → ([^<]+)<\/div>/,
+        '<div><span>Date d’émission :</span> $1<br/><span>Validité du devis :</span> $2</div>');
     }
 
     // Le bloc de références est partagé par les 15 modèles pour conserver les mêmes
