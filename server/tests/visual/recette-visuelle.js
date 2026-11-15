@@ -33,6 +33,7 @@ const PAGES = [
   { name: 'crm', file: 'crm.html', ready: '#activity-form' },
   { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
   { name: 'automatisations', file: 'automatisations.html', ready: '#automation-form' },
+  { name: 'abonnement', file: 'abonnement.html', ready: '#plan-cards .subscription-plan-card' },
   { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true }
 ];
 
@@ -654,6 +655,32 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
       'Chaque information d’un encaissement doit rester nommée et visible sur mobile.');
+  }
+  if (pageDefinition.name === 'abonnement') {
+    const subscriptionUi = await page.evaluate(() => ({
+      planCards: document.querySelectorAll('#plan-cards .subscription-plan-card').length,
+      headerIcon: Boolean(document.querySelector('.subscription-eyebrow .ic svg.icon')),
+      currentPlanIcon: Boolean(document.querySelector('.subscription-current-icon svg.icon')),
+      trustIcons: Array.from(document.querySelectorAll('.subscription-trust > div > .ic svg.icon')).length,
+      planIcons: Array.from(document.querySelectorAll('.subscription-plan-card .plan-icon svg.icon')).length,
+      activeMenuIcon: Boolean(document.querySelector('#app-navigation .nav-item.active[href="abonnement.html"] .ic svg.icon')),
+      rawIconPlaceholder: (document.querySelector('.page-abonnement')?.innerText || '').includes("${Icon("),
+      gridColumns: getComputedStyle(document.querySelector('.subscription-plan-grid')).gridTemplateColumns
+    }));
+    assert.equal(subscriptionUi.planCards, 4,
+      'La page Abonnement doit présenter les quatre formules. ' + JSON.stringify(subscriptionUi));
+    assert.equal(subscriptionUi.headerIcon, true,
+      'Le pictogramme d’en-tête Abonnement doit être rendu en SVG.');
+    assert.equal(subscriptionUi.currentPlanIcon, true,
+      'La carte de formule active doit afficher son pictogramme SVG.');
+    assert.equal(subscriptionUi.trustIcons, 3,
+      'Les trois garanties de paiement doivent afficher leurs pictogrammes SVG.');
+    assert.equal(subscriptionUi.planIcons, 4,
+      'Chaque formule doit afficher un pictogramme SVG professionnel.');
+    assert.equal(subscriptionUi.activeMenuIcon, true,
+      'L’entrée Abonnement du menu doit utiliser son icône SVG dédiée.');
+    assert.equal(subscriptionUi.rawIconPlaceholder, false,
+      'Aucun placeholder JavaScript brut ne doit rester visible dans la page Abonnement.');
   }
   assert.deepEqual(pageErrors, [],
     pageDefinition.name + ' a généré des erreurs JavaScript: ' + pageErrors.join(' | '));
