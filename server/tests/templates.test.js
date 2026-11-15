@@ -26,7 +26,7 @@ describe('Galerie de sélection des modèles (public/parametres.html)', () => {
     const source = fs.readFileSync(path.resolve(__dirname, '../../public/parametres.html'), 'utf8');
     for (const id of ['nova', 'nordique', 'luxe', 'tech', 'horizon']) {
       assert.match(source, new RegExp("id: '" + id + "', name:"), id + ' doit être dans la galerie');
-      assert.match(source, new RegExp('<option value=\\\"' + id + '\\\">'), id + ' doit être dans le sélecteur natif');
+      assert.ok(source.includes('<option value="' + id + '">'), id + ' doit être dans le sélecteur natif');
       assert.match(source, new RegExp("id: '" + id + "'[^\\n]*tier: 'all'"), id + ' doit être disponible sur tous les plans');
     }
   });
