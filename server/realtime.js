@@ -1,6 +1,7 @@
 const cluster = require('cluster');
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
+const { pool } = require('./config/db');
 const { getRedisClient, isRedisConfigured, isRedisReady } = require('./config/redis');
 
 let io = null;
