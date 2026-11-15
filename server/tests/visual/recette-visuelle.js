@@ -612,7 +612,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       const selector = element.tagName.toLowerCase() +
         (element.id ? '#' + element.id : '') +
         (typeof element.className === 'string' && element.className.trim()
-          ? '.' + element.className.trim().split(/\\s+/).slice(0, 3).join('.')
+          ? '.' + element.className.trim().split(/\s+/).slice(0, 3).join('.')
           : '');
       return {
         selector,
@@ -1199,8 +1199,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.equal(screenMetrics.hasMeta, true, type + ' : les références du document doivent être visibles.');
     assert.equal(screenMetrics.hasTaxDetail, true, type + ' : le détail TVA multi-taux doit être présent.');
     const parseAmount = (value) => Number(String(value || '')
-      .replace(/[\\s\\u00a0\\u202f]/g, '')
-      .replace(/[^\\d,.-]/g, '')
+      .replace(/[\s\u00a0\u202f]/g, '')
+      .replace(/[^\d,.-]/g, '')
       .replace(/\\./g, '')
       .replace(',', '.'));
     const taxRowsTotal = screenMetrics.taxRowAmounts.reduce((sum, value) => sum + parseAmount(value), 0);
