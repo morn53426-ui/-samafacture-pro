@@ -7,6 +7,14 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'secret-de-test-ne-jamais-uti
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
+// requireAuth vérifie désormais la version de jeton en base (utils/session.js). Ce test reste un test
+// unitaire pur : on remplace ce module par un double contrôlable, sans base de données.
+const sessionPath = require.resolve('../utils/session');
+const etatSession = { valide: true };
+require.cache[sessionPath] = {
+  id: sessionPath, filename: sessionPath, loaded: true,
+  exports: { jetonEstValide: async () => etatSession.valide }
+};
 const { requireAuth } = require('../middleware/auth');
 
 function jetonValide() {
@@ -29,60 +37,60 @@ function fauxeReponse() {
 }
 
 describe('requireAuth — en-tête Authorization (comportement existant, inchangé)', () => {
-  test('un jeton Bearer valide authentifie normalement, quelle que soit la méthode', () => {
+  test('un jeton Bearer valide authentifie normalement, quelle que soit la méthode', async () => {
     const req = fauxeRequete({ method: 'POST', authorization: `Bearer ${jetonValide()}` });
     const res = fauxeReponse();
     let appele = false;
-    requireAuth(req, res, () => { appele = true; });
+    await requireAuth(req, res, () => { appele = true; });
     assert.equal(appele, true);
     assert.equal(req.user.email, 'test@test.sn');
     assert.equal(res.statusCode, null); // next() a été appelé, aucune réponse d'erreur envoyée
   });
 
-  test("aucun jeton (ni en-tête, ni cookie) → 401", () => {
+  test("aucun jeton (ni en-tête, ni cookie) → 401", async () => {
     const req = fauxeRequete({});
     const res = fauxeReponse();
     let appele = false;
-    requireAuth(req, res, () => { appele = true; });
+    await requireAuth(req, res, () => { appele = true; });
     assert.equal(appele, false);
     assert.equal(res.statusCode, 401);
   });
 
-  test('un jeton invalide/expiré → 401', () => {
+  test('un jeton invalide/expiré → 401', async () => {
     const req = fauxeRequete({ authorization: 'Bearer ceci-nest-pas-un-jwt-valide' });
     const res = fauxeReponse();
-    requireAuth(req, res, () => {});
+    await requireAuth(req, res, () => {});
     assert.equal(res.statusCode, 401);
   });
 });
 
 describe('requireAuth — repli sur le cookie sf_token (migration progressive)', () => {
-  test("GET via cookie seul (sans en-tête Authorization) fonctionne, sans exiger l'en-tête anti-CSRF", () => {
+  test("GET via cookie seul (sans en-tête Authorization) fonctionne, sans exiger l'en-tête anti-CSRF", async () => {
     const req = fauxeRequete({ method: 'GET', cookies: { sf_token: jetonValide() } });
     const res = fauxeReponse();
     let appele = false;
-    requireAuth(req, res, () => { appele = true; });
+    await requireAuth(req, res, () => { appele = true; });
     assert.equal(appele, true, 'GET ne modifie rien : pas besoin de protection CSRF');
   });
 
-  test("POST via cookie seul, SANS l'en-tête anti-CSRF → refusé (403)", () => {
+  test("POST via cookie seul, SANS l'en-tête anti-CSRF → refusé (403)", async () => {
     const req = fauxeRequete({ method: 'POST', cookies: { sf_token: jetonValide() } });
     const res = fauxeReponse();
     let appele = false;
-    requireAuth(req, res, () => { appele = true; });
+    await requireAuth(req, res, () => { appele = true; });
     assert.equal(appele, false);
     assert.equal(res.statusCode, 403);
   });
 
-  test("POST via cookie, AVEC l'en-tête anti-CSRF attendu → autorisé", () => {
+  test("POST via cookie, AVEC l'en-tête anti-CSRF attendu → autorisé", async () => {
     const req = fauxeRequete({ method: 'POST', cookies: { sf_token: jetonValide() }, xRequestedWith: 'SamaFacturePro' });
     const res = fauxeReponse();
     let appele = false;
-    requireAuth(req, res, () => { appele = true; });
+    await requireAuth(req, res, () => { appele = true; });
     assert.equal(appele, true);
   });
 
-  test("un en-tête Authorization présent est TOUJOURS prioritaire sur le cookie (pas de vérif CSRF dans ce cas)", () => {
+  test("un en-tête Authorization présent est TOUJOURS prioritaire sur le cookie (pas de vérif CSRF dans ce cas)", async () => {
     // Si jamais le cookie contenait un jeton invalide/périmé mais que Authorization est valide,
     // le comportement actuel (celui de tout le frontend aujourd'hui) doit continuer à passer.
     const req = fauxeRequete({
@@ -92,7 +100,23 @@ describe('requireAuth — repli sur le cookie sf_token (migration progressive)',
     });
     const res = fauxeReponse();
     let appele = false;
-    requireAuth(req, res, () => { appele = true; });
+    await requireAuth(req, res, () => { appele = true; });
     assert.equal(appele, true);
+  });
+});
+
+describe('requireAuth — révocation des sessions (token_version)', () => {
+  test('un jeton dont la version ne correspond plus au compte est refusé (401)', async () => {
+    etatSession.valide = false;
+    try {
+      const req = fauxeRequete({ authorization: `Bearer ${jetonValide()}` });
+      const res = fauxeReponse();
+      let appele = false;
+      await requireAuth(req, res, () => { appele = true; });
+      assert.equal(appele, false);
+      assert.equal(res.statusCode, 401);
+    } finally {
+      etatSession.valide = true;
+    }
   });
 });

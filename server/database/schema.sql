@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
   google_id VARCHAR(255),
   reset_token_hash VARCHAR(64),
   reset_token_expires DATETIME,
+  token_version INT NOT NULL DEFAULT 0, -- incrémenté pour révoquer tous les JWT émis (voir server/utils/session.js)
   signature_default MEDIUMTEXT,
   devise VARCHAR(10) NOT NULL DEFAULT 'FCFA',
   plan VARCHAR(20) NOT NULL DEFAULT 'gratuit', -- gratuit | starter | pro | entreprise

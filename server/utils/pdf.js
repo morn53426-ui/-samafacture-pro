@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { getTokenVersion } = require('./session');
 
 // -----------------------------------------------------------------------------
 // Génère un vrai fichier PDF pour une facture, en réutilisant EXACTEMENT le même
@@ -68,14 +69,27 @@ function releaseSlot() {
   if (next) next();
 }
 
-function signerTokenTemporaire(user) {
+async function signerTokenTemporaire(user) {
   // Token à usage unique pour cette génération, durée de vie très courte : uniquement
   // le temps que le navigateur headless charge la page (pas un token de session classique).
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role, nom: user.nom },
+    { id: user.id, email: user.email, role: user.role, nom: user.nom, tv: (await getTokenVersion(user.id)) || 0 },
     process.env.JWT_SECRET,
     { expiresIn: '2m' }
   );
+}
+
+const HOTES_POLICES_AUTORISES = new Set(['https://fonts.googleapis.com', 'https://fonts.gstatic.com']);
+
+// Règle réseau de la page PDF : application elle-même, data:/blob: et polices Google uniquement.
+function urlPdfAutorisee(url, origineApp) {
+  try {
+    if (url.startsWith('data:') || url.startsWith('blob:') || url === 'about:blank') return true;
+    const origine = new URL(url).origin;
+    return origine === origineApp || HOTES_POLICES_AUTORISES.has(origine);
+  } catch (_) {
+    return false;
+  }
 }
 
 async function genererPdfFacture(factureId, user) {
@@ -85,7 +99,7 @@ async function genererPdfFacture(factureId, user) {
     const browser = await getBrowser();
     page = await browser.newPage();
 
-    const token = signerTokenTemporaire(user);
+    const token = await signerTokenTemporaire(user);
     const baseUrl = (process.env.PDF_BASE_URL || process.env.APP_URL || 'http://localhost:4000').replace(/\/$/, '');
 
     // La page PDF peut être servie par un serveur HTTP de test sur un port aléatoire
@@ -96,6 +110,16 @@ async function genererPdfFacture(factureId, user) {
     // de tout script applicatif. Cela supprime les timeouts PDF dus à des appels API envoyés
     // vers un autre port.
     const apiBaseUrl = `${baseUrl}/api`;
+
+    // Chromium tourne avec --no-sandbox et détient un JWT valide 2 min : on bloque toute requête
+    // sortante hors de l'application (et des polices Google), pour qu'un contenu injecté dans une
+    // facture ne puisse ni exfiltrer le jeton ni joindre le réseau interne (SSRF).
+    const origineApp = new URL(baseUrl).origin;
+    await page.setRequestInterception(true);
+    page.on('request', (requete) => {
+      if (urlPdfAutorisee(requete.url(), origineApp)) requete.continue();
+      else requete.abort('blockedbyclient');
+    });
     await page.evaluateOnNewDocument((t, apiUrl) => {
       localStorage.setItem('sf_token', t);
       window.SAMAFACTURE_API_URL = apiUrl;
@@ -166,4 +190,4 @@ async function closeBrowser() {
   }
 }
 
-module.exports = { genererPdfFacture, closeBrowser };
+module.exports = { genererPdfFacture, closeBrowser, urlPdfAutorisee };
