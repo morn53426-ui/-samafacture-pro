@@ -73,10 +73,13 @@
         <div class="field"><label>Conditions de règlement / validité</label><textarea id="conditions_reglement" rows="3" maxlength="5000" placeholder="Conditions particulières de paiement ou de validité du devis."></textarea></div>
 
         <div class="invoice-section-heading invoice-lines-heading"><span class="ic"><i class="ic" data-icon="file-stack"></i></span><div><h3>Articles</h3><p>Ajoutez les prestations ou produits facturés.</p></div></div>
-        <table class="invoice-lines-table">
-          <thead><tr><th>Désignation</th><th style="width:110px;">Qté</th><th style="width:140px;">Prix U.</th><th style="width:90px;">TVA%</th><th style="width:130px;">Total</th><th></th></tr></thead>
-          <tbody id="lignes-body"></tbody>
-        </table>
+        <div class="invoice-lines-scroll" role="region" aria-label="Tableau des articles" tabindex="0">
+          <table class="invoice-lines-table">
+            <thead><tr><th>Désignation</th><th>Qté</th><th>Prix U.</th><th>TVA%</th><th>Total</th><th><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody id="lignes-body"></tbody>
+          </table>
+        </div>
+        <p class="invoice-lines-scroll-hint">Faites défiler le tableau horizontalement pour accéder à tous les champs.</p>
         <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addLigne()">+ Ajouter une ligne</button>
 
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:20px;">
