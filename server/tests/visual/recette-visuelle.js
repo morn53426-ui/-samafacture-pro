@@ -1218,15 +1218,18 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       margin: { top: '12mm', bottom: '14mm', left: '12mm', right: '12mm' },
       scale: 1
     });
-    assert.equal(pdf.subarray(0, 5).toString('latin1'), '%PDF-', type + ' : la sortie doit être un vrai fichier PDF.');
-    assert.ok(pdf.length > 5000, type + ' : le PDF doit contenir le document complet.');
-    const pdfSource = pdf.toString('latin1');
+    // Puppeteer 25 peut renvoyer un Uint8Array plutôt qu'un Buffer : normaliser
+    // avant les conversions texte, sans dépendre de Uint8Array.toString(encoding).
+    const pdfBuffer = Buffer.from(pdf);
+    assert.equal(pdfBuffer.subarray(0, 5).toString('latin1'), '%PDF-', type + ' : la sortie doit être un vrai fichier PDF.');
+    assert.ok(pdfBuffer.length > 5000, type + ' : le PDF doit contenir le document complet.');
+    const pdfSource = pdfBuffer.toString('latin1');
     const pages = (pdfSource.match(/\/Type\s*\/Page\b/g) || []).length;
     assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
     if (type === 'devis') {
       assert.ok(pages >= 2, 'Le devis long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
     }
-    fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdf);
+    fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdfBuffer);
     return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
   }
 
