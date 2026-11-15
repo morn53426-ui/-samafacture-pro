@@ -121,17 +121,24 @@ describe('Génération PDF de facture', () => {
         fondDocument: getComputedStyle(document.querySelector('.invoice-doc')).backgroundColor
       }));
 
-      // En mode système sombre, la page suit d'abord la préférence du navigateur.
+      // En mode système sombre, la page suit la préférence du navigateur.
       let etat = await lireEtatTheme();
       assert.equal(etat.theme, null);
-      assert.equal(etat.couleurFondApp.toLowerCase(), '#0f1420');
+      const couleurSystemeSombre = etat.couleurFondApp;
 
-      // L'aperçu imprimé doit être clair quel que soit le thème de l'application.
+      // La palette claire de référence est lue depuis le vrai CSS, sans figer ses hexadécimaux.
+      await page.evaluate(() => window.SamaTheme.definir('light'));
+      const couleurPaletteClaire = (await lireEtatTheme()).couleurFondApp;
+      assert.notEqual(couleurSystemeSombre, couleurPaletteClaire,
+        'le navigateur doit réellement appliquer deux palettes distinctes');
+      await page.evaluate(() => window.SamaTheme.definir('auto'));
+
+      // L'aperçu imprimé doit reprendre exactement la palette claire de l'application.
       await page.emulateMediaType('print');
       await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, 'light');
-      assert.equal(etat.couleurFondApp.toLowerCase(), '#f6f4ee');
+      assert.equal(etat.couleurFondApp, couleurPaletteClaire);
       assert.equal(etat.toolbar, 'none');
       assert.equal(etat.fondDocument, 'rgb(255, 255, 255)');
 
@@ -140,19 +147,22 @@ describe('Génération PDF de facture', () => {
       await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, null);
-      assert.equal(etat.couleurFondApp.toLowerCase(), '#0f1420');
+      assert.equal(etat.couleurFondApp, couleurSystemeSombre);
 
       // Le même cycle doit préserver un choix sombre explicite de l'utilisateur.
       await page.evaluate(() => window.SamaTheme.definir('dark'));
+      const couleurThemeSombreManuel = (await lireEtatTheme()).couleurFondApp;
+      assert.notEqual(couleurThemeSombreManuel, couleurPaletteClaire);
       await page.emulateMediaType('print');
       await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, 'light');
+      assert.equal(etat.couleurFondApp, couleurPaletteClaire);
       await page.emulateMediaType('screen');
       await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
       etat = await lireEtatTheme();
       assert.equal(etat.theme, 'dark');
-      assert.equal(etat.couleurFondApp.toLowerCase(), '#0f1420');
+      assert.equal(etat.couleurFondApp, couleurThemeSombreManuel);
     } finally {
       await browser.close().catch(() => {});
     }
