@@ -716,6 +716,30 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
         ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
         : null,
+      invoiceLineLayout: location.pathname.includes('nouvelle-facture') && window.innerWidth <= 640
+        ? (() => {
+            const table = document.querySelector('.invoice-lines-table');
+            const wrapper = table?.closest('.invoice-lines-scroll');
+            const row = table?.querySelector('tbody tr');
+            const designation = row?.querySelector('.ligne-designation');
+            const quantity = row?.querySelector('.ligne-qte');
+            if (!table || !wrapper || !designation || !quantity) return { found: false };
+            const designationRect = designation.getBoundingClientRect();
+            const quantityRect = quantity.getBoundingClientRect();
+            return {
+              found: true,
+              tableWidth: table.getBoundingClientRect().width,
+              wrapperWidth: wrapper.getBoundingClientRect().width,
+              scrollWidth: wrapper.scrollWidth,
+              clientWidth: wrapper.clientWidth,
+              overflowX: getComputedStyle(wrapper).overflowX,
+              designationRight: designationRect.right,
+              quantityLeft: quantityRect.left,
+              designationColumnWidth: designation.closest('td').getBoundingClientRect().width,
+              quantityColumnWidth: quantity.closest('td').getBoundingClientRect().width
+            };
+          })()
+        : null,
       uncontainedTables,
       missingNavigationIcons: Array.from(document.querySelectorAll('.sidebar .nav-item')).filter((item) => {
         const svg = item.querySelector('.ic svg');
@@ -741,6 +765,19 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   assert.deepEqual(metrics.missingNavigationIcons, [],
     pageDefinition.name + ' : toutes les entrées du menu doivent afficher une icône SVG reconnue : ' +
     JSON.stringify(metrics.missingNavigationIcons));
+  if (pageDefinition.name === 'nouvelle-facture' && viewport.width <= 640) {
+    const layout = metrics.invoiceLineLayout;
+    assert.equal(layout?.found, true,
+      'Le tableau des articles doit afficher la désignation et la quantité à ' + viewport.width + 'px.');
+    assert.ok(layout.designationColumnWidth >= 240 && layout.quantityColumnWidth >= 85,
+      'Les colonnes désignation et quantité doivent conserver leur largeur minimale : ' +
+      JSON.stringify(layout));
+    assert.ok(layout.designationRight <= layout.quantityLeft,
+      'Les champs désignation et quantité ne doivent jamais se chevaucher : ' + JSON.stringify(layout));
+    assert.ok(layout.scrollWidth > layout.clientWidth &&
+      /^(auto|scroll|overlay)$/.test(layout.overflowX),
+      'Le tableau doit défiler dans sa zone dédiée sur mobile : ' + JSON.stringify(layout));
+  }
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
