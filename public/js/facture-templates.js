@@ -1034,8 +1034,8 @@ function createFactureTemplates(helpers) {
         </div>
         <div style="padding:14px 16px;border:1px solid #E1E5EA;border-radius:8px;">
           <div style="color:#7A8492;font-size:.66rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin-bottom:8px;">Références du document</div>
-          <div style="font-size:.8rem;line-height:1.9;"><span style="color:#7A8492;">Émis le</span> ${formatDate(facture.date_emission)}</div>
-          <div style="font-size:.8rem;line-height:1.9;"><span style="color:#7A8492;">${isDevis ? 'Valable jusqu’au' : 'À régler avant le'}</span> ${formatDate(isDevis ? facture.date_validite : facture.date_echeance)}</div>
+          <div style="font-size:.8rem;line-height:1.9;"><span style="color:#7A8492;">Date d’émission</span> ${formatDate(facture.date_emission)}</div>
+          <div style="font-size:.8rem;line-height:1.9;"><span style="color:#7A8492;">${isDevis ? 'Validité du devis' : 'Échéance de paiement'}</span> ${formatDate(isDevis ? facture.date_validite : facture.date_echeance)}</div>
           <div style="margin-top:7px;">${statutBadge(facture.statut)}</div>
         </div>
       </div>
