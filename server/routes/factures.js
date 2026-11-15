@@ -4,7 +4,7 @@ const QRCode = require('qrcode');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
-const { FREE_MONTHLY_INVOICE_LIMIT, isPaidPlan } = require('../utils/plans');
+const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { escapeHtmlEmail, sanitizeEmailHeader } = require('../utils/email-escape');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
@@ -530,29 +530,6 @@ router.post('/', async (req, res, next) => {
     const referenceDocument = optionalText(reference_externe, 100);
     const conditionsDocument = optionalText(conditions_reglement, 5000);
 
-    // Quota du plan gratuit : 10 factures par mois (les devis restent illimités sur tous les
-    // plans). On relit le plan depuis la base plutôt que le jeton JWT, pour qu'un changement
-    // de plan prenne effet immédiatement sans attendre l'expiration de la session.
-    if (docType === 'facture') {
-      const [[userRow]] = await pool.query('SELECT plan FROM users WHERE id = ?', [req.tenantId]);
-      if (!isPaidPlan(userRow?.plan)) {
-        const [[{ n: countThisMonth }]] = await pool.query(
-          `SELECT COUNT(*) as n FROM factures
-           WHERE user_id = ? AND type = 'facture' AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')`,
-          [req.tenantId]
-        );
-        if (countThisMonth >= FREE_MONTHLY_INVOICE_LIMIT) {
-          notifierUtilisateur(req.tenantId, 'alerte_quota', {
-            message: `Vous avez atteint la limite de ${FREE_MONTHLY_INVOICE_LIMIT} factures du plan Gratuit ce mois-ci.`
-          });
-          return res.status(403).json({
-            error: `Le plan Gratuit est limité à ${FREE_MONTHLY_INVOICE_LIMIT} factures par mois. Passez à un plan payant dans Paramètres pour continuer.`,
-            code: 'QUOTA_DEPASSE'
-          });
-        }
-      }
-    }
-
     let calculFacture;
     try {
       calculFacture = computeTotals(lignesValidees, remise, frais_livraison);
@@ -569,6 +546,19 @@ router.post('/', async (req, res, next) => {
 
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    if (docType === 'facture') {
+    const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
+    if (!quota.allowed) {
+      await conn.rollback();
+      notifierUtilisateur(req.tenantId, 'alerte_quota', {
+        message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
+      });
+      return res.status(403).json({
+        error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant dans Paramètres pour continuer.`,
+        code: 'QUOTA_DEPASSE'
+      });
+    }
+    }
     const numero = await nextNumero(conn, req.tenantId, docType);
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
@@ -701,6 +691,17 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
     if (!devis) return res.status(404).json({ error: 'Devis introuvable.' });
 
     await conn.beginTransaction();
+    const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
+    if (!quota.allowed) {
+      await conn.rollback();
+      notifierUtilisateur(req.tenantId, 'alerte_quota', {
+        message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
+      });
+      return res.status(403).json({
+        error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant dans Paramètres pour continuer.`,
+        code: 'QUOTA_DEPASSE'
+      });
+    }
     const numero = await nextNumero(conn, req.tenantId, 'facture');
     await conn.query(`UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente', date_validite = NULL WHERE id = ? AND user_id = ?`, [numero, devis.id, req.tenantId]);
 
@@ -749,6 +750,19 @@ router.post('/:id/dupliquer', async (req, res, next) => {
     const [lignesSource] = await pool.query('SELECT * FROM facture_lignes WHERE facture_id = ?', [source.id]);
 
     await conn.beginTransaction();
+    if (source.type === 'facture') {
+    const quota = await reserveMonthlyInvoiceQuota(conn, req.tenantId);
+    if (!quota.allowed) {
+      await conn.rollback();
+      notifierUtilisateur(req.tenantId, 'alerte_quota', {
+        message: `Vous avez atteint la limite de ${quota.limit} factures du plan Gratuit ce mois-ci.`
+      });
+      return res.status(403).json({
+        error: `Le plan Gratuit est limité à ${quota.limit} factures par mois. Passez à un plan payant dans Paramètres pour continuer.`,
+        code: 'QUOTA_DEPASSE'
+      });
+    }
+    }
     const numero = await nextNumero(conn, req.tenantId, source.type);
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)

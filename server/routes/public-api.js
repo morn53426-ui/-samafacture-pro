@@ -2,7 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../config/db');
 const { computeTotals, insererLignesFacture, ajusterStockFacture } = require('./factures');
-const { FREE_MONTHLY_INVOICE_LIMIT, isPaidPlan } = require('../utils/plans');
+const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
 
 const router = express.Router();
@@ -85,14 +85,16 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
     }
     const lines = inputLines.map(l => ({ ...l, produit_id: validProducts.has(Number(l.produit_id)) ? Number(l.produit_id) : null }));
     const totals = computeTotals(lines, req.body.remise, req.body.frais_livraison);
-    const [userRows] = await pool.query('SELECT plan FROM users WHERE id = ?', [uid]);
-    if (!isPaidPlan(userRows[0]?.plan)) {
-      const [[count]] = await pool.query("SELECT COUNT(*) AS n FROM factures WHERE user_id = ? AND type = 'facture' AND date_emission >= DATE_FORMAT(CURDATE(), '%Y-%m-01')", [uid]);
-      if (Number(count.n) >= FREE_MONTHLY_INVOICE_LIMIT) return res.status(403).json({ error: 'Le quota mensuel de factures du plan Gratuit est atteint.' });
-    }
-
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    const quota = await reserveMonthlyInvoiceQuota(conn, uid);
+    if (!quota.allowed) {
+      await conn.rollback();
+      return res.status(403).json({
+        error: `Le quota mensuel de ${quota.limit} factures gratuites est atteint.`,
+        code: 'QUOTA_DEPASSE'
+      });
+    }
     const numero = 'API-' + new Date().getFullYear() + '-' + crypto.randomBytes(5).toString('hex').toUpperCase();
     const dateEmission = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.date_emission || '')) ? req.body.date_emission : new Date().toISOString().slice(0, 10);
     const [result] = await conn.query(
