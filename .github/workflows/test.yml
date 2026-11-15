@@ -28,6 +28,16 @@ jobs:
           --health-timeout=5s
           --health-retries=12
           --health-start-period=30s
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+          --health-start-period=10s
 
     steps:
       - name: Récupérer le dépôt
@@ -118,6 +128,71 @@ jobs:
           path: server/tests/diagnostics/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Smoke test du démarrage cluster avec MySQL et Redis
+        timeout-minutes: 5
+        working-directory: server
+        env:
+          NODE_ENV: development
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: samafacture_cluster_smoke
+          DB_POOL_SIZE: 5
+          DB_QUEUE_LIMIT: 50
+          REDIS_URL: redis://127.0.0.1:6379
+          JWT_SECRET: ci-secret-cluster-smoke-ne-pas-utiliser-en-production
+          APP_URL: http://127.0.0.1:4178
+          PORT: 4178
+          WEB_CONCURRENCY: 2
+          PDF_JOBS_DIR: /tmp/samafacture-cluster-smoke-pdf
+          BACKUP_DIR: /tmp/samafacture-cluster-smoke-backups
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$PDF_JOBS_DIR" "$BACKUP_DIR"
+          node cluster.js > /tmp/samafacture-cluster-smoke.log 2>&1 &
+          CLUSTER_PID=$!
+          cleanup() {
+            kill -TERM "$CLUSTER_PID" 2>/dev/null || true
+            for attempt in $(seq 1 15); do
+              if ! kill -0 "$CLUSTER_PID" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            kill -KILL "$CLUSTER_PID" 2>/dev/null || true
+            wait "$CLUSTER_PID" 2>/dev/null || true
+            cat /tmp/samafacture-cluster-smoke.log
+          }
+          trap cleanup EXIT
+
+          READY=0
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4178/api/ready > /tmp/samafacture-cluster-ready.json; then
+              if grep -q '"redis":"up"' /tmp/samafacture-cluster-ready.json; then
+                READY=1
+                break
+              fi
+            fi
+            if ! kill -0 "$CLUSTER_PID" 2>/dev/null; then
+              echo "Le processus cluster s'est arrêté avant d'être prêt." >&2
+              cat /tmp/samafacture-cluster-smoke.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+          if [ "$READY" -ne 1 ]; then
+            echo "Le cluster n'a pas atteint l'état ready avec MySQL et Redis." >&2
+            cat /tmp/samafacture-cluster-smoke.log
+            cat /tmp/samafacture-cluster-ready.json 2>/dev/null || true
+            exit 1
+          fi
+
+          # Cette route passe par le limiteur Redis partagé ; elle vérifie aussi
+          # que les commandes RedisStore sont disponibles après le démarrage.
+          curl -fsS http://127.0.0.1:4178/api/config > /dev/null
+          echo "Démarrage cluster validé : 2 workers, MySQL prêt et Redis opérationnel."
 
       - name: Recette visuelle responsive avec données extrêmes
         timeout-minutes: 20
