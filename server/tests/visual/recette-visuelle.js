@@ -264,6 +264,17 @@ function fixtureFor(pathname, fixtures) {
       tva: index % 5 === 0 ? 0 : 18,
       total_ligne: (index % 4 === 0 ? 2 : 1) * (10000 + index * 250) * (index % 5 === 0 ? 1 : 1.18)
     }));
+    const sousTotal = lignes.reduce((sum, ligne) => sum + ligne.quantite * ligne.prix_unitaire, 0);
+    const remise = 5000;
+    const fraisLivraison = 2500;
+    // Garder le jeu de données comptablement cohérent : la TVA est calculée sur la base
+    // nette après remise, comme dans server/routes/factures.js.
+    const totalTva = Number(lignes.reduce((sum, ligne) => {
+      const base = ligne.quantite * ligne.prix_unitaire;
+      const baseNette = sousTotal > 0 ? base - remise * (base / sousTotal) : base;
+      return sum + baseNette * (Number(ligne.tva) || 0) / 100;
+    }, 0).toFixed(2));
+    const total = Number((sousTotal - remise + fraisLivraison + totalTva).toFixed(2));
     return {
       facture: {
         id: isQuote ? 988 : 987,
@@ -279,12 +290,12 @@ function fixtureFor(pathname, fixtures) {
         date_validite: isQuote ? '2026-12-15' : null,
         objet: isQuote ? 'Proposition commerciale détaillée et conditions de réalisation' : 'Prestation de services',
         reference_externe: isQuote ? 'BC-CLIENT-2026-0988' : 'BC-CLIENT-2026-0987',
-        sous_total: 360000,
-        total_tva: 64800,
-        remise: 5000,
-        frais_livraison: 2500,
-        total: 422300,
-        montant_paye: isQuote ? 0 : 80000,
+        sous_total: sousTotal,
+        total_tva: totalTva,
+        remise,
+        frais_livraison: fraisLivraison,
+        total,
+        montant_paye: isQuote ? 0 : 40000,
         commentaires: 'Document de démonstration généré uniquement pour la recette visuelle.',
         mode_paiement: isQuote ? null : 'Virement bancaire',
         conditions_reglement: isQuote ? 'Offre valable 30 jours. Acompte de 40 % après validation.' : 'Règlement sous 15 jours.'
@@ -1176,6 +1187,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       hasTaxDetail: Boolean(document.querySelector('.invoice-doc .sf-doc-tax')),
       hasPaymentBalance: Boolean(document.querySelector('.invoice-doc .sf-payment-balance')),
       hasQuoteAcceptance: Boolean(document.querySelector('.invoice-doc .sf-acceptance-panel')),
+      taxRowAmounts: Array.from(document.querySelectorAll('.invoice-doc .sf-doc-tax-row strong')).map(element => element.textContent),
+      taxTotalAmount: document.querySelector('.invoice-doc .sf-doc-tax-total strong')?.textContent || '',
       validityLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Validité du devis'),
       dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance')
     }));
@@ -1185,6 +1198,16 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       type + ' : l’aperçu écran ne doit pas élargir la page : ' + JSON.stringify(screenMetrics));
     assert.equal(screenMetrics.hasMeta, true, type + ' : les références du document doivent être visibles.');
     assert.equal(screenMetrics.hasTaxDetail, true, type + ' : le détail TVA multi-taux doit être présent.');
+    const parseAmount = (value) => Number(String(value || '')
+      .replace(/[\\s\\u00a0\\u202f]/g, '')
+      .replace(/[^\\d,.-]/g, '')
+      .replace(/\\./g, '')
+      .replace(',', '.'));
+    const taxRowsTotal = screenMetrics.taxRowAmounts.reduce((sum, value) => sum + parseAmount(value), 0);
+    assert.ok(Math.abs(taxRowsTotal - parseAmount(screenMetrics.taxTotalAmount)) <= 0.011,
+      type + ' : le détail TVA par taux doit correspondre au total de TVA : ' + JSON.stringify({
+        rows: screenMetrics.taxRowAmounts, total: screenMetrics.taxTotalAmount
+      }));
     if (type === 'facture') {
       assert.equal(screenMetrics.hasPaymentBalance, true, 'La facture doit indiquer le solde restant dû.');
       assert.equal(screenMetrics.hasQuoteAcceptance, false, 'Une facture ne doit pas afficher le bon pour accord du devis.');
@@ -1202,11 +1225,15 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     await page.emulateMediaType('print');
     const printMetrics = await page.evaluate(() => ({
       toolbarDisplay: getComputedStyle(document.querySelector('.toolbar')).display,
+      themeToggleDisplay: document.querySelector('.theme-toggle-flottant')
+        ? getComputedStyle(document.querySelector('.theme-toggle-flottant')).display
+        : 'none',
       tableHeaderDisplay: getComputedStyle(document.querySelector('.sf-document-table thead')).display,
       pageRule: getComputedStyle(document.querySelector('.invoice-doc')).breakInside,
       overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX
     }));
     assert.equal(printMetrics.toolbarDisplay, 'none', type + ' : la barre d’outils ne doit jamais être imprimée.');
+    assert.equal(printMetrics.themeToggleDisplay, 'none', type + ' : le sélecteur de thème ne doit jamais recouvrir le document imprimé.');
     assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
       type + ' : l’en-tête du tableau doit être répété lorsque le document passe sur une nouvelle page.');
     assert.equal(printMetrics.overflowX, 'visible', type + ' : le document ne doit pas être coupé horizontalement à l’impression.');
