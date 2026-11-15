@@ -325,9 +325,17 @@
             <option value="USD">USD</option>
           </select>
         </div>
-        <div class="field">
-          <label>Modèle de facture</label>
-          <select id="facture_template">
+        <div class="field invoice-template-field">
+          <div class="invoice-template-heading">
+            <div>
+              <label id="invoice-template-title">Choisissez le modèle de vos factures</label>
+              <p>Visualisez chaque présentation avant de la sélectionner. L’aperçu utilise l’identité de votre entreprise et des données fictives.</p>
+            </div>
+            <span class="invoice-template-count"><i class="ic" data-icon="layout-grid" aria-hidden="true"></i> 15 modèles</span>
+          </div>
+          <div id="invoice-template-gallery" class="invoice-template-gallery"
+               role="group" aria-labelledby="invoice-template-title" aria-describedby="invoice-template-help"></div>
+          <select id="facture_template" class="invoice-template-native-select" aria-label="Modèle de facture sélectionné">
             <option value="classique">Classique — sobre, professionnel</option>
             <option value="moderne">Moderne — bandeau de couleur, mise en avant du logo</option>
             <option value="minimaliste">Minimaliste — noir et blanc, épuré</option>
@@ -344,7 +352,7 @@
             <option value="saveurs">Saveurs — chaleureux, restaurants et commerces</option>
             <option value="platine">◆ Entreprise — Platine — logo en avant, QR et signature numérique mis en valeur</option>
           </select>
-          <div class="helper">S'applique à toutes vos factures et devis imprimés.</div>
+          <div id="invoice-template-help" class="helper invoice-template-help">Le modèle choisi s’applique à toutes vos factures et à vos devis imprimés. Les modèles Pro et Entreprise restent visibles pour vous permettre de les comparer ; leur activation dépend de votre formule.</div>
         </div>
 
         <div class="perso-section">
@@ -458,6 +466,7 @@
 </div>
 
 <script src="js/api.js"></script>
+<script src="js/facture-templates.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/sidebar.js"></script>
 <script>
@@ -498,8 +507,169 @@
     renderLogoPreview();
     renderSignaturePreview();
     updateLivePreviewName();
+    renderInvoiceTemplateGallery(u, u.facture_template || 'classique');
   }
   fill();
+
+  // --- Galerie visuelle des 15 modèles ----------------------------------------------
+  const INVOICE_TEMPLATE_META = [
+    { id: 'classique', name: 'Classique', description: 'Sobre, clair et professionnel.', tier: 'all' },
+    { id: 'moderne', name: 'Moderne', description: 'Bandeau graphique et logo mis en avant.', tier: 'all' },
+    { id: 'minimaliste', name: 'Minimaliste', description: 'Noir et blanc, lecture très épurée.', tier: 'all' },
+    { id: 'elegant', name: 'Élégant', description: 'Filets dorés et présentation raffinée.', tier: 'pro' },
+    { id: 'corporate', name: 'Corporate', description: 'Blocs structurés pour les entreprises.', tier: 'pro' },
+    { id: 'creatif', name: 'Créatif', description: 'Mise en page colorée et expressive.', tier: 'pro' },
+    { id: 'prestige', name: 'Prestige', description: 'Noir profond, or et total valorisé.', tier: 'enterprise' },
+    { id: 'heritage', name: 'Héritage', description: 'Double cadre et style papier à en-tête.', tier: 'enterprise' },
+    { id: 'diamant', name: 'Diamant', description: 'Équilibre minimaliste et détails dorés.', tier: 'enterprise' },
+    { id: 'epure', name: 'Épuré', description: 'Grande typographie et signature client.', tier: 'all' },
+    { id: 'azur', name: 'Azur', description: 'Formes géométriques et accents bleus.', tier: 'all' },
+    { id: 'circuit', name: 'Circuit', description: 'Identité verte, idéale pour les métiers IT.', tier: 'all' },
+    { id: 'atelier', name: 'Atelier', description: 'Tons terre et orange, esprit artisanal.', tier: 'all' },
+    { id: 'saveurs', name: 'Saveurs', description: 'Style chaleureux pour commerces et restaurants.', tier: 'all' },
+    { id: 'platine', name: 'Platine', description: 'Logo, vérification QR et signature numérique.', tier: 'enterprise' }
+  ];
+  const PRO_TEMPLATE_IDS = new Set(['elegant', 'corporate', 'creatif']);
+  const ENTERPRISE_TEMPLATE_IDS = new Set(['prestige', 'heritage', 'diamant', 'platine']);
+
+  function canUseInvoiceTemplate(plan, templateId) {
+    if (ENTERPRISE_TEMPLATE_IDS.has(templateId)) return plan === 'entreprise';
+    if (PRO_TEMPLATE_IDS.has(templateId)) return plan === 'pro' || plan === 'entreprise';
+    return true;
+  }
+
+  function renderInvoiceTemplateGallery(user, selectedTemplate) {
+    const gallery = document.getElementById('invoice-template-gallery');
+    const templateSelect = document.getElementById('facture_template');
+    if (!gallery || typeof createFactureTemplates !== 'function') return;
+
+    const previewUser = {
+      ...user,
+      entreprise_nom: document.getElementById('entreprise_nom')?.value || user.entreprise_nom || 'Votre entreprise',
+      entreprise_logo: currentLogo,
+      entreprise_adresse: document.getElementById('entreprise_adresse')?.value || user.entreprise_adresse || '',
+      entreprise_telephone: document.getElementById('entreprise_telephone')?.value || user.entreprise_telephone || '',
+      entreprise_email: document.getElementById('entreprise_email')?.value || user.entreprise_email || '',
+      entreprise_ninea: document.getElementById('entreprise_ninea')?.value || user.entreprise_ninea || '',
+      entreprise_rccm: document.getElementById('entreprise_rccm')?.value || user.entreprise_rccm || '',
+      entreprise_site_web: document.getElementById('entreprise_site_web')?.value || user.entreprise_site_web || '',
+      entreprise_banque: document.getElementById('entreprise_banque')?.value || user.entreprise_banque || '',
+      entreprise_rib: document.getElementById('entreprise_rib')?.value || user.entreprise_rib || '',
+      entreprise_conditions_reglement: document.getElementById('entreprise_conditions_reglement')?.value || user.entreprise_conditions_reglement || '',
+      entreprise_mentions_legales: document.getElementById('entreprise_mentions_legales')?.value || user.entreprise_mentions_legales || '',
+      signature_default: currentSignature,
+      devise: document.getElementById('devise')?.value || user.devise || 'FCFA'
+    };
+    const renderer = createFactureTemplates({
+      escapeHtml,
+      formatDate,
+      statutBadge,
+      formatMontant: (amount) => formatMontant(amount, previewUser.devise)
+    });
+    const factureApercu = {
+      numero: 'FAC-APERÇU-001',
+      client_nom: 'Client exemple',
+      client_adresse: 'Dakar, Sénégal',
+      client_telephone: '+221 77 000 00 00',
+      client_email: 'client@exemple.sn',
+      date_emission: '2026-11-15',
+      date_echeance: '2026-12-15',
+      objet: 'Prestation de services',
+      reference_externe: 'BC-EXEMPLE-001',
+      conditions_reglement: 'Paiement à réception de facture.',
+      statut: 'en_attente',
+      sous_total: 150000,
+      total_tva: 27000,
+      remise: 0,
+      frais_livraison: 0,
+      total: 177000,
+      montant_paye: 0,
+      commentaires: 'Document de démonstration : les informations et montants sont fictifs.',
+      mode_paiement: 'Virement bancaire'
+    };
+    const lignesApercu = [
+      { designation: 'Prestation de conseil et accompagnement', quantite: 1, prix_unitaire: 100000, tva: 18, total_ligne: 118000 },
+      { designation: 'Frais de mise en service', quantite: 1, prix_unitaire: 50000, tva: 18, total_ligne: 59000 }
+    ];
+    const plan = user.plan || 'gratuit';
+    gallery.innerHTML = INVOICE_TEMPLATE_META.map(meta => {
+      const selected = selectedTemplate === meta.id;
+      const allowed = canUseInvoiceTemplate(plan, meta.id);
+      const tierLabel = meta.tier === 'pro' ? 'Pro' : meta.tier === 'enterprise' ? 'Entreprise' : 'Tous les plans';
+      const lockLabel = meta.tier === 'pro' ? 'Réservé au plan Pro' : 'Réservé au plan Entreprise';
+      const html = renderer.renderInvoiceHtml({
+        user: previewUser,
+        facture: factureApercu,
+        lignes: lignesApercu,
+        isDevis: false,
+        qrCode: null,
+        template: meta.id,
+        personnalisation: readPersonnalisationPayload()
+      });
+      return `
+        <article class="invoice-template-card${selected ? ' is-selected' : ''}${allowed ? '' : ' is-locked'}" data-template-card="${meta.id}">
+          <div class="invoice-template-card-heading">
+            <div>
+              <h3>${escapeHtml(meta.name)}</h3>
+              <p>${escapeHtml(meta.description)}</p>
+            </div>
+            <span class="invoice-template-tier tier-${meta.tier}">${escapeHtml(tierLabel)}</span>
+          </div>
+          <div class="invoice-template-preview-window" aria-label="Aperçu du modèle ${escapeHtml(meta.name)}">
+            <div class="invoice-template-preview-canvas">
+              <div class="invoice-doc tpl-${meta.id}">${html}</div>
+            </div>
+            <span class="invoice-template-preview-watermark">APERÇU</span>
+          </div>
+          <div class="invoice-template-card-footer">
+            ${allowed
+              ? `<button type="button" class="btn ${selected ? 'btn-primary' : 'btn-outline'} invoice-template-choice" data-select-template="${meta.id}" aria-pressed="${String(selected)}">${selected ? 'Modèle sélectionné' : 'Choisir ce modèle'}</button>`
+              : `<span class="invoice-template-locked-label"><i class="ic" data-icon="lock" aria-hidden="true"></i>${escapeHtml(lockLabel)}</span>`}
+          </div>
+        </article>`;
+    }).join('');
+
+    updateInvoiceTemplatePreviewScales();
+    gallery.querySelectorAll('[data-select-template]').forEach(button => {
+      button.addEventListener('click', () => {
+        templateSelect.value = button.dataset.selectTemplate;
+        updateInvoiceTemplateSelection();
+      });
+    });
+  }
+
+  function updateInvoiceTemplateSelection() {
+    const selectedTemplate = document.getElementById('facture_template')?.value || 'classique';
+    document.querySelectorAll('[data-template-card]').forEach(card => {
+      const selected = card.dataset.templateCard === selectedTemplate;
+      card.classList.toggle('is-selected', selected);
+      const button = card.querySelector('[data-select-template]');
+      if (button) {
+        button.classList.toggle('btn-primary', selected);
+        button.classList.toggle('btn-outline', !selected);
+        button.setAttribute('aria-pressed', String(selected));
+        button.textContent = selected ? 'Modèle sélectionné' : 'Choisir ce modèle';
+      }
+    });
+  }
+
+  function updateInvoiceTemplatePreviewScales() {
+    document.querySelectorAll('.invoice-template-preview-window').forEach(windowElement => {
+      const canvas = windowElement.querySelector('.invoice-template-preview-canvas');
+      if (!canvas) return;
+      const scale = Math.min((windowElement.clientWidth - 16) / 794, 0.38);
+      canvas.style.transform = 'translateX(-50%) scale(' + scale.toFixed(4) + ')';
+      windowElement.style.height = Math.round(890 * scale) + 'px';
+    });
+  }
+
+  document.getElementById('facture_template')?.addEventListener('change', updateInvoiceTemplateSelection);
+  document.getElementById('entreprise_nom')?.addEventListener('input', () => {
+    const user = Api.currentUser() || {};
+    renderInvoiceTemplateGallery(user, document.getElementById('facture_template').value);
+  });
+  window.addEventListener('resize', updateInvoiceTemplatePreviewScales);
+  // -------------------------------------------------------------------------------
 
   // --- Personnalisation du modèle (couleurs / logo / police) ---------------------------------
   // Clés reconnues par le serveur (server/routes/auth.js) et le moteur de rendu
