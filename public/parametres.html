@@ -478,7 +478,7 @@
               <label id="invoice-template-title">Choisissez le modèle de vos factures</label>
               <p>Visualisez chaque présentation avant de la sélectionner. L’aperçu utilise l’identité de votre entreprise et des données fictives.</p>
             </div>
-            <span class="invoice-template-count"><i class="ic" data-icon="file-stack" aria-hidden="true"></i> 15 modèles</span>
+            <span class="invoice-template-count"><i class="ic" data-icon="file-stack" aria-hidden="true"></i> 19 modèles</span>
           </div>
           <div id="invoice-template-gallery" class="invoice-template-gallery"
                role="group" aria-labelledby="invoice-template-title" aria-describedby="invoice-template-help"></div>
@@ -498,6 +498,10 @@
             <option value="atelier">Atelier — tons terre/orange, artisans et BTP</option>
             <option value="saveurs">Saveurs — chaleureux, restaurants et commerces</option>
             <option value="platine">◆ Entreprise — Platine — logo en avant, QR et signature numérique mis en valeur</option>
+            <option value="executive">◆ Entreprise — Exécutif — bandeau bleu nuit et détails dorés</option>
+            <option value="institution">◆ Entreprise — Institution — présentation formelle et structurée</option>
+            <option value="signature">◆ Entreprise — Signature — style éditorial vert profond et bronze</option>
+            <option value="consolide">◆ Entreprise — Consolidé — synthèse de gestion</option>
           </select>
           <div id="invoice-template-help" class="helper invoice-template-help">Le modèle choisi s’applique à toutes vos factures et à vos devis imprimés. Les modèles Pro et Entreprise restent visibles pour vous permettre de les comparer ; leur activation dépend de votre formule.</div>
         </div>
@@ -637,6 +641,10 @@
     { id: 'prestige', name: 'Prestige', description: 'Noir profond, or et total valorisé.', tier: 'enterprise' },
     { id: 'heritage', name: 'Héritage', description: 'Double cadre et style papier à en-tête.', tier: 'enterprise' },
     { id: 'diamant', name: 'Diamant', description: 'Équilibre minimaliste et détails dorés.', tier: 'enterprise' },
+    { id: 'executive', name: 'Exécutif', description: 'Bandeau exécutif bleu nuit et détails dorés.', tier: 'enterprise' },
+    { id: 'institution', name: 'Institution', description: 'Présentation formelle et informations structurées.', tier: 'enterprise' },
+    { id: 'signature', name: 'Signature', description: 'Style éditorial vert profond et bronze.', tier: 'enterprise' },
+    { id: 'consolide', name: 'Consolidé', description: 'Vue synthétique pour le suivi de gestion.', tier: 'enterprise' },
     { id: 'epure', name: 'Épuré', description: 'Grande typographie et signature client.', tier: 'all' },
     { id: 'azur', name: 'Azur', description: 'Formes géométriques et accents bleus.', tier: 'all' },
     { id: 'circuit', name: 'Circuit', description: 'Identité verte, idéale pour les métiers IT.', tier: 'all' },
@@ -645,7 +653,7 @@
     { id: 'platine', name: 'Platine', description: 'Logo, vérification QR et signature numérique.', tier: 'enterprise' }
   ];
   const PRO_TEMPLATE_IDS = new Set(['elegant', 'corporate', 'creatif']);
-  const ENTERPRISE_TEMPLATE_IDS = new Set(['prestige', 'heritage', 'diamant', 'platine']);
+  const ENTERPRISE_TEMPLATE_IDS = new Set(['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide']);
 
   function canUseInvoiceTemplate(plan, templateId) {
     if (ENTERPRISE_TEMPLATE_IDS.has(templateId)) return plan === 'entreprise';
