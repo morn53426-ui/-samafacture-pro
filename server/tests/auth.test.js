@@ -87,6 +87,28 @@ describe('Authentification', () => {
       'un nouveau jeton (nouvelle version) doit fonctionner');
   });
 
+  test('la déconnexion révoque le JWT Bearer côté serveur', async () => {
+    const connexion = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(connexion.status, 200);
+    const ancienToken = connexion.body.token;
+    assert.equal((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${ancienToken}`)).status, 200);
+
+    const logout = await request(app)
+      .post('/api/auth/logout')
+      .set('Authorization', `Bearer ${ancienToken}`);
+    assert.equal(logout.status, 204);
+
+    const sessionExpiree = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ancienToken}`);
+    assert.equal(sessionExpiree.status, 401, 'un jeton présenté avant déconnexion ne doit plus être accepté');
+
+    const nouvelleConnexion = await request(app).post('/api/auth/login').send({ email, password });
+    assert.equal(nouvelleConnexion.status, 200);
+    assert.equal((await request(app).get('/api/auth/me')
+      .set('Authorization', `Bearer ${nouvelleConnexion.body.token}`)).status, 200);
+  });
+
   test('un utilisateur ne peut pas attribuer lui-même un plan Starter, Pro ou Entreprise', async () => {
     const connexion = await request(app).post('/api/auth/login').send({ email, password });
     assert.equal(connexion.status, 200);
