@@ -148,6 +148,14 @@ function createFactureTemplates(helpers) {
     `;
   }
 
+  function paymentStampLabel(facture, isDevis) {
+    if (isDevis) return 'Devis';
+    const total = Math.max(0, Number(facture.total) || 0);
+    const paid = Math.max(0, Number(facture.montant_paye) || 0);
+    if (facture.statut === 'payee' || (total > 0 && paid >= total)) return 'Payée';
+    return paid > 0 ? 'Paiement partiel' : 'Non payée';
+  }
+
   function footerHtml(user, facture, isDevis, stampClass, qrCode, personnalisation) {
     return `
       <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
@@ -159,7 +167,7 @@ function createFactureTemplates(helpers) {
         <div style="display:flex; align-items:flex-end; gap:14px;">
           ${qrCodeHtml(qrCode, 64)}
           <div class="stamp ${stampClass}"${secondaryColor(personnalisation, null) ? ` style="border-color:${secondaryColor(personnalisation, null)}; color:${secondaryColor(personnalisation, null)};"` : ''}>
-            ${facture.statut === 'payee' ? 'Payée' : (isDevis ? 'Devis' : 'Non payée')}
+            ${paymentStampLabel(facture, isDevis)}
           </div>
         </div>
       </div>
@@ -257,7 +265,7 @@ function createFactureTemplates(helpers) {
 
   // --- Modèle Minimaliste : noir et blanc, épuré, sans couleurs ---
   function renderMinimaliste(user, facture, lignes, isDevis, qrCode, personnalisation) {
-    const statutLabel = { payee: 'Payée', en_attente: 'En attente', en_retard: 'En retard', annulee: 'Annulée' }[facture.statut] || facture.statut;
+    const statutLabel = !isDevis && paymentStampLabel(facture, false) === 'Paiement partiel' ? 'Paiement partiel' : ({ payee: 'Payée', en_attente: 'En attente', en_retard: 'En retard', annulee: 'Annulée' }[facture.statut] || facture.statut);
     return `
       <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #111; padding-bottom:18px; margin-bottom:26px;">
         <div style="display:flex; align-items:center; gap:12px;">
@@ -432,7 +440,7 @@ function createFactureTemplates(helpers) {
           ${signatureHtml(user, 180)}
         </div>
         <div class="stamp" style="border-color:var(--emerald); color:var(--emerald); transform:rotate(6deg);">
-          ${facture.statut === 'payee' ? 'Merci ! 🎉' : (isDevis ? 'Devis' : 'À régler')}
+          ${paymentStampLabel(facture, isDevis)}
         </div>
       </div>
     `;
@@ -639,7 +647,7 @@ function createFactureTemplates(helpers) {
         <div style="display:flex; align-items:flex-end; gap:14px;">
           ${qrCodeHtml(qrCode, 60)}
           <div class="stamp ${facture.statut === 'payee' ? '' : 'stamp-clay'}">
-            ${facture.statut === 'payee' ? 'Payée' : (isDevis ? 'Devis' : 'Non payée')}
+            ${paymentStampLabel(facture, isDevis)}
           </div>
         </div>
       </div>
@@ -788,7 +796,7 @@ function createFactureTemplates(helpers) {
         <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
           ${qrCodeHtml(qrCode, 78)}
           <div class="stamp ${facture.statut === 'payee' ? '' : 'stamp-clay'}">
-            ${facture.statut === 'payee' ? 'Payée' : (isDevis ? 'Devis' : 'Non payée')}
+            ${paymentStampLabel(facture, isDevis)}
           </div>
         </div>
       </div>
