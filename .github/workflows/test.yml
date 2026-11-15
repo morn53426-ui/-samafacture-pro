@@ -59,7 +59,20 @@ jobs:
           APP_URL=https://example.invalid
           ALLOWED_ORIGINS=https://example.invalid
           ENV
-          docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml config --quiet
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml config --format json > /tmp/samafacture-compose.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const compose = JSON.parse(fs.readFileSync('/tmp/samafacture-compose.json', 'utf8'));
+          const dependency = compose.services?.['pdf-worker']?.depends_on?.app;
+          if (dependency?.condition !== 'service_healthy') {
+            throw new Error('Le worker PDF doit attendre que le service app soit healthy.');
+          }
+          const dockerfile = fs.readFileSync('Dockerfile', 'utf8');
+          if (!dockerfile.includes('HEALTHCHECK ')) {
+            throw new Error('Le service app doit exposer un HEALTHCHECK utilisé par depends_on.');
+          }
+          console.log('Dépendance PDF validée : app healthy avant le worker PDF.');
+          NODE
           rm -f .env
 
       - name: Installer Node.js
