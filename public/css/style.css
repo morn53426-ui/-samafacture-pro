@@ -5994,6 +5994,7 @@ a.btn .icon {
   .invoice-doc .sf-total-row { padding: 4px 0; }
   .invoice-doc .sf-total-row.sf-total-grand { padding-top: 8px; }
   .invoice-doc img { max-width: 100% !important; }
+  .theme-toggle-flottant { display: none !important; }
 }
 
 
