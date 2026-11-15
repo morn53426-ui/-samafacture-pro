@@ -935,6 +935,8 @@ function createFactureTemplates(helpers) {
     const legalDetails = [
       user.entreprise_ninea ? 'NINEA : ' + escapeHtml(user.entreprise_ninea) : null,
       user.entreprise_rccm ? 'RCCM : ' + escapeHtml(user.entreprise_rccm) : null,
+      user.entreprise_telephone ? 'Tél. : ' + escapeHtml(user.entreprise_telephone) : null,
+      user.entreprise_email ? 'Email : ' + escapeHtml(user.entreprise_email) : null,
       user.entreprise_site_web ? escapeHtml(user.entreprise_site_web) : null
     ].filter(Boolean);
     const legalMentions = user.entreprise_mentions_legales
