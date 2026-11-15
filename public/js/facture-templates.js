@@ -876,10 +876,14 @@ function createFactureTemplates(helpers) {
     `;
   }
 
-  function documentMetaHtml(facture, isDevis) {
+  function documentMetaHtml(facture, isDevis, includeDates = false) {
     const fields = [];
     if (facture.objet) fields.push(['Objet', escapeHtml(facture.objet)]);
     if (facture.reference_externe) fields.push(['Référence client / commande', escapeHtml(facture.reference_externe)]);
+    if (includeDates) {
+      fields.push(['Date d’émission', formatDate(facture.date_emission)]);
+      fields.push([isDevis ? 'Validité du devis' : 'Échéance de paiement', formatDate(isDevis ? facture.date_validite : facture.date_echeance)]);
+    }
     if (!fields.length) return '';
     return `
       <section class="sf-doc-meta" aria-label="Informations du document">
@@ -1006,11 +1010,17 @@ function createFactureTemplates(helpers) {
       ? { ...facture, date_echeance: facture.date_validite || null }
       : facture;
     let html = render(user, facturePourRendu, lignes, isDevis, qrCode, personnalisation);
-    if (isDevis) html = html.replace(/Échéance/g, 'Validité du devis');
+    if (isDevis) {
+      html = html.replace(/Échéance/g, 'Validité du devis');
+      // Le modèle Créatif utilisait deux dates avec une simple flèche, sans préciser
+      // explicitement qu'il s'agit de la validité du devis.
+      html = html.replace(/<div>📅 ([^<]+) → ([^<]+)<\/div>/g,
+        '<div><span>Date d’émission :</span> $1<br/><span>Validité du devis :</span> $2</div>');
+    }
 
     // Le bloc de références est partagé par les 15 modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
-    const meta = documentMetaHtml(facture, isDevis);
+    const meta = documentMetaHtml(facture, isDevis, template === 'minimaliste' || template === 'saveurs');
     const firstTable = html.indexOf('<table');
     if (meta && firstTable >= 0) html = html.slice(0, firstTable) + meta + html.slice(firstTable);
 
