@@ -58,6 +58,37 @@ describe('Génération PDF de facture', () => {
     assert.equal(res.body.slice(0, 5).toString('latin1'), '%PDF-');
   });
 
+  test('les cinq nouveaux modèles produisent chacun un vrai PDF avec Puppeteer', async () => {
+    const nouveauxModeles = ['nova', 'nordique', 'luxe', 'tech', 'horizon'];
+
+    for (const modele of nouveauxModeles) {
+      await pool.query(
+        'UPDATE users SET facture_template = ? WHERE id = ?',
+        [modele, userIdA]
+      );
+
+      const res = await request(app)
+        .get(`/api/factures/${factureId}/pdf`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks = [];
+          response.on('data', chunk => chunks.push(chunk));
+          response.on('end', () => callback(null, Buffer.concat(chunks)));
+        });
+
+      assert.equal(res.status, 200, modele + ' doit générer une réponse HTTP 200');
+      assert.match(res.headers['content-type'] || '', /^application\/pdf(?:;|$)/,
+        modele + ' doit renvoyer un fichier PDF');
+      assert.equal(res.body.slice(0, 5).toString('latin1'), '%PDF-',
+        modele + ' doit produire une signature PDF valide');
+      assert.ok(res.body.length > 1500,
+        modele + ' ne doit pas produire un PDF vide ou tronqué');
+      assert.match(res.body.toString('latin1'), /\/Type\s*\/Page\b/,
+        modele + ' doit contenir au moins une page PDF');
+    }
+  });
+
   test("B ne peut pas télécharger le PDF d'une facture de A (404, pas de fuite de document)", async () => {
     const res = await request(app)
       .get(`/api/factures/${factureId}/pdf`)
