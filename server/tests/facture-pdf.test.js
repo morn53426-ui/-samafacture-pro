@@ -1,6 +1,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+const puppeteer = require('puppeteer');
 const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 // GET /api/factures/:id/pdf (génération via Puppeteer, utils/pdf.js) n'était pas testé.
@@ -86,6 +87,74 @@ describe('Génération PDF de facture', () => {
         modele + ' ne doit pas produire un PDF vide ou tronqué');
       assert.match(res.body.toString('latin1'), /\/Type\s*\/Page\b/,
         modele + ' doit contenir au moins une page PDF');
+    }
+  });
+
+  test("l'impression force le thème papier puis restaure le thème utilisateur", async () => {
+    const baseUrl = process.env.PDF_BASE_URL;
+    assert.ok(baseUrl, 'le serveur HTTP de test doit être démarré');
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+      await page.evaluateOnNewDocument((token, apiBaseUrl) => {
+        localStorage.setItem('sf_token', token);
+        localStorage.setItem('sf_theme', 'auto');
+        window.SAMAFACTURE_API_URL = apiBaseUrl;
+      }, tokenA, `${baseUrl}/api`);
+
+      await page.goto(`${baseUrl}/facture-detail.html?id=${factureId}`, {
+        waitUntil: 'networkidle0',
+        timeout: 20000
+      });
+      await page.waitForFunction(() => window.__docReady === true, { timeout: 15000 });
+
+      const lireEtatTheme = () => page.evaluate(() => ({
+        theme: document.documentElement.getAttribute('data-theme'),
+        couleurFondApp: getComputedStyle(document.documentElement).getPropertyValue('--cream').trim(),
+        toolbar: getComputedStyle(document.querySelector('.toolbar')).display,
+        fondDocument: getComputedStyle(document.querySelector('.invoice-doc')).backgroundColor
+      }));
+
+      // En mode système sombre, la page suit d'abord la préférence du navigateur.
+      let etat = await lireEtatTheme();
+      assert.equal(etat.theme, null);
+      assert.equal(etat.couleurFondApp.toLowerCase(), '#0f1420');
+
+      // L'aperçu imprimé doit être clair quel que soit le thème de l'application.
+      await page.emulateMediaType('print');
+      await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+      etat = await lireEtatTheme();
+      assert.equal(etat.theme, 'light');
+      assert.equal(etat.couleurFondApp.toLowerCase(), '#f6f4ee');
+      assert.equal(etat.toolbar, 'none');
+      assert.equal(etat.fondDocument, 'rgb(255, 255, 255)');
+
+      // À la fermeture de l'aperçu, le mode système sombre doit être rétabli.
+      await page.emulateMediaType('screen');
+      await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+      etat = await lireEtatTheme();
+      assert.equal(etat.theme, null);
+      assert.equal(etat.couleurFondApp.toLowerCase(), '#0f1420');
+
+      // Le même cycle doit préserver un choix sombre explicite de l'utilisateur.
+      await page.evaluate(() => window.SamaTheme.definir('dark'));
+      await page.emulateMediaType('print');
+      await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+      etat = await lireEtatTheme();
+      assert.equal(etat.theme, 'light');
+      await page.emulateMediaType('screen');
+      await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+      etat = await lireEtatTheme();
+      assert.equal(etat.theme, 'dark');
+      assert.equal(etat.couleurFondApp.toLowerCase(), '#0f1420');
+    } finally {
+      await browser.close().catch(() => {});
     }
   });
 
