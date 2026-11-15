@@ -443,6 +443,13 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     const hasKicker = Boolean(main?.querySelector('.workspace-page-kicker, .pro-eyebrow, .billing-eyebrow, .subscription-eyebrow'));
     const unhydratedIcons = Array.from(document.querySelectorAll('i[data-icon]'))
       .map(element => element.getAttribute('data-icon'));
+    const navigationIcons = Array.from(document.querySelectorAll('.nav-item svg.icon'));
+    const navigationIconsLegible = navigationIcons.length > 0 && navigationIcons.every(icon => {
+      const style = getComputedStyle(icon);
+      return Number.parseFloat(style.width) >= 20 &&
+        Number.parseFloat(style.height) >= 20 &&
+        Number.parseFloat(style.strokeWidth) >= 1.8;
+    });
     return {
       workspacePage: Boolean(main),
       hasHeader,
@@ -450,6 +457,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       dataHeading: Boolean(main?.querySelector('.workspace-data-heading')),
       filterPanel: Boolean(main?.querySelector('.workspace-filter-card')),
       unhydratedIcons,
+      navigationIconsLegible,
       headingFont: getComputedStyle(document.querySelector('h1')).fontFamily,
       bodyFont: getComputedStyle(document.body).fontFamily
     };
@@ -473,6 +481,10 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   }
   assert.deepEqual(layoutAudit.unhydratedIcons, [],
     pageDefinition.name + ' contient des icônes statiques non reconnues : ' + JSON.stringify(layoutAudit.unhydratedIcons));
+  if (!pageDefinition.public) {
+    assert.equal(layoutAudit.navigationIconsLegible, true,
+      pageDefinition.name + ' : les icônes de navigation doivent mesurer au moins 20 px avec un trait de 1,8.'); 
+  }
 
   const navigationGeometry = await page.evaluate(() => {
     const sidebar = document.getElementById('app-sidebar');
@@ -848,6 +860,12 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
         icon.getAttribute('viewBox') === '0 0 24 24' &&
         icon.getAttribute('stroke-linecap') === 'round' &&
         icon.getAttribute('stroke-linejoin') === 'round'),
+    iconsLegible: [...document.querySelectorAll('.nav-item svg.icon')].every(icon => {
+      const style = getComputedStyle(icon);
+      return Number.parseFloat(style.width) >= 20 &&
+        Number.parseFloat(style.height) >= 20 &&
+        Number.parseFloat(style.strokeWidth) >= 1.8;
+    }),
     topbarQuickActionsDoNotOverlap: (() => {
       const quick = document.querySelector('.app-topbar-quick-actions')?.getBoundingClientRect();
       const logout = document.querySelector('.app-topbar-logout')?.getBoundingClientRect();
@@ -865,6 +883,7 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     headingFont: '"IBM Plex Sans", sans-serif',
     bodyFont: '"IBM Plex Sans", sans-serif',
     iconsConsistent: true,
+    iconsLegible: true,
     topbarQuickActionsDoNotOverlap: true
   }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
 
