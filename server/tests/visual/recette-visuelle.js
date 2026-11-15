@@ -11,9 +11,12 @@ const OUTPUT_DIR = path.resolve(process.env.VISUAL_ARTIFACTS_DIR || path.join(__
 const DATASET = process.env.VISUAL_DATASET || 'worst';
 const VIEWPORTS = [
   { name: 'mobile-320', width: 320, height: 812 },
+  { name: 'mobile-360', width: 360, height: 800 },
   { name: 'mobile-390', width: 390, height: 844 },
   { name: 'tablet-768', width: 768, height: 1024 },
-  { name: 'desktop-1440', width: 1440, height: 1000 }
+  { name: 'laptop-1024', width: 1024, height: 900 },
+  { name: 'desktop-1440', width: 1440, height: 1000 },
+  { name: 'wide-1920', width: 1920, height: 1080 }
 ];
 const PAGES = [
   { name: 'dashboard', file: 'dashboard.html', ready: '#paiements-body tr:not(.row-skeleton)', charts: ['chart-evolution', 'chart-repartition'] },
@@ -247,6 +250,49 @@ function fixtureFor(pathname, fixtures) {
     factures: fixtures.factures,
     pagination: { page: 1, limite: 20, total: fixtures.factures.length, total_pages: fixtures.factures.length ? 1 : 0 }
   };
+  if (/^\/api\/factures\/(987|988)$/.test(pathname)) {
+    const isQuote = pathname.endsWith('/988');
+    const lineCount = isQuote ? 28 : 8;
+    const lignes = Array.from({ length: lineCount }, (_, index) => ({
+      designation: makeLong(
+        (isQuote ? 'Lot de prestation et fournitures prévu au devis — ' : 'Prestation facturée — ') +
+        String(index + 1).padStart(2, '0') + ' · ',
+        DATASET === 'normal' ? 70 : 148
+      ),
+      quantite: index % 4 === 0 ? 2 : 1,
+      prix_unitaire: 10000 + index * 250,
+      tva: index % 5 === 0 ? 0 : 18,
+      total_ligne: (index % 4 === 0 ? 2 : 1) * (10000 + index * 250) * (index % 5 === 0 ? 1 : 1.18)
+    }));
+    return {
+      facture: {
+        id: isQuote ? 988 : 987,
+        numero: isQuote ? 'DV-2026-0988' : 'FAC-2026-0987',
+        type: isQuote ? 'devis' : 'facture',
+        statut: 'en_attente',
+        client_nom: fixtures.clients[0]?.nom || 'Client de recette',
+        client_adresse: fixtures.clients[0]?.adresse || 'Dakar, Sénégal',
+        client_telephone: fixtures.clients[0]?.telephone || '+221 77 123 45 67',
+        client_email: fixtures.clients[0]?.email || 'client@example.sn',
+        date_emission: '2026-11-15',
+        date_echeance: isQuote ? null : '2026-12-15',
+        date_validite: isQuote ? '2026-12-15' : null,
+        objet: isQuote ? 'Proposition commerciale détaillée et conditions de réalisation' : 'Prestation de services',
+        reference_externe: isQuote ? 'BC-CLIENT-2026-0988' : 'BC-CLIENT-2026-0987',
+        sous_total: 360000,
+        total_tva: 64800,
+        remise: 5000,
+        frais_livraison: 2500,
+        total: 422300,
+        montant_paye: isQuote ? 0 : 80000,
+        commentaires: 'Document de démonstration généré uniquement pour la recette visuelle.',
+        mode_paiement: isQuote ? null : 'Virement bancaire',
+        conditions_reglement: isQuote ? 'Offre valable 30 jours. Acompte de 40 % après validation.' : 'Règlement sous 15 jours.'
+      },
+      lignes,
+      qr_code: null
+    };
+  }
   if (pathname === '/api/depenses') return { depenses: fixtures.depenses || [] };
   if (pathname === '/api/rapports/comptabilite') {
     return {
@@ -500,6 +546,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       firstContentLeft: main?.querySelector('.dashboard-welcome, .page-header, .workspace-page-header')
         ? Math.round(main.querySelector('.dashboard-welcome, .page-header, .workspace-page-header').getBoundingClientRect().left)
         : null,
+      firstContentWidth: main?.querySelector('.dashboard-welcome, .page-header, .workspace-page-header')
+        ? Math.round(main.querySelector('.dashboard-welcome, .page-header, .workspace-page-header').getBoundingClientRect().width)
+        : null,
       contentPaddingLeft: main ? Math.round(parseFloat(getComputedStyle(main).paddingLeft) || 0) : null,
       expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim()
     };
@@ -524,7 +573,28 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' : aucun voile de navigation ne doit masquer le contenu desktop.');
   }
 
+  if (!pageDefinition.public && viewport.width >= 1900) {
+    assert.ok(navigationGeometry.firstContentWidth <= 1721,
+      pageDefinition.name + ' : le contenu métier doit être borné à 1 720 px sur écran ultra-large : ' +
+      JSON.stringify(navigationGeometry));
+    assert.ok(navigationGeometry.firstContentLeft > navigationGeometry.mainLeft + 40,
+      pageDefinition.name + ' : les blocs doivent être centrés dans la zone de travail ultra-large : ' +
+      JSON.stringify(navigationGeometry));
+  }
+
   const metrics = await page.evaluate(() => {
+    const uncontainedTables = Array.from(document.querySelectorAll('table')).filter((table) => {
+      if (table.getBoundingClientRect().width <= (table.parentElement?.getBoundingClientRect().width || 0) + 1) return false;
+      let ancestor = table.parentElement;
+      while (ancestor && ancestor !== document.body) {
+        const style = getComputedStyle(ancestor);
+        if (ancestor.scrollWidth > ancestor.clientWidth + 1 &&
+            /^(auto|scroll|overlay)$/.test(style.overflowX)) return false;
+        ancestor = ancestor.parentElement;
+      }
+      return true;
+    }).map((table) => table.getAttribute('aria-label') || table.id || table.className || 'table')
+      .slice(0, 12);
     const overflowElements = Array.from(document.body.querySelectorAll('*')).map((element) => {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
@@ -555,6 +625,11 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
         ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
         : null,
+      uncontainedTables,
+      missingNavigationIcons: Array.from(document.querySelectorAll('.sidebar .nav-item')).filter((item) => {
+        const svg = item.querySelector('.ic svg');
+        return !svg || svg.getAttribute('viewBox') !== '0 0 24 24';
+      }).map((item) => item.getAttribute('aria-label') || item.textContent.trim()).slice(0, 20),
       overflowElements
     };
   });
@@ -569,6 +644,12 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     pageDefinition.name + ' déborde horizontalement à ' + viewport.width + 'px: ' + JSON.stringify(metrics));
   assert.ok(metrics.body <= metrics.viewport + 1,
     pageDefinition.name + ' élargit le body à ' + viewport.width + 'px: ' + JSON.stringify(metrics));
+  assert.deepEqual(metrics.uncontainedTables, [],
+    pageDefinition.name + ' : un tableau trop large doit défiler dans sa carte, sans élargir la page : ' +
+    JSON.stringify(metrics.uncontainedTables));
+  assert.deepEqual(metrics.missingNavigationIcons, [],
+    pageDefinition.name + ' : toutes les entrées du menu doivent afficher une icône SVG reconnue : ' +
+    JSON.stringify(metrics.missingNavigationIcons));
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
@@ -1072,18 +1153,103 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
 
   await prepareDocument('facture');
   await prepareDocument('devis');
+
+  async function verifyDocumentPdf(documentId, type) {
+    // Revenir au média écran avant de capturer l’aperçu de chaque document.
+    await page.emulateMediaType(null);
+    await page.goto(baseUrl + '/facture-detail.html?id=' + documentId, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.__docReady === true, { timeout: 15000 });
+    await page.waitForSelector('.invoice-doc .sf-document-table tbody tr');
+    await page.evaluate(async () => {
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      await Promise.all(Array.from(document.querySelectorAll('#doc img')).map(image =>
+        typeof image.decode === 'function' ? image.decode().catch(() => {}) : Promise.resolve()
+      ));
+    });
+    const screenMetrics = await page.evaluate(() => ({
+      title: document.title,
+      lineCount: document.querySelectorAll('.invoice-doc .sf-document-table tbody tr').length,
+      tableWidth: Math.round(document.querySelector('.invoice-doc .sf-document-table').getBoundingClientRect().width),
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+      hasMeta: Boolean(document.querySelector('.invoice-doc .sf-doc-meta')),
+      hasTaxDetail: Boolean(document.querySelector('.invoice-doc .sf-doc-tax')),
+      hasPaymentBalance: Boolean(document.querySelector('.invoice-doc .sf-payment-balance')),
+      hasQuoteAcceptance: Boolean(document.querySelector('.invoice-doc .sf-acceptance-panel')),
+      validityLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Validité du devis'),
+      dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance')
+    }));
+    assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),
+      type + ' : toutes les lignes doivent être rendues avant l’impression : ' + JSON.stringify(screenMetrics));
+    assert.ok(screenMetrics.documentWidth <= screenMetrics.viewportWidth + 1,
+      type + ' : l’aperçu écran ne doit pas élargir la page : ' + JSON.stringify(screenMetrics));
+    assert.equal(screenMetrics.hasMeta, true, type + ' : les références du document doivent être visibles.');
+    assert.equal(screenMetrics.hasTaxDetail, true, type + ' : le détail TVA multi-taux doit être présent.');
+    if (type === 'facture') {
+      assert.equal(screenMetrics.hasPaymentBalance, true, 'La facture doit indiquer le solde restant dû.');
+      assert.equal(screenMetrics.hasQuoteAcceptance, false, 'Une facture ne doit pas afficher le bon pour accord du devis.');
+    } else {
+      assert.equal(screenMetrics.validityLabel, true, 'Le devis doit afficher sa date de validité.');
+      assert.equal(screenMetrics.dueLabel, false, 'Le devis ne doit pas afficher une échéance de paiement.');
+      assert.equal(screenMetrics.hasQuoteAcceptance, true, 'Le devis doit prévoir une zone d’acceptation.');
+      assert.equal(screenMetrics.hasPaymentBalance, false, 'Le devis ne doit pas afficher un solde de paiement.');
+    }
+
+    await page.screenshot({
+      path: path.join(OUTPUT_DIR, 'document-' + type + '-apercu-' + DATASET + '.png'),
+      fullPage: true
+    });
+    await page.emulateMediaType('print');
+    const printMetrics = await page.evaluate(() => ({
+      toolbarDisplay: getComputedStyle(document.querySelector('.toolbar')).display,
+      tableHeaderDisplay: getComputedStyle(document.querySelector('.sf-document-table thead')).display,
+      pageRule: getComputedStyle(document.querySelector('.invoice-doc')).breakInside,
+      overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX
+    }));
+    assert.equal(printMetrics.toolbarDisplay, 'none', type + ' : la barre d’outils ne doit jamais être imprimée.');
+    assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
+      type + ' : l’en-tête du tableau doit être répété lorsque le document passe sur une nouvelle page.');
+    assert.equal(printMetrics.overflowX, 'visible', type + ' : le document ne doit pas être coupé horizontalement à l’impression.');
+
+    const pdf = await page.pdf({
+      format: 'A4',
+      preferCSSPageSize: true,
+      printBackground: true,
+      margin: { top: '12mm', bottom: '14mm', left: '12mm', right: '12mm' },
+      scale: 1
+    });
+    // Puppeteer 25 peut renvoyer un Uint8Array plutôt qu'un Buffer : normaliser
+    // avant les conversions texte, sans dépendre de Uint8Array.toString(encoding).
+    const pdfBuffer = Buffer.from(pdf);
+    assert.equal(pdfBuffer.subarray(0, 5).toString('latin1'), '%PDF-', type + ' : la sortie doit être un vrai fichier PDF.');
+    assert.ok(pdfBuffer.length > 5000, type + ' : le PDF doit contenir le document complet.');
+    const pdfSource = pdfBuffer.toString('latin1');
+    const pages = (pdfSource.match(/\/Type\s*\/Page\b/g) || []).length;
+    assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
+    if (type === 'devis') {
+      assert.ok(pages >= 2, 'Le devis long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
+    }
+    fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdfBuffer);
+    return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
+  }
+
+  const invoicePdf = await verifyDocumentPdf(987, 'facture');
+  const quotePdf = await verifyDocumentPdf(988, 'devis');
   await page.close();
-  return { invoiceCreation: 'ok', quoteCreation: 'ok', totalWithDiscountVatAndDelivery: 20380 };
+  return {
+    invoiceCreation: 'ok',
+    quoteCreation: 'ok',
+    totalWithDiscountVatAndDelivery: 20380,
+    invoicePrint: invoicePdf,
+    quotePrint: quotePdf,
+    screenshots: 2,
+    pdfFiles: 2
+  };
 }
 
 async function capturePublicPages(browser, baseUrl, fixtures, screenshotsDir) {
   const captures = [];
-  const viewports = [
-    { name: 'mobile-320', width: 320, height: 812 },
-    { name: 'mobile-390', width: 390, height: 844 },
-    { name: 'tablet-768', width: 768, height: 1024 },
-    { name: 'desktop-1440', width: 1440, height: 1000 }
-  ];
+  const viewports = VIEWPORTS;
   for (const file of ['index.html', 'login.html']) {
     const name = file === 'index.html' ? 'accueil' : 'connexion';
     for (const viewport of viewports) {
@@ -1172,7 +1338,7 @@ async function main() {
       workspaceShell: shell,
       themeAndZoom,
       documentFlows,
-      screenshots: results.length + 2 + publicPages.length,
+      screenshots: results.length + 2 + publicPages.length + (documentFlows.screenshots || 0),
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));

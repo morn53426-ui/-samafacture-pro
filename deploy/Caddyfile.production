@@ -15,5 +15,6 @@
     -Server
   }
 
-  reverse_proxy app:4000
+  # Keep the load-balancing/sticky-session layer in front of all API replicas.
+  reverse_proxy nginx:80
 }

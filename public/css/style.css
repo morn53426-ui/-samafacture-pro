@@ -5559,3 +5559,500 @@ a.btn .icon {
     height: 20px;
   }
 }
+
+/* Écrans ultra-larges : les blocs métier gardent une largeur de lecture maîtrisée.
+   La barre supérieure reste pleine largeur ; le rail latéral conserve son espace. */
+@media (min-width: 1900px) {
+  body .main-content.workspace-page > :not(.app-topbar):not(#topbar-root) {
+    width: min(100%, 1720px) !important;
+    max-width: 1720px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
+
+/* Identité de marque : logo plus présent, cadrage propre et contraste régulier. */
+.sidebar-brand {
+  min-height: 104px;
+  padding: 16px 16px;
+  gap: 12px;
+}
+.sidebar-brand .mark {
+  width: 48px !important;
+  height: 48px !important;
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(210, 174, 111, .78);
+  box-shadow: 0 7px 20px rgba(0, 0, 0, .24), 0 0 0 3px rgba(255,255,255,.045);
+}
+.sidebar-brand .mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+}
+.sidebar-brand .name {
+  font-size: 1.06rem;
+  line-height: 1.12;
+  font-weight: 750;
+  letter-spacing: -.025em;
+  color: #fff;
+}
+.sidebar-brand .sub {
+  margin-top: 4px;
+  font-size: .68rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: .045em;
+  color: #C9D3E4;
+}
+.sidebar-brand .brand-pro {
+  margin-left: 4px;
+  padding: 2px 7px 3px;
+  border: 1px solid rgba(239, 204, 137, .52);
+  border-radius: 6px;
+  background: linear-gradient(135deg, #C79A52, #E5C17F);
+  color: #17233B;
+  font-size: .68rem;
+  font-weight: 850;
+  vertical-align: 2px;
+}
+.nav-item .ic svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  stroke-width: 1.85;
+}
+.lp-header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 1.08rem;
+  font-weight: 750;
+  letter-spacing: -.02em;
+}
+.lp-header .brand img {
+  width: 44px;
+  height: 44px;
+  padding: 3px;
+  object-fit: contain;
+  border-radius: 13px;
+  border: 1px solid #E2D6C3;
+  background: #fff;
+  box-shadow: 0 5px 16px rgba(15, 27, 51, .12);
+}
+.auth-form-card .auth-form-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.auth-form-card .auth-form-badge .mark {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  padding: 3px;
+  border-radius: 14px;
+  border: 1px solid #E2D6C3;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 27, 51, .13);
+}
+.auth-form-card .auth-form-badge .mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.auth-form-card .auth-form-badge span {
+  font-size: 1.02rem;
+  font-weight: 750;
+  color: var(--ink);
+  letter-spacing: -.015em;
+}
+.sidebar.is-collapsed .sidebar-brand {
+  min-height: 92px;
+  padding: 14px 8px;
+}
+.sidebar.is-collapsed .sidebar-brand .mark {
+  width: 44px !important;
+  height: 44px !important;
+  flex-basis: 44px;
+}
+@media (max-width: 640px) {
+  .sidebar-brand { min-height: 96px; }
+  .lp-header .brand { gap: 9px; font-size: 1rem; }
+  .lp-header .brand img { width: 40px; height: 40px; }
+}
+
+
+/* =========================================================================
+   Documents commerciaux — lisibilité commune, aperçu écran et sortie A4.
+   Les 15 modèles gardent leur identité graphique ; ces règles homogénéisent
+   les tableaux, les informations complémentaires et la pagination imprimée.
+   ========================================================================= */
+.invoice-doc {
+  box-sizing: border-box;
+  color: #243044;
+  font-size: 14px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.invoice-doc .sf-document-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+}
+.invoice-doc .sf-document-table th,
+.invoice-doc .sf-document-table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.invoice-doc .sf-document-table th:first-child,
+.invoice-doc .sf-document-table td:first-child { width: 42%; text-align: left; }
+.invoice-doc .sf-document-table th:nth-child(2),
+.invoice-doc .sf-document-table td:nth-child(2) { width: 9%; text-align: right; }
+.invoice-doc .sf-document-table th:nth-child(3),
+.invoice-doc .sf-document-table td:nth-child(3) { width: 18%; text-align: right; }
+.invoice-doc .sf-document-table th:nth-child(4),
+.invoice-doc .sf-document-table td:nth-child(4) { width: 10%; text-align: right; }
+.invoice-doc .sf-document-table th:nth-child(5),
+.invoice-doc .sf-document-table td:nth-child(5) { width: 21%; text-align: right; }
+.invoice-doc .sf-document-table thead th {
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: normal;
+}
+.invoice-doc .sf-document-table tbody td {
+  font-size: 11px;
+  line-height: 1.45;
+}
+.invoice-doc .sf-doc-description {
+  font-weight: 550;
+  color: #263449;
+}
+.invoice-doc .sf-document-table .sf-doc-qty,
+.invoice-doc .sf-document-table .sf-doc-unit-price,
+.invoice-doc .sf-document-table .sf-doc-tax-rate,
+.invoice-doc .sf-document-table .sf-doc-line-total {
+  white-space: normal;
+}
+.invoice-doc .sf-doc-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 22px;
+  padding: 13px 15px;
+  border: 1px solid #dce4ec;
+  border-left: 4px solid #0f766e;
+  border-radius: 9px;
+  background: #f7fafc;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.invoice-doc .sf-doc-meta-item { min-width: 0; }
+.invoice-doc .sf-doc-meta-label,
+.invoice-doc .sf-extra-title {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .065em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+.invoice-doc .sf-doc-meta-value {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.invoice-doc .sf-doc-tax {
+  width: min(100%, 360px);
+  margin: 14px 0 0 auto;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #475569;
+  font-size: 10px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.invoice-doc .sf-doc-tax-title {
+  margin-bottom: 6px;
+  color: #334155;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+.invoice-doc .sf-doc-tax-row,
+.invoice-doc .sf-doc-tax-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+.invoice-doc .sf-doc-tax-base { color: #64748b; }
+.invoice-doc .sf-doc-tax-total {
+  margin-top: 5px;
+  padding-top: 7px;
+  border-top: 1px solid #dce2e8;
+  color: #172033;
+  font-weight: 800;
+}
+.invoice-doc .sf-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 6px 0;
+  color: #536174;
+  font-size: 11px;
+}
+.invoice-doc .sf-total-row > :last-child {
+  flex-shrink: 0;
+  text-align: right;
+}
+.invoice-doc .sf-total-row.sf-total-grand {
+  margin-top: 5px;
+  padding: 11px 0 5px;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 800;
+}
+.invoice-doc .sf-doc-extras {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  color: #334155;
+  font-size: 10px;
+}
+.invoice-doc .sf-extra-panel {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #dce2e8;
+  border-radius: 8px;
+  background: #fff;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.invoice-doc .sf-payment-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  border-left: 4px solid #0f766e;
+  background: #f7fafc;
+}
+.invoice-doc .sf-payment-metric { min-width: 0; }
+.invoice-doc .sf-payment-value {
+  display: block;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.invoice-doc .sf-payment-balance .sf-payment-value { color: #9a5b11; }
+.invoice-doc .sf-extra-body { line-height: 1.65; overflow-wrap: anywhere; }
+.invoice-doc .sf-bank-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+.invoice-doc .sf-bank-item { min-width: 0; }
+.invoice-doc .sf-bank-item span {
+  display: block;
+  margin-bottom: 2px;
+  color: #64748b;
+  font-size: 9px;
+}
+.invoice-doc .sf-bank-item strong {
+  display: block;
+  color: #172033;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.invoice-doc .sf-acceptance-panel { border-top: 2px solid #0f766e; }
+.invoice-doc .sf-acceptance-copy {
+  margin: 0 0 13px;
+  color: #475569;
+  line-height: 1.55;
+}
+.invoice-doc .sf-acceptance-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.invoice-doc .sf-sign-field { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+.invoice-doc .sf-sign-label {
+  color: #475569;
+  font-size: 10px;
+  font-weight: 650;
+}
+.invoice-doc .sf-sign-line {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  border-bottom: 1px solid #94a3b8;
+}
+.invoice-doc .sf-doc-legal {
+  margin-top: 4px;
+  padding-top: 9px;
+  border-top: 1px solid #dce2e8;
+  color: #64748b;
+  font-size: 9px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.invoice-doc .sf-doc-legal-mentions { margin-top: 3px; }
+
+@media (max-width: 640px) {
+  /* Le tableau reste lisible dans un défilement interne sur téléphone ; l'impression
+     A4 repasse à 100 % de largeur dans le bloc @media print ci-dessous. */
+  .invoice-doc .sf-document-table {
+    min-width: 520px;
+    table-layout: fixed;
+  }
+  .invoice-doc .sf-doc-meta,
+  .invoice-doc .sf-payment-summary,
+  .invoice-doc .sf-bank-grid { grid-template-columns: minmax(0, 1fr); }
+  .invoice-doc .sf-acceptance-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .invoice-doc .sf-sign-field { gap: 7px; }
+}
+
+@media print {
+  .invoice-doc {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #172033 !important;
+    font-size: 9.5pt !important;
+  }
+  .invoice-doc .head {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  .invoice-doc .sf-document-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    overflow: visible !important;
+  }
+  .invoice-doc .sf-document-table thead { display: table-header-group !important; }
+  .invoice-doc .sf-document-table tfoot { display: table-footer-group !important; }
+  .invoice-doc .sf-document-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .invoice-doc .sf-document-table th,
+  .invoice-doc .sf-document-table td {
+    padding: 6px 6px !important;
+    font-size: 8.5pt !important;
+    line-height: 1.35 !important;
+    overflow-wrap: anywhere !important;
+  }
+  .invoice-doc .sf-doc-meta,
+  .invoice-doc .sf-doc-tax,
+  .invoice-doc .sf-extra-panel,
+  .invoice-doc .stamp,
+  .invoice-doc img {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .invoice-doc h1,
+  .invoice-doc h2,
+  .invoice-doc h3,
+  .invoice-doc .sf-doc-meta-label,
+  .invoice-doc .sf-extra-title {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  .invoice-doc .sf-doc-extras { margin-top: 14px; }
+  .invoice-doc .sf-extra-panel { padding: 9px 11px; }
+  .invoice-doc .sf-total-row { padding: 4px 0; }
+  .invoice-doc .sf-total-row.sf-total-grand { padding-top: 8px; }
+  .invoice-doc img { max-width: 100% !important; }
+}
+
+
+/* Totaux des modèles Créatif et Prestige : conserver le contraste du bloc sombre. */
+.invoice-doc .sf-total-panel-dark .sf-total-row {
+  color: rgba(255,255,255,.78);
+}
+.invoice-doc .sf-total-panel-dark .sf-total-row.sf-total-grand {
+  color: var(--gold);
+  border-top-color: var(--gold) !important;
+}
+.invoice-doc .sf-total-panel-dark .sf-total-row.sf-total-grand strong {
+  color: inherit;
+}
+@media print {
+  .invoice-doc .sf-total-panel-dark {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+@media print {
+  .invoice-doc > div:first-child,
+  .invoice-doc .grid,
+  .invoice-doc .sf-totals {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
+
+/* Icônes de navigation : rester au seuil de lisibilité testé sur chaque viewport. */
+.nav-item .ic svg.icon,
+.nav-item .ic svg {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 21px;
+  stroke-width: 1.9;
+}
+
+
+/* Tablette large / petit ordinateur : séparer la recherche des commandes du compte.
+   Le rail compact et les boutons conservent leur taille sans pousser la page hors écran. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .app-topbar {
+    flex-wrap: wrap;
+    justify-content: stretch;
+    gap: 12px;
+    margin: -24px -24px 22px;
+    padding: 12px 24px;
+    min-height: 0;
+  }
+  .app-topbar-search {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+  }
+  .app-topbar-account {
+    margin-left: auto;
+    max-width: 100%;
+  }
+}
