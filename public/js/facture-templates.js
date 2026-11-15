@@ -1163,7 +1163,7 @@ function createFactureTemplates(helpers) {
     if (isDevis) {
       // Le modèle Corporate possède aussi un titre composite "Émission / Échéance".
       // Le corriger pour ne laisser aucune notion de règlement sur un devis.
-      html = html.replace(/Émission\\s*\\/\\s*Échéance/gi, 'Émission / Validité du devis');
+      html = html.replace(/Émission\s*\/\s*Échéance/gi, 'Émission / Validité du devis');
     }
 
     // Le bloc de références est partagé par les 19 modèles modèles pour conserver les mêmes
