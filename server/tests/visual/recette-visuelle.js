@@ -558,7 +558,8 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     const hasKicker = Boolean(main?.querySelector('.workspace-page-kicker, .pro-eyebrow, .billing-eyebrow, .subscription-eyebrow'));
     const unhydratedIcons = Array.from(document.querySelectorAll('i[data-icon]'))
       .map(element => element.getAttribute('data-icon'));
-    const navigationIcons = Array.from(document.querySelectorAll('.nav-item svg.icon'));
+    const navigationItems = Array.from(document.querySelectorAll('#app-navigation .nav-item'));
+    const navigationIcons = Array.from(document.querySelectorAll('#app-navigation .nav-item > .ic > svg.icon'));
     const navigationIconsLegible = navigationIcons.length > 0 && navigationIcons.every(icon => {
       const style = getComputedStyle(icon);
       return Number.parseFloat(style.width) >= 20 &&
@@ -572,6 +573,11 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       dataHeading: Boolean(main?.querySelector('.workspace-data-heading')),
       filterPanel: Boolean(main?.querySelector('.workspace-filter-card')),
       unhydratedIcons,
+      navigationItemCount: navigationItems.length,
+      navigationIconCount: navigationIcons.length,
+      navigationItemsWithoutIcon: navigationItems
+        .filter(item => !item.querySelector(':scope > .ic > svg.icon'))
+        .map(item => item.textContent.trim()),
       navigationIconsLegible,
       headingFont: getComputedStyle(document.querySelector('h1')).fontFamily,
       bodyFont: getComputedStyle(document.body).fontFamily
@@ -597,6 +603,14 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   assert.deepEqual(layoutAudit.unhydratedIcons, [],
     pageDefinition.name + ' contient des icônes statiques non reconnues : ' + JSON.stringify(layoutAudit.unhydratedIcons));
   if (!pageDefinition.public) {
+    assert.ok(layoutAudit.navigationItemCount > 0,
+      pageDefinition.name + ' doit présenter des entrées de navigation.');
+    assert.equal(layoutAudit.navigationIconCount, layoutAudit.navigationItemCount,
+      pageDefinition.name + ' : chaque entrée du menu doit avoir une icône SVG valide. ' +
+      JSON.stringify(layoutAudit.navigationItemsWithoutIcon));
+    assert.deepEqual(layoutAudit.navigationItemsWithoutIcon, [],
+      pageDefinition.name + ' contient des entrées sans icône : ' +
+      JSON.stringify(layoutAudit.navigationItemsWithoutIcon));
     assert.equal(layoutAudit.navigationIconsLegible, true,
       pageDefinition.name + ' : les icônes de navigation doivent mesurer au moins 20 px avec un trait de 1,8.'); 
   }
