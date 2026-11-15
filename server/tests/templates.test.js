@@ -17,11 +17,21 @@ const { createFactureTemplates } = require('../../public/js/facture-templates.js
 const TEMPLATES_ATTENDUS = [
   'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
   'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
-  'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs'
+  'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs',
+  'nova', 'nordique', 'luxe', 'tech', 'horizon'
 ];
 
 describe('Galerie de sélection des modèles (public/parametres.html)', () => {
-  test('présente les dix-neuf rendus réels et affiche clairement les restrictions de formule', () => {
+  test('les cinq nouveaux modèles apparaissent dans la galerie et restent accessibles à tous les plans', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../public/parametres.html'), 'utf8');
+    for (const id of ['nova', 'nordique', 'luxe', 'tech', 'horizon']) {
+      assert.match(source, new RegExp("id: '" + id + "', name:"), id + ' doit être dans la galerie');
+      assert.match(source, new RegExp('<option value=\\\"' + id + '\\\">'), id + ' doit être dans le sélecteur natif');
+      assert.match(source, new RegExp("id: '" + id + "'[^\\n]*tier: 'all'"), id + ' doit être disponible sur tous les plans');
+    }
+  });
+
+  test('présente les vingt-quatre rendus réels et affiche clairement les restrictions de formule', () => {
     const settingsPath = path.resolve(__dirname, '../../public/parametres.html');
     const source = fs.readFileSync(settingsPath, 'utf8');
     const declaration = source.match(/const INVOICE_TEMPLATE_META = \[([\s\S]*?)\n  \];/);
@@ -29,7 +39,7 @@ describe('Galerie de sélection des modèles (public/parametres.html)', () => {
     assert.ok(declaration, 'La page Paramètres doit déclarer son catalogue visuel de modèles.');
     const galleryIds = Array.from(declaration[1].matchAll(/id: '([^']+)'/g), match => match[1]);
     assert.deepEqual([...galleryIds].sort(), [...TEMPLATES_ATTENDUS].sort(),
-      'La galerie doit rester synchronisée avec les dix-neuf modèles rendus par le moteur.');
+      'La galerie doit rester synchronisée avec les vingt-quatre modèles rendus par le moteur.');
 
     assert.match(source, /id="invoice-template-gallery"/,
       'La page doit offrir une zone de galerie dédiée.');
@@ -210,7 +220,7 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     assert.doesNotMatch(html, /undefined|NaN/);
   });
 
-  test('les quinze modèles distinguent le prix HT, le total TTC et le solde de facture', () => {
+  test('les vingt-quatre modèles distinguent le prix HT, le total TTC et le solde de facture', () => {
     for (const template of TEMPLATES_ATTENDUS) {
       const html = templates.renderInvoiceHtml({
         user: userDeTest(), facture: factureDeTest({ montant_paye: 25000 }), lignes: lignesDeTest,
@@ -229,7 +239,7 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     }
   });
 
-  test('les quinze modèles identifient clairement les dates de facture', () => {
+  test('les vingt-quatre modèles identifient clairement les dates de facture', () => {
     for (const template of TEMPLATES_ATTENDUS) {
       const html = templates.renderInvoiceHtml({
         user: userDeTest(),
