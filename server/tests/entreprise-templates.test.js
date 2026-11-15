@@ -22,7 +22,7 @@ describe('Nouveaux modèles de facture — PUT /api/auth/entreprise', () => {
     await nettoyerUtilisateur(userId);
   });
 
-  for (const template of ['epure', 'azur', 'circuit', 'atelier', 'saveurs']) {
+  for (const template of ['epure', 'azur', 'circuit', 'atelier', 'saveurs', 'nova', 'nordique', 'luxe', 'tech', 'horizon']) {
     test(`le modèle gratuit "${template}" s'enregistre même sur le plan gratuit`, async () => {
       const res = await request(app)
         .put('/api/auth/entreprise')
