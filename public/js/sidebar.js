@@ -29,7 +29,7 @@ function renderSidebar(activePage) {
       { id: 'facture-ia', icon: 'file-check', label: 'Facture par IA', href: 'facture-ia.html' }
     ]},
     { group: 'Compte', items: [
-      { id: 'abonnement', icon: 'gem', label: 'Abonnement', href: 'abonnement.html' },
+      { id: 'abonnement', icon: 'wallet-cards', label: 'Abonnement', href: 'abonnement.html' },
       { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' }
     ]},
     { group: 'Aide et ressources', items: [
