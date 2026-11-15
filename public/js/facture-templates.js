@@ -215,7 +215,7 @@ function createFactureTemplates(helpers) {
         <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--navy-950)', personnalisation)}</div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
@@ -259,7 +259,7 @@ function createFactureTemplates(helpers) {
         <div style="width:290px; background:var(--emerald-light); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, 'var(--emerald)', personnalisation)}</div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
@@ -342,7 +342,7 @@ function createFactureTemplates(helpers) {
         <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}</div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
@@ -498,7 +498,7 @@ function createFactureTemplates(helpers) {
         </div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
@@ -539,7 +539,7 @@ function createFactureTemplates(helpers) {
         <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}</div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
@@ -581,7 +581,7 @@ function createFactureTemplates(helpers) {
         <div style="width:270px;">${totalsRowsHtml(facture, isDevis, 'var(--gold)', personnalisation)}</div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
@@ -646,7 +646,7 @@ function createFactureTemplates(helpers) {
         </div>
         <div style="display:flex; align-items:flex-end; gap:14px;">
           ${qrCodeHtml(qrCode, 60)}
-          <div class="stamp ${facture.statut === 'payee' ? '' : 'stamp-clay'}">
+          <div class="stamp ${paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay'}">
             ${paymentStampLabel(facture, isDevis)}
           </div>
         </div>
@@ -702,7 +702,7 @@ function createFactureTemplates(helpers) {
         </div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
@@ -747,7 +747,7 @@ function createFactureTemplates(helpers) {
         <div style="width:280px;">${totalsRowsHtml(facture, isDevis, 'var(--emerald)', personnalisation)}</div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
@@ -795,7 +795,7 @@ function createFactureTemplates(helpers) {
         </div>
         <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
           ${qrCodeHtml(qrCode, 78)}
-          <div class="stamp ${facture.statut === 'payee' ? '' : 'stamp-clay'}">
+          <div class="stamp ${paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay'}">
             ${paymentStampLabel(facture, isDevis)}
           </div>
         </div>
@@ -841,7 +841,7 @@ function createFactureTemplates(helpers) {
         <div style="width:280px; border:2px solid #C1622B; border-radius:8px; padding:14px 18px;">${totalsRowsHtml(facture, isDevis, '#8A3F16', personnalisation)}</div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
@@ -875,7 +875,7 @@ function createFactureTemplates(helpers) {
         <div style="width:270px; border-top:2px dashed var(--clay); padding-top:10px;">${totalsRowsHtml(facture, isDevis, 'var(--clay)', personnalisation)}</div>
       </div>
 
-      ${footerHtml(user, facture, isDevis, facture.statut === 'payee' ? '' : 'stamp-clay', qrCode, personnalisation)}
+      ${footerHtml(user, facture, isDevis, paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay', qrCode, personnalisation)}
     `;
   }
 
