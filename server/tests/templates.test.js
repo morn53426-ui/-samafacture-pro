@@ -163,6 +163,53 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     assert.doesNotMatch(html, /undefined|NaN/);
   });
 
+  test('les quinze modèles distinguent le prix HT, le total TTC et le solde de facture', () => {
+    for (const template of TEMPLATES_ATTENDUS) {
+      const html = templates.renderInvoiceHtml({
+        user: userDeTest(), facture: factureDeTest({ montant_paye: 25000 }), lignes: lignesDeTest,
+        isDevis: false, qrCode: null, template
+      });
+      assert.match(html, /sf-document-table/, template + ' doit utiliser le tableau commun');
+      assert.match(html, /Prix unitaire HT/, template + ' doit identifier les prix unitaires HT');
+      assert.match(html, /Montant TTC/, template + ' doit identifier le total TTC des lignes');
+      assert.match(html, /Sous-total HT/, template + ' doit séparer le sous-total HT');
+      assert.match(html, /Déjà réglé/, template + ' doit présenter les sommes reçues');
+      assert.match(html, /Reste à payer/, template + ' doit afficher le solde dû');
+      assert.match(html, /Coordonnées de règlement/, template + ' doit présenter les informations bancaires configurées');
+      assert.doesNotMatch(html, /undefined|NaN/);
+    }
+  });
+
+  test('un devis affiche sa date de validité et ne présente jamais une échéance de paiement', () => {
+    for (const template of TEMPLATES_ATTENDUS) {
+      const html = templates.renderInvoiceHtml({
+        user: userDeTest(), facture: factureDeTest({
+          numero: 'DV-VALIDITE-2026',
+          date_echeance: null,
+          date_validite: '2026-08-15',
+          conditions_reglement: 'Acompte après acceptation.'
+        }), lignes: lignesDeTest,
+        isDevis: true, qrCode: null, template
+      });
+      assert.match(html, /Validité du devis/, template + ' doit nommer correctement la date du devis');
+      assert.match(html, /15\/08\/2026/, template + ' doit afficher la date de validité enregistrée');
+      assert.doesNotMatch(html, /Échéance/, template + ' ne doit pas parler d’échéance pour un devis');
+      assert.match(html, /Bon pour accord/, template + ' doit conserver la zone d’acceptation');
+      assert.doesNotMatch(html, /Reste à payer/, template + ' ne doit pas créer de solde de paiement sur un devis');
+    }
+  });
+
+  test('le solde de paiement est plafonné à zéro pour une facture intégralement réglée', () => {
+    const html = templates.renderInvoiceHtml({
+      user: userDeTest(),
+      facture: factureDeTest({ montant_paye: 150000 }),
+      lignes: lignesDeTest, isDevis: false, qrCode: null, template: 'classique'
+    });
+    assert.match(html, /Reste à payer/);
+    assert.match(html, /0 FCFA/);
+    assert.doesNotMatch(html, /-\s*\d[\d\s]*FCFA/);
+  });
+
   test('un identifiant de modèle inconnu retombe sur le modèle "classique" (comportement déjà existant, non modifié)', () => {
     const html = templates.renderInvoiceHtml({
       user: userDeTest(), facture: factureDeTest(), lignes: lignesDeTest,
