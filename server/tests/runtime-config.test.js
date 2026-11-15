@@ -21,6 +21,24 @@ test('configuration runtime expose des valeurs scalables', () => {
 });
 
 
+
+test('configuration runtime applique des valeurs par défaut adaptées au multi-instance', () => {
+  const savedPool = process.env.DB_POOL_SIZE;
+  const savedQueue = process.env.DB_QUEUE_LIMIT;
+  delete process.env.DB_POOL_SIZE;
+  delete process.env.DB_QUEUE_LIMIT;
+  try {
+    const config = getRuntimeConfig();
+    assert.equal(config.dbPoolSize, 10);
+    assert.equal(config.dbQueueLimit, 200);
+  } finally {
+    if (savedPool === undefined) delete process.env.DB_POOL_SIZE;
+    else process.env.DB_POOL_SIZE = savedPool;
+    if (savedQueue === undefined) delete process.env.DB_QUEUE_LIMIT;
+    else process.env.DB_QUEUE_LIMIT = savedQueue;
+  }
+});
+
 test('la production refuse HTTP et exige exactement son origine HTTPS publique', () => {
   const names = ['NODE_ENV', 'JWT_SECRET', 'APP_URL', 'ALLOWED_ORIGINS', 'REDIS_URL', 'BACKUP_ENCRYPTION_KEY'];
   const saved = Object.fromEntries(names.map(name => [name, process.env[name]]));
