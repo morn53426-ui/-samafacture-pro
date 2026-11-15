@@ -535,7 +535,10 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       notificationBell: Boolean(document.querySelector('#workspace-notification-toggle .ic svg')),
       notificationPanel: Boolean(document.querySelector('#workspace-notification-panel[hidden]')),
       sidebar: Boolean(document.querySelector('#app-sidebar')),
-      activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active') || document.querySelector('.app-topbar-localization[aria-current="page"]'))
+      activeNavigation: Boolean(document.querySelector('#app-navigation .nav-item.active') || document.querySelector('.app-topbar-localization[aria-current="page"]')),
+      activeNavigationCurrent: !document.querySelector('#app-navigation .nav-item.active') ||
+        document.querySelector('#app-navigation .nav-item.active')?.getAttribute('aria-current') === 'page',
+      desktopToggleControls: Boolean(document.querySelector('#sidebar-collapse-toggle[aria-controls="app-navigation"]'))
     }));
     assert.equal(shell.toolbar, true, pageDefinition.name + ' doit afficher la barre supérieure commune.');
     assert.equal(shell.search, true, pageDefinition.name + ' doit afficher la recherche globale.');
@@ -543,6 +546,10 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.equal(shell.notificationPanel, true, pageDefinition.name + ' doit garder le panneau fermé au chargement.');
     assert.equal(shell.sidebar, true, pageDefinition.name + ' doit afficher la navigation latérale.');
     assert.equal(shell.activeNavigation, true, pageDefinition.name + ' doit signaler la page active.');
+    assert.equal(shell.activeNavigationCurrent, true,
+      pageDefinition.name + ' doit exposer aria-current="page" sur le lien actif.');
+    assert.equal(shell.desktopToggleControls, true,
+      pageDefinition.name + ' doit associer le bouton de menu à la navigation contrôlée.');
   }
 
   const layoutAudit = await page.evaluate(() => {
