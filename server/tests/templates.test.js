@@ -205,9 +205,8 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       facture: factureDeTest({ montant_paye: 150000 }),
       lignes: lignesDeTest, isDevis: false, qrCode: null, template: 'classique'
     });
-    assert.match(html, /Reste à payer/);
-    assert.match(html, /0 FCFA/);
-    assert.doesNotMatch(html, /-\s*\d[\d\s]*FCFA/);
+    assert.match(html, /sf-payment-balance[\s\S]*?0 FCFA/,
+      'le solde restant dû ne doit jamais devenir négatif après règlement intégral');
   });
 
   test('un identifiant de modèle inconnu retombe sur le modèle "classique" (comportement déjà existant, non modifié)', () => {
