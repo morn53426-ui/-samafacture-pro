@@ -140,7 +140,7 @@ describe('Génération PDF de facture', () => {
       assert.equal(etat.theme, 'light');
       assert.equal(etat.couleurFondApp, couleurPaletteClaire);
       assert.equal(etat.toolbar, 'none');
-      assert.equal(etat.fondDocument, 'rgb(255, 255, 255)');
+      assert.equal(etat.fondDocument, 'rgb(255, 254, 252)', 'le fond papier doit rester blanc cassé en impression');
 
       // À la fermeture de l'aperçu, le mode système sombre doit être rétabli.
       await page.emulateMediaType('screen');
