@@ -785,6 +785,15 @@
 
   let currentLogo = null;
   let currentSignature = null;
+  const invoiceTemplatePreviewState = {
+    renderer: null,
+    user: null,
+    facture: null,
+    lignes: [],
+    templateId: 'classique',
+    documentType: 'facture',
+    scale: 1
+  };
 
   // Déclarée avant toute fonction d'initialisation qui l'utilise.
   const PERSO_COULEURS = ['couleur_principale', 'couleur_secondaire', 'couleur_texte'];
@@ -861,6 +870,7 @@
       client_email: 'client@exemple.sn',
       date_emission: '2026-11-15',
       date_echeance: '2026-12-15',
+      date_validite: '2026-12-15',
       objet: 'Prestation de services',
       reference_externe: 'BC-EXEMPLE-001',
       conditions_reglement: 'Paiement à réception de facture.',
@@ -878,6 +888,10 @@
       { designation: 'Prestation de conseil et accompagnement', quantite: 1, prix_unitaire: 100000, tva: 18, total_ligne: 118000 },
       { designation: 'Frais de mise en service', quantite: 1, prix_unitaire: 50000, tva: 18, total_ligne: 59000 }
     ];
+    invoiceTemplatePreviewState.renderer = renderer;
+    invoiceTemplatePreviewState.user = previewUser;
+    invoiceTemplatePreviewState.facture = factureApercu;
+    invoiceTemplatePreviewState.lignes = lignesApercu;
     const plan = user.plan || 'gratuit';
     gallery.innerHTML = INVOICE_TEMPLATE_META.map(meta => {
       const selected = selectedTemplate === meta.id;
@@ -906,6 +920,9 @@
             <div class="invoice-template-preview-canvas">
               <div class="invoice-doc tpl-${meta.id}">${html}</div>
             </div>
+            <button type="button" class="invoice-template-preview-trigger" data-open-template-preview="${meta.id}" aria-label="Ouvrir l’aperçu détaillé du modèle ${escapeHtml(meta.name)}">
+              <span>Voir en grand · A4</span>
+            </button>
             <span class="invoice-template-preview-watermark">APERÇU</span>
           </div>
           <div class="invoice-template-card-footer">
@@ -922,6 +939,9 @@
         templateSelect.value = button.dataset.selectTemplate;
         updateInvoiceTemplateSelection();
       });
+    });
+    gallery.querySelectorAll('[data-open-template-preview]').forEach(button => {
+      button.addEventListener('click', () => openInvoiceTemplatePreview(button.dataset.openTemplatePreview));
     });
   }
 
@@ -944,18 +964,122 @@
     document.querySelectorAll('.invoice-template-preview-window').forEach(windowElement => {
       const canvas = windowElement.querySelector('.invoice-template-preview-canvas');
       if (!canvas) return;
-      const scale = Math.min((windowElement.clientWidth - 16) / 794, 0.38);
+      const scale = Math.min((windowElement.clientWidth - 16) / 794, 0.48);
       canvas.style.transform = 'translateX(-50%) scale(' + scale.toFixed(4) + ')';
-      windowElement.style.height = Math.round(890 * scale) + 'px';
+      windowElement.style.height = Math.round(1000 * scale) + 'px';
     });
   }
+
+  function renderInvoiceTemplatePreviewDocument() {
+    const state = invoiceTemplatePreviewState;
+    const documentElement = document.getElementById('invoice-template-preview-document');
+    if (!state.renderer || !documentElement) return;
+    const isQuote = state.documentType === 'devis';
+    const sample = {
+      ...state.facture,
+      numero: isQuote ? 'DEV-APERÇU-001' : 'FAC-APERÇU-001',
+      date_validite: state.facture.date_validite || '2026-12-15'
+    };
+    const html = state.renderer.renderInvoiceHtml({
+      user: state.user,
+      facture: sample,
+      lignes: state.lignes,
+      isDevis: isQuote,
+      qrCode: null,
+      template: state.templateId,
+      personnalisation: readPersonnalisationPayload()
+    });
+    documentElement.className = 'invoice-template-preview-full-page invoice-doc tpl-' + state.templateId;
+    documentElement.innerHTML = html;
+    const meta = INVOICE_TEMPLATE_META.find(item => item.id === state.templateId);
+    document.getElementById('invoice-template-preview-name').textContent = (meta?.name || 'Modèle') + (isQuote ? ' — Devis' : ' — Facture');
+    document.getElementById('invoice-template-preview-description').textContent =
+      (meta?.description || '') + ' · Aperçu fictif A4 avec vos informations d’entreprise.';
+    document.getElementById('invoice-template-preview-invoice').setAttribute('aria-pressed', String(!isQuote));
+    document.getElementById('invoice-template-preview-quote').setAttribute('aria-pressed', String(isQuote));
+    const plan = state.user?.plan || 'gratuit';
+    const allowed = canUseInvoiceTemplate(plan, state.templateId);
+    const useButton = document.getElementById('invoice-template-preview-use');
+    useButton.disabled = !allowed;
+    useButton.textContent = allowed ? 'Utiliser ce modèle' : 'Disponible avec une formule supérieure';
+  }
+
+  function updateInvoiceTemplatePreviewZoom() {
+    const stage = document.getElementById('invoice-template-preview-stage');
+    const wrapper = document.getElementById('invoice-template-preview-scaled');
+    const page = document.getElementById('invoice-template-preview-document');
+    if (!stage || !wrapper || !page) return;
+    const scale = Math.max(0.28, Math.min(1.5, invoiceTemplatePreviewState.scale || 1));
+    wrapper.style.width = Math.round(794 * scale) + 'px';
+    wrapper.style.height = Math.round(1123 * scale) + 'px';
+    page.style.transform = 'scale(' + scale.toFixed(3) + ')';
+    document.getElementById('invoice-template-preview-zoom-level').textContent = Math.round(scale * 100) + ' %';
+  }
+
+  function fitInvoiceTemplatePreview() {
+    const stage = document.getElementById('invoice-template-preview-stage');
+    if (!stage) return;
+    invoiceTemplatePreviewState.scale = Math.min(1, Math.max(0.28, (stage.clientWidth - 32) / 794));
+    updateInvoiceTemplatePreviewZoom();
+  }
+
+  function openInvoiceTemplatePreview(templateId) {
+    const meta = INVOICE_TEMPLATE_META.find(item => item.id === templateId);
+    if (!meta) return;
+    invoiceTemplatePreviewState.templateId = templateId;
+    invoiceTemplatePreviewState.documentType = 'facture';
+    renderInvoiceTemplatePreviewDocument();
+    const modal = document.getElementById('invoice-template-preview-modal');
+    modal.style.display = 'flex';
+    requestAnimationFrame(fitInvoiceTemplatePreview);
+  }
+
+  function closeInvoiceTemplatePreview() {
+    const modal = document.getElementById('invoice-template-preview-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  document.getElementById('invoice-template-preview-close')?.addEventListener('click', closeInvoiceTemplatePreview);
+  document.getElementById('invoice-template-preview-modal')?.addEventListener('click', event => {
+    if (event.target === event.currentTarget) closeInvoiceTemplatePreview();
+  });
+  document.getElementById('invoice-template-preview-invoice')?.addEventListener('click', () => {
+    invoiceTemplatePreviewState.documentType = 'facture';
+    renderInvoiceTemplatePreviewDocument();
+  });
+  document.getElementById('invoice-template-preview-quote')?.addEventListener('click', () => {
+    invoiceTemplatePreviewState.documentType = 'devis';
+    renderInvoiceTemplatePreviewDocument();
+  });
+  document.getElementById('invoice-template-preview-zoom-in')?.addEventListener('click', () => {
+    invoiceTemplatePreviewState.scale = Math.min(1.5, invoiceTemplatePreviewState.scale + 0.16);
+    updateInvoiceTemplatePreviewZoom();
+  });
+  document.getElementById('invoice-template-preview-zoom-out')?.addEventListener('click', () => {
+    invoiceTemplatePreviewState.scale = Math.max(0.28, invoiceTemplatePreviewState.scale - 0.16);
+    updateInvoiceTemplatePreviewZoom();
+  });
+  document.getElementById('invoice-template-preview-zoom-fit')?.addEventListener('click', fitInvoiceTemplatePreview);
+  document.getElementById('invoice-template-preview-use')?.addEventListener('click', () => {
+    const state = invoiceTemplatePreviewState;
+    if (!canUseInvoiceTemplate(state.user?.plan || 'gratuit', state.templateId)) return;
+    const select = document.getElementById('facture_template');
+    select.value = state.templateId;
+    updateInvoiceTemplateSelection();
+    closeInvoiceTemplatePreview();
+    document.querySelector('[data-template-card="' + state.templateId + '"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
 
   document.getElementById('facture_template')?.addEventListener('change', updateInvoiceTemplateSelection);
   document.getElementById('entreprise_nom')?.addEventListener('input', () => {
     const user = Api.currentUser() || {};
     renderInvoiceTemplateGallery(user, document.getElementById('facture_template').value);
   });
-  window.addEventListener('resize', updateInvoiceTemplatePreviewScales);
+  window.addEventListener('resize', () => {
+    updateInvoiceTemplatePreviewScales();
+    const modal = document.getElementById('invoice-template-preview-modal');
+    if (modal && getComputedStyle(modal).display !== 'none') fitInvoiceTemplatePreview();
+  });
   // -------------------------------------------------------------------------------
 
 
