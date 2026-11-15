@@ -115,7 +115,7 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       });
       assert.ok(html && html.length > 200);
       assert.match(html, /DV-2026-0007/);
-      assert.match(html, /Devis valable jusqu’au/, 'la date de validité du devis doit apparaître');
+      assert.match(html, /Validité du devis/, 'la date de validité du devis doit apparaître');
       assert.match(html, /Bon pour accord/, 'le devis doit proposer une zone d’acceptation');
       assert.match(html, /Signature et cachet/, 'la zone d’acceptation doit prévoir une signature client');
       assert.doesNotMatch(html, /Reste à payer/, 'un devis ne doit pas afficher un solde à payer');
