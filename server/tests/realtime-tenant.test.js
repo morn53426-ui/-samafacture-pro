@@ -2,6 +2,18 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { resolveSocketTenant } = require('../realtime');
 
+describe('Reconnexion des notifications lors du changement d’entreprise', () => {
+  test('la page Professionnel déclenche un changement de salle et le sidebar recrée le socket', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const sidebar = fs.readFileSync(path.resolve(__dirname, '../../public/js/sidebar.js'), 'utf8');
+    const professional = fs.readFileSync(path.resolve(__dirname, '../../public/professionnel.html'), 'utf8');
+    assert.match(professional, /dispatchEvent\(new Event\('sf-company-changed'\)\)/);
+    assert.match(sidebar, /addEventListener\('sf-company-changed', connecterNotifications\)/);
+    assert.match(sidebar, /if \(socket\) socket\.disconnect\(\)/);
+  });
+});
+
 describe('Sélection d’entreprise Socket.IO', () => {
   test('un propriétaire rejoint son propre espace sans requête SQL', async () => {
     let called = false;

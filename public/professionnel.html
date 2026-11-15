@@ -509,6 +509,7 @@ async function loadCustomReport() {
 el('company-select').addEventListener('change', e => {
   if (e.target.value) localStorage.setItem('sf_company_owner', e.target.value);
   else localStorage.removeItem('sf_company_owner');
+  window.dispatchEvent(new Event('sf-company-changed'));
   loadWorkspace();
 });
 
