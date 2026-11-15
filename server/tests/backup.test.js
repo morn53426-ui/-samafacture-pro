@@ -14,10 +14,10 @@ const { preparerFluxGzip } = require('../restore-backup');
 
 const fakeDump = path.join(tempRoot, 'fake-mysqldump.sh');
 
-function ecrireFauxDump(exitCode) {
+function ecrireFauxDump(exitCode, delaySeconds = 0) {
   fs.writeFileSync(
     fakeDump,
-    `#!/bin/sh\nprintf 'CREATE TABLE backup_test_fixture (id INT);\\n'\nexit ${exitCode}\n`,
+    `#!/bin/sh\nif [ ${delaySeconds} -gt 0 ]; then sleep ${delaySeconds}; fi\nprintf 'CREATE TABLE backup_test_fixture (id INT);\\n'\nexit ${exitCode}\n`,
     { mode: 0o700 }
   );
   fs.chmodSync(fakeDump, 0o700);
@@ -63,6 +63,29 @@ describe('Sauvegardes automatiques', () => {
 
     const doublon = await executerSauvegardeQuotidienne();
     assert.equal(doublon, false, 'une seule sauvegarde quotidienne doit être enregistrée');
+  });
+
+  test('une archive ne devient visible qu’après la fin du dump temporaire', async () => {
+    ecrireFauxDump(0, 2);
+    process.env.MYSQLDUMP_PATH = fakeDump;
+    delete process.env.BACKUP_ENCRYPTION_KEY;
+
+    const fichiersAvant = new Set(await fs.promises.readdir(BACKUP_DIR));
+    const operation = effectuerSauvegarde();
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    const enCours = (await fs.promises.readdir(BACKUP_DIR)).filter(name => !fichiersAvant.has(name));
+    assert.equal(enCours.some(name => name.endsWith('.sql.gz') && !name.endsWith('.tmp')), false,
+      'aucune archive définitive ne doit apparaître avant la fin de mysqldump');
+    assert.equal(enCours.some(name => name.endsWith('.sql.gz.tmp')), true,
+      'le dump doit rester dans un fichier temporaire pendant son exécution');
+
+    const resultat = await operation;
+    assert.ok(resultat.path.endsWith('.sql.gz'));
+    const apres = await fs.promises.readdir(BACKUP_DIR);
+    assert.equal(apres.some(name => name.endsWith('.sql.gz.tmp')), false,
+      'le fichier temporaire doit disparaître après publication atomique');
+    assert.ok(apres.includes(path.basename(resultat.path)));
   });
 
   test('le mode production refuse de créer une sauvegarde non chiffrée sans clé', async () => {
