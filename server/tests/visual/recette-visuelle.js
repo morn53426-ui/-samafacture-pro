@@ -1155,6 +1155,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   await prepareDocument('devis');
 
   async function verifyDocumentPdf(documentId, type) {
+    // Revenir au média écran avant de capturer l’aperçu de chaque document.
+    await page.emulateMediaType(null);
     await page.goto(baseUrl + '/facture-detail.html?id=' + documentId, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.__docReady === true, { timeout: 15000 });
     await page.waitForSelector('.invoice-doc .sf-document-table tbody tr');
@@ -1205,6 +1207,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX
     }));
     assert.equal(printMetrics.toolbarDisplay, 'none', type + ' : la barre d’outils ne doit jamais être imprimée.');
+    assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
+      type + ' : l’en-tête du tableau doit être répété lorsque le document passe sur une nouvelle page.');
     assert.equal(printMetrics.overflowX, 'visible', type + ' : le document ne doit pas être coupé horizontalement à l’impression.');
 
     const pdf = await page.pdf({
