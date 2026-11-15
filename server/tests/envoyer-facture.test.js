@@ -1,6 +1,11 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+// Ces scénarios valident l'absence de SMTP : ne jamais utiliser les identifiants éventuels
+// du .env local et ne jamais envoyer de vrais emails pendant les tests.
+process.env.SMTP_HOST = '';
+process.env.SMTP_USER = '';
+process.env.SMTP_PASSWORD = '';
 const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 // Vérifie que la route POST /factures/:id/envoyer se comporte toujours à l'identique après
