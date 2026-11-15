@@ -5570,3 +5570,124 @@ a.btn .icon {
     margin-right: auto !important;
   }
 }
+
+
+/* Identité de marque : logo plus présent, cadrage propre et contraste régulier. */
+.sidebar-brand {
+  min-height: 104px;
+  padding: 16px 16px;
+  gap: 12px;
+}
+.sidebar-brand .mark {
+  width: 48px !important;
+  height: 48px !important;
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(210, 174, 111, .78);
+  box-shadow: 0 7px 20px rgba(0, 0, 0, .24), 0 0 0 3px rgba(255,255,255,.045);
+}
+.sidebar-brand .mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+}
+.sidebar-brand .name {
+  font-size: 1.06rem;
+  line-height: 1.12;
+  font-weight: 750;
+  letter-spacing: -.025em;
+  color: #fff;
+}
+.sidebar-brand .sub {
+  margin-top: 4px;
+  font-size: .68rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: .045em;
+  color: #C9D3E4;
+}
+.sidebar-brand .brand-pro {
+  margin-left: 4px;
+  padding: 2px 7px 3px;
+  border: 1px solid rgba(239, 204, 137, .52);
+  border-radius: 6px;
+  background: linear-gradient(135deg, #C79A52, #E5C17F);
+  color: #17233B;
+  font-size: .68rem;
+  font-weight: 850;
+  vertical-align: 2px;
+}
+.nav-item .ic svg {
+  display: block;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+  stroke-width: 1.85;
+}
+.lp-header .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 1.08rem;
+  font-weight: 750;
+  letter-spacing: -.02em;
+}
+.lp-header .brand img {
+  width: 44px;
+  height: 44px;
+  padding: 3px;
+  object-fit: contain;
+  border-radius: 13px;
+  border: 1px solid #E2D6C3;
+  background: #fff;
+  box-shadow: 0 5px 16px rgba(15, 27, 51, .12);
+}
+.auth-form-card .auth-form-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.auth-form-card .auth-form-badge .mark {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  padding: 3px;
+  border-radius: 14px;
+  border: 1px solid #E2D6C3;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 27, 51, .13);
+}
+.auth-form-card .auth-form-badge .mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.auth-form-card .auth-form-badge span {
+  font-size: 1.02rem;
+  font-weight: 750;
+  color: var(--ink);
+  letter-spacing: -.015em;
+}
+.sidebar.is-collapsed .sidebar-brand {
+  min-height: 92px;
+  padding: 14px 8px;
+}
+.sidebar.is-collapsed .sidebar-brand .mark {
+  width: 44px !important;
+  height: 44px !important;
+  flex-basis: 44px;
+}
+@media (max-width: 640px) {
+  .sidebar-brand { min-height: 96px; }
+  .lp-header .brand { gap: 9px; font-size: 1rem; }
+  .lp-header .brand img { width: 40px; height: 40px; }
+}
