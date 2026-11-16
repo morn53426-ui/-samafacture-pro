@@ -101,3 +101,25 @@ fait de votre côté.
   aujourd'hui (web servi par ce même serveur Express) ; l'activer en cross-origin
   (`credentials: true` + liste stricte d'origines) serait à faire seulement si un frontend séparé
   apparaît un jour.
+
+
+## 6. Assainissement des journaux HTTP
+
+Les formats Morgan par défaut (`dev` et `combined`) journalisaient l'URL complète et le
+`Referer`. Cela pouvait exposer un jeton de réinitialisation présent dans une query string ou
+un code de consultation publique placé dans le chemin. Le gestionnaire d'erreurs Express
+journalisait également `req.originalUrl` sans filtrage.
+
+Corrections :
+- Morgan utilise désormais des jetons dédiés : les query strings sont retirées, les codes des
+  routes publiques `/api/public/consulter/:id/:code` et `/api/public/verifier/:id/:code`
+  ainsi que le jeton de `/api/public/paiement/:token`, sont remplacés par `[redacted]`, et le referrer est limité à son origine.
+- Le journal du gestionnaire d'erreurs utilise le même assainissement.
+- Le format d'accès Nginx utilise `$uri` (sans arguments), masque le dernier segment des routes
+  publiques de vérification/consultation et ne journalise que l'origine du referrer.
+- Des tests couvrent les jetons de réinitialisation, les codes publics, Morgan et le format Nginx.
+
+**Limite résiduelle :** les journaux d'erreur Nginx natifs peuvent, selon le type d'erreur amont,
+inclure la ligne de requête. Pour éliminer entièrement ce risque, une évolution ultérieure pourra
+déplacer les codes publics hors des URL (fragment côté navigateur puis POST du code dans le corps),
+tout en conservant la compatibilité des anciens liens.
