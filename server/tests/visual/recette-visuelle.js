@@ -1228,7 +1228,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   // Un viewport mobile très court simule le clavier virtuel ouvert.
   // Le panneau doit rester dans l'écran même lorsque l'espace sous la cloche
   // est inférieur à l'ancienne hauteur minimale de 140 px.
-  await page.click('#workspace-notification-toggle');
+  await page.evaluate(() => closeWorkspaceNotifications());
   await page.setViewport({ width: 320, height: 180, deviceScaleFactor: 1 });
   await page.evaluate(() => {
     const toggle = document.getElementById('workspace-notification-toggle');
@@ -1242,6 +1242,8 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
     }
   });
   await page.click('#workspace-notification-toggle');
+  assert.equal(await page.$eval('#workspace-notification-panel', element => !element.hidden), true,
+    'Le panneau doit être ouvert avant de vérifier ses limites.');
   const shortViewportPanel = await page.$eval('#workspace-notification-panel', element => {
     const rect = element.getBoundingClientRect();
     return {
