@@ -135,6 +135,7 @@ async function getPdfPath(id) {
 module.exports = {
   enqueuePdfJob,
   ENQUEUE_PDF_JOB_SCRIPT,
+  MIGRATE_LEGACY_JOB_SCRIPT,
   getPdfJob,
   getPdfPath,
   ensurePdfConsumerGroup,
