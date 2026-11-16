@@ -255,6 +255,16 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.equal(retryQueued.statut, 'queued');
   assert.equal(Number(retryQueued.tentatives), 0);
   assert.equal(retryQueued.dernier_code_erreur, null);
+
+  // L'invitation initiale reste volontairement en file jusqu'au scénario de reprise
+  // qui suit ; la différer ici isole ce test de la tâche historique de plus petit ID.
+  await pool.query(
+    `UPDATE email_outbox
+     SET prochaine_tentative = DATE_ADD(NOW(), INTERVAL 1 HOUR)
+     WHERE id = ? AND statut IN ('queued', 'retry')`,
+    [queuedEmail.id]
+  );
+
   const retrySent = await dispatchPendingEmails({
     batchSize: 1,
     sender: async payload => {
