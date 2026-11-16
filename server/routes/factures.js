@@ -20,7 +20,7 @@ router.use(requireAuth, resolveTenant, requirePermission);
 
 async function nextNumero(conn, userId, type, year = new Date().getFullYear()) {
   const prefix = type === 'devis' ? 'DEV' : 'FAC';
-  const year = new Date().getFullYear();
+  const numeroYear = Number(year);
 
   // Incrément atomique via la table compteurs_numerotation : la ligne (user_id, type, année)
   // est verrouillée le temps de l'opération (dans la transaction en cours), ce qui élimine
@@ -29,11 +29,11 @@ async function nextNumero(conn, userId, type, year = new Date().getFullYear()) {
     `INSERT INTO compteurs_numerotation (user_id, type, annee, dernier_numero)
      VALUES (?, ?, ?, LAST_INSERT_ID(1))
      ON DUPLICATE KEY UPDATE dernier_numero = LAST_INSERT_ID(dernier_numero + 1)`,
-    [userId, type, year]
+    [userId, type, numeroYear]
   );
   const [[{ n }]] = await conn.query('SELECT LAST_INSERT_ID() as n');
   const next = String(n).padStart(4, '0');
-  return `${prefix}-${year}-${next}`;
+  return `${prefix}-${numeroYear}-${next}`;
 }
 
 function round2(n) {
