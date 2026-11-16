@@ -1016,7 +1016,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     await page.waitForFunction(() =>
       getComputedStyle(document.getElementById('invoice-template-preview-modal')).display !== 'none'
     );
-    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('Tab');
+    await page.keyboard.up('Shift');
     assert.equal(await page.evaluate(() => document.activeElement?.id || ''),
       'invoice-template-preview-use',
       'Maj+Tab depuis le premier contrôle doit rester dans la fenêtre et aller au dernier contrôle.');
