@@ -20,7 +20,7 @@ function runMigrationInNewProcess() {
   });
 }
 
-test('une base déjà en version 7 reçoit la table et l’index du quota en version 8', async () => {
+test('une base en version 7 reçoit la migration du quota sans bloquer les versions suivantes', async () => {
   await setupTestDatabase();
   await pool.query('DROP TABLE IF EXISTS facture_usage_mensuelle');
   await pool.query('UPDATE _samafacture_schema_meta SET version = 7 WHERE id = 1');
@@ -30,7 +30,7 @@ test('une base déjà en version 7 reçoit la table et l’index du quota en ver
   assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v8 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 8);
+  assert.ok(Number(meta.version) >= 8, 'la migration v8 doit être appliquée sans empêcher les migrations ultérieures');
 
   const [tables] = await pool.query(
     `SELECT TABLE_NAME FROM information_schema.TABLES
