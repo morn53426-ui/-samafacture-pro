@@ -324,6 +324,29 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   ]);
   assert.match(dashboard.body.note, /aucune conversion de change/i);
 
+  const [[outsider]] = await pool.query('SELECT email FROM users WHERE id = ?', [outsiderId]);
+  const secondInvitation = await request(app)
+    .post('/api/pro/company-group/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: outsider.email });
+  assert.equal(secondInvitation.status, 201, secondInvitation.text);
+  const [[secondOutbox]] = await pool.query(
+    `SELECT id, statut FROM email_outbox
+     WHERE entity_type = 'company_group_invitation' AND entity_id = ?`,
+    [secondInvitation.body.id]
+  );
+  assert.equal(secondOutbox.statut, 'queued');
+  const revoked = await request(app)
+    .delete('/api/pro/company-group/invitations/' + secondInvitation.body.id)
+    .set('Authorization', 'Bearer ' + groupOwnerToken);
+  assert.equal(revoked.status, 200, revoked.text);
+  const [[revokedOutbox]] = await pool.query(
+    'SELECT statut, dernier_code_erreur FROM email_outbox WHERE id = ?',
+    [secondOutbox.id]
+  );
+  assert.equal(revokedOutbox.statut, 'cancelled');
+  assert.equal(revokedOutbox.dernier_code_erreur, 'invitation_revoked');
+
   const leave = await request(app)
     .delete('/api/pro/company-group/leave')
     .set('Authorization', 'Bearer ' + subsidiaryToken);
