@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { isEnterprisePlan } = require('../utils/plans');
 
 const ROLE_PERMISSIONS = {
   proprietaire: ['*'],
@@ -58,14 +59,18 @@ async function resolveTenant(req, res, next) {
             `SELECT gc.company_owner_id AS owner_user_id,
                     'administrateur' AS role,
                     '["*"]' AS permissions_json,
-                    g.id AS company_group_id
+                    g.id AS company_group_id,
+                    group_owner.plan AS group_plan
              FROM pro_company_group_companies gc
              JOIN pro_company_groups g ON g.id = gc.group_id
+             JOIN users group_owner ON group_owner.id = g.owner_user_id
              WHERE g.owner_user_id = ? AND gc.company_owner_id = ?
              LIMIT 1`,
             [req.actorId, selectedOwner]
           );
-          if (!groupRows.length) return res.status(403).json({ error: 'Vous ne faites pas partie de cette entreprise.' });
+          if (!groupRows.length || !isEnterprisePlan(groupRows[0].group_plan)) {
+            return res.status(403).json({ error: 'L’accès multi-sociétés nécessite une formule Entreprise active et une invitation acceptée.' });
+          }
           req.tenantId = Number(groupRows[0].owner_user_id);
           req.companyMembership = groupRows[0];
           req.permissions = ['*'];

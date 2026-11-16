@@ -86,6 +86,29 @@ function renderCreate(){
   });
 }
 
+
+function renderMembership(membership){
+  const group=membership.groupe||{};
+  root.innerHTML=`
+    <section class="group-panel">
+      <h2>Votre société est rattachée à un groupe</h2>
+      <p class="group-muted">Groupe : <strong>${escapeHtml(group.nom||'Groupe')}</strong></p>
+      <div class="group-note">${group.actif
+        ? 'Le propriétaire du groupe dispose d’un accès administrateur à l’espace de votre société. Vos données restent dans votre compte séparé.'
+        : 'La formule Entreprise du propriétaire du groupe n’est plus active. L’accès au groupe est suspendu jusqu’à sa réactivation.'}</div>
+      ${membership.peut_quitter?'<button class="btn btn-outline group-danger" id="leave-group" type="button" style="margin-top:16px">Quitter ce groupe</button>':''}
+    </section>`;
+  document.getElementById('leave-group')?.addEventListener('click',async()=>{
+    if(!confirm('Quitter ce groupe ? Le propriétaire perdra son accès à votre société, mais toutes vos données resteront dans votre compte.'))return;
+    try{
+      const result=await Api.del('/pro/company-group/leave');
+      localStorage.removeItem('sf_company_group_member');
+      message(result.message||'Votre société a quitté le groupe.');
+      await load();
+    }catch(err){message(err.message,'error');}
+  });
+}
+
 function renderGroup(data,dashboard){
   const group=data.groupe;
   const companies=data.societes||[];
@@ -160,19 +183,26 @@ function renderGroup(data,dashboard){
 
 async function load(){
   try{
-    const data=await Api.get('/pro/company-group');
-    if(!data.groupe){renderCreate();return;}
-    const dashboard=await Api.get('/pro/company-group/dashboard');
-    renderGroup(data,dashboard);
-  }catch(err){
-    if(currentUser.plan!=='entreprise'){
-      root.innerHTML='<section class="group-panel"><h2>Formule Entreprise requise</h2><p class="group-muted">La gestion des groupes et filiales est réservée à la formule Entreprise.</p><a class="btn btn-primary" href="abonnement.html">Voir les formules</a></section>';
-    }else message(err.message,'error');
-  }
+    if(currentUser.plan==='entreprise'){
+      const data=await Api.get('/pro/company-group');
+      if(data.groupe){
+        const dashboard=await Api.get('/pro/company-group/dashboard');
+        renderGroup(data,dashboard);
+        return;
+      }
+    }
+    const membership=await Api.get('/pro/company-group/membership');
+    if(membership.membre){
+      localStorage.setItem('sf_company_group_member','true');
+      renderMembership(membership);
+      return;
+    }
+    localStorage.removeItem('sf_company_group_member');
+    if(currentUser.plan==='entreprise'){renderCreate();return;}
+    root.innerHTML='<section class="group-panel"><h2>Formule Entreprise requise</h2><p class="group-muted">La gestion des groupes et filiales est réservée à la formule Entreprise.</p><a class="btn btn-primary" href="abonnement.html">Voir les formules</a></section>';
+  }catch(err){message(err.message,'error');}
 }
-if(currentUser.plan!=='entreprise'){
-  root.innerHTML='<section class="group-panel"><h2>Formule Entreprise requise</h2><p class="group-muted">La gestion des groupes et filiales est réservée à la formule Entreprise.</p><a class="btn btn-primary" href="abonnement.html">Voir les formules</a></section>';
-}else load();
+load();
 </script>
 </body>
 </html>

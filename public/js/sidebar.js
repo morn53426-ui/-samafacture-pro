@@ -40,7 +40,7 @@ function renderSidebar(activePage) {
     ]}
   ];
 
-  if (user?.plan === 'entreprise') {
+  if (user?.plan === 'entreprise' || localStorage.getItem('sf_company_group_member') === 'true') {
     const accountSection = nav.find(section => section.group === 'Compte');
     if (accountSection) {
       accountSection.items.unshift({

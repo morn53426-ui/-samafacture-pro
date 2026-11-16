@@ -42,7 +42,8 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
        ? await Api.post('/pro/company-group/invitations/accept',{token})
        : await Api.post('/pro/team/invitations/accept',{token});
      if(!isCompanyGroup) localStorage.setItem('sf_company_owner',String(result.entreprise_id));
-     root.innerHTML='<h1>Invitation acceptée</h1><p>'+escapeHtml(result.message)+'</p><a class="btn btn-primary" style="width:100%" href="'+(isCompanyGroup?'dashboard.html':'professionnel.html')+'">Continuer</a>';
+     else localStorage.setItem('sf_company_group_member','true');
+     root.innerHTML='<h1>Invitation acceptée</h1><p>'+escapeHtml(result.message)+'</p><a class="btn btn-primary" style="width:100%" href="'+(isCompanyGroup?'groupe-entreprise.html':'professionnel.html')+'">Continuer</a>';
    }catch(err){
      document.getElementById('invite-error').innerHTML='<div class="error-box">'+escapeHtml(err.message)+'</div>';
      button.disabled=false;button.textContent='Réessayer';

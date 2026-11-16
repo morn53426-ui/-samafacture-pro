@@ -666,6 +666,36 @@ router.get('/team/companies', async (req, res, next) => {
 
 
 /* ---------------------- GROUPE MULTI-SOCIÉTÉS (ENTREPRISE) ------------- */
+
+router.get('/company-group/membership', async (req, res, next) => {
+  try {
+    const [[membership]] = await pool.query(
+      `SELECT g.id AS group_id, g.nom AS group_name, g.owner_user_id,
+              owner.entreprise_nom AS group_owner_company,
+              owner.plan AS group_plan,
+              gc.is_primary
+       FROM pro_company_group_companies gc
+       JOIN pro_company_groups g ON g.id = gc.group_id
+       JOIN users owner ON owner.id = g.owner_user_id
+       WHERE gc.company_owner_id = ?
+       LIMIT 1`,
+      [actor(req)]
+    );
+    if (!membership) return res.json({ membre: false });
+    res.json({
+      membre: true,
+      groupe: {
+        id: Number(membership.group_id),
+        nom: membership.group_name,
+        entreprise_proprietaire: membership.group_owner_company,
+        actif: isEnterprisePlan(membership.group_plan)
+      },
+      societe_principale: Number(membership.is_primary) === 1,
+      peut_quitter: Number(membership.is_primary) !== 1
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/company-group', async (req, res, next) => {
   try {
     if (!await assertEnterpriseGroupOwner(req, res)) return;
