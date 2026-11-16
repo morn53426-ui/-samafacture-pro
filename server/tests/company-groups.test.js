@@ -256,7 +256,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   const staleInvitation = await request(app)
     .post('/api/pro/company-group/invitations')
     .set('Authorization', 'Bearer ' + groupOwnerToken)
-    .send({ email: outsiderRecipient.email });
+    .send({ email: outsider.email });
   assert.equal(staleInvitation.status, 201, staleInvitation.text);
   const [[staleOutbox]] = await pool.query(
     "SELECT id FROM email_outbox WHERE entity_type = 'company_group_invitation' AND entity_id = ?",
