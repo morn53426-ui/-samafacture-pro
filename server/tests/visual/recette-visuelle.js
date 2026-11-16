@@ -1224,6 +1224,40 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   await page.click('.app-notification-clear');
   assert.equal(await page.$eval('#workspace-notification-list', element => element.textContent.trim()),
     'Aucune notification reçue pendant cette session.', 'Le bouton Effacer doit vider la liste.');
+
+  // Un viewport mobile très court simule le clavier virtuel ouvert.
+  // Le panneau doit rester dans l'écran même lorsque l'espace sous la cloche
+  // est inférieur à l'ancienne hauteur minimale de 140 px.
+  await page.click('#workspace-notification-toggle');
+  await page.setViewport({ width: 390, height: 180, deviceScaleFactor: 1 });
+  await page.evaluate(() => {
+    const toggle = document.getElementById('workspace-notification-toggle');
+    toggle.style.position = 'fixed';
+    toggle.style.top = '0px';
+    toggle.style.right = '12px';
+    for (let i = 0; i < 20; i++) {
+      pushWorkspaceNotification('Notification de test ' + i,
+        'Message long pour remplir la liste et vérifier le défilement dans un écran mobile de faible hauteur.',
+        'info');
+    }
+  });
+  await page.click('#workspace-notification-toggle');
+  const shortViewportPanel = await page.$eval('#workspace-notification-panel', element => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, viewportHeight: window.innerHeight, height: rect.height };
+  });
+  assert.ok(shortViewportPanel.top >= 0 && shortViewportPanel.bottom <= shortViewportPanel.viewportHeight + 1,
+    'Le panneau de notifications doit rester visible dans un viewport mobile court : ' + JSON.stringify(shortViewportPanel));
+  await page.evaluate(() => {
+    const toggle = document.getElementById('workspace-notification-toggle');
+    toggle.style.removeProperty('position');
+    toggle.style.removeProperty('top');
+    toggle.style.removeProperty('right');
+    closeWorkspaceNotifications();
+    clearWorkspaceNotifications();
+  });
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+
   await page.type('#workspace-search', 'Coopérative Thiès');
   await page.click('.app-topbar-search button');
   await page.waitForFunction(() => location.pathname.endsWith('/clients.html'), { timeout: 15000 });
