@@ -56,7 +56,7 @@ async function verifierFacturesRecurrentes() {
       );
       for (const { id, user_id, envoi_auto_email } of dues) {
         try {
-          const facture = await genererFactureDepuisModele(id, user_id);
+          const facture = await genererFactureDepuisModele(id, user_id, { onlyIfDue: true });
           if (!facture) continue;
           console.log(`🔁 Facture récurrente générée : ${facture.numero} (modèle #${id})`);
           if (envoi_auto_email) {
