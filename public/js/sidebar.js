@@ -40,6 +40,18 @@ function renderSidebar(activePage) {
     ]}
   ];
 
+  if (user?.plan === 'entreprise') {
+    const accountSection = nav.find(section => section.group === 'Compte');
+    if (accountSection) {
+      accountSection.items.unshift({
+        id: 'groupe-entreprise',
+        icon: 'building-2',
+        label: 'Groupe & sociétés',
+        href: 'groupe-entreprise.html'
+      });
+    }
+  }
+
   const planLabels = { gratuit: 'Plan Gratuit', starter: 'Plan Starter', pro: 'Plan Pro', entreprise: 'Plan Entreprise' };
   // Sur ordinateur, la navigation démarre en mode compact pour laisser la priorité
   // à la zone de travail. La préférence utilisateur est conservée entre les pages.
