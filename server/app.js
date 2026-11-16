@@ -15,6 +15,7 @@ const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
 const morgan = require('morgan');
+const { sanitizeRequestTargetForLog, sanitizeReferrerForLog } = require('./utils/log-sanitizer');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const path = require('path');
@@ -76,15 +77,19 @@ if (process.env.TRUST_PROXY) app.set('trust proxy', 1);
 
 app.use(compression()); // compresse les réponses (gzip/brotli) : bande passante et temps de réponse réduits
 
-// Journal des requêtes HTTP (méthode, chemin, statut, temps de réponse) — utile pour le
-// diagnostic en production et pour repérer une dérive de performance. Désactivé pendant
-// les tests automatisés (bruit inutile dans la sortie de `npm test`) et ignore délibérément
-// /api/health, appelé très fréquemment par les sondes de supervision (uptime monitor,
-// load balancer), pour ne pas noyer les vrais logs applicatifs. Format "combined" en
-// production (inclut IP et user-agent, exploitable par un agrégateur de logs), "dev" en
-// développement (concis, coloré, plus lisible dans un terminal).
+// Les URL peuvent contenir des secrets : jeton de réinitialisation en query string,
+// code de consultation dans le chemin /api/public/consulter/:id/:code, etc. Ne jamais utiliser
+// les formats Morgan "combined"/"dev" qui journalisent :url et :referrer sans assainissement.
+morgan.token('sf-url', (req) => sanitizeRequestTargetForLog(req.originalUrl || req.url));
+morgan.token('sf-referrer', (req) => sanitizeReferrerForLog(req.headers.referer || req.headers.referrer));
+const accessLogFormat = process.env.NODE_ENV === 'production'
+  ? ':remote-addr - :remote-user [:date[clf]] ":method :sf-url HTTP/:http-version" :status :res[content-length] ":sf-referrer" ":user-agent" :response-time ms'
+  : ':method :sf-url :status :response-time ms - :res[content-length]';
+
+// Journal des requêtes HTTP : chemin assaini, statut et temps de réponse. Désactivé pendant
+// les tests et pour /api/health afin de conserver des journaux utiles sans exposer de secrets.
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', {
+  app.use(morgan(accessLogFormat, {
     skip: (req) => req.path === '/api/health'
   }));
 }
@@ -436,7 +441,7 @@ app.use((err, req, res, next) => {
   // Contexte minimal utile au diagnostic (méthode, chemin, utilisateur si authentifié) sans
   // aller au-delà : jamais le corps de la requête ni les en-têtes (risque de logger un mot
   // de passe, un jeton, ou une donnée client sensible par erreur).
-  console.error(`[${req.requestId || '-'}] [${req.method} ${req.originalUrl}]${req.user ? ` user#${req.user.id}` : ''}`, err);
+  console.error(`[${req.requestId || '-'}] [${req.method} ${sanitizeRequestTargetForLog(req.originalUrl || req.url)}]${req.user ? ` user#${req.user.id}` : ''}`, err);
   captureException(err);
   if (isPoolSaturationError(err)) {
     res.setHeader('Retry-After', '2');

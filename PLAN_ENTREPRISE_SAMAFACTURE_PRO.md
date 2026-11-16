@@ -1,6 +1,6 @@
 # Plan d’entreprise — SamaFacture Pro
 
-**Version :** 0.1 — 16 novembre 2026  
+**Version :** 0.2 — 16 novembre 2026  
 **Statut :** document de travail stratégique — hypothèses à valider avec des clients  
 **Marché de départ recommandé :** Sénégal  
 **Ambition :** construire un SaaS de gestion commerciale adapté aux petites entreprises d’Afrique francophone, puis aux entreprises francophones d’Europe.
@@ -181,6 +181,31 @@ Chantiers spécifiques :
 - étude des obligations de facturation électronique applicables et de leur calendrier avant toute promesse commerciale.
 
 L'internationalisation n'est pas seulement une traduction : elle implique le droit, la fiscalité, le paiement, la sécurité, la monnaie, le support et la distribution.
+
+
+### État réel de l'internationalisation — contrôle du code du 16 novembre 2026
+
+Les réglages techniques constituent une première base, mais ne signifient pas que le produit est déjà prêt à être commercialisé dans tous les pays.
+
+| Domaine | Base présente dans le dépôt | Limite à traiter avant une ouverture internationale |
+|---|---|---|
+| Pays, devises et fuseaux | Listes de pays, de codes de devises et de fuseaux IANA dans `server/config/localization.js`, avec paramètres par entreprise | Une option dans une liste ne valide ni les obligations locales, ni la disponibilité d'un prestataire, ni l'adéquation juridique d'une facture |
+| Langue | Les préférences enregistrées et les formats prennent en charge le français et l'anglais | Le choix de langue ne traduit pas encore toute l'interface. Les libellés des pages restent largement en français ; les catalogues complets de traduction, les emails, l'aide et les documents multilingues restent à construire. Le portugais et l'arabe ne sont pas proposés |
+| Dates et nombres | Les dates et nombres s'appuient sur les paramètres régionaux et les fuseaux horaires | Chaque pays et ses changements d'heure doivent être testés sur les écrans, les PDF, les emails et les tâches planifiées |
+| Devise | Une devise par défaut est enregistrée pour l'entreprise ; les anciens documents conservent leur devise | Le changement de devise de base est refusé dès qu'un historique commercial ou financier existe. Aucune conversion automatique ni consolidation comptable multidevise ne doit être promise sans chantier dédié |
+| Fiscalité | Un paramètre de régime fiscal générique est proposé | Les choix « standard », « simplifié », « franchise » et « autre » ne constituent pas un moteur fiscal national. TVA, numérotation réglementaire, identifiants fiscaux, mentions obligatoires et facturation électronique nécessitent des profils validés pays par pays |
+
+**Conséquence commerciale :** ne pas présenter SamaFacture Pro comme « disponible dans toute l'Afrique et l'Europe » au seul motif que des pays, devises et fuseaux apparaissent dans les paramètres. Le premier marché commercial reste le Sénégal ; chaque extension doit être explicitement activée après validation produit, fiscale, juridique, paiement et support.
+
+### Chantiers produit à ordonner pour l'international
+
+1. **Internationalisation de l'interface :** introduire un catalogue de messages centralisé, une langue par utilisateur, un mécanisme de repli français, puis faire traduire et tester les écrans, notifications, emails, documents PDF, onboarding et centre d'aide. Prioriser le français et l'anglais ; évaluer ensuite portugais et arabe selon la demande réelle. Prévoir l'affichage RTL avant d'annoncer l'arabe.
+2. **Profils pays :** maintenir pour chaque pays les identifiants fiscaux, règles de TVA, mentions de facture, règles d'arrondi, formats et obligations de conservation, avec validation d'un professionnel local.
+3. **Monnaies et comptabilité :** distinguer devise par défaut, devise d'un document et devise de règlement ; stocker les montants et taux appliqués à la date de transaction ; ne jamais convertir rétroactivement un historique sans écriture comptable explicite.
+4. **Paiements locaux :** vérifier pour chaque pays les prestataires, devises effectivement encaissables, frais, remboursements, délais de règlement et procédures de rapprochement.
+5. **Validation de marché :** conduire des entretiens et pilotes dans le pays ciblé avant d'ouvrir les inscriptions payantes ; mesurer les clients actifs, la volonté de payer, le coût du support et les demandes non couvertes.
+
+Le lancement dans un pays supplémentaire est conditionné à une fiche de validation signée par le responsable produit et les conseils locaux : langue, devise, fiscalité, paiement, données personnelles, contrats, support, sauvegardes et procédures de remboursement.
 
 ## 7. Plan d'acquisition des 100 premiers clients
 

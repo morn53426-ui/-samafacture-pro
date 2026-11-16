@@ -34,9 +34,10 @@ cet en-tête). C'est la base pour qu'une future page ou un futur client puisse s
 sur le cookie, sans que web et mobile aient besoin de migrer en même temps.
 
 Un analyseur de cookies minimal a été écrit à la main dans `server/app.js` plutôt que d'ajouter la
-dépendance `cookie-parser` — `server/package-lock.json` est déjà signalé absent dans
-`AUDIT_PRODUCTION.md` §1.1, ajouter une dépendance non déclarée dans le lock file aurait aggravé ce
-problème plutôt que d'avancer sur autre chose.
+dépendance `cookie-parser`, afin de limiter les dépendances nécessaires à cette migration. **Mise à
+jour du 16 novembre 2026 :** `server/package-lock.json` est maintenant présent et suivi dans le
+dépôt. Toute nouvelle dépendance doit être ajoutée à `server/package.json` et au lockfile via
+`npm install`, puis vérifiée avec `npm ci` en CI.
 
 Une route `POST /auth/logout` a été ajoutée pour effacer ce cookie ; `Api.clearSession()`
 (`public/js/api.js`) l'appelle désormais en tâche de fond (best-effort, non bloquant — la
@@ -83,13 +84,14 @@ la laisser hors de cette politique que deviner et risquer de la casser.
 
 ## 4. Tests ajoutés
 
-`server/tests/csrf-cookie-auth.test.js` — 6 tests unitaires purs de `requireAuth` (sans base de
-données ni serveur HTTP, seulement `jsonwebtoken`) : jeton Bearer toujours prioritaire, cookie
-accepté en repli, GET par cookie seul autorisé, POST par cookie seul refusé sans l'en-tête
-anti-CSRF puis autorisé avec. **Non exécutés dans cet environnement** — `jsonwebtoken` n'est pas
-installé ici (`server/node_modules/` absent, voir `AUDIT_PRODUCTION.md` §1.1) — la logique a été
-relue pas à pas contre chaque cas de test, mais à confirmer avec `npm test` une fois `npm install`
-fait de votre côté.
+`server/tests/csrf-cookie-auth.test.js` — tests unitaires purs de `requireAuth` (sans base de
+données ni serveur HTTP, seulement `jsonwebtoken`) : priorité du jeton Bearer, cookie accepté en
+repli et contrôle CSRF sur les méthodes qui modifient des données. **Historique :** ces tests
+n'étaient pas exécutés dans l'environnement de rédaction initial (dépendances locales absentes).
+**Vérification ultérieure :** sur le commit `abf4994f57e01dd2dedefb92299fa58e82b90361`, le workflow
+GitHub Actions `43859492636` a exécuté `npm ci`, `npm audit` et l'ensemble de la suite : 307 tests
+réussis, 0 échec, 0 test ignoré. Ce résultat concerne ce commit précis et ne remplace pas une
+vérification sur chaque nouvelle version.
 
 ## 5. Ce qui n'a pas été touché dans cette phase
 
@@ -101,3 +103,25 @@ fait de votre côté.
   aujourd'hui (web servi par ce même serveur Express) ; l'activer en cross-origin
   (`credentials: true` + liste stricte d'origines) serait à faire seulement si un frontend séparé
   apparaît un jour.
+
+
+## 6. Assainissement des journaux HTTP
+
+Les formats Morgan par défaut (`dev` et `combined`) journalisaient l'URL complète et le
+`Referer`. Cela pouvait exposer un jeton de réinitialisation présent dans une query string ou
+un code de consultation publique placé dans le chemin. Le gestionnaire d'erreurs Express
+journalisait également `req.originalUrl` sans filtrage.
+
+Corrections :
+- Morgan utilise désormais des jetons dédiés : les query strings sont retirées, les codes des
+  routes publiques `/api/public/consulter/:id/:code` et `/api/public/verifier/:id/:code`
+  ainsi que le jeton de `/api/public/paiement/:token`, sont remplacés par `[redacted]`, et le referrer est limité à son origine.
+- Le journal du gestionnaire d'erreurs utilise le même assainissement.
+- Le format d'accès Nginx utilise `$uri` (sans arguments), masque le dernier segment des routes
+  publiques de vérification/consultation et ne journalise que l'origine du referrer.
+- Des tests couvrent les jetons de réinitialisation, les codes publics, Morgan et le format Nginx.
+
+**Limite résiduelle :** les journaux d'erreur Nginx natifs peuvent, selon le type d'erreur amont,
+inclure la ligne de requête. Pour éliminer entièrement ce risque, une évolution ultérieure pourra
+déplacer les codes publics hors des URL (fragment côté navigateur puis POST du code dans le corps),
+tout en conservant la compatibilité des anciens liens.

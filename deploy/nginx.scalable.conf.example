@@ -16,14 +16,28 @@ http {
     resolver 127.0.0.11 valid=5s ipv6=off;
     map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 
+    # Ne journalise ni les query strings (reset token), ni les codes publics de facture/devis,
+    # ni les jetons des liens de paiement placés dans le chemin, ni le Referer complet.
+    map $uri $sf_log_uri {
+        default $uri;
+        ~*^(/api/public/(?:consulter|verifier)/[^/]+)/[^/]+$ $1/[redacted];
+        ~*^(/api/public/paiement)/[^/]+$ $1/[redacted];
+    }
+    map $http_referer $sf_log_referer {
+        default "-";
+        ~^(https?://[^/]+) $1;
+    }
+    log_format sf_safe '$remote_addr - $remote_user [$time_local] "$request_method $sf_log_uri $server_protocol" $status $body_bytes_sent "$sf_log_referer" "$http_user_agent" $request_time';
+    access_log /dev/stdout sf_safe;
+
 
     upstream samafacture_api {
         zone samafacture_api 64k;
-        keepalive 32;
+        # ip_hash doit précéder keepalive pour conserver l'algorithme de routage sticky.
         # Avec Docker Compose, le DNS du service app peut retourner plusieurs réplicas.
-        # ip_hash conserve une même connexion Socket.IO sur la même instance ; Redis assure
-        # la diffusion des événements entre instances.
+        # Redis assure la diffusion des événements entre instances.
         ip_hash;
+        keepalive 32;
         server app:4000 resolve;
     }
 
