@@ -141,6 +141,18 @@ async function dispatchPendingEmails({ sender = sendMail, batchSize = DEFAULT_BA
         summary.cancelled += 1;
         continue;
       }
+      // Une tâche récupérée après un crash à la dernière tentative a été
+      // incrémentée au-delà de MAX_ATTEMPTS lors de sa nouvelle réservation :
+      // elle passe directement en échec, sans nouvel appel SMTP.
+      if (Number(job.tentatives) > MAX_ATTEMPTS) {
+        const exhaustedError = new Error('Nombre maximal de tentatives email atteint.');
+        exhaustedError.code = 'max_attempts_exceeded';
+        const exhausted = await markEmailFailure(job, exhaustedError);
+        if (exhausted.failed) summary.failed += 1;
+        else summary.retried += 1;
+        console.warn('Email outbox #' + job.id + ' abandonné : ' + exhausted.code);
+        continue;
+      }
       const message = decryptEmailPayload(job.payload_enc);
       const result = await sender(message);
       if (!result || result.sent !== true) {
