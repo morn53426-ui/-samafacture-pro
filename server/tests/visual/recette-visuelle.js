@@ -1030,6 +1030,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     await page.waitForFunction(() =>
       getComputedStyle(document.getElementById('invoice-template-preview-modal')).display === 'none'
     );
+    await page.waitForFunction(() =>
+      document.activeElement?.getAttribute('data-open-template-preview') === 'nova'
+    );
     const focusAfterEscape = await page.evaluate(() =>
       document.activeElement?.getAttribute('data-open-template-preview') || ''
     );
