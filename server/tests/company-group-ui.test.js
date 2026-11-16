@@ -19,7 +19,7 @@ describe('Retour visuel des invitations Entreprise', () => {
 
   test('ne prétend pas que SMTP est absent quand un envoi échoue ou reste non confirmé', () => {
     assert.doesNotMatch(page, /Non \(SMTP à configurer\)/);
-    assert.match(page, /Invitation créée\\. Son email sera traité par la file d’envoi sécurisée/);
+    assert.ok(page.includes('Invitation créée. Son email sera traité par la file d’envoi sécurisée.'), 'un message de file d’envoi doit être prévu si le serveur ne fournit pas d’avertissement');
     assert.match(page, /escapeHtml\(result\.avertissement/);
   });
 
