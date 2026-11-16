@@ -103,7 +103,7 @@ const fakeRedis = {
     const firstKey = options.keys[0];
     const streamKey = options.keys[1];
 
-    if (script.includes("redis.pcall('XADD'")) {
+    if (script.includes("redis.call('HSET'")) {
       const [id, userId, factureId, createdAt, rawJob] = options.arguments;
       state.hashes.set(firstKey, {
         id, status: 'queued', userId, factureId, createdAt
