@@ -188,7 +188,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
       throw error;
     }
   });
-  assert.deepEqual(failedDelivery, { claimed: 1, sent: 0, retried: 1, failed: 0 });
+  assert.deepEqual(failedDelivery, { claimed: 1, sent: 0, retried: 1, failed: 0, cancelled: 0 });
   const [[retryRow]] = await pool.query(
     'SELECT statut, tentatives, dernier_code_erreur FROM email_outbox WHERE id = ?',
     [queuedEmail.id]
@@ -210,7 +210,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
       return { sent: true };
     }
   });
-  assert.deepEqual(successfulDelivery, { claimed: 1, sent: 1, retried: 0, failed: 0 });
+  assert.deepEqual(successfulDelivery, { claimed: 1, sent: 1, retried: 0, failed: 0, cancelled: 0 });
   assert.equal(deliveredPayload.to, recipient.email);
   assert.match(deliveredPayload.text, new RegExp(token));
   const [[sentRow]] = await pool.query(
@@ -220,6 +220,36 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.equal(sentRow.statut, 'sent');
   assert.equal(Number(sentRow.tentatives), 2);
   assert.ok(sentRow.envoye_le, 'la date d’envoi doit être enregistrée');
+
+  // Un message expiré ne doit pas partir, même s'il est encore présent dans l'outbox.
+  const [expiredInvite] = await pool.query(
+    `INSERT INTO pro_company_group_invitations
+      (group_id, invited_email, token_hash, statut, expire_at)
+     VALUES (?, ?, ?, 'envoyee', DATE_SUB(NOW(), INTERVAL 1 DAY))`,
+    [created.body.id, 'expired-invite@example.test', 'a'.repeat(64)]
+  );
+  await pool.query(
+    `INSERT INTO email_outbox
+      (owner_user_id, entity_type, entity_id, idempotency_key, payload_enc, statut, prochaine_tentative)
+     VALUES (?, 'company_group_invitation', ?, ?, ?, 'queued', NOW())`,
+    [groupOwnerId, expiredInvite.insertId, 'f'.repeat(64), queuedEmail.payload_enc]
+  );
+  let expiredEmailWasSent = false;
+  const expiredDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async () => {
+      expiredEmailWasSent = true;
+      return { sent: true };
+    }
+  });
+  assert.deepEqual(expiredDelivery, { claimed: 1, sent: 0, retried: 0, failed: 0, cancelled: 1 });
+  assert.equal(expiredEmailWasSent, false, 'un lien expiré ne doit pas être envoyé');
+  const [[expiredOutbox]] = await pool.query(
+    'SELECT statut, dernier_code_erreur FROM email_outbox WHERE entity_id = ? AND entity_type = ?',
+    [expiredInvite.insertId, 'company_group_invitation']
+  );
+  assert.equal(expiredOutbox.statut, 'cancelled');
+  assert.equal(expiredOutbox.dernier_code_erreur, 'entity_inactive');
 
   const wrongOwner = await request(app)
     .post('/api/pro/company-group/invitations/accept')
