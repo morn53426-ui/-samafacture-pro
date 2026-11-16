@@ -201,12 +201,30 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .set('X-SF-Company-Owner', String(subsidiaryOwnerId));
   assert.equal(forbidden.status, 403);
 
+  // Une facture annulée ne doit pas gonfler les totaux consolidés du groupe.
+  await pool.query(
+    `INSERT INTO factures
+      (user_id, client_id, numero, type, date_emission, statut, total, montant_paye)
+     VALUES
+      (?, ?, ?, 'facture', '2026-11-16', 'en_attente', 1000, 250),
+      (?, ?, ?, 'facture', '2026-11-16', 'annulee', 9000, 9000)`,
+    [subsidiaryOwnerId, subsidiaryClientId, 'TEST-GROUPE-ACTIVE', subsidiaryOwnerId, subsidiaryClientId, 'TEST-GROUPE-ANNULEE']
+  );
+
   const dashboard = await request(app)
     .get('/api/pro/company-group/dashboard')
     .set('Authorization', 'Bearer ' + groupOwnerToken);
   assert.equal(dashboard.status, 200, dashboard.text);
   assert.equal(dashboard.body.societes.length, 2);
   assert.ok(Array.isArray(dashboard.body.factures_par_devise));
+  const subsidiary = dashboard.body.societes.find(company => Number(company.id) === Number(subsidiaryOwnerId));
+  assert.ok(subsidiary, 'la filiale doit être présente dans le tableau de bord');
+  assert.deepEqual(subsidiary.factures, [
+    { devise: 'FCFA', nombre: 1, total: 1000, encaisse: 250 }
+  ], 'la facture annulée doit être exclue du nombre, du total et des encaissements');
+  assert.deepEqual(dashboard.body.factures_par_devise, [
+    { devise: 'FCFA', nombre_factures: 1, total_facture: 1000, total_encaisse: 250 }
+  ]);
   assert.match(dashboard.body.note, /aucune conversion de change/i);
 
   const leave = await request(app)
