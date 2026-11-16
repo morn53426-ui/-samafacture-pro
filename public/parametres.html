@@ -944,7 +944,8 @@
       });
     });
     gallery.querySelectorAll('[data-open-template-preview]').forEach(button => {
-      button.addEventListener('click', () => openInvoiceTemplatePreview(button.dataset.openTemplatePreview));
+      button.addEventListener('click', () =>
+        openInvoiceTemplatePreview(button.dataset.openTemplatePreview, button));
     });
   }
 
@@ -1026,12 +1027,14 @@
     updateInvoiceTemplatePreviewZoom();
   }
 
-  function openInvoiceTemplatePreview(templateId) {
+  function openInvoiceTemplatePreview(templateId, triggerElement) {
     const meta = INVOICE_TEMPLATE_META.find(item => item.id === templateId);
     if (!meta) return;
     const modal = document.getElementById('invoice-template-preview-modal');
     invoiceTemplatePreviewState.triggerElement =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      triggerElement instanceof HTMLElement
+        ? triggerElement
+        : document.activeElement instanceof HTMLElement ? document.activeElement : null;
     invoiceTemplatePreviewState.templateId = templateId;
     invoiceTemplatePreviewState.documentType = 'facture';
     renderInvoiceTemplatePreviewDocument();
