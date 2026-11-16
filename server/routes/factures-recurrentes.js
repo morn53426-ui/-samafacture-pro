@@ -304,7 +304,7 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
     // manuelle ou un autre passage n'obtienne le verrou et n'avance l'échéance. Recontrôler
     // la date sous verrou évite de générer une seconde facture pour la même échéance.
     const [[scheduleState]] = await conn.query(
-      'SELECT prochaine_date <= CURDATE() AS due FROM factures_recurrentes WHERE id = ? AND user_id = ?',
+      'SELECT (actif = 1 AND prochaine_date <= CURDATE()) AS due FROM factures_recurrentes WHERE id = ? AND user_id = ?',
       [modele.id, userId]
     );
     const scheduledDateDue = Number(scheduleState?.due) === 1;
