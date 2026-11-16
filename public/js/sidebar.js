@@ -258,8 +258,10 @@ function positionWorkspaceNotificationPanel() {
   if (!panel || !toggle || panel.hidden) return;
 
   const properties = ['position', 'top', 'left', 'right', 'width', 'max-width', 'max-height'];
+  const list = panel.querySelector('.app-notification-list');
   if (window.innerWidth > 640) {
     properties.forEach(property => panel.style.removeProperty(property));
+    if (list) list.style.removeProperty('max-height');
     return;
   }
 
@@ -290,6 +292,12 @@ function positionWorkspaceNotificationPanel() {
   // viewport court réduit la zone visible ; la liste conserve alors son scroll interne.
   maxHeight = Math.max(0, Math.min(maxHeight, viewportHeight - safeGutter * 2));
   top = Math.max(safeGutter, Math.min(top, viewportHeight - safeGutter - maxHeight));
+
+  // Réserver l'espace de l'en-tête et donner le reste à la liste défilante.
+  // Sans cette contrainte, le max-height du panneau pouvait couper le bas de la liste
+  // au lieu de réduire sa zone de scroll dans les viewports courts.
+  const headerHeight = panel.querySelector('.app-notification-panel-head')?.getBoundingClientRect().height || 0;
+  if (list) list.style.maxHeight = Math.round(Math.max(0, maxHeight - headerHeight)) + 'px';
 
   panel.style.position = 'fixed';
   panel.style.top = Math.round(top) + 'px';
