@@ -85,21 +85,64 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base existante en version 9 reçoit les migrations v10 et v11 des groupes et de l’outbox email', async () => {
-  // Simule une installation déjà initialisée en v9 : seules les nouvelles tables
-  // de la migration 006 sont absentes. Les tables historiques et leurs données restent intactes.
+test('une base v8 reçoit les migrations v9 à v12 sans perdre les données existantes', async () => {
+  // Simule strictement l'état de main : schéma v8 sans colonne/index v9-v10,
+  // ni tables multi-sociétés v11 et outbox v12.
   await pool.query('DROP TABLE IF EXISTS email_outbox');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitations');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_companies');
   await pool.query('DROP TABLE IF EXISTS pro_company_groups');
-  await pool.query('UPDATE _samafacture_schema_meta SET version = 9 WHERE id = 1');
+
+  const [existingDueIndex] = await pool.query(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures_recurrentes'
+       AND INDEX_NAME = 'idx_factures_recurrentes_active_due'`
+  );
+  if (existingDueIndex.length) {
+    await pool.query('ALTER TABLE factures_recurrentes DROP INDEX idx_factures_recurrentes_active_due');
+  }
+  const [existingAnchor] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures_recurrentes'
+       AND COLUMN_NAME = 'jour_ancre'`
+  );
+  if (existingAnchor.length) {
+    await pool.query('ALTER TABLE factures_recurrentes DROP COLUMN jour_ancre');
+  }
+
+  const [[beforeUser]] = await pool.query(
+    'SELECT id, email FROM users WHERE id = ? LIMIT 1',
+    [groupOwnerId]
+  );
+  assert.ok(beforeUser, 'le compte de test doit exister avant la migration');
+  await pool.query('UPDATE _samafacture_schema_meta SET version = 8 WHERE id = 1');
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v9 → v10 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v12 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.ok(Number(meta.version) >= 11, 'la version du schéma doit être avancée jusqu’à v11 après migration');
+  assert.equal(Number(meta.version), 12, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12');
+
+  const [[afterUser]] = await pool.query(
+    'SELECT id, email FROM users WHERE id = ? LIMIT 1',
+    [groupOwnerId]
+  );
+  assert.deepEqual(afterUser, beforeUser, 'les comptes existants doivent rester intacts');
+
+  const [anchorColumns] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures_recurrentes'
+       AND COLUMN_NAME = 'jour_ancre'`
+  );
+  assert.equal(anchorColumns.length, 1, 'la colonne jour_ancre de la migration v9 doit être créée');
+
+  const [dueIndexes] = await pool.query(
+    `SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures_recurrentes'
+       AND INDEX_NAME = 'idx_factures_recurrentes_active_due'`
+  );
+  assert.equal(dueIndexes.length, 1, 'l’index d’échéances actives de la migration v10 doit être créé');
 
   const [tables] = await pool.query(
     'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?)',
@@ -108,7 +151,7 @@ test('une base existante en version 9 reçoit les migrations v10 et v11 des grou
   assert.deepEqual(
     tables.map(row => row.TABLE_NAME).sort(),
     ['email_outbox', 'pro_company_group_companies', 'pro_company_group_invitations', 'pro_company_groups'],
-    'les tables des migrations 006 et 007 doivent être recréées sur une base v9'
+    'les tables de groupes v11 et de l’outbox v12 doivent être créées'
   );
 });
 
