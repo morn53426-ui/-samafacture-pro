@@ -787,7 +787,8 @@ router.post('/:id/dupliquer', async (req, res, next) => {
   try {
     await conn.beginTransaction();
     // Toutes les créations de factures verrouillent d'abord le compte pour sérialiser le quota.
-    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    const [[account]] = await conn.query('SELECT fuseau_horaire FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    const accountLocalDate = localDateString(account?.fuseau_horaire || 'Africa/Dakar');
     const [sourceRows] = await conn.query(
       'SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE',
       [req.params.id, req.tenantId]
