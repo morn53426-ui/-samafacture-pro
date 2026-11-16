@@ -85,7 +85,7 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v12 sans perdre les données existantes', async () => {
+test('une base v8 reçoit les migrations v9 à v13 sans perdre les données existantes', async () => {
   // Simule strictement l'état de main : schéma v8 sans colonne/index v9-v10,
   // ni tables multi-sociétés v11, outbox v12 et preuve email v13.
   await pool.query('DROP TABLE IF EXISTS email_outbox');
