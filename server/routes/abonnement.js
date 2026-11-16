@@ -108,6 +108,7 @@ router.get('/moyens-disponibles', requireAuth, (req, res) => {
  *             properties:
  *               plan: { type: string, enum: [starter, pro, entreprise] }
  *               fournisseur: { type: string, enum: [wave, paydunya] }
+ *               moyen: { type: string, enum: [wave, orange_money, carte_bancaire], description: 'Choix du client ; facultatif pour compatibilité avec les anciens appels.' }
  *     responses:
  *       200:
  *         description: URL de paiement à ouvrir.
