@@ -25,6 +25,7 @@ Pour configurer et utiliser les modèles complets de factures et devis, consulte
   - Dépenses (CRUD) pour suivre les sorties d'argent
   - Rapports : ventes par jour/semaine/mois/année/client/produit, export CSV, résumé comptable (recettes, dépenses, bénéfice net, TVA collectée)
   - Paramètres entreprise : identité, coordonnées légales, banque/RIB, conditions de règlement, logo et personnalisation visuelle ; **19 modèles de facture/devis** partagés entre aperçu, impression et PDF
+  - **Base d’internationalisation** : paramètres pays, devise, fuseau IANA, langue préférée et formats de date ; échéances et plusieurs rapports utilisent la date civile de l’entreprise. Périmètre et limites (traduction complète, conversions de devises, fiscalité par pays) : [INTERNATIONALISATION_SCOPE.md](INTERNATIONALISATION_SCOPE.md).
   - Centre d'aide (FAQ), Support technique (formulaire de contact) et Politique de confidentialité
   - Checklist de préparation conformité (à compléter et faire valider) : [CONFORMITE_DONNEES_CHECKLIST.md](CONFORMITE_DONNEES_CHECKLIST.md)
   - Interface responsive : menu latéral escamotable sur mobile/tablette, tableaux et grilles adaptatifs
