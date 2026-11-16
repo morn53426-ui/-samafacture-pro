@@ -292,6 +292,8 @@ La facture "imprimable" (`facture-detail.html`) peut être exportée en vrai fic
 
 **File de tâches asynchrones** : les nouvelles demandes sont traitées par Redis Streams avec consumer group, acquittement après état terminal (`XACK`) et reprise des tâches pending (`XAUTOCLAIM`). Les anciennes tâches encore présentes dans la liste Redis sont migrées au démarrage du worker. La livraison est au moins une fois : voir [PDF_QUEUE_OPERATIONS.md](PDF_QUEUE_OPERATIONS.md) pour le délai de visibilité, les tentatives, la persistance Redis et la recette de reprise.
 
+Les PDF temporaires des tâches sont purgés automatiquement par le worker après une rétention configurable (25 heures par défaut), sans toucher aux fichiers étrangers au format UUID attendu. Les métadonnées de job expirent séparément selon `PDF_JOB_TTL_SECONDS`.
+
 ## Notifications en temps réel (Socket.io)
 
 L'application pousse des notifications instantanées au navigateur, sans rechargement de page ni sondage répété du serveur : facture marquée payée, nouveau client ajouté, quota du plan Gratuit atteint. Elles apparaissent sous forme de petites notifications ("toast") en bas de l'écran, sur tous les onglets/appareils connectés au même compte.
