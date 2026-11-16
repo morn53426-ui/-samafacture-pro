@@ -32,6 +32,24 @@ describe('Retour visuel des invitations Entreprise', () => {
     assert.ok(reloadIndex >= 0 && linkIndex > reloadIndex, 'le lien doit être inséré après le re-rendu de la page');
   });
 
+  test('permet de récupérer un lien actif après rechargement de la page', () => {
+    assert.match(page, /data-copy-invitation=/);
+    assert.match(page, /Api\.get\('\/pro\/company-group\/invitations\/'\+invitationId\+'\/link'\)/);
+    assert.match(page, /copyInvitationLink\(button\.dataset\.copyInvitation,button\)/);
+  });
+
+  test('ne propose la relance manuelle que pour un email définitivement échoué', () => {
+    assert.match(page, /item\.email_statut==='failed'\?/);
+    assert.match(page, /data-retry-email=/);
+    assert.match(page, /Api\.post\('\/pro\/company-group\/invitations\/'\+id\+'\/retry-email',\{\}\)/);
+  });
+
+  test('copie le lien sans l’injecter dans le DOM et prévoit un fallback navigateur', () => {
+    assert.match(page, /navigator\.clipboard\?\.writeText/);
+    assert.match(page, /document\.execCommand\('copy'\)/);
+    assert.match(page, /field\.remove\(\)/);
+  });
+
   test('annonce le résultat de l’invitation aux technologies d’assistance', () => {
     assert.match(page, /role="status" aria-live="polite"/);
   });
