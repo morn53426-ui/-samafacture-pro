@@ -258,30 +258,40 @@ function positionWorkspaceNotificationPanel() {
   if (!panel || !toggle || panel.hidden) return;
 
   const properties = ['position', 'top', 'left', 'right', 'width', 'max-width', 'max-height'];
+  const list = panel.querySelector('.app-notification-list');
   if (window.innerWidth > 640) {
     properties.forEach(property => panel.style.removeProperty(property));
+    if (list) list.style.removeProperty('max-height');
     return;
   }
 
   const rect = toggle.getBoundingClientRect();
   const gutter = 12;
+  const viewportHeight = Math.max(0, window.innerHeight);
+  const safeGutter = Math.min(gutter, viewportHeight / 2);
   const width = Math.max(180, Math.min(360, window.innerWidth - gutter * 2));
   const left = Math.max(gutter, Math.min(
     rect.right - width,
     window.innerWidth - width - gutter
   ));
-  const availableBelow = Math.max(0, window.innerHeight - rect.bottom - 20);
-  const availableAbove = Math.max(0, rect.top - 20);
+  const availableBelow = Math.max(0, viewportHeight - rect.bottom - safeGutter - 8);
+  const availableAbove = Math.max(0, rect.top - safeGutter - 8);
   let top;
   let maxHeight;
 
   if (availableBelow >= 220 || availableBelow >= availableAbove) {
     top = rect.bottom + 8;
-    maxHeight = Math.min(430, Math.max(140, availableBelow));
+    maxHeight = Math.min(430, availableBelow);
   } else {
-    maxHeight = Math.min(430, Math.max(140, availableAbove));
-    top = Math.max(gutter, rect.top - maxHeight - 8);
+    maxHeight = Math.min(430, availableAbove);
+    top = rect.top - maxHeight - 8;
   }
+
+  // Ne jamais imposer une hauteur minimale qui dépasse l'espace réellement libre.
+  // Le panneau peut être plus petit que 140 px lorsque le clavier mobile ou un
+  // viewport court réduit la zone visible ; la liste conserve alors son scroll interne.
+  maxHeight = Math.max(0, Math.min(maxHeight, viewportHeight - safeGutter * 2));
+  top = Math.max(safeGutter, Math.min(top, viewportHeight - safeGutter - maxHeight));
 
   panel.style.position = 'fixed';
   panel.style.top = Math.round(top) + 'px';
@@ -289,7 +299,13 @@ function positionWorkspaceNotificationPanel() {
   panel.style.right = 'auto';
   panel.style.width = Math.round(width) + 'px';
   panel.style.maxWidth = Math.round(width) + 'px';
-  panel.style.maxHeight = Math.round(Math.min(maxHeight, window.innerHeight - gutter * 2)) + 'px';
+  panel.style.maxHeight = Math.round(maxHeight) + 'px';
+
+  // Mesurer l'en-tête après avoir appliqué la largeur finale : son texte peut
+  // passer sur plusieurs lignes sur les téléphones étroits. Réserver son espace
+  // et donner tout le reste à la liste défilante pour éviter de la couper.
+  const headerHeight = panel.querySelector('.app-notification-panel-head')?.getBoundingClientRect().height || 0;
+  if (list) list.style.maxHeight = Math.round(Math.max(0, maxHeight - headerHeight)) + 'px';
 }
 
 function toggleWorkspaceNotifications(event) {
