@@ -8,6 +8,7 @@ const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { encryptSecret, decryptSecret } = require('../utils/pro-webhooks');
 const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydunya } = require('../config/payments');
 const net = require('net');
+const { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, SUPPORTED_TIMEZONES } = require('../config/localization');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -1769,15 +1770,6 @@ router.put('/crm/activities/:id', async (req, res, next) => {
 });
 
 /* ---------------------- PARAMÈTRES INTERNATIONAUX ---------------------- */
-const SUPPORTED_CURRENCIES = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
-const SUPPORTED_COUNTRIES = ['SN','CI','ML','BF','BJ','TG','NE','GN','CM','GA','TD','CG','CD','FR','BE','CH','US','GB','CA','MA'];
-const SUPPORTED_TIMEZONES = [
-  'Africa/Dakar','Africa/Abidjan','Africa/Bamako','Africa/Ouagadougou','Africa/Porto-Novo',
-  'Africa/Lome','Africa/Niamey','Africa/Conakry','Africa/Douala','Africa/Libreville',
-  'Africa/Ndjamena','Africa/Brazzaville','Africa/Kinshasa','Europe/Paris','Europe/Brussels',
-  'Europe/Zurich','Europe/London','America/New_York','America/Toronto','UTC'
-];
-
 router.get('/localization', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
