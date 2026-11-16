@@ -153,7 +153,13 @@
     document.getElementById('recurrente-form').reset();
     document.getElementById('recurrente-id').value = '';
     document.getElementById('modal-error').innerHTML = '';
-    document.getElementById('prochaine_date').value = new Date().toISOString().slice(0, 10);
+    const maintenant = new Date();
+    const dateLocale = [
+      maintenant.getFullYear(),
+      String(maintenant.getMonth() + 1).padStart(2, '0'),
+      String(maintenant.getDate()).padStart(2, '0')
+    ].join('-');
+    document.getElementById('prochaine_date').value = dateLocale;
     document.getElementById('client_id').innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.nom)}</option>`).join('');
     document.getElementById('lignes-body').innerHTML = '';
     addLigne();
