@@ -31,6 +31,19 @@ let options={};
 function fillSelect(id,values,labels={}){
   $(id).innerHTML=(values||[]).map(v=>'<option value="'+escapeHtml(v)+'">'+escapeHtml(labels[v]||v)+'</option>').join('');
 }
+function refreshCountryLabels(){
+  const selected=$('pays_code').value;
+  const language=$('langue').value==='en'?'en':'fr';
+  let labels={};
+  try {
+    const names=new Intl.DisplayNames([language],{type:'region'});
+    labels=Object.fromEntries((options.pays||[]).map(code=>[code,names.of(code)||code]));
+  } catch (_) {
+    labels=Object.fromEntries((options.pays||[]).map(code=>[code,code]));
+  }
+  fillSelect('pays_code',options.pays||[],labels);
+  if ((options.pays||[]).includes(selected)) $('pays_code').value=selected;
+}
 function refreshPreview(){
   const locale=$('langue').value==='en'?'en-US':'fr-FR';
   const currency=$('devise').value||'FCFA';
@@ -46,22 +59,17 @@ async function load(){
   const data=await Api.get('/pro/localization');
   options=data.options||{};
   const p=data.parametres||{};
-  let countryLabels={};
-  try {
-    const names=new Intl.DisplayNames([p.langue==='en'?'en':'fr'],{type:'region'});
-    countryLabels=Object.fromEntries((options.pays||[]).map(code=>[code,names.of(code)||code]));
-  } catch (_) {
-    countryLabels=Object.fromEntries((options.pays||[]).map(code=>[code,code]));
-  }
-  fillSelect('pays_code',options.pays||[],countryLabels);
+  fillSelect('pays_code',options.pays||[]);
   fillSelect('devise',options.devises||[]);
   fillSelect('fuseau_horaire',options.fuseaux||[]);
   fillSelect('format_date',options.formats_date||[]);
   fillSelect('regime_fiscal',options.regimes_fiscaux||[],{standard:'Standard',simplifie:'Régime simplifié',franchise:'Franchise',autre:'Autre'});
   Object.keys(p).forEach(key=>{if($(key))$(key).value=p[key];});
+  refreshCountryLabels();
   refreshPreview();
 }
-['langue','devise','format_date','fuseau_horaire'].forEach(id=>$(id).addEventListener('change',refreshPreview));
+$('langue').addEventListener('change',()=>{refreshCountryLabels();refreshPreview();});
+['devise','format_date','fuseau_horaire'].forEach(id=>$(id).addEventListener('change',refreshPreview));
 $('save-localization').addEventListener('click',async()=>{
   const button=$('save-localization');button.disabled=true;
   try{
