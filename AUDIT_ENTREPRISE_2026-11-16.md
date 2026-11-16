@@ -59,7 +59,7 @@ Le test d'upgrade simule une base existante en version 8, retire les objets intr
 
 ## Vérifications GitHub Actions
 
-Révision testée : `cff824b30959e4f13bb59e0fcf80307c37bf1199` (tête de la PR #60 au moment du CI)
+Révision de code testée : `6adac3c457e090ad1edfad2b88a57251b82a6d08` (tête de code de la PR #60 validée par le run 732 ; les commits suivants ne modifient que ce rapport)
 
 - Tests Node.js/MySQL : **325 réussis, 0 échec**, 50 suites.
 - `npm audit` : **0 vulnérabilité**.
@@ -71,7 +71,7 @@ Révision testée : `cff824b30959e4f13bb59e0fcf80307c37bf1199` (tête de la PR #
 Exécutions :
 - [Tests automatisés Entreprise — run 732](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43937603519) : 325 tests réussis, 0 échec, 50 suites.
 - [Package source ZIP Entreprise — run 486](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43937603522).
-- [Validation PDF #56 — run 729](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43936062465) : 374 tests réussis, 0 échec, 47 suites ; Redis Streams smoke test et restauration réelle MySQL réussis ; 119 captures responsive sur 7 largeurs ; 0 vulnérabilité npm.
+- [Validation PDF #56 — run 730](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43936717405) : 374 tests réussis, 0 échec, 47 suites ; Redis Streams smoke test et restauration réelle MySQL réussis ; 119 captures responsive sur 7 largeurs ; 0 vulnérabilité npm.
 - La tête actuelle de #56 confirme aussi la décision documentaire de renouvellement mensuel automatique ; le CI run 730 sur cette tête est entièrement réussi.
 
 ## Limites et risques restant à traiter
