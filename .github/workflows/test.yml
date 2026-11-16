@@ -161,6 +161,16 @@ jobs:
           }
           console.log('Aucune vulnérabilité npm détectée.');
           NODE
+      - name: Installer les clients MySQL pour la restauration réelle
+        shell: bash
+        run: |
+          if ! command -v mysql >/dev/null 2>&1 || ! command -v mysqldump >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y default-mysql-client
+          fi
+          mysql --version
+          mysqldump --version
+
       - name: Vérifier le script de recette staging
         working-directory: server
         run: node --check scripts/staging-smoke.js
@@ -178,6 +188,7 @@ jobs:
           TEST_DB_NAME: samafacture_test
           JWT_SECRET: ci-secret-ne-pas-utiliser-en-production
           APP_URL: http://127.0.0.1:4000
+          RUN_REAL_RESTORE_SMOKE: 'true'
         run: |
           mkdir -p tests/diagnostics
           node --process-timeout=12m --report-on-process-timeout --report-exclude-env --report-directory=tests/diagnostics --test --test-concurrency=1 --test-timeout=300000 --test-reporter=spec "tests/*.test.js"
