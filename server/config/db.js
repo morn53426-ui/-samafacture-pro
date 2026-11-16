@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -207,6 +207,7 @@ async function runMigrations(conn) {
     { table: 'factures', column: 'conditions_reglement', definition: 'TEXT' },
     { table: 'paiements', column: 'idempotency_key', definition: 'VARCHAR(100)' },
     { table: 'factures_recurrentes', column: 'envoi_auto_email', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
+    { table: 'factures_recurrentes', column: 'jour_ancre', definition: 'TINYINT UNSIGNED NULL AFTER prochaine_date' },
     { table: 'abonnement_paiements', column: 'internal_reference', definition: "VARCHAR(64) NOT NULL DEFAULT ''" }
   ];
 
@@ -220,6 +221,12 @@ async function runMigrations(conn) {
       await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
     }
   }
+
+  // Le jour d'ancrage est initialisé depuis la prochaine échéance des modèles
+  // déjà existants. Une fois renseigné, il n'est jamais recalculé par la migration.
+  await conn.query(
+    'UPDATE factures_recurrentes SET jour_ancre = DAY(prochaine_date) WHERE jour_ancre IS NULL'
+  );
 
   // Élargit entreprise_logo si la colonne existe encore avec l'ancien type TEXT (~65 Ko max,
   // trop petit pour un logo encodé en base64). MEDIUMTEXT supporte jusqu'à 16 Mo.
