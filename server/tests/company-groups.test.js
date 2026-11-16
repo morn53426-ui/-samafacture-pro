@@ -251,6 +251,42 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.equal(expiredOutbox.statut, 'cancelled');
   assert.equal(expiredOutbox.dernier_code_erreur, 'entity_inactive');
 
+  // Un crash lors de la huitième tentative ne doit pas provoquer une neuvième remise.
+  const [exhaustedInvite] = await pool.query(
+    `INSERT INTO pro_company_group_invitations
+      (group_id, invited_email, token_hash, statut, expire_at)
+     VALUES (?, ?, ?, 'envoyee', DATE_ADD(NOW(), INTERVAL 7 DAY))`,
+    [created.body.id, 'max-attempt@example.test', 'b'.repeat(64)]
+  );
+  const [exhaustedOutboxInsert] = await pool.query(
+    `INSERT INTO email_outbox
+      (owner_user_id, entity_type, entity_id, idempotency_key, payload_enc,
+       statut, tentatives, prochaine_tentative, verrouille_le, lock_token)
+     VALUES (?, 'company_group_invitation', ?, ?, ?, 'processing', 8, NOW(),
+             DATE_SUB(NOW(), INTERVAL 10 MINUTE),
+             '00000000-0000-4000-8000-000000000008')`,
+    [groupOwnerId, exhaustedInvite.insertId, 'e'.repeat(64), queuedEmail.payload_enc]
+  );
+  let exhaustedEmailWasSent = false;
+  const exhaustedDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async () => {
+      exhaustedEmailWasSent = true;
+      return { sent: true };
+    }
+  });
+  assert.deepEqual(exhaustedDelivery, {
+    claimed: 1, sent: 0, retried: 0, failed: 1, cancelled: 0
+  });
+  assert.equal(exhaustedEmailWasSent, false, 'le plafond de tentatives doit empêcher la neuvième remise SMTP');
+  const [[exhaustedOutbox]] = await pool.query(
+    'SELECT statut, tentatives, dernier_code_erreur FROM email_outbox WHERE id = ?',
+    [exhaustedOutboxInsert.insertId]
+  );
+  assert.equal(exhaustedOutbox.statut, 'failed');
+  assert.equal(Number(exhaustedOutbox.tentatives), 9);
+  assert.equal(exhaustedOutbox.dernier_code_erreur, 'max_attempts_exceeded');
+
   // Un worker doit aussi abandonner une tâche devenue invalide avant sa remise SMTP.
   const [[outsider]] = await pool.query('SELECT email FROM users WHERE id = ?', [outsiderId]);
   const staleInvitation = await request(app)
