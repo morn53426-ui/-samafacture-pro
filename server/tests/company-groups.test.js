@@ -395,12 +395,12 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .delete('/api/pro/company-group/invitations/' + secondInvitation.body.id)
     .set('Authorization', 'Bearer ' + groupOwnerToken);
   assert.equal(revokedQueued.status, 200, revokedQueued.text);
-  const [[revokedOutbox]] = await pool.query(
+  const [[revokedQueuedOutbox]] = await pool.query(
     'SELECT statut, dernier_code_erreur FROM email_outbox WHERE id = ?',
     [secondOutbox.id]
   );
-  assert.equal(revokedOutbox.statut, 'cancelled');
-  assert.equal(revokedOutbox.dernier_code_erreur, 'invitation_revoked');
+  assert.equal(revokedQueuedOutbox.statut, 'cancelled');
+  assert.equal(revokedQueuedOutbox.dernier_code_erreur, 'invitation_revoked');
 
   const leave = await request(app)
     .delete('/api/pro/company-group/leave')
