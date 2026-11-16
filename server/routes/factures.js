@@ -712,7 +712,8 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
   try {
     await conn.beginTransaction();
     // Ordre commun de verrouillage : compte, puis document métier.
-    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    const [[account]] = await conn.query('SELECT fuseau_horaire FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    const accountLocalDate = localDateString(account?.fuseau_horaire || 'Africa/Dakar');
     const [devisRows] = await conn.query(
       `SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'devis' FOR UPDATE`,
       [req.params.id, req.tenantId]
@@ -737,10 +738,10 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
       });
     }
 
-    const numero = await nextNumero(conn, req.tenantId, 'facture');
+    const numero = await nextNumero(conn, req.tenantId, 'facture', Number(accountLocalDate.slice(0, 4)));
     await conn.query(
-      `UPDATE factures SET type = 'facture', numero = ?, statut = 'en_attente', date_validite = NULL WHERE id = ? AND user_id = ? AND type = 'devis'`,
-      [numero, devis.id, req.tenantId]
+      `UPDATE factures SET type = 'facture', numero = ?, date_emission = ?, statut = 'en_attente', date_validite = NULL WHERE id = ? AND user_id = ? AND type = 'devis'`,
+      [numero, accountLocalDate, devis.id, req.tenantId]
     );
     const [lignesDevis] = await conn.query(
       'SELECT produit_id, quantite FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL',
@@ -816,12 +817,12 @@ router.post('/:id/dupliquer', async (req, res, next) => {
       'SELECT * FROM facture_lignes WHERE facture_id = ?',
       [source.id]
     );
-    const numero = await nextNumero(conn, req.tenantId, source.type);
+    const numero = await nextNumero(conn, req.tenantId, source.type, Number(accountLocalDate.slice(0, 4)));
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
-       VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
       [
-        req.tenantId, source.client_id, numero, source.type, source.date_echeance || null,
+        req.tenantId, source.client_id, numero, source.type, accountLocalDate, source.date_echeance || null,
         source.date_validite || null, source.objet || null, source.reference_externe || null,
         source.conditions_reglement || null, source.devise || 'FCFA', source.remise,
         source.frais_livraison, source.mode_paiement, source.commentaires,
