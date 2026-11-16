@@ -1037,7 +1037,7 @@ router.delete('/company-group/invitations/:invitationId', async (req, res, next)
     // Annule seulement les messages qui n'ont pas encore été réclamés.
     // Un message déjà en cours de remise SMTP peut être impossible à rappeler.
     const [cancelled] = await conn.query(
-      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, updated_at = NOW() WHERE entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry')",
+      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_revoked', updated_at = NOW() WHERE entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry')",
       [invitation.id]
     );
     const [[emailState]] = await conn.query(
