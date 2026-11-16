@@ -108,6 +108,12 @@ jobs:
         working-directory: server
         run: npm ci
 
+      - name: Vérifier Redis Streams, la PEL et le transfert des tâches historiques
+        working-directory: server
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+        run: node scripts/pdf-stream-smoke.js
+
       - name: Détecter le navigateur Chromium du runner CI
         shell: bash
         run: |
