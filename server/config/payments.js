@@ -103,9 +103,10 @@ async function creerFacturePaydunya({ amount, description, reference, storeName,
     body: JSON.stringify({
       invoice: {
         total_amount: Math.round(amount),
-        description,
-        ...(Array.isArray(channels) && channels.length ? { channels } : {})
+        description
       },
+      // PayDunya attend "channels" à la racine du JSON, pas dans invoice.
+      ...(Array.isArray(channels) && channels.length ? { channels } : {}),
       store: { name: storeName || 'SamaFacture Pro' },
       custom_data: { reference },
       actions: {
