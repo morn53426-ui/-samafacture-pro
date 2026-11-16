@@ -8,6 +8,19 @@ const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { localDateString } = require('../utils/local-date');
 
 const router = express.Router();
+function parseBooleanInput(value, fieldName, fallback) {
+  if (value === undefined) return fallback;
+  if (value === null) return false;
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0' || normalized === '') return false;
+  }
+  throw new TypeError(fieldName + ' doit être un booléen (true/false).');
+}
+
 router.use(requireAuth, resolveTenant, requirePermission);
 
 function parseDateOnly(value) {
@@ -95,6 +108,7 @@ router.get('/', async (req, res, next) => {
  *               frais_livraison: { type: number, default: 0 }
  *               mode_paiement: { type: string, nullable: true }
  *               commentaires: { type: string, nullable: true }
+ *               envoi_auto_email: { type: boolean, default: false }
  *               lignes: { type: array, items: { $ref: '#/components/schemas/LigneFacture' } }
  *     responses:
  *       201: { description: "Créée.", content: { application/json: { schema: { type: object, properties: { recurrente: { $ref: '#/components/schemas/FactureRecurrente' } } } } } }
@@ -103,6 +117,13 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { client_id, libelle, frequence, prochaine_date, remise, frais_livraison, mode_paiement, commentaires, lignes, envoi_auto_email } = req.body;
+
+    let envoiAutoEmail;
+    try {
+      envoiAutoEmail = parseBooleanInput(envoi_auto_email, 'envoi_auto_email', false);
+    } catch (booleanErr) {
+      return res.status(400).json({ error: booleanErr.message });
+    }
 
     if (!client_id || !libelle || !Array.isArray(lignes) || lignes.length === 0) {
       return res.status(400).json({ error: 'Client, libellé et au moins une ligne sont requis.' });
@@ -145,7 +166,7 @@ router.post('/', async (req, res, next) => {
       [
         req.tenantId, client_id, libelle, freq, prochaineDate, jourAncre,
         positiveNumber(remise, 0), positiveNumber(frais_livraison, 0), mode_paiement || null, commentaires || null,
-        JSON.stringify(lignesClean), envoi_auto_email ? 1 : 0
+        JSON.stringify(lignesClean), envoiAutoEmail ? 1 : 0
       ]
     );
 
@@ -179,6 +200,7 @@ router.post('/', async (req, res, next) => {
  *               mode_paiement: { type: string, nullable: true }
  *               commentaires: { type: string, nullable: true }
  *               actif: { type: boolean }
+ *               envoi_auto_email: { type: boolean }
  *     responses:
  *       200: { description: "Mise à jour.", content: { application/json: { schema: { type: object, properties: { recurrente: { $ref: '#/components/schemas/FactureRecurrente' } } } } } }
  *       404: { description: "Introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
@@ -190,6 +212,19 @@ router.put('/:id', async (req, res, next) => {
     if (!existing) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
 
     const { libelle, frequence, prochaine_date, remise, frais_livraison, mode_paiement, commentaires, actif, envoi_auto_email } = req.body;
+
+    let actifValue;
+    let envoiAutoEmailValue;
+    try {
+      actifValue = parseBooleanInput(actif, 'actif', Number(existing.actif) === 1);
+      envoiAutoEmailValue = parseBooleanInput(
+        envoi_auto_email,
+        'envoi_auto_email',
+        Number(existing.envoi_auto_email) === 1
+      );
+    } catch (booleanErr) {
+      return res.status(400).json({ error: booleanErr.message });
+    }
     const freqValides = ['hebdomadaire', 'mensuelle', 'annuelle'];
     // Même règle qu'à la création (POST ci-dessus) : le libellé est obligatoire — corrige la
     // même incohérence que celle déjà trouvée sur clients/produits/dépenses (une chaîne vide
@@ -225,8 +260,8 @@ router.put('/:id', async (req, res, next) => {
         frais_livraison !== undefined ? positiveNumber(frais_livraison, existing.frais_livraison) : existing.frais_livraison,
         mode_paiement ?? existing.mode_paiement,
         commentaires ?? existing.commentaires,
-        actif !== undefined ? (actif ? 1 : 0) : existing.actif,
-        envoi_auto_email !== undefined ? (envoi_auto_email ? 1 : 0) : existing.envoi_auto_email,
+        actifValue ? 1 : 0,
+        envoiAutoEmailValue ? 1 : 0,
         existing.id, req.tenantId
       ]
     );

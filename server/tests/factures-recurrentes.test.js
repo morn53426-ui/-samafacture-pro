@@ -207,6 +207,64 @@ describe('Factures récurrentes : cohérence des calculs avec la création manue
     assert.equal(Number(response.body.recurrente.jour_ancre), Number(expectedDate.slice(-2)));
   });
 
+  test('la création interprète false comme désactivé et rejette les valeurs non booléennes', async () => {
+    const disabled = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Option email désactivée explicitement',
+        envoi_auto_email: 'false',
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+
+    assert.equal(disabled.status, 201);
+    assert.equal(Number(disabled.body.recurrente.envoi_auto_email), 0);
+
+    const invalid = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Option email invalide',
+        envoi_auto_email: 'off',
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+
+    assert.equal(invalid.status, 400);
+    assert.match(invalid.body.error, /envoi_auto_email doit être un booléen/);
+  });
+
+  test('la mise à jour conserve false comme false pour actif et envoi_auto_email', async () => {
+    const created = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Option email modifiable',
+        envoi_auto_email: true,
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(created.status, 201);
+
+    const updated = await request(app)
+      .put(`/api/factures-recurrentes/${created.body.recurrente.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ actif: 'false', envoi_auto_email: 'false' });
+
+    assert.equal(updated.status, 200);
+    assert.equal(Number(updated.body.recurrente.actif), 0);
+    assert.equal(Number(updated.body.recurrente.envoi_auto_email), 0);
+
+    const invalid = await request(app)
+      .put(`/api/factures-recurrentes/${created.body.recurrente.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ envoi_auto_email: 'off' });
+
+    assert.equal(invalid.status, 400);
+    assert.match(invalid.body.error, /envoi_auto_email doit être un booléen/);
+  });
+
   test('générer une facture récurrente inexistante renvoie 404', async () => {
     const res = await request(app)
       .post('/api/factures-recurrentes/999999999/generer')
