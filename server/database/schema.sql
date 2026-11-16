@@ -208,6 +208,7 @@ CREATE TABLE IF NOT EXISTS factures_recurrentes (
   libelle VARCHAR(190) NOT NULL,
   frequence VARCHAR(20) NOT NULL DEFAULT 'mensuelle', -- hebdomadaire | mensuelle | annuelle
   prochaine_date DATE NOT NULL,
+  jour_ancre TINYINT UNSIGNED NULL,
   remise DECIMAL(14,2) NOT NULL DEFAULT 0,
   frais_livraison DECIMAL(14,2) NOT NULL DEFAULT 0,
   mode_paiement VARCHAR(50),
