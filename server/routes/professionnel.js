@@ -1067,11 +1067,12 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
     }
 
     const [[existingProof]] = await conn.query(
-      "SELECT id, expires_at, sent_at, used_at FROM pro_company_group_invitation_verifications WHERE invitation_id = ? LIMIT 1 FOR UPDATE",
+      "SELECT id, used_at, (expires_at > NOW()) AS is_active, (sent_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)) AS recently_sent " +
+      "FROM pro_company_group_invitation_verifications WHERE invitation_id = ? LIMIT 1 FOR UPDATE",
       [invite.id]
     );
-    if (existingProof && !existingProof.used_at && new Date(existingProof.expires_at) > new Date() &&
-        new Date(existingProof.sent_at).getTime() > Date.now() - 60 * 1000) {
+    if (existingProof && !existingProof.used_at && Number(existingProof.is_active) === 1 &&
+        Number(existingProof.recently_sent) === 1) {
       const [[outbox]] = await conn.query(
         "SELECT statut FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ? LIMIT 1",
         [existingProof.id]
