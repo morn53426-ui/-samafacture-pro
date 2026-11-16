@@ -17,13 +17,8 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
   const suffix = crypto.randomBytes(8).toString('hex');
   const sourceDb = 'sf_restore_source_' + suffix;
   const targetDb = 'sf_restore_target_' + suffix;
-  const original = {
-    DB_NAME: process.env.DB_NAME,
-    BACKUP_DIR: process.env.BACKUP_DIR,
-    BACKUP_ENCRYPTION_KEY: process.env.BACKUP_ENCRYPTION_KEY,
-    MYSQLDUMP_PATH: process.env.MYSQLDUMP_PATH,
-    MYSQL_PATH: process.env.MYSQL_PATH
-  };
+  const keys = ['DB_NAME', 'BACKUP_DIR', 'BACKUP_ENCRYPTION_KEY', 'MYSQLDUMP_PATH', 'MYSQL_PATH'];
+  const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST || '127.0.0.1',
     port: Number(process.env.DB_PORT || 3306),
@@ -66,11 +61,10 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
     assert.equal(rows[1].label, 'Données francophones — Dakar');
     assert.equal(String(rows[1].amount), '987.65');
   } finally {
-    process.env.DB_NAME = original.DB_NAME;
-    process.env.BACKUP_DIR = original.BACKUP_DIR;
-    process.env.BACKUP_ENCRYPTION_KEY = original.BACKUP_ENCRYPTION_KEY;
-    process.env.MYSQLDUMP_PATH = original.MYSQLDUMP_PATH;
-    process.env.MYSQL_PATH = original.MYSQL_PATH;
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
     await connection.query('DROP DATABASE IF EXISTS ??', [sourceDb]).catch(() => {});
     await connection.query('DROP DATABASE IF EXISTS ??', [targetDb]).catch(() => {});
     await connection.end();
