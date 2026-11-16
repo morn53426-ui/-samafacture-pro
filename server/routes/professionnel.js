@@ -9,7 +9,7 @@ const { encryptSecret, decryptSecret } = require('../utils/pro-webhooks');
 const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydunya } = require('../config/payments');
 const net = require('net');
 const { isEnterprisePlan } = require('../utils/plans');
-const { encryptEmailPayload } = require('../utils/email-outbox-crypto');
+const { encryptEmailPayload, decryptEmailPayload } = require('../utils/email-outbox-crypto');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -830,7 +830,7 @@ router.post('/company-group/invitations', async (req, res, next) => {
 
     // L'invitation et son email chiffré sont enregistrés dans la même transaction :
     // aucun lien/jeton brut ne reste en clair dans la base ou les journaux.
-    const payloadEnc = encryptEmailPayload({ to: email, subject, text });
+    const payloadEnc = encryptEmailPayload({ to: email, subject, text, invitation_url: invitationUrl });
     const idempotencyKey = crypto.createHash('sha256')
       .update('company-group-invitation:' + result.insertId)
       .digest('hex');
@@ -852,6 +852,144 @@ router.post('/company-group/invitations', async (req, res, next) => {
       email_statut: 'queued',
       avertissement: 'Email placé dans la file d’envoi sécurisée. Il sera envoyé en arrière-plan et réessayé automatiquement en cas d’indisponibilité temporaire du serveur SMTP.',
       expire_le: expires
+    });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+router.get('/company-group/invitations/:invitationId/link', async (req, res, next) => {
+  try {
+    if (!await assertEnterpriseGroupOwner(req, res)) return;
+    if (!idOk(req.params.invitationId)) {
+      return res.status(400).json({ error: 'Identifiant d’invitation invalide.' });
+    }
+
+    const [[invitation]] = await pool.query(
+      `SELECT i.id, i.invited_email, i.token_hash, e.payload_enc
+       FROM pro_company_group_invitations i
+       JOIN pro_company_groups g ON g.id = i.group_id
+       JOIN email_outbox e
+         ON e.entity_type = 'company_group_invitation' AND e.entity_id = i.id
+       WHERE i.id = ? AND g.owner_user_id = ?
+         AND i.statut = 'envoyee' AND i.expire_at > NOW()
+       LIMIT 1`,
+      [req.params.invitationId, actor(req)]
+    );
+    if (!invitation) {
+      return res.status(404).json({ error: 'Invitation active introuvable ou expirée.' });
+    }
+
+    const payload = decryptEmailPayload(invitation.payload_enc);
+    if (String(payload.to).toLowerCase() !== String(invitation.invited_email).toLowerCase()) {
+      return res.status(409).json({
+        error: 'Le lien de cette invitation ne peut pas être récupéré.',
+        code: 'LIEN_INVITATION_INDISPONIBLE'
+      });
+    }
+    const fallbackLink = typeof payload.text === 'string'
+      ? payload.text.match(/https?:\/\/[^\s]+/)?.[0]
+      : null;
+    const invitationUrl = String(payload.invitation_url || fallbackLink || '');
+    let parsed;
+    try { parsed = new URL(invitationUrl); } catch {
+      return res.status(409).json({
+        error: 'Le lien de cette invitation ne peut pas être récupéré.',
+        code: 'LIEN_INVITATION_INDISPONIBLE'
+      });
+    }
+    const token = parsed.searchParams.get('token') || '';
+    if (!['http:', 'https:'].includes(parsed.protocol) ||
+        parsed.username || parsed.password ||
+        parsed.pathname !== '/invitation.html' ||
+        parsed.searchParams.get('type') !== 'company-group' ||
+        !/^[a-f0-9]{64}$/i.test(token)) {
+      return res.status(409).json({
+        error: 'Le lien de cette invitation ne peut pas être récupéré.',
+        code: 'LIEN_INVITATION_INDISPONIBLE'
+      });
+    }
+    const tokenHash = crypto.createHash('sha256').update(token).digest();
+    const expectedHash = Buffer.from(invitation.token_hash, 'hex');
+    if (expectedHash.length !== tokenHash.length || !crypto.timingSafeEqual(expectedHash, tokenHash)) {
+      return res.status(409).json({
+        error: 'Le lien de cette invitation ne peut pas être récupéré.',
+        code: 'LIEN_INVITATION_INDISPONIBLE'
+      });
+    }
+
+    await audit(req, 'groupe.societes.lien_invitation_recupere', 'invitation_groupe', invitation.id, {
+      email: invitation.invited_email
+    });
+    res.json({ id: invitation.id, email: invitation.invited_email, invitation_url: invitationUrl });
+  } catch (err) { next(err); }
+});
+
+router.post('/company-group/invitations/:invitationId/retry-email', async (req, res, next) => {
+  let conn;
+  try {
+    if (!await assertEnterpriseGroupOwner(req, res)) return;
+    if (!idOk(req.params.invitationId)) {
+      return res.status(400).json({ error: 'Identifiant d’invitation invalide.' });
+    }
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [[group]] = await conn.query(
+      'SELECT id FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1 FOR UPDATE',
+      [actor(req)]
+    );
+    if (!group) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Groupe de sociétés introuvable.' });
+    }
+
+    const [[invitation]] = await conn.query(
+      `SELECT i.id, i.invited_email, e.id AS email_id, e.statut AS email_statut
+       FROM pro_company_group_invitations i
+       JOIN email_outbox e
+         ON e.entity_type = 'company_group_invitation' AND e.entity_id = i.id
+       WHERE i.id = ? AND i.group_id = ?
+         AND i.statut = 'envoyee' AND i.expire_at > NOW()
+       LIMIT 1 FOR UPDATE`,
+      [req.params.invitationId, group.id]
+    );
+    if (!invitation) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Invitation active introuvable ou expirée.' });
+    }
+    if (invitation.email_statut !== 'failed') {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Seul un email définitivement échoué peut être relancé.',
+        code: 'EMAIL_NON_RELANCABLE',
+        email_statut: invitation.email_statut
+      });
+    }
+
+    const [updated] = await conn.query(
+      `UPDATE email_outbox
+       SET statut = 'queued', tentatives = 0, prochaine_tentative = NOW(),
+           verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = NULL,
+           updated_at = NOW()
+       WHERE id = ? AND statut = 'failed'`,
+      [invitation.email_id]
+    );
+    if (updated.affectedRows !== 1) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Cet email ne peut plus être relancé.' });
+    }
+    await conn.commit();
+    await audit(req, 'groupe.societes.email_invitation_relance', 'invitation_groupe', invitation.id, {
+      email: invitation.invited_email
+    });
+    res.status(202).json({
+      success: true,
+      email_statut: 'queued',
+      message: 'Email remis dans la file d’envoi sécurisée.'
     });
   } catch (err) {
     if (conn) { try { await conn.rollback(); } catch (_) {} }
