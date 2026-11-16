@@ -25,6 +25,17 @@ let outsiderToken;
 let starterToken;
 let subsidiaryClientId;
 
+function getVerificationTokens(verificationUrl) {
+  const url = new URL(verificationUrl);
+  const fragment = new URLSearchParams(url.hash.replace(/^#/, ''));
+  assert.equal(url.searchParams.has('token'), false, 'le jeton d’invitation ne doit pas être transmis dans la requête GET');
+  assert.equal(url.searchParams.has('verification_token'), false, 'le jeton de preuve ne doit pas être transmis dans la requête GET');
+  return {
+    token: fragment.get('token'),
+    verificationToken: fragment.get('verification_token')
+  };
+}
+
 async function register(prefix, companyName) {
   const response = await request(app)
     .post('/api/auth/register')
@@ -499,8 +510,9 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.equal(proofOutbox.statut, 'queued');
   let proofEmail = decryptEmailPayload(proofOutbox.payload_enc);
   assert.equal(proofEmail.to, recipient.email);
-  const verificationUrl = new URL(proofEmail.verification_url);
-  let verificationToken = verificationUrl.searchParams.get('verification_token');
+  const verificationTokens = getVerificationTokens(proofEmail.verification_url);
+  assert.equal(verificationTokens.token, token, 'le jeton d’invitation est conservé dans le fragment');
+  let verificationToken = verificationTokens.verificationToken;
   assert.match(verificationToken || '', /^[a-f0-9]{64}$/i);
   assert.equal(proofRow.token_hash, crypto.createHash('sha256').update(verificationToken).digest('hex'), 'la base doit stocker le SHA-256 du jeton, jamais sa valeur brute');
   assert.doesNotMatch(proofOutbox.payload_enc, new RegExp(verificationToken));
@@ -550,7 +562,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   );
   assert.equal(rotatedOutbox.id, proofOutbox.id, 'le renvoi doit réutiliser la ligne outbox de l’invitation');
   proofEmail = decryptEmailPayload(rotatedOutbox.payload_enc);
-  const rotatedVerificationToken = new URL(proofEmail.verification_url).searchParams.get('verification_token');
+  const rotatedVerificationToken = getVerificationTokens(proofEmail.verification_url).verificationToken;
   assert.match(rotatedVerificationToken || '', /^[a-f0-9]{64}$/i);
   assert.notEqual(rotatedVerificationToken, verificationToken);
   const oldProofReplay = await request(app)
@@ -727,7 +739,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     [expiryProof.id]
   );
   const expiryProofEmail = decryptEmailPayload(expiryProofOutbox.payload_enc);
-  const expiryVerificationToken = new URL(expiryProofEmail.verification_url).searchParams.get('verification_token');
+  const expiryVerificationToken = getVerificationTokens(expiryProofEmail.verification_url).verificationToken;
   await pool.query(
     'UPDATE email_outbox SET statut = \'sent\' WHERE entity_type = ? AND entity_id = ?',
     ['company_group_invitation', expiryInvitation.body.id]
@@ -840,8 +852,8 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     "SELECT payload_enc FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
     [concurrentProof.id]
   );
-  const concurrentVerificationUrl = new URL(decryptEmailPayload(concurrentOutbox.payload_enc).verification_url);
-  const concurrentVerificationToken = concurrentVerificationUrl.searchParams.get('verification_token');
+  const concurrentVerificationTokens = getVerificationTokens(decryptEmailPayload(concurrentOutbox.payload_enc).verification_url);
+  const concurrentVerificationToken = concurrentVerificationTokens.verificationToken;
   assert.match(concurrentVerificationToken || '', /^[a-f0-9]{64}$/i);
   const concurrentAcceptances = await Promise.all([
     request(app)

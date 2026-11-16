@@ -21,12 +21,14 @@ describe('Retour visuel des invitations Entreprise', () => {
     assert.match(invitationPage, /confirmation sera envoyée à cette adresse/i);
   });
 
-  test('préserve le jeton de preuve pendant la connexion puis le consomme via la route dédiée', () => {
-    assert.match(invitationPage, /nextParams\.set\('verification_token',verificationToken\)/);
-    assert.match(invitationPage, /\/pro\/company-group\/invitations\/accept\/verify/);
-    assert.match(invitationPage, /history\.replaceState\(null,'','invitation\.html'\)/);
+  test('préserve les jetons hors des URL pendant la connexion puis les consomme via la route dédiée', () => {
+    assert.match(invitationPage, /URLSearchParams\\(location\\.hash\\.replace/);
+    assert.match(invitationPage, /sessionStorage\\.setItem\\(invitationStorageKey,token\\)/);
+    assert.match(invitationPage, /sessionStorage\\.setItem\\(verificationStorageKey,verificationToken\\)/);
+    assert.match(invitationPage, /groupResumeUrl='invitation\\.html\\?type=company-group&resume=1'/);
+    assert.doesNotMatch(invitationPage, /nextParams\\.set\\('verification_token'/);
+    assert.match(invitationPage, /\\/pro\\/company-group\\/invitations\\/accept\\/verify/);
   });
-
   test('ne laisse pas les jetons de vérification dans le referer ou la barre d’adresse après lecture', () => {
     assert.match(invitationPage, /name="referrer" content="no-referrer"/);
     assert.match(invitationPage, /history\.replaceState/);

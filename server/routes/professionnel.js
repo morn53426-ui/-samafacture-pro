@@ -1109,7 +1109,7 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
       [invite.id]
     );
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
-    const verificationUrl = base + '/invitation.html?type=company-group&token=' +
+    const verificationUrl = base + '/invitation.html?type=company-group#token=' +
       encodeURIComponent(token) + '&verification_token=' + encodeURIComponent(verificationToken);
     const subject = 'Confirmez votre adresse email pour rejoindre le groupe SamaFacture Pro';
     const text = 'Une demande a été faite pour rattacher votre société au groupe « ' + invite.group_name +

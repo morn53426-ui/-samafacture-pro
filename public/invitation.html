@@ -23,27 +23,57 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
 <script>
 (function(){
  const params=new URLSearchParams(location.search);
- const token=params.get('token')||'';
- const verificationToken=params.get('verification_token')||'';
+ const fragmentParams=new URLSearchParams(location.hash.replace(/^#/,'')); 
  const isCompanyGroup=params.get('type')==='company-group';
+ const resumeCompanyGroup=isCompanyGroup && params.get('resume')==='1';
  const root=document.getElementById('invite-content');
+ const invitationStorageKey='sf_company_group_invitation_token';
+ const verificationStorageKey='sf_company_group_verification_token';
+ const validToken=value=>/^[a-f0-9]{64}$/i.test(String(value||''));
+ const groupResumeUrl='invitation.html?type=company-group&resume=1';
+ let token='';
+ let verificationToken='';
 
- if(!/^[a-f0-9]{64}$/i.test(token)){
-   root.innerHTML='<h1>Invitation invalide</h1><p>Le lien d’invitation est incomplet.</p>';
+ if(isCompanyGroup){
+   if(resumeCompanyGroup){
+     token=sessionStorage.getItem(invitationStorageKey)||'';
+     verificationToken=sessionStorage.getItem(verificationStorageKey)||'';
+   }else{
+     // Compatibilité : accepte aussi les anciens liens en query string pendant leur validité.
+     token=params.get('token')||fragmentParams.get('token')||'';
+     verificationToken=params.get('verification_token')||fragmentParams.get('verification_token')||'';
+     if(validToken(token)) sessionStorage.setItem(invitationStorageKey,token);
+     else sessionStorage.removeItem(invitationStorageKey);
+     if(validToken(verificationToken)) sessionStorage.setItem(verificationStorageKey,verificationToken);
+     else sessionStorage.removeItem(verificationStorageKey);
+   }
+ }else{
+   token=params.get('token')||'';
+   sessionStorage.removeItem(invitationStorageKey);
+   sessionStorage.removeItem(verificationStorageKey);
+ }
+
+ if(!validToken(token)){
+   root.innerHTML='<h1>Invitation invalide</h1><p>Le lien d’invitation est incomplet ou a expiré.</p>';
    return;
  }
 
- const nextParams=new URLSearchParams();
- if(isCompanyGroup) nextParams.set('type','company-group');
- nextParams.set('token',token);
- if(isCompanyGroup && /^[a-f0-9]{64}$/i.test(verificationToken)){
-   nextParams.set('verification_token',verificationToken);
- }
- const next='invitation.html?'+nextParams.toString();
+ // Le fragment n'est jamais transmis au serveur HTTP. Les paramètres hérités d'anciens
+ // liens sont également retirés avant d'afficher la page ou de rediriger vers la connexion.
+ history.replaceState(null,'',isCompanyGroup?groupResumeUrl:'invitation.html');
 
- if(!Api.token()) history.replaceState(null,'','invitation.html');
+ const next=isCompanyGroup
+   ? groupResumeUrl
+   : 'invitation.html?'+new URLSearchParams({token}).toString();
+
+ function clearCompanyGroupTokens(){
+   if(!isCompanyGroup) return;
+   sessionStorage.removeItem(invitationStorageKey);
+   sessionStorage.removeItem(verificationStorageKey);
+ }
 
  function showSuccess(result){
+   clearCompanyGroupTokens();
    if(!isCompanyGroup) localStorage.setItem('sf_company_owner',String(result.entreprise_id));
    else localStorage.setItem('sf_company_group_member','true');
    history.replaceState(null,'','invitation.html');
@@ -51,22 +81,20 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
  }
 
  if(!Api.token()){
-   root.innerHTML='<h1>Vous avez été invité</h1><p>Connectez-vous avec l’adresse email qui a reçu l’invitation. Pour un groupe de sociétés, une seconde confirmation sera envoyée à cette adresse avant tout rattachement.</p><a class="btn btn-primary" style="width:100%" href="login.html?next='+encodeURIComponent(next)+'">Se connecter pour accepter</a><a style="display:block;text-align:center;margin-top:14px;color:var(--emerald)" href="register.html?next='+encodeURIComponent(next)+'">Créer un compte</a>';
+   root.innerHTML='<h1>Vous avez été invité</h1><p>Connectez-vous avec l’adresse email qui a reçu l’invitation. Pour un groupe de sociétés, la confirmation finale sera traitée après connexion.</p><a class="btn btn-primary" style="width:100%" href="login.html?next='+encodeURIComponent(next)+'">Se connecter pour accepter</a><a style="display:block;text-align:center;margin-top:14px;color:var(--emerald)" href="register.html?next='+encodeURIComponent(next)+'">Créer un compte</a>';
    return;
  }
 
- if(isCompanyGroup && /^[a-f0-9]{64}$/i.test(verificationToken)){
-   history.replaceState(null,'','invitation.html');
+ if(isCompanyGroup && validToken(verificationToken)){
    root.innerHTML='<h1>Confirmation de votre adresse email</h1><p>Vérification du lien sécurisé et rattachement de votre société…</p><div id="invite-error" style="margin-top:14px"></div>';
    Api.post('/pro/company-group/invitations/accept/verify',{token,verification_token:verificationToken})
      .then(showSuccess)
      .catch(err=>{
-       document.getElementById('invite-error').innerHTML='<div class="error-box">'+escapeHtml(err.message)+'</div><p>Retournez au lien d’invitation et demandez un nouveau message de confirmation si le lien a expiré.</p>';
+       document.getElementById('invite-error').innerHTML='<div class="error-box">'+escapeHtml(err.message)+'</div><p>Rechargez cette page pour réessayer ou demandez un nouveau lien si celui-ci a expiré.</p>';
      });
    return;
  }
 
- history.replaceState(null,'','invitation.html');
  root.innerHTML=isCompanyGroup
    ? '<h1>Rejoindre un groupe de sociétés</h1><p>En acceptant, vous autorisez le propriétaire du groupe à accéder à l’espace de votre société avec les droits administrateur. Votre compte, vos factures et vos données restent séparés des autres sociétés du groupe. Vous devrez ensuite confirmer cette adresse depuis votre boîte email avant le rattachement.</p><button class="btn btn-primary" id="accept-invite" style="width:100%">Continuer vers la confirmation email</button><div id="invite-error" style="margin-top:14px"></div>'
    : '<h1>Rejoindre une équipe</h1><p>En acceptant, l’entreprise qui vous a invité pourra vous donner accès à son espace de travail selon les autorisations définies pour votre rôle.</p><button class="btn btn-primary" id="accept-invite" style="width:100%">Accepter l’invitation</button><div id="invite-error" style="margin-top:14px"></div>';
@@ -80,7 +108,8 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
        ? await Api.post('/pro/company-group/invitations/accept',{token})
        : await Api.post('/pro/team/invitations/accept',{token});
      if(isCompanyGroup && result.verification_required){
-       root.innerHTML='<h1>Vérifiez votre boîte email</h1><p>'+escapeHtml(result.message)+'</p><p>Le groupe ne pourra accéder à votre société qu’après ouverture du lien envoyé à cette adresse. Ce lien expire après 20 minutes.</p>';
+       clearCompanyGroupTokens();
+       root.innerHTML='<h1>Vérifiez votre boîte email</h1><p>'+escapeHtml(result.message)+'</p><p>Le groupe ne pourra accéder à votre société qu’après ouverture du lien de confirmation reçu. Ce lien expire après 20 minutes.</p>';
        return;
      }
      showSuccess(result);
