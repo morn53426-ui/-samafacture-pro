@@ -101,7 +101,9 @@ async function executerRelancesAutomatiques() {
   try {
     await withMysqlAdvisoryLock('samafacture:pro-automatic-reminders', async () => {
       const [automations] = await pool.query(
-        "SELECT * FROM pro_automations WHERE actif = 1 AND type IN ('relance_impayes_email','relance_devis_email','alerte_stock_email') AND (prochaine_execution IS NULL OR prochaine_execution <= NOW()) ORDER BY id ASC LIMIT 50"
+        "SELECT a.*, u.fuseau_horaire FROM pro_automations a JOIN users u ON u.id = a.user_id " +
+        "WHERE a.actif = 1 AND a.type IN ('relance_impayes_email','relance_devis_email','alerte_stock_email') " +
+        "AND (a.prochaine_execution IS NULL OR a.prochaine_execution <= NOW()) ORDER BY a.id ASC LIMIT 50"
       );
 
       for (const automation of automations) {
@@ -109,6 +111,7 @@ async function executerRelancesAutomatiques() {
           const config = typeof automation.configuration_json === 'string'
             ? JSON.parse(automation.configuration_json || '{}')
             : (automation.configuration_json || {});
+          const companyLocalDate = localDateString(automation.fuseau_horaire || 'Africa/Dakar');
           const smtpReady = isSmtpConfigured();
 
           if (automation.type === 'relance_devis_email') {
@@ -126,10 +129,10 @@ async function executerRelancesAutomatiques() {
               "FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id " +
               "LEFT JOIN pro_portal_quote_decisions d ON d.facture_id = f.id AND d.user_id = f.user_id " +
               "WHERE f.user_id = ? AND f.type = 'devis' AND f.statut = 'en_attente' " +
-              "AND f.date_validite BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY) " +
+              "AND f.date_validite BETWEEN ? AND DATE_ADD(?, INTERVAL ? DAY) " +
               "AND d.id IS NULL AND c.email IS NOT NULL AND c.email <> '' " +
               "ORDER BY f.date_validite ASC LIMIT 250",
-              [automation.user_id, horizon]
+              [automation.user_id, companyLocalDate, companyLocalDate, horizon]
             );
             let sent = 0, failed = false;
             for (const quote of quotes) {
@@ -180,7 +183,7 @@ async function executerRelancesAutomatiques() {
               [automation.user_id]
             );
             const [[account]] = await pool.query('SELECT email, entreprise_nom FROM users WHERE id = ?', [automation.user_id]);
-            const runKey = 'stock:' + new Date().toISOString().slice(0, 10);
+            const runKey = 'stock:' + companyLocalDate;
             const [prior] = await pool.query(
               'SELECT id FROM pro_automation_runs WHERE automation_id = ? AND run_key = ? LIMIT 1',
               [automation.id, runKey]
@@ -237,9 +240,9 @@ async function executerRelancesAutomatiques() {
               "SELECT c.id, c.nom, c.email, COUNT(f.id) AS nb_factures, SUM(f.total - f.montant_paye) AS solde, GROUP_CONCAT(CONCAT(f.numero, ' (reste ', FORMAT(f.total - f.montant_paye, 2), ')') ORDER BY f.date_echeance SEPARATOR '\\n') AS details " +
               "FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id " +
               "WHERE f.user_id = ? AND f.type = 'facture' AND f.statut IN ('en_attente','en_retard') " +
-              "AND f.date_echeance IS NOT NULL AND f.date_echeance <= DATE_SUB(CURDATE(), INTERVAL ? DAY) " +
+              "AND f.date_echeance IS NOT NULL AND f.date_echeance <= DATE_SUB(?, INTERVAL ? DAY) " +
               "AND f.total > f.montant_paye AND c.email IS NOT NULL AND c.email <> '' GROUP BY c.id, c.nom, c.email",
-              [automation.user_id, jours]
+              [automation.user_id, companyLocalDate, jours]
             );
             let sent = 0, failed = false;
             for (const client of clients) {
