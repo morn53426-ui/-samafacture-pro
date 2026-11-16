@@ -90,7 +90,7 @@
     document.getElementById('modal-title').textContent = 'Nouvelle dépense';
     document.getElementById('depense-form').reset();
     document.getElementById('depense-id').value = '';
-    document.getElementById('date_depense').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('date_depense').value = dateCivileAujourdhui();
     document.getElementById('modal-error').innerHTML = '';
     document.getElementById('modal').style.display = 'flex';
   }

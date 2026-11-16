@@ -216,7 +216,7 @@
         providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'wave\', this)">' + Icon('smartphone') + ' Payer avec Wave</button>');
       }
       if (moyens.paydunya) {
-        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', this)">' + Icon('credit-card') + ' Orange Money / Carte</button>');
+        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', this)">' + Icon('credit-card') + ' Payer avec PayDunya</button>');
       }
       actions = providers.length
         ? '<div class="plan-payment-actions">' + providers.join('') + '</div>'
@@ -300,7 +300,7 @@
     document.getElementById('checkout-plan').textContent = PLAN_LABELS[plan] || plan;
     document.getElementById('checkout-amount').textContent = formatMontant(montant, 'FCFA');
     document.getElementById('checkout-provider').textContent =
-      fournisseur === 'wave' ? 'Wave' : 'Orange Money / Carte via PayDunya';
+      fournisseur === 'wave' ? 'Wave' : 'PayDunya';
     document.getElementById('checkout-disclosure-copy').textContent =
       'Le paiement est ponctuel, sans prélèvement ultérieur. Le plan reste associé au compte jusqu’à un changement manuel ; aucune date d’expiration automatique n’est gérée actuellement.';
     document.getElementById('checkout-activation-copy').textContent =
