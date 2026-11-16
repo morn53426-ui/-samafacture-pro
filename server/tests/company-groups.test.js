@@ -120,7 +120,7 @@ test('une base v8 reçoit les migrations v9 à v12 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v12 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v13 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
   assert.equal(Number(meta.version), 13, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12 → v13');
@@ -652,6 +652,53 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     { devise: 'FCFA', nombre_factures: 1, total_facture: 1000, total_encaisse: 250 }
   ]);
   assert.match(dashboard.body.note, /aucune conversion de change/i);
+
+  // Un jeton expiré doit être rejeté par l'API et par le worker email.
+  const [[starterRecipient]] = await pool.query('SELECT email FROM users WHERE id = ?', [starterId]);
+  const expiryInvitation = await request(app)
+    .post('/api/pro/company-group/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: starterRecipient.email });
+  assert.equal(expiryInvitation.status, 201, expiryInvitation.text);
+  const expiryInviteToken = new URL(expiryInvitation.body.invitation_url).searchParams.get('token');
+  const expiryChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + starterToken)
+    .send({ token: expiryInviteToken });
+  assert.equal(expiryChallenge.status, 202, expiryChallenge.text);
+  const [[expiryProof]] = await pool.query(
+    'SELECT id FROM pro_company_group_invitation_verifications WHERE invitation_id = ?',
+    [expiryInvitation.body.id]
+  );
+  const [[expiryProofOutbox]] = await pool.query(
+    "SELECT id, payload_enc FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [expiryProof.id]
+  );
+  const expiryProofEmail = decryptEmailPayload(expiryProofOutbox.payload_enc);
+  const expiryVerificationToken = new URL(expiryProofEmail.verification_url).searchParams.get('verification_token');
+  await pool.query(
+    'UPDATE email_outbox SET statut = \'sent\' WHERE entity_type = ? AND entity_id = ?',
+    ['company_group_invitation', expiryInvitation.body.id]
+  );
+  await pool.query(
+    'UPDATE pro_company_group_invitation_verifications SET expires_at = DATE_SUB(NOW(), INTERVAL 1 SECOND) WHERE id = ?',
+    [expiryProof.id]
+  );
+  const expiredProof = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + starterToken)
+    .send({ token: expiryInviteToken, verification_token: expiryVerificationToken });
+  assert.equal(expiredProof.status, 404, 'un jeton expiré ne doit pas rattacher la société');
+  const expiredProofDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async () => ({ sent: true })
+  });
+  assert.deepEqual(expiredProofDelivery, { claimed: 1, sent: 0, retried: 0, failed: 0, cancelled: 1 });
+  const [[expiredProofOutboxState]] = await pool.query(
+    'SELECT statut FROM email_outbox WHERE id = ?',
+    [expiryProofOutbox.id]
+  );
+  assert.equal(expiredProofOutboxState.statut, 'cancelled');
 
   const [[outsiderRecipient]] = await pool.query('SELECT email FROM users WHERE id = ?', [outsiderId]);
   const secondInvitation = await request(app)
