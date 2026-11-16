@@ -828,7 +828,7 @@ router.post('/company-group/invitations', async (req, res, next) => {
         subject: 'Invitation à rejoindre un groupe de sociétés SamaFacture Pro',
         text: 'Le groupe « ' + group.nom + ' » vous invite à rattacher votre société à son espace de gestion. Acceptez uniquement si vous autorisez explicitement le propriétaire du groupe à accéder à votre société : ' + invitationUrl
       }) || { sent: false };
-    } catch (mailError) {
+    } catch {
       // L'invitation est déjà enregistrée : remettre le lien au propriétaire pour
       // qu'il puisse le transmettre manuellement au lieu de masquer un succès partiel.
       console.warn('Envoi de l’invitation au groupe non confirmé ; lien remis pour copie manuelle.');
