@@ -344,6 +344,16 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.equal(expiredOutbox.statut, 'cancelled');
   assert.equal(expiredOutbox.dernier_code_erreur, 'entity_inactive');
 
+  const invitationListAfterExpiry = await request(app)
+    .get('/api/pro/company-group')
+    .set('Authorization', 'Bearer ' + groupOwnerToken);
+  assert.equal(invitationListAfterExpiry.status, 200, invitationListAfterExpiry.text);
+  assert.equal(
+    invitationListAfterExpiry.body.invitations.some(item => Number(item.id) === Number(expiredInvite.insertId)),
+    false,
+    'une invitation expirée ne doit plus apparaître dans la liste des actions disponibles'
+  );
+
   // Un crash lors de la huitième tentative ne doit pas provoquer une neuvième remise.
   const [exhaustedInvite] = await pool.query(
     `INSERT INTO pro_company_group_invitations
