@@ -27,7 +27,7 @@ async function claimPendingEmails(batchSize = DEFAULT_BATCH_SIZE) {
   try {
     await conn.beginTransaction();
     const [rows] = await conn.query(
-      `SELECT id, payload_enc, tentatives
+      `SELECT id, entity_type, entity_id, payload_enc, tentatives
        FROM email_outbox
        WHERE
          ((statut IN ('queued', 'retry') AND prochaine_tentative <= NOW())
@@ -59,6 +59,28 @@ async function claimPendingEmails(batchSize = DEFAULT_BATCH_SIZE) {
   } finally {
     conn.release();
   }
+}
+
+async function isEmailJobDeliverable(job) {
+  if (job.entity_type !== 'company_group_invitation') return true;
+  const [[invitation]] = await pool.query(
+    `SELECT id
+     FROM pro_company_group_invitations
+     WHERE id = ? AND statut = 'envoyee' AND expire_at > NOW()
+     LIMIT 1`,
+    [job.entity_id]
+  );
+  return Boolean(invitation);
+}
+
+async function markEmailCancelled(job) {
+  await pool.query(
+    `UPDATE email_outbox
+     SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL,
+         dernier_code_erreur = 'entity_inactive', updated_at = NOW()
+     WHERE id = ? AND statut = 'processing' AND lock_token = ?`,
+    [job.id, job.lockToken]
+  );
 }
 
 async function markEmailSent(job) {
@@ -110,10 +132,15 @@ async function dispatchPendingEmails({ sender = sendMail, batchSize = DEFAULT_BA
   }
 
   const jobs = await claimPendingEmails(batchSize);
-  const summary = { claimed: jobs.length, sent: 0, retried: 0, failed: 0 };
+  const summary = { claimed: jobs.length, sent: 0, retried: 0, failed: 0, cancelled: 0 };
 
   for (const job of jobs) {
     try {
+      if (!await isEmailJobDeliverable(job)) {
+        await markEmailCancelled(job);
+        summary.cancelled += 1;
+        continue;
+      }
       const message = decryptEmailPayload(job.payload_enc);
       const result = await sender(message);
       if (!result || result.sent !== true) {
@@ -188,6 +215,8 @@ module.exports = {
   retryDelaySeconds,
   safeErrorCode,
   claimPendingEmails,
+  isEmailJobDeliverable,
+  markEmailCancelled,
   dispatchPendingEmails,
   startEmailOutboxWorker
 };
