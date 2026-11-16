@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { localDateString } = require('../utils/local-date');
+const { SUPPORTED_CURRENCIES } = require('../config/localization');
 const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { escapeHtmlEmail, sanitizeEmailHeader } = require('../utils/email-escape');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
@@ -518,8 +519,7 @@ router.post('/', async (req, res, next) => {
     const companyCurrency = String(companyRows[0]?.devise || 'FCFA').toUpperCase();
     const companyLocalDate = localDateString(companyRows[0]?.fuseau_horaire || 'Africa/Dakar');
     const documentCurrency = String(devise || companyCurrency).toUpperCase();
-    const supportedCurrencies = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
-    if (!supportedCurrencies.includes(documentCurrency)) return res.status(400).json({ error: 'Devise de document non prise en charge.' });
+    if (!SUPPORTED_CURRENCIES.includes(documentCurrency)) return res.status(400).json({ error: 'Devise de document non prise en charge.' });
     if (documentCurrency !== companyCurrency) {
       return res.status(409).json({ error: 'La devise du document doit correspondre à la devise de base de l’entreprise. Les conversions multi-devises ne sont pas encore activées.' });
     }
