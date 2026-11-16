@@ -831,7 +831,7 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
     }
     const token = String(req.body.token || '');
     if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(400).json({ error: 'Jeton d’invitation invalide.' });
-    if (!req.user.email) return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email vérifiée.' });
+    if (!req.user.email) return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
 
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     conn = await pool.getConnection();
