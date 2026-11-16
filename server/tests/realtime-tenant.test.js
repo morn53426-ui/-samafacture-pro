@@ -27,6 +27,40 @@ describe('Sélection d’entreprise Socket.IO', () => {
     assert.equal(tenant, 12); assert.deepEqual(calls[0].params, [25, 12]); assert.match(calls[0].sql, /active = 1/);
   });
 
+  test('un propriétaire de groupe rejoint une filiale après acceptation si le plan Entreprise est actif', async () => {
+    const calls = [];
+    const tenant = await resolveSocketTenant(12, '34', async (sql, params) => {
+      calls.push({ sql, params });
+      return calls.length === 1
+        ? [[]]
+        : [[{ owner_user_id: 34, group_plan: 'entreprise' }]];
+    });
+
+    assert.equal(tenant, 34);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[1].params, [12, 34]);
+    assert.match(calls[1].sql, /pro_company_group_companies/);
+    assert.match(calls[1].sql, /g\.owner_user_id = \?/);
+  });
+
+  test('un groupe sans plan Entreprise actif ne donne pas accès à une filiale', async () => {
+    let call = 0;
+    await assert.rejects(
+      resolveSocketTenant(12, '34', async () => {
+        call += 1;
+        return call === 1 ? [[]] : [[{ owner_user_id: 34, group_plan: 'pro' }]];
+      }),
+      /Adhésion à cette entreprise absente ou inactive/
+    );
+  });
+
+  test('une filiale ne peut pas rejoindre le tenant de son groupe', async () => {
+    await assert.rejects(
+      resolveSocketTenant(34, '12', async () => [[]]),
+      /Adhésion à cette entreprise absente ou inactive/
+    );
+  });
+
   test('une sélection falsifiée ou une adhésion inactive est refusée', async () => {
     await assert.rejects(resolveSocketTenant(25, 'not-an-id', async () => [[]]), /Sélection d’entreprise invalide/);
     await assert.rejects(resolveSocketTenant(25, '99', async () => [[]]), /Adhésion à cette entreprise absente ou inactive/);
