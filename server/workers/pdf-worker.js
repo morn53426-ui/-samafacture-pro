@@ -14,6 +14,7 @@ const {
   getPdfPath,
   JOB_TTL,
   JOB_DIR,
+  cleanupExpiredPdfFiles,
   JOB_PREFIX,
   STREAM_KEY
 } = require('../pdf-queue');
