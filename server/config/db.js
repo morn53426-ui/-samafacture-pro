@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 9;
+const CURRENT_SCHEMA_VERSION = 10;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -133,14 +133,9 @@ async function initializeDatabaseOnce() {
         [CURRENT_SCHEMA_VERSION]
       );
     } else if (Number(meta.version) < CURRENT_SCHEMA_VERSION) {
-      // Une installation plus ancienne possède le marqueur mais pas encore toutes
-      // les migrations de cette version. On les applique une seule fois sous le
-      // verrou inter-processus puis on avance le numéro de version.
-      await runMigrations(conn);
-      await conn.query(
-        'UPDATE _samafacture_schema_meta SET version = ?, initialized_at = NOW() WHERE id = 1',
-        [CURRENT_SCHEMA_VERSION]
-      );
+      // Une installation existante en v9 doit aussi recevoir la migration 006
+      // des groupes multi-sociétés avant que le marqueur passe en v10.
+      await upgradeExistingSchema(conn, meta.version);
     }
   } finally {
     if (lockAcquired) {
@@ -152,6 +147,21 @@ async function initializeDatabaseOnce() {
     }
     conn.release();
   }
+}
+
+async function upgradeExistingSchema(conn, currentVersion) {
+  const version = Number(currentVersion);
+  if (!Number.isInteger(version) || version < 0) {
+    throw new Error('Version de schéma existante invalide.');
+  }
+  if (version >= CURRENT_SCHEMA_VERSION) return false;
+
+  await runMigrations(conn);
+  await conn.query(
+    'UPDATE _samafacture_schema_meta SET version = ?, initialized_at = NOW() WHERE id = 1',
+    [CURRENT_SCHEMA_VERSION]
+  );
+  return true;
 }
 
 /**
@@ -377,4 +387,4 @@ async function runMigrations(conn) {
 
 }
 
-module.exports = { pool, initDatabase };
+module.exports = { pool, initDatabase, CURRENT_SCHEMA_VERSION, upgradeExistingSchema };
