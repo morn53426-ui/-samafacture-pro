@@ -26,6 +26,7 @@ Pour configurer et utiliser les modèles complets de factures et devis, consulte
   - Rapports : ventes par jour/semaine/mois/année/client/produit, export CSV, résumé comptable (recettes, dépenses, bénéfice net, TVA collectée)
   - Paramètres entreprise : identité, coordonnées légales, banque/RIB, conditions de règlement, logo et personnalisation visuelle ; **19 modèles de facture/devis** partagés entre aperçu, impression et PDF
   - Centre d'aide (FAQ), Support technique (formulaire de contact) et Politique de confidentialité
+  - Checklist de préparation conformité (à compléter et faire valider) : [CONFORMITE_DONNEES_CHECKLIST.md](CONFORMITE_DONNEES_CHECKLIST.md)
   - Interface responsive : menu latéral escamotable sur mobile/tablette, tableaux et grilles adaptatifs
   - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature électronique, factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle)
   - **Partage WhatsApp manuel** des factures et devis depuis les listes et le détail : message prérempli et lien sécurisé de consultation ; l'utilisateur vérifie puis confirme l'envoi dans WhatsApp
@@ -286,6 +287,8 @@ La facture "imprimable" (`facture-detail.html`) peut être exportée en vrai fic
 - Chaque génération de PDF est nettement plus coûteuse en mémoire/CPU qu'un appel API classique. Un seul navigateur est réutilisé (pas relancé à chaque demande), et un maximum de 3 générations simultanées est appliqué pour éviter qu'un pic de demandes ne sature le serveur — au-delà, les demandes suivantes attendent leur tour au lieu d'échouer.
 - Sur un hébergement Linux très limité en ressources (petit mutualisé), cette fonctionnalité peut nécessiter un plan supérieur ou un service séparé dédié à la génération de PDF. Sur Windows (WAMPserver local, développement) et sur la plupart des VPS/hébergements dédiés, elle fonctionne sans configuration supplémentaire.
 - `APP_URL` doit être correctement renseigné dans `.env` (voir plus haut) : c'est l'adresse que Puppeteer utilise pour charger la page à imprimer.
+
+**File de tâches asynchrones** : les nouvelles demandes sont traitées par Redis Streams avec consumer group, acquittement après état terminal (`XACK`) et reprise des tâches pending (`XAUTOCLAIM`). Les anciennes tâches encore présentes dans la liste Redis sont migrées au démarrage du worker. La livraison est au moins une fois : voir [PDF_QUEUE_OPERATIONS.md](PDF_QUEUE_OPERATIONS.md) pour le délai de visibilité, les tentatives, la persistance Redis et la recette de reprise.
 
 ## Notifications en temps réel (Socket.io)
 
