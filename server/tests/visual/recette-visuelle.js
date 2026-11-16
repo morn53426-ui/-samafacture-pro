@@ -28,7 +28,8 @@ const PAGES = [
   { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
   { name: 'rapports', file: 'rapports.html', ready: '#table-body tr', charts: ['chart-ventes'], responsiveTable: '#table-body' },
   { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
-  { name: 'parametres', file: 'parametres.html', ready: '#entreprise_nom' },
+  { name: 'parametres', file: 'parametres.html', ready: '[data-template-card="classique"]' },
+  { name: 'professionnel', file: 'professionnel.html', ready: '#pro-sales' },
   { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' },
   { name: 'crm', file: 'crm.html', ready: '#activity-form' },
   { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
@@ -716,6 +717,68 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
         ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
         : null,
+      proWorkspaceNavigation: location.pathname.includes('professionnel')
+        ? (() => {
+            const guide = document.querySelector('.pro-workspace-guide');
+            const rect = guide?.getBoundingClientRect();
+            const links = Array.from(document.querySelectorAll('.pro-workspace-guide a[href^="#"]'));
+            return {
+              found: Boolean(guide),
+              left: rect ? rect.left : -1,
+              right: rect ? rect.right : window.innerWidth + 1,
+              width: rect ? rect.width : 0,
+              linkCount: links.length,
+              missingTargets: links.filter(link => !document.getElementById(link.getAttribute('href').slice(1)))
+                .map(link => link.getAttribute('href')),
+              groupCount: document.querySelectorAll('.pro-workspace-guide-group').length
+            };
+          })()
+        : null,
+      invoiceTemplateGallery: location.pathname.includes('parametres')
+        ? (() => {
+            const gallery = document.getElementById('invoice-template-gallery');
+            const rect = gallery?.getBoundingClientRect();
+            const cards = Array.from(document.querySelectorAll('[data-template-card]'));
+            const triggers = Array.from(document.querySelectorAll('[data-open-template-preview]'));
+            return {
+              found: Boolean(gallery),
+              count: cards.length,
+              triggers: triggers.length,
+              width: rect ? rect.width : 0,
+              left: rect ? rect.left : -1,
+              right: rect ? rect.right : window.innerWidth + 1,
+              cardWidths: cards.slice(0, 3).map(card => Math.round(card.getBoundingClientRect().width))
+            };
+          })()
+        : null,
+      invoiceLineLayout: location.pathname.includes('nouvelle-facture') && window.innerWidth <= 640
+        ? (() => {
+            const table = document.querySelector('.invoice-lines-table');
+            const wrapper = table?.closest('.invoice-lines-container');
+            const row = table?.querySelector('tbody tr');
+            const designation = row?.querySelector('.ligne-designation');
+            const quantity = row?.querySelector('.ligne-qte');
+            if (!table || !wrapper || !row || !designation || !quantity) return { found: false };
+            const designationRect = designation.getBoundingClientRect();
+            const quantityRect = quantity.getBoundingClientRect();
+            const overlaps = !(designationRect.right <= quantityRect.left ||
+              designationRect.left >= quantityRect.right ||
+              designationRect.bottom <= quantityRect.top ||
+              designationRect.top >= quantityRect.bottom);
+            return {
+              found: true,
+              tableWidth: table.getBoundingClientRect().width,
+              wrapperWidth: wrapper.getBoundingClientRect().width,
+              scrollWidth: wrapper.scrollWidth,
+              clientWidth: wrapper.clientWidth,
+              overlaps,
+              sameCell: designation.closest('td') === quantity.closest('td'),
+              designationColumnWidth: designation.closest('td').getBoundingClientRect().width,
+              quantityColumnWidth: quantity.closest('td').getBoundingClientRect().width,
+              quantityLabel: quantity.closest('td').dataset.label || ''
+            };
+          })()
+        : null,
       uncontainedTables,
       missingNavigationIcons: Array.from(document.querySelectorAll('.sidebar .nav-item')).filter((item) => {
         const svg = item.querySelector('.ic svg');
@@ -741,6 +804,72 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   assert.deepEqual(metrics.missingNavigationIcons, [],
     pageDefinition.name + ' : toutes les entrées du menu doivent afficher une icône SVG reconnue : ' +
     JSON.stringify(metrics.missingNavigationIcons));
+  if (pageDefinition.name === 'professionnel') {
+    const nav = metrics.proWorkspaceNavigation;
+    assert.equal(nav?.found, true, 'L’espace professionnel doit présenter une navigation par activité.');
+    assert.equal(nav.groupCount, 4, 'Les outils professionnels doivent être rangés en quatre rubriques.');
+    assert.equal(nav.linkCount, 9, 'Les neuf modules professionnels doivent être accessibles depuis la navigation.');
+    assert.deepEqual(nav.missingTargets, [], 'Chaque accès rapide doit pointer vers un module existant.');
+    assert.ok(nav.left >= -1 && nav.right <= metrics.viewport + 1,
+      'La navigation professionnelle ne doit pas sortir de l’écran : ' + JSON.stringify(nav));
+    if (viewport.width <= 560) {
+      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
+      assert.equal(gridColumns.split(' ').length, 1,
+        'Les rubriques professionnelles doivent s’empiler sur téléphone : ' + gridColumns);
+    }
+    if (viewport.width === 1440) {
+      await page.click('.pro-workspace-guide a[href="#pro-integrations"]');
+      assert.equal(await page.evaluate(() => location.hash), '#pro-integrations',
+        'Les accès rapides doivent naviguer jusqu’au module choisi.');
+    }
+  }
+  if (pageDefinition.name === 'parametres') {
+    const gallery = metrics.invoiceTemplateGallery;
+    assert.equal(gallery?.found, true, 'La galerie de modèles doit être présente dans les paramètres.');
+    assert.equal(gallery.count, 24, 'Les 24 modèles de facture doivent être visibles.');
+    assert.equal(gallery.triggers, 24, 'Chaque modèle doit proposer un aperçu A4 cliquable.');
+    assert.ok(gallery.left >= -1 && gallery.right <= metrics.viewport + 1,
+      'La galerie des modèles ne doit pas déborder de l’écran : ' + JSON.stringify(gallery));
+    if (viewport.width <= 640) {
+      assert.ok(gallery.cardWidths.every(width => width >= Math.min(260, metrics.viewport - 36)),
+        'Les aperçus de modèles doivent rester assez larges sur mobile : ' + JSON.stringify(gallery));
+    }
+  }
+  if (pageDefinition.name === 'nouvelle-facture' && viewport.width <= 640) {
+    const layout = metrics.invoiceLineLayout;
+    assert.equal(layout?.found, true,
+      'La ligne d’article doit afficher ses champs à ' + viewport.width + 'px.');
+    assert.equal(layout.sameCell, false,
+      'La désignation et la quantité doivent rester dans deux cellules distinctes : ' + JSON.stringify(layout));
+    assert.equal(layout.overlaps, false,
+      'Les champs désignation et quantité ne doivent jamais se chevaucher : ' + JSON.stringify(layout));
+    assert.ok(layout.designationColumnWidth >= 180 && layout.quantityColumnWidth >= 75,
+      'Les champs doivent conserver une largeur utilisable dans la fiche mobile : ' + JSON.stringify(layout));
+    assert.equal(layout.quantityLabel, 'Quantité',
+      'Le champ quantité doit garder son libellé sur mobile : ' + JSON.stringify(layout));
+    const accessibleLineFields = await page.$eval('.invoice-lines-table tbody tr', row => {
+      const fields = [
+        ['.ligne-designation', 'Désignation'],
+        ['.ligne-qte', 'Quantité'],
+        ['.ligne-pu', 'Prix unitaire en FCFA'],
+        ['.ligne-tva', 'TVA en pourcentage']
+      ];
+      return fields.map(([selector, expected]) => {
+        const input = row.querySelector(selector);
+        return {
+          id: input?.id || '',
+          label: input?.labels ? Array.from(input.labels).map(label => label.textContent.trim()).join(' ') : '',
+          expected
+        };
+      });
+    });
+    assert.ok(accessibleLineFields.every(field => field.id && field.label === field.expected),
+      'Chaque champ d’article doit posséder un label HTML associé : ' + JSON.stringify(accessibleLineFields));
+    assert.ok(layout.tableWidth <= layout.wrapperWidth + 1 &&
+      layout.scrollWidth <= layout.clientWidth + 1,
+      'La fiche article doit tenir sur la largeur du téléphone, sans défilement latéral : ' +
+      JSON.stringify(layout));
+  }
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
@@ -792,6 +921,129 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.ok(labels.length > 0 && labels.every(Boolean),
       pageDefinition.name + ' : toutes les cellules du tableau mobile doivent avoir un libellé. Labels : ' +
       JSON.stringify(labels));
+  }
+
+  if (pageDefinition.name === 'parametres' && [320, 1440].includes(viewport.width)) {
+    await page.waitForSelector('[data-open-template-preview="nova"]', { timeout: 15000 });
+    const dialogSemantics = await page.$eval('#invoice-template-preview-modal', modal => ({
+      role: modal.getAttribute('role'),
+      modal: modal.getAttribute('aria-modal'),
+      labelledBy: modal.getAttribute('aria-labelledby'),
+      describedBy: modal.getAttribute('aria-describedby'),
+      heading: document.getElementById(modal.getAttribute('aria-labelledby'))?.textContent.trim(),
+      description: document.getElementById(modal.getAttribute('aria-describedby'))?.textContent.trim()
+    }));
+    assert.deepEqual(dialogSemantics, {
+      role: 'dialog',
+      modal: 'true',
+      labelledBy: 'invoice-template-preview-name',
+      describedBy: 'invoice-template-preview-description',
+      heading: 'Modèle de facture',
+      description: 'Exemple avec les informations de votre entreprise.'
+    }, 'La fenêtre d’aperçu doit exposer un nom et une description aux technologies d’assistance.');
+
+    await page.click('[data-open-template-preview="nova"]');
+    await page.waitForFunction(() => {
+      const modal = document.getElementById('invoice-template-preview-modal');
+      return modal && getComputedStyle(modal).display !== 'none';
+    }, { timeout: 5000 });
+    const initialDialogFocus = await page.evaluate(() => document.activeElement?.id || '');
+    assert.equal(initialDialogFocus, 'invoice-template-preview-close',
+      'À l’ouverture, le focus clavier doit entrer dans la fenêtre d’aperçu.');
+
+    const fittedPreview = await page.evaluate(() => {
+      const modal = document.getElementById('invoice-template-preview-modal');
+      const stage = document.getElementById('invoice-template-preview-stage');
+      const wrapper = document.getElementById('invoice-template-preview-scaled');
+      const page = document.getElementById('invoice-template-preview-document');
+      const modalRect = modal.getBoundingClientRect();
+      return {
+        modalLeft: modalRect.left,
+        modalRight: modalRect.right,
+        modalTop: modalRect.top,
+        modalBottom: modalRect.bottom,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        stageWidth: stage.clientWidth,
+        wrapperWidth: wrapper.getBoundingClientRect().width,
+        wrapperHeight: wrapper.getBoundingClientRect().height,
+        pageWidth: page.offsetWidth,
+        pageHeight: page.offsetHeight,
+        zoom: document.getElementById('invoice-template-preview-zoom-level').textContent
+      };
+    });
+    assert.ok(fittedPreview.modalLeft >= -1 && fittedPreview.modalRight <= fittedPreview.viewportWidth + 1 &&
+      fittedPreview.modalTop >= -1 && fittedPreview.modalBottom <= fittedPreview.viewportHeight + 1,
+      'La fenêtre d’aperçu A4 doit rester dans l’écran : ' + JSON.stringify(fittedPreview));
+    assert.ok(fittedPreview.wrapperWidth <= fittedPreview.stageWidth + 1 &&
+      fittedPreview.pageWidth === 794 && fittedPreview.pageHeight >= 1123,
+      'L’aperçu doit afficher la vraie feuille A4 à une échelle adaptée : ' + JSON.stringify(fittedPreview));
+
+    await page.click('#invoice-template-preview-quote');
+    const quotePreview = await page.evaluate(() => ({
+      heading: document.getElementById('invoice-template-preview-name').textContent,
+      numberVisible: document.getElementById('invoice-template-preview-document').textContent.includes('DEV-APERÇU-001'),
+      quoteSelected: document.getElementById('invoice-template-preview-quote').getAttribute('aria-pressed')
+    }));
+    assert.ok(quotePreview.heading.includes('Devis') && quotePreview.numberVisible &&
+      quotePreview.quoteSelected === 'true',
+      'Le bouton Devis doit afficher un vrai aperçu de devis : ' + JSON.stringify(quotePreview));
+
+    const zoomBefore = await page.$eval('#invoice-template-preview-scaled', element => element.getBoundingClientRect().width);
+    await page.click('#invoice-template-preview-zoom-in');
+    const zoomAfter = await page.$eval('#invoice-template-preview-scaled', element => element.getBoundingClientRect().width);
+    assert.ok(zoomAfter > zoomBefore + 20,
+      'Le contrôle + doit agrandir la feuille A4 : ' + JSON.stringify({ zoomBefore, zoomAfter }));
+    await page.click('#invoice-template-preview-zoom-fit');
+    await page.click('#invoice-template-preview-use');
+    await page.waitForFunction(() =>
+      getComputedStyle(document.getElementById('invoice-template-preview-modal')).display === 'none'
+    );
+    const selection = await page.evaluate(() => ({
+      value: document.getElementById('facture_template').value,
+      selected: document.querySelector('[data-template-card="nova"]')?.classList.contains('is-selected')
+    }));
+    assert.deepEqual(selection, { value: 'nova', selected: true },
+      'Le bouton Utiliser ce modèle doit actualiser la sélection enregistrable.');
+
+    await page.waitForFunction(() =>
+      document.activeElement?.getAttribute('data-open-template-preview') === 'nova'
+    );
+    const focusAfterSelection = await page.evaluate(() =>
+      document.activeElement?.getAttribute('data-open-template-preview') || ''
+    );
+    assert.equal(focusAfterSelection, 'nova',
+      'La fermeture de l’aperçu doit rendre le focus au modèle qui l’a ouvert.');
+
+    await page.click('[data-open-template-preview="nova"]');
+    await page.waitForFunction(() =>
+      getComputedStyle(document.getElementById('invoice-template-preview-modal')).display !== 'none'
+    );
+    await page.waitForFunction(() =>
+      document.activeElement?.id === 'invoice-template-preview-close'
+    );
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('Tab');
+    await page.keyboard.up('Shift');
+    assert.equal(await page.evaluate(() => document.activeElement?.id || ''),
+      'invoice-template-preview-use',
+      'Maj+Tab depuis le premier contrôle doit rester dans la fenêtre et aller au dernier contrôle.');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement?.id || ''),
+      'invoice-template-preview-close',
+      'Tab depuis le dernier contrôle doit revenir au premier contrôle.');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() =>
+      getComputedStyle(document.getElementById('invoice-template-preview-modal')).display === 'none'
+    );
+    await page.waitForFunction(() =>
+      document.activeElement?.getAttribute('data-open-template-preview') === 'nova'
+    );
+    const focusAfterEscape = await page.evaluate(() =>
+      document.activeElement?.getAttribute('data-open-template-preview') || ''
+    );
+    assert.equal(focusAfterEscape, 'nova',
+      'La touche Échap doit fermer l’aperçu et rendre le focus à son déclencheur.');
   }
 
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
@@ -853,6 +1105,36 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   assert.equal(reduced.transform, 'none', 'Le toast ne doit pas se déplacer en mode mouvement réduit.');
   assert.ok(parseFloat(reduced.transitionDuration) <= 0.001,
     'La transition du toast doit être quasiment instantanée en mouvement réduit.');
+
+  await reducedPage.setViewport({ width: 320, height: 812, deviceScaleFactor: 1 });
+  const longToastMessage = 'Notification importante : une opération nécessite votre attention. ' +
+    'Consultez les détails avant de poursuivre. '.repeat(14) +
+    'REFERENCE-' + 'X'.repeat(180);
+  await reducedPage.evaluate(message => showToast(message, 'info'), longToastMessage);
+  await reducedPage.waitForFunction(() => document.querySelectorAll('.toast').length >= 2);
+  const longToastLayout = await reducedPage.evaluate(() => {
+    const container = document.querySelector('.toast-container');
+    const toast = container?.lastElementChild;
+    const containerRect = container?.getBoundingClientRect();
+    const toastRect = toast?.getBoundingClientRect();
+    return {
+      viewport: window.innerWidth,
+      left: containerRect?.left ?? -1,
+      right: containerRect?.right ?? window.innerWidth + 1,
+      toastWidth: toast?.clientWidth || 0,
+      toastScrollWidth: toast?.scrollWidth || 0,
+      toastHeight: toast?.getBoundingClientRect().height || 0,
+      toastScrollHeight: toast?.scrollHeight || 0,
+      boxRight: toastRect?.right ?? window.innerWidth + 1
+    };
+  });
+  assert.ok(longToastLayout.left >= 0 && longToastLayout.right <= longToastLayout.viewport + 1 &&
+    longToastLayout.boxRight <= longToastLayout.viewport + 1,
+    'Une notification longue doit rester entièrement dans l’écran à 320 px : ' + JSON.stringify(longToastLayout));
+  assert.ok(longToastLayout.toastWidth > 0 &&
+    longToastLayout.toastScrollWidth <= longToastLayout.toastWidth + 1,
+    'Le texte d’une notification longue doit revenir à la ligne sans être coupé : ' + JSON.stringify(longToastLayout));
+
   const tooltipMetrics = await reducedPage.evaluate(() => {
     const element = document.createElement('button');
     element.setAttribute('data-tooltip', 'Aide');
@@ -989,6 +1271,57 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
       JSON.stringify(narrowToolbar));
   assert.ok(narrowToolbar.documentWidth <= narrowToolbar.viewport + 1,
     'La barre supérieure ne doit pas élargir le document à 320 px : ' + JSON.stringify(narrowToolbar));
+
+  await mobile.click('#workspace-notification-toggle');
+  const longNotificationTitle = 'Alerte de règlement et de validation du document pour le compte principal — '.repeat(4);
+  const longNotificationBody = ('Une opération demande votre attention : vérifiez la référence, le montant, la date ' +
+    'et le statut avant de confirmer cette action dans votre espace de travail. ').repeat(8);
+  await mobile.evaluate(({ title, body }) => pushWorkspaceNotification(title, body, 'info'), {
+    title: longNotificationTitle,
+    body: longNotificationBody
+  });
+  const longNotificationLayout = await mobile.evaluate(() => {
+    const panel = document.getElementById('workspace-notification-panel');
+    const list = document.getElementById('workspace-notification-list');
+    const toggle = document.getElementById('workspace-notification-toggle');
+    const item = list?.querySelector('.app-notification-item');
+    const title = item?.querySelector('strong');
+    const message = item?.querySelector('p');
+    const rect = panel?.getBoundingClientRect();
+    const toggleRect = toggle?.getBoundingClientRect();
+    return {
+      viewport: window.innerWidth,
+      left: rect?.left ?? -1,
+      right: rect?.right ?? window.innerWidth + 1,
+      top: rect?.top ?? -1,
+      toggleBottom: toggleRect?.bottom ?? 0,
+      panelWidth: panel?.clientWidth || 0,
+      panelScrollWidth: panel?.scrollWidth || 0,
+      listWidth: list?.clientWidth || 0,
+      listScrollWidth: list?.scrollWidth || 0,
+      listOverflowY: list ? getComputedStyle(list).overflowY : '',
+      titleWidth: title?.clientWidth || 0,
+      titleScrollWidth: title?.scrollWidth || 0,
+      messageWidth: message?.clientWidth || 0,
+      messageScrollWidth: message?.scrollWidth || 0,
+      messageHeight: message?.getBoundingClientRect().height || 0
+    };
+  });
+  assert.ok(longNotificationLayout.left >= 0 &&
+    longNotificationLayout.right <= longNotificationLayout.viewport + 1,
+    'Le panneau de notifications doit rester dans les limites de l’écran : ' + JSON.stringify(longNotificationLayout));
+  assert.ok(longNotificationLayout.top >= longNotificationLayout.toggleBottom + 4,
+    'Le panneau ne doit pas recouvrir la cloche qui sert à le fermer : ' + JSON.stringify(longNotificationLayout));
+  assert.ok(longNotificationLayout.panelWidth > 0 &&
+    longNotificationLayout.panelScrollWidth <= longNotificationLayout.panelWidth + 1 &&
+    longNotificationLayout.listScrollWidth <= longNotificationLayout.listWidth + 1,
+    'Les notifications longues ne doivent pas élargir le panneau : ' + JSON.stringify(longNotificationLayout));
+  assert.ok(longNotificationLayout.titleWidth > 0 &&
+    longNotificationLayout.titleScrollWidth <= longNotificationLayout.titleWidth + 1 &&
+    longNotificationLayout.messageWidth > 0 &&
+    longNotificationLayout.messageScrollWidth <= longNotificationLayout.messageWidth + 1,
+    'Le titre et le message doivent se replier sans être coupés : ' + JSON.stringify(longNotificationLayout));
+
   await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await mobile.click('#mobile-toggle-btn');
   const opened = await mobile.evaluate(() => ({

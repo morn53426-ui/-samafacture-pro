@@ -17,7 +17,7 @@
 <body>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content pro-workspace">
+  <main class="main-content workspace-page pro-workspace">
     <div class="page-header">
       <div>
         <div class="pro-eyebrow"><i class="ic" data-icon="briefcase-business"></i> OUTILS DE GESTION AVANCÉS</div>
@@ -38,6 +38,59 @@
       <article class="pro-kpi"><span>Demandes de remboursement</span><strong id="kpi-refunds">—</strong></article>
       <article class="pro-kpi"><span>Documents archivés</span><strong id="kpi-documents">—</strong></article>
     </section>
+
+    <nav class="pro-workspace-guide" aria-label="Navigation par activité dans l'espace professionnel">
+      <div class="pro-workspace-guide-head">
+        <div>
+          <h2>Accès rapide par activité</h2>
+          <p>Choisissez une rubrique pour accéder directement à l’outil correspondant.</p>
+        </div>
+        <span class="pro-status">9 outils · 4 rubriques</span>
+      </div>
+      <div class="pro-workspace-guide-grid">
+        <section class="pro-workspace-guide-group" aria-label="Commerce et relation client">
+          <div class="pro-workspace-guide-group-head">
+            <span class="pro-workspace-guide-icon"><i class="ic" data-icon="clipboard-list"></i></span>
+            <div><strong>Commerce & clients</strong><small>Suivi des ventes et de la clientèle</small></div>
+          </div>
+          <div class="pro-workspace-guide-links">
+            <a href="#pro-sales">Ventes et documents commerciaux</a>
+            <a href="#pro-clients">Clients et relances</a>
+          </div>
+        </section>
+        <section class="pro-workspace-guide-group" aria-label="Finances et gestion">
+          <div class="pro-workspace-guide-group-head">
+            <span class="pro-workspace-guide-icon"><i class="ic" data-icon="credit-card"></i></span>
+            <div><strong>Finances & gestion</strong><small>Encaissements, caisses et analyses</small></div>
+          </div>
+          <div class="pro-workspace-guide-links">
+            <a href="#pro-payments">Paiements et remboursements</a>
+            <a href="#pro-management">Établissements et caisses</a>
+            <a href="#pro-reports">Marges et analyses</a>
+          </div>
+        </section>
+        <section class="pro-workspace-guide-group" aria-label="Équipe et documents">
+          <div class="pro-workspace-guide-group-head">
+            <span class="pro-workspace-guide-icon"><i class="ic" data-icon="users"></i></span>
+            <div><strong>Équipe & documents</strong><small>Collaborateurs et pièces justificatives</small></div>
+          </div>
+          <div class="pro-workspace-guide-links">
+            <a href="#pro-team">Équipe et autorisations</a>
+            <a href="#pro-documents">Documents et signatures</a>
+          </div>
+        </section>
+        <section class="pro-workspace-guide-group" aria-label="Automatisation et connexions">
+          <div class="pro-workspace-guide-group-head">
+            <span class="pro-workspace-guide-icon"><i class="ic" data-icon="globe"></i></span>
+            <div><strong>Automatisation & connexions</strong><small>Processus et services externes</small></div>
+          </div>
+          <div class="pro-workspace-guide-links">
+            <a href="#pro-automation">Automatisations</a>
+            <a href="#pro-integrations">API et intégrations</a>
+          </div>
+        </section>
+      </div>
+    </nav>
 
     <div class="pro-module-grid">
       <section class="card pro-module" id="pro-sales">
