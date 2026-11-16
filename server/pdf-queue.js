@@ -14,12 +14,24 @@ async function enqueuePdfJob({ factureId, user }) {
   await fs.mkdir(JOB_DIR, { recursive: true });
   const id = crypto.randomUUID();
   const job = { id, factureId: Number(factureId), user: { id: user.id, email: user.email, role: user.role, nom: user.nom }, createdAt: new Date().toISOString() };
-  // Audit final : le champ `id` n'était jamais écrit ici (ni par le worker dans
-  // workers/pdf-worker.js), alors que getPdfJob() ci-dessous teste `data.id` — code mort qui ne
-  // fonctionnait que par accident grâce au `||` avec `status`. On l'écrit désormais réellement.
-  await redis.hSet(JOB_PREFIX + id, { id, status: 'queued', userId: String(user.id), factureId: String(factureId), createdAt: job.createdAt });
-  await redis.expire(JOB_PREFIX + id, JOB_TTL);
-  await redis.rPush(QUEUE_KEY, JSON.stringify(job));
+  const key = JOB_PREFIX + id;
+
+  // Le hash reste disponible tant que le travail est en attente. La liste Redis ne possède
+  // pas de TTL : expirer le hash ici ferait perdre userId si le worker restait arrêté plus
+  // longtemps que JOB_TTL, même si l'élément de la file était encore présent.
+  // Le worker applique JOB_TTL uniquement après un état terminal (completed/failed).
+  // MULTI/EXEC rend la création du hash et l'ajout à la file atomiques : pas de hash orphelin
+  // si l'ajout à la liste échoue entre deux commandes.
+  const transaction = redis.multi();
+  transaction.hSet(key, {
+    id,
+    status: 'queued',
+    userId: String(user.id),
+    factureId: String(factureId),
+    createdAt: job.createdAt
+  });
+  transaction.rPush(QUEUE_KEY, JSON.stringify(job));
+  await transaction.exec();
   return id;
 }
 
