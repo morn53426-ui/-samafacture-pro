@@ -12,7 +12,7 @@ router.use(requireAuth, resolveTenant, requirePermission);
 function parseDateOnly(value) {
   const iso = value instanceof Date
     ? value.toISOString().slice(0, 10)
-    : String(value ?? '').slice(0, 10);
+    : String(value ?? '').trim();
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!match) throw new TypeError('La date doit respecter le format AAAA-MM-JJ.');
   const year = Number(match[1]);
