@@ -5,6 +5,7 @@ const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
 const { computeTotals, insererLignesFacture } = require('./factures');
 const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
+const { localDateString } = require('../utils/local-date');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -288,7 +289,7 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
   try {
     await conn.beginTransaction();
     // Même ordre de verrouillage que les autres créations : compte, puis modèle.
-    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
+    const [[company]] = await conn.query('SELECT devise, fuseau_horaire FROM users WHERE id = ? FOR UPDATE', [userId]);
 
     // SELECT ... FOR UPDATE sérialise les générations du même modèle. Le scheduler
     // recontrôle l'échéance après le verrou (onlyIfDue) et saute une échéance déjà traitée.
@@ -307,11 +308,9 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
     // Un passage du scheduler peut avoir sélectionné ce modèle avant qu'une génération
     // manuelle ou un autre passage n'obtienne le verrou et n'avance l'échéance. Recontrôler
     // la date sous verrou évite de générer une seconde facture pour la même échéance.
-    const [[scheduleState]] = await conn.query(
-      'SELECT (actif = 1 AND prochaine_date <= CURDATE()) AS due FROM factures_recurrentes WHERE id = ? AND user_id = ?',
-      [modele.id, userId]
-    );
-    const scheduledDateDue = Number(scheduleState?.due) === 1;
+    const companyLocalDate = localDateString(company?.fuseau_horaire || 'Africa/Dakar');
+    const modeleNextDate = parseDateOnly(modele.prochaine_date).iso;
+    const scheduledDateDue = Number(modele.actif) === 1 && modeleNextDate <= companyLocalDate;
     if (onlyIfDue && !scheduledDateDue) {
       await conn.rollback();
       return null;
@@ -327,8 +326,8 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
       throw error;
     }
 
-    const [[company]] = await conn.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [userId]);
     const documentCurrency = String(company?.devise || 'FCFA').toUpperCase();
+    const documentDate = companyLocalDate;
 
     const lignes = JSON.parse(modele.lignes_json);
     // Même règle de calcul qu'une facture créée manuellement (voir routes/factures.js) :
@@ -340,7 +339,7 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
 
     // Numérotation atomique (même mécanisme que POST /api/factures)
     const prefix = 'FAC';
-    const year = new Date().getFullYear();
+    const year = Number(documentDate.slice(0, 4));
     await conn.query(
       `INSERT INTO compteurs_numerotation (user_id, type, annee, dernier_numero)
        VALUES (?, 'facture', ?, LAST_INSERT_ID(1))
@@ -352,8 +351,8 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
 
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
-       VALUES (?, ?, ?, 'facture', CURDATE(), ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, modele.client_id, numero, documentCurrency, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
+       VALUES (?, ?, ?, 'facture', ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, modele.client_id, numero, documentDate, documentCurrency, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
     );
     const factureId = result.insertId;
 
