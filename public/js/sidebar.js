@@ -267,15 +267,24 @@ function positionWorkspaceNotificationPanel() {
 
   const rect = toggle.getBoundingClientRect();
   const gutter = 12;
-  const viewportHeight = Math.max(0, window.innerHeight);
-  const safeGutter = Math.min(gutter, viewportHeight / 2);
-  const width = Math.max(180, Math.min(360, window.innerWidth - gutter * 2));
-  const left = Math.max(gutter, Math.min(
+  // innerHeight décrit le viewport de mise en page. Sur iOS Safari et certains
+  // navigateurs mobiles, le clavier réduit seulement le viewport visuel.
+  const visualViewport = window.visualViewport;
+  const viewportLeft = Math.max(0, Number(visualViewport?.offsetLeft) || 0);
+  const viewportTop = Math.max(0, Number(visualViewport?.offsetTop) || 0);
+  const viewportWidth = Math.max(0, Number(visualViewport?.width) || window.innerWidth);
+  const viewportHeight = Math.max(0, Number(visualViewport?.height) || window.innerHeight);
+  const safeGutterX = Math.min(gutter, viewportWidth / 2);
+  const safeGutterY = Math.min(gutter, viewportHeight / 2);
+  const viewportRight = viewportLeft + viewportWidth;
+  const viewportBottom = viewportTop + viewportHeight;
+  const width = Math.max(0, Math.min(360, viewportWidth - safeGutterX * 2));
+  const left = Math.max(viewportLeft + safeGutterX, Math.min(
     rect.right - width,
-    window.innerWidth - width - gutter
+    viewportRight - width - safeGutterX
   ));
-  const availableBelow = Math.max(0, viewportHeight - rect.bottom - safeGutter - 8);
-  const availableAbove = Math.max(0, rect.top - safeGutter - 8);
+  const availableBelow = Math.max(0, viewportBottom - rect.bottom - safeGutterY - 8);
+  const availableAbove = Math.max(0, rect.top - viewportTop - safeGutterY - 8);
   let top;
   let maxHeight;
 
@@ -290,8 +299,11 @@ function positionWorkspaceNotificationPanel() {
   // Ne jamais imposer une hauteur minimale qui dépasse l'espace réellement libre.
   // Le panneau peut être plus petit que 140 px lorsque le clavier mobile ou un
   // viewport court réduit la zone visible ; la liste conserve alors son scroll interne.
-  maxHeight = Math.max(0, Math.min(maxHeight, viewportHeight - safeGutter * 2));
-  top = Math.max(safeGutter, Math.min(top, viewportHeight - safeGutter - maxHeight));
+  maxHeight = Math.max(0, Math.min(maxHeight, viewportHeight - safeGutterY * 2));
+  top = Math.max(viewportTop + safeGutterY, Math.min(
+    top,
+    viewportBottom - safeGutterY - maxHeight
+  ));
 
   panel.style.position = 'fixed';
   panel.style.top = Math.round(top) + 'px';
@@ -340,6 +352,10 @@ function bindWorkspaceNotificationDismiss() {
   window.__sfNotificationDismissBound = true;
   window.addEventListener('resize', positionWorkspaceNotificationPanel);
   window.addEventListener('orientationchange', positionWorkspaceNotificationPanel);
+  // Le clavier virtuel et le zoom peuvent modifier le viewport visuel sans
+  // déclencher de redimensionnement du viewport de mise en page.
+  window.visualViewport?.addEventListener('resize', positionWorkspaceNotificationPanel);
+  window.visualViewport?.addEventListener('scroll', positionWorkspaceNotificationPanel);
   document.addEventListener('click', event => {
     if (!event.target.closest('.app-notification')) closeWorkspaceNotifications();
   });

@@ -1153,6 +1153,27 @@ async function verifyMotion(browser, baseUrl, fixtures) {
 
 async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   const page = await preparePage(browser, baseUrl, fixtures, false);
+  // Simule Safari iOS : le clavier réduit le viewport visuel sans réduire
+  // window.innerHeight. Le faux VisualViewport reste un EventTarget afin de
+  // vérifier aussi le repositionnement déclenché par son événement resize.
+  await page.evaluateOnNewDocument(() => {
+    const visualViewport = new EventTarget();
+    Object.defineProperties(visualViewport, {
+      width: { get: () => window.innerWidth },
+      height: { get: () => Number.isFinite(window.__sfTestVisualViewportHeight)
+        ? window.__sfTestVisualViewportHeight
+        : window.innerHeight },
+      offsetLeft: { get: () => Number(window.__sfTestVisualViewportOffsetLeft) || 0 },
+      offsetTop: { get: () => Number(window.__sfTestVisualViewportOffsetTop) || 0 },
+      scale: { get: () => 1 },
+      pageLeft: { get: () => window.scrollX },
+      pageTop: { get: () => window.scrollY }
+    });
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: visualViewport
+    });
+  });
   const clientRequests = [];
   page.on('request', (request) => {
     if (request.url().includes('/api/clients')) clientRequests.push(request.url());
@@ -1225,11 +1246,10 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   assert.equal(await page.$eval('#workspace-notification-list', element => element.textContent.trim()),
     'Aucune notification reçue pendant cette session.', 'Le bouton Effacer doit vider la liste.');
 
-  // Un viewport mobile très court simule le clavier virtuel ouvert.
-  // Le panneau doit rester dans l'écran même lorsque l'espace sous la cloche
-  // est inférieur à l'ancienne hauteur minimale de 140 px.
+  // Simule un clavier virtuel qui réduit le viewport visuel à 180 px alors
+  // que le viewport de mise en page reste à 844 px (cas rencontré sur iOS Safari).
   await page.evaluate(() => closeWorkspaceNotifications());
-  await page.setViewport({ width: 320, height: 180, deviceScaleFactor: 1 });
+  await page.setViewport({ width: 320, height: 844, deviceScaleFactor: 1 });
   await page.evaluate(() => {
     const toggle = document.getElementById('workspace-notification-toggle');
     toggle.style.position = 'fixed';
@@ -1244,6 +1264,8 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   await page.evaluate(() => {
     closeWorkspaceNotifications();
     toggleWorkspaceNotifications();
+    window.__sfTestVisualViewportHeight = 180;
+    window.visualViewport.dispatchEvent(new Event('resize'));
   });
   assert.equal(await page.$eval('#workspace-notification-panel', element => !element.hidden), true,
     'Le panneau doit être ouvert avant de vérifier ses limites.');
@@ -1252,19 +1274,23 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
     return {
       top: rect.top, bottom: rect.bottom,
       left: rect.left, right: rect.right,
-      viewportHeight: window.innerHeight, viewportWidth: window.innerWidth,
+      visualViewportHeight: window.visualViewport.height,
+      visualViewportWidth: window.visualViewport.width,
+      layoutViewportHeight: window.innerHeight,
       height: rect.height
     };
   });
+  assert.ok(shortViewportPanel.layoutViewportHeight > shortViewportPanel.visualViewportHeight,
+    'Le test doit distinguer le viewport visuel du viewport de mise en page.');
   assert.ok(
     shortViewportPanel.top >= 0 &&
-    shortViewportPanel.bottom <= shortViewportPanel.viewportHeight + 1 &&
+    shortViewportPanel.bottom <= shortViewportPanel.visualViewportHeight + 1 &&
     shortViewportPanel.left >= 0 &&
-    shortViewportPanel.right <= shortViewportPanel.viewportWidth + 1,
-    'Le panneau de notifications doit rester entièrement dans un viewport mobile étroit et court : ' + JSON.stringify(shortViewportPanel)
+    shortViewportPanel.right <= shortViewportPanel.visualViewportWidth + 1,
+    'Le panneau de notifications doit rester entièrement dans le viewport visuel réduit : ' + JSON.stringify(shortViewportPanel)
   );
   assert.ok(shortViewportPanel.height > 0,
-    'Le panneau ne doit pas devenir invisible dans un viewport mobile court.');
+    'Le panneau ne doit pas devenir invisible dans un viewport visuel réduit.');
   const shortViewportScroll = await page.$eval('#workspace-notification-panel', element => {
     const list = element.querySelector('.app-notification-list');
     return { clientHeight: list.clientHeight, scrollHeight: list.scrollHeight };
@@ -1272,6 +1298,8 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   assert.ok(shortViewportScroll.clientHeight > 0 && shortViewportScroll.scrollHeight > shortViewportScroll.clientHeight,
     'La liste doit conserver un défilement interne lorsque le panneau est réduit : ' + JSON.stringify(shortViewportScroll));
   await page.evaluate(() => {
+    window.__sfTestVisualViewportHeight = null;
+    window.visualViewport.dispatchEvent(new Event('resize'));
     const toggle = document.getElementById('workspace-notification-toggle');
     toggle.style.removeProperty('position');
     toggle.style.removeProperty('top');
