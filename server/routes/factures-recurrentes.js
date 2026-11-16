@@ -118,7 +118,15 @@ router.post('/', async (req, res, next) => {
 
     let prochaineDate;
     try {
-      prochaineDate = parseDateOnly(prochaine_date || new Date()).iso;
+      let premiereDate = prochaine_date;
+      if (!premiereDate) {
+        const [[company]] = await pool.query(
+          'SELECT fuseau_horaire FROM users WHERE id = ?',
+          [req.tenantId]
+        );
+        premiereDate = localDateString(company?.fuseau_horaire || 'Africa/Dakar');
+      }
+      prochaineDate = parseDateOnly(premiereDate).iso;
     } catch (dateErr) {
       return res.status(400).json({ error: dateErr.message });
     }
