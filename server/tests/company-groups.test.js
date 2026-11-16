@@ -486,10 +486,10 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     [proofRow.id]
   );
   assert.equal(proofOutbox.statut, 'queued');
-  const proofEmail = decryptEmailPayload(proofOutbox.payload_enc);
+  let proofEmail = decryptEmailPayload(proofOutbox.payload_enc);
   assert.equal(proofEmail.to, recipient.email);
   const verificationUrl = new URL(proofEmail.verification_url);
-  const verificationToken = verificationUrl.searchParams.get('verification_token');
+  let verificationToken = verificationUrl.searchParams.get('verification_token');
   assert.match(verificationToken || '', /^[a-f0-9]{64}$/i);
   assert.notEqual(proofRow.token_hash, verificationToken, 'la base ne doit stocker que le hash du jeton');
   assert.doesNotMatch(proofOutbox.payload_enc, new RegExp(verificationToken));
@@ -516,6 +516,38 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     [proofRow.id]
   );
   assert.equal(Number(proofOutboxCount.total), 1, 'un nouvel email ne doit pas être créé pendant le délai anti-abus');
+
+  // Après le délai anti-abus, un nouveau lien remplace l'ancien sans créer de doublon d'outbox.
+  const originalProofHash = proofRow.token_hash;
+  await pool.query(
+    'UPDATE pro_company_group_invitation_verifications SET sent_at = DATE_SUB(NOW(), INTERVAL 2 MINUTE) WHERE id = ?',
+    [proofRow.id]
+  );
+  const resentChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token });
+  assert.equal(resentChallenge.status, 202, resentChallenge.text);
+  const [[rotatedProof]] = await pool.query(
+    'SELECT token_hash FROM pro_company_group_invitation_verifications WHERE id = ?',
+    [proofRow.id]
+  );
+  assert.notEqual(rotatedProof.token_hash, originalProofHash, 'le renvoi doit invalider le précédent jeton');
+  const [[rotatedOutbox]] = await pool.query(
+    "SELECT id, payload_enc FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [proofRow.id]
+  );
+  assert.equal(rotatedOutbox.id, proofOutbox.id, 'le renvoi doit réutiliser la ligne outbox de l’invitation');
+  proofEmail = decryptEmailPayload(rotatedOutbox.payload_enc);
+  const rotatedVerificationToken = new URL(proofEmail.verification_url).searchParams.get('verification_token');
+  assert.match(rotatedVerificationToken || '', /^[a-f0-9]{64}$/i);
+  assert.notEqual(rotatedVerificationToken, verificationToken);
+  const oldProofReplay = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(oldProofReplay.status, 404);
+  verificationToken = rotatedVerificationToken;
 
   let deliveredVerificationPayload;
   const verificationDelivery = await dispatchPendingEmails({
