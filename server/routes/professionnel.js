@@ -1031,7 +1031,7 @@ router.get('/company-group/dashboard', async (req, res, next) => {
               COALESCE(SUM(total),0) AS total_facture,
               COALESCE(SUM(montant_paye),0) AS total_encaisse
        FROM factures
-       WHERE user_id IN (${slots}) AND type = 'facture'
+       WHERE user_id IN (${slots}) AND type = 'facture' AND statut <> 'annulee'
        GROUP BY user_id, devise`,
       ids
     );
