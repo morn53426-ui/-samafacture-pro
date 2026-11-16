@@ -20,7 +20,7 @@ function runMigrationInNewProcess() {
   });
 }
 
-test('une base déjà en version 7 applique les migrations du quota v8 et de l’ancre récurrente v9', async () => {
+test('une base en version 7 applique les migrations quota v8, ancre v9 et index d’échéance v10', async () => {
   await setupTestDatabase();
   await pool.query('DROP TABLE IF EXISTS facture_usage_mensuelle');
   const [quotaIndex] = await pool.query(
@@ -30,6 +30,14 @@ test('une base déjà en version 7 applique les migrations du quota v8 et de l�
   );
   if (quotaIndex.length) {
     await pool.query('ALTER TABLE factures DROP INDEX idx_factures_user_type_created_at');
+  }
+  const [dueIndex] = await pool.query(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures_recurrentes'
+       AND INDEX_NAME = 'idx_factures_recurrentes_active_due'`
+  );
+  if (dueIndex.length) {
+    await pool.query('ALTER TABLE factures_recurrentes DROP INDEX idx_factures_recurrentes_active_due');
   }
   const [anchorColumn] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -43,10 +51,10 @@ test('une base déjà en version 7 applique les migrations du quota v8 et de l�
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v9 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v10 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 9);
+  assert.equal(Number(meta.version), 10);
 
   const [tables] = await pool.query(
     `SELECT TABLE_NAME FROM information_schema.TABLES
@@ -67,6 +75,13 @@ test('une base déjà en version 7 applique les migrations du quota v8 et de l�
        AND COLUMN_NAME = 'jour_ancre'`
   );
   assert.equal(anchorColumns.length, 1, 'La colonne du jour d’ancrage doit être recréée par la migration v9.');
+
+  const [dueIndexes] = await pool.query(
+    `SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures_recurrentes'
+       AND INDEX_NAME = 'idx_factures_recurrentes_active_due'`
+  );
+  assert.equal(dueIndexes.length, 1, 'L’index des prochaines échéances actives doit être recréé par la migration v10.');
 });
 
 after(teardownTestEnvironment);
