@@ -161,6 +161,7 @@ async function initializeDatabaseOnce() {
  */
 async function runMigrations(conn) {
   // v10 : applique la migration 006 des groupes multi-sociétés aux bases déjà initialisées en v9.
+  // v11 : applique la migration 007 de l'outbox email durable aux bases existantes en v10.
   // v8 : registre persistant du quota mensuel, rétrocompatible avec les bases v7.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
