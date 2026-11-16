@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
+<meta name="referrer" content="no-referrer" />
 <title>Invitation — SamaFacture Pro</title>
 <link rel="stylesheet" href="css/style.css" />
 <link rel="icon" type="image/png" href="images/icon-192.png" />
@@ -23,33 +24,71 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
 (function(){
  const params=new URLSearchParams(location.search);
  const token=params.get('token')||'';
+ const verificationToken=params.get('verification_token')||'';
  const isCompanyGroup=params.get('type')==='company-group';
  const root=document.getElementById('invite-content');
- if(!/^[a-f0-9]{64}$/i.test(token)){root.innerHTML='<h1>Invitation invalide</h1><p>Le lien d’invitation est incomplet.</p>';return;}
- if(!Api.token()){
-   const next='invitation.html?'+(isCompanyGroup?'type=company-group&':'')+'token='+encodeURIComponent(token);
-   root.innerHTML='<h1>Vous avez été invité</h1><p>Connectez-vous avec l’adresse email qui a reçu l’invitation. Si vous n’avez pas encore de compte, créez-en un avec cette même adresse.</p><a class="btn btn-primary" style="width:100%" href="login.html?next='+encodeURIComponent(next)+'">Se connecter pour accepter</a><a style="display:block;text-align:center;margin-top:14px;color:var(--emerald)" href="register.html?next='+encodeURIComponent(next)+'">Créer un compte</a>';
+
+ if(!/^[a-f0-9]{64}$/i.test(token)){
+   root.innerHTML='<h1>Invitation invalide</h1><p>Le lien d’invitation est incomplet.</p>';
    return;
  }
+
+ const nextParams=new URLSearchParams();
+ if(isCompanyGroup) nextParams.set('type','company-group');
+ nextParams.set('token',token);
+ if(isCompanyGroup && /^[a-f0-9]{64}$/i.test(verificationToken)){
+   nextParams.set('verification_token',verificationToken);
+ }
+ const next='invitation.html?'+nextParams.toString();
+
+ function showSuccess(result){
+   if(!isCompanyGroup) localStorage.setItem('sf_company_owner',String(result.entreprise_id));
+   else localStorage.setItem('sf_company_group_member','true');
+   history.replaceState(null,'','invitation.html');
+   root.innerHTML='<h1>Invitation acceptée</h1><p>'+escapeHtml(result.message)+'</p><a class="btn btn-primary" style="width:100%" href="'+(isCompanyGroup?'groupe-entreprise.html':'professionnel.html')+'">Continuer</a>';
+ }
+
+ if(!Api.token()){
+   root.innerHTML='<h1>Vous avez été invité</h1><p>Connectez-vous avec l’adresse email qui a reçu l’invitation. Pour un groupe de sociétés, une seconde confirmation sera envoyée à cette adresse avant tout rattachement.</p><a class="btn btn-primary" style="width:100%" href="login.html?next='+encodeURIComponent(next)+'">Se connecter pour accepter</a><a style="display:block;text-align:center;margin-top:14px;color:var(--emerald)" href="register.html?next='+encodeURIComponent(next)+'">Créer un compte</a>';
+   return;
+ }
+
+ if(isCompanyGroup && /^[a-f0-9]{64}$/i.test(verificationToken)){
+   history.replaceState(null,'','invitation.html');
+   root.innerHTML='<h1>Confirmation de votre adresse email</h1><p>Vérification du lien sécurisé et rattachement de votre société…</p><div id="invite-error" style="margin-top:14px"></div>';
+   Api.post('/pro/company-group/invitations/accept/verify',{token,verification_token:verificationToken})
+     .then(showSuccess)
+     .catch(err=>{
+       document.getElementById('invite-error').innerHTML='<div class="error-box">'+escapeHtml(err.message)+'</div><p>Retournez au lien d’invitation et demandez un nouveau message de confirmation si le lien a expiré.</p>';
+     });
+   return;
+ }
+
+ history.replaceState(null,'','invitation.html');
  root.innerHTML=isCompanyGroup
-   ? '<h1>Rejoindre un groupe de sociétés</h1><p>En acceptant, vous autorisez le propriétaire du groupe à accéder à l’espace de votre société avec les droits administrateur. Votre compte, vos factures et vos données restent séparés des autres sociétés du groupe. Vous pouvez quitter le groupe ultérieurement.</p><button class="btn btn-primary" id="accept-invite" style="width:100%">Autoriser et rejoindre le groupe</button><div id="invite-error" style="margin-top:14px"></div>'
+   ? '<h1>Rejoindre un groupe de sociétés</h1><p>En acceptant, vous autorisez le propriétaire du groupe à accéder à l’espace de votre société avec les droits administrateur. Votre compte, vos factures et vos données restent séparés des autres sociétés du groupe. Vous devrez ensuite confirmer cette adresse depuis votre boîte email avant le rattachement.</p><button class="btn btn-primary" id="accept-invite" style="width:100%">Continuer vers la confirmation email</button><div id="invite-error" style="margin-top:14px"></div>'
    : '<h1>Rejoindre une équipe</h1><p>En acceptant, l’entreprise qui vous a invité pourra vous donner accès à son espace de travail selon les autorisations définies pour votre rôle.</p><button class="btn btn-primary" id="accept-invite" style="width:100%">Accepter l’invitation</button><div id="invite-error" style="margin-top:14px"></div>';
+
  document.getElementById('accept-invite').addEventListener('click',async()=>{
    const button=document.getElementById('accept-invite');
-   button.disabled=true;button.textContent='Acceptation…';
+   button.disabled=true;
+   button.textContent=isCompanyGroup?'Envoi de la confirmation…':'Acceptation…';
    try{
-     const result= isCompanyGroup
+     const result=isCompanyGroup
        ? await Api.post('/pro/company-group/invitations/accept',{token})
        : await Api.post('/pro/team/invitations/accept',{token});
-     if(!isCompanyGroup) localStorage.setItem('sf_company_owner',String(result.entreprise_id));
-     else localStorage.setItem('sf_company_group_member','true');
-     root.innerHTML='<h1>Invitation acceptée</h1><p>'+escapeHtml(result.message)+'</p><a class="btn btn-primary" style="width:100%" href="'+(isCompanyGroup?'groupe-entreprise.html':'professionnel.html')+'">Continuer</a>';
+     if(isCompanyGroup && result.verification_required){
+       root.innerHTML='<h1>Vérifiez votre boîte email</h1><p>'+escapeHtml(result.message)+'</p><p>Le groupe ne pourra accéder à votre société qu’après ouverture du lien envoyé à cette adresse. Ce lien expire après 20 minutes.</p>';
+       return;
+     }
+     showSuccess(result);
    }catch(err){
      document.getElementById('invite-error').innerHTML='<div class="error-box">'+escapeHtml(err.message)+'</div>';
-     button.disabled=false;button.textContent='Réessayer';
+     button.disabled=false;
+     button.textContent='Réessayer';
    }
  });
-})();
+})();;
 </script>
 </body>
 </html>
