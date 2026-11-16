@@ -42,8 +42,8 @@ async function verifierCanal(t, channel) {
   assert.equal(result.checkoutUrl, 'https://sandbox.paydunya.test/checkout');
   assert.equal(requete.url, 'https://app.paydunya.com/sandbox-api/v1/checkout-invoice/create');
   const payload = JSON.parse(requete.options.body);
-  assert.deepEqual(payload.invoice.channels, [channel]);
-  assert.equal(payload.channels, undefined, 'channels doit être placé dans invoice selon le contrat API');
+  assert.deepEqual(payload.channels, [channel], 'channels doit être placé à la racine du JSON selon le contrat PayDunya');
+  assert.equal(Object.hasOwn(payload.invoice, 'channels'), false, 'invoice ne doit pas contenir channels');
 }
 
 test('PayDunya limite le checkout au canal Orange Money Sénégal sélectionné', async t => {
