@@ -223,7 +223,7 @@
         providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'wave\', this)">' + Icon('smartphone') + ' Payer avec Wave</button>');
       }
       if (moyens.paydunya) {
-        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', this)">' + Icon('credit-card') + ' Orange Money / Carte</button>');
+        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', this)">' + Icon('credit-card') + ' Payer avec PayDunya</button>');
       }
       actions = providers.length
         ? '<div class="plan-payment-actions">' + providers.join('') + '</div>'
@@ -307,7 +307,7 @@
     document.getElementById('checkout-plan').textContent = PLAN_LABELS[plan] || plan;
     document.getElementById('checkout-amount').textContent = formatMontant(montant, 'FCFA');
     document.getElementById('checkout-provider').textContent =
-      fournisseur === 'wave' ? 'Wave' : 'Orange Money / Carte via PayDunya';
+      fournisseur === 'wave' ? 'Wave' : 'PayDunya';
     document.getElementById('checkout-disclosure-copy').textContent =
       'L’offre cible est mensuelle et renouvelable automatiquement. Le renouvellement ne sera activé qu’après validation d’un mandat accepté par le prestataire et consentement explicite.';
     document.getElementById('checkout-activation-copy').textContent =
