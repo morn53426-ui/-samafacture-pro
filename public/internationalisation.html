@@ -45,12 +45,19 @@ function refreshPreview(){
 async function load(){
   const data=await Api.get('/pro/localization');
   options=data.options||{};
-  fillSelect('pays_code',options.pays||[]);
+  const p=data.parametres||{};
+  let countryLabels={};
+  try {
+    const names=new Intl.DisplayNames([p.langue==='en'?'en':'fr'],{type:'region'});
+    countryLabels=Object.fromEntries((options.pays||[]).map(code=>[code,names.of(code)||code]));
+  } catch (_) {
+    countryLabels=Object.fromEntries((options.pays||[]).map(code=>[code,code]));
+  }
+  fillSelect('pays_code',options.pays||[],countryLabels);
   fillSelect('devise',options.devises||[]);
   fillSelect('fuseau_horaire',options.fuseaux||[]);
   fillSelect('format_date',options.formats_date||[]);
   fillSelect('regime_fiscal',options.regimes_fiscaux||[],{standard:'Standard',simplifie:'Régime simplifié',franchise:'Franchise',autre:'Autre'});
-  const p=data.parametres||{};
   Object.keys(p).forEach(key=>{if($(key))$(key).value=p[key];});
   refreshPreview();
 }
