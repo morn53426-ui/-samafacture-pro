@@ -164,14 +164,26 @@ test('refuse un identifiant de tâche qui pourrait sortir du répertoire PDF', a
     factureId: 42,
     user: { id: 7 }
   });
-  const result = await processPdfQueueEntry(dependencies(
-    redis,
-    async () => { renderCalls += 1; return Buffer.from('x'); },
-    async () => '/unused',
-    entry
-  ));
+  const originalError = console.error;
+  const logged = [];
+  console.error = (...args) => logged.push(args);
+  let result;
+  try {
+    result = await processPdfQueueEntry(dependencies(
+      redis,
+      async () => { renderCalls += 1; return Buffer.from('x'); },
+      async () => '/unused',
+      entry
+    ));
+  } finally {
+    console.error = originalError;
+  }
 
   assert.equal(result, 'invalid');
+  assert.equal(logged.length, 1);
+  assert.match(String(logged[0][0]), /Tâche PDF invalide acquittée/);
+  assert.equal(logged[0][1], 'stream-1');
+  assert.equal(JSON.stringify(logged).includes('../../etc/passwd'), false);
   assert.equal(renderCalls, 0);
   assert.deepEqual(redis.acked, ['stream-1']);
 });

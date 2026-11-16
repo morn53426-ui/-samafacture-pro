@@ -2,6 +2,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const crypto = require('crypto');
 const { getRedisClient, isRedisReady } = require('./config/redis');
+const { isUuid } = require('./utils/uuid');
 
 const QUEUE_KEY = process.env.PDF_QUEUE_KEY || 'samafacture:pdf:queue';
 const STREAM_KEY = process.env.PDF_STREAM_KEY || 'samafacture:pdf:stream';
@@ -140,11 +141,10 @@ async function cleanupExpiredPdfFiles({
     throw err;
   }
 
-  const pdfName = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$/i;
   let removed = 0;
   for (const entry of entries) {
     // Do not follow symlinks or touch unrelated files in a shared volume.
-    if (!entry.isFile() || !pdfName.test(entry.name)) continue;
+    if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.pdf') || !isUuid(entry.name.slice(0, -4))) continue;
     const file = path.join(JOB_DIR, entry.name);
     const stat = await fs.stat(file).catch(() => null);
     if (!stat || !stat.isFile() || now - stat.mtimeMs < retentionMs) continue;
@@ -168,6 +168,7 @@ async function getPdfJob(id, userId) {
 }
 
 async function getPdfPath(id) {
+  if (!isUuid(id)) throw new TypeError('Identifiant de tâche PDF invalide.');
   return path.join(JOB_DIR, id + '.pdf');
 }
 

@@ -1,10 +1,12 @@
+const { isUuid } = require('./utils/uuid');
+
 const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 
 function parseJob(entry) {
   try {
     const job = JSON.parse(entry && entry.message && entry.message.job || '');
     if (!job || typeof job !== 'object') return null;
-    if (!/^[0-9a-f-]{36}$/i.test(String(job.id || ''))) return null;
+    if (!isUuid(job.id)) return null;
     if (!Number.isSafeInteger(Number(job.factureId)) || Number(job.factureId) <= 0) return null;
     if (!job.user || job.user.id === undefined || job.user.id === null) return null;
     return job;
@@ -30,6 +32,9 @@ async function processPdfQueueEntry({
 }) {
   const job = parseJob(entry);
   if (!job) {
+    // Acknowledge poison messages to avoid an infinite retry loop, but retain an
+    // operational trace without logging the payload or any customer data.
+    console.error('Tâche PDF invalide acquittée sans exécution (entrée Redis) :', entry && entry.id || 'inconnue');
     await acknowledge(entry.id);
     return 'invalid';
   }

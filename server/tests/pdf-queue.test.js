@@ -151,6 +151,7 @@ const {
   migrateLegacyPdfQueue,
   claimNextPdfJob,
   acknowledgePdfJob,
+  getPdfPath,
   JOB_PREFIX,
   QUEUE_KEY,
   STREAM_KEY,
@@ -210,7 +211,7 @@ test('crée le consumer group et tolère son existence lors des redémarrages', 
 
 test('migre les tâches de l’ancienne liste vers le stream', async () => {
   const oldJob = JSON.stringify({
-    id: 'legacy-job-00000000-0000-0000-0000-000000000000',
+    id: '12345678-1234-4234-8234-123456789abc',
     factureId: 17,
     user: { id: 4, email: 'legacy@example.test', role: 'user', nom: 'Legacy' }
   });
@@ -246,4 +247,14 @@ test('acquitte et retire du stream une tâche terminée', async () => {
 
   assert.equal(state.pending.some(value => value.id === entry.id), false);
   assert.equal((state.streams.get(STREAM_KEY) || []).some(value => value.id === entry.id), false);
+});
+
+test('refuse les identifiants non UUID avant de construire un chemin PDF', async () => {
+  const validId = '12345678-1234-4234-8234-123456789abc';
+  assert.equal(await getPdfPath(validId), path.join(jobsDir, validId + '.pdf'));
+  await assert.rejects(getPdfPath('../../etc/passwd'), {
+    name: 'TypeError',
+    message: 'Identifiant de tâche PDF invalide.'
+  });
+  await assert.rejects(getPdfPath('not-a-uuid'), /Identifiant de tâche PDF invalide/);
 });

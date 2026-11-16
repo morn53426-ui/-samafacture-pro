@@ -15,6 +15,7 @@ La livraison est *au moins une fois*, pas exactement une fois. Si un worker s'ar
 - Nombre maximal de tentatives : 3 (`PDF_JOB_MAX_ATTEMPTS=3`).
 - Une erreur transitoire conserve l'entrée dans la PEL sans `XACK`. Elle est réclamée après le délai d'inactivité.
 - Après la dernière tentative, le statut passe à `failed`, le hash conserve le résultat pendant `PDF_JOB_TTL_SECONDS`, puis l'entrée est acquittée et supprimée.
+- Les identifiants de tâche doivent être des UUID valides. Le worker rejette les messages mal formés avant le rendu ; les chemins de fichiers vérifient aussi l'identifiant avant toute écriture ou lecture. Une entrée invalide est journalisée avec son identifiant Redis (sans journaliser son contenu client), puis acquittée pour éviter une boucle de poison message.
 - Une entrée dont le hash est déjà terminal est acquittée sans régénérer le PDF ; cela couvre l'arrêt entre l'écriture de l'état terminal et `XACK`.
 
 Le délai de visibilité doit être supérieur au temps maximal habituel de génération. Pour des PDF pouvant prendre plus de 30 minutes, augmentez `PDF_JOB_CLAIM_IDLE_MS` afin d'éviter qu'un deuxième worker ne réclame le même rendu pendant qu'il est toujours actif.
