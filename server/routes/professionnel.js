@@ -857,6 +857,10 @@ router.post('/company-group/invitations', async (req, res, next) => {
     await conn.commit();
 
     await audit(req, 'groupe.societes.invitation_creee', 'invitation_groupe', result.insertId, { email });
+    // Le jeton brut n'est retourné qu'au propriétaire et ne doit jamais être mis en cache.
+    res.set('Cache-Control', 'no-store, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.status(201).json({
       id: result.insertId,
       email,
@@ -938,6 +942,10 @@ router.get('/company-group/invitations/:invitationId/link', async (req, res, nex
     await audit(req, 'groupe.societes.lien_invitation_recupere', 'invitation_groupe', invitation.id, {
       email: invitation.invited_email
     });
+    // Le lien contient un jeton d'acceptation : désactive explicitement tout cache HTTP.
+    res.set('Cache-Control', 'no-store, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json({ id: invitation.id, email: invitation.invited_email, invitation_url: invitationUrl });
   } catch (err) { next(err); }
 });
