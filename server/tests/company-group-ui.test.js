@@ -19,11 +19,17 @@ describe('Retour visuel des invitations Entreprise', () => {
 
   test('ne prétend pas que SMTP est absent quand un envoi échoue ou reste non confirmé', () => {
     assert.doesNotMatch(page, /Non \(SMTP à configurer\)/);
-    assert.match(
-      page,
-      /Envoi email non confirmé\. Copiez et transmettez le lien manuellement\./
-    );
+    assert.match(page, /Invitation créée\\. Son email sera traité par la file d’envoi sécurisée/);
     assert.match(page, /escapeHtml\(result\.avertissement/);
+  });
+
+  test('affiche le lien après le rechargement du groupe pour ne pas le perdre du DOM', () => {
+    const handlerStart = page.indexOf("document.getElementById('invite-company-form').addEventListener");
+    const handlerEnd = page.indexOf("root.querySelectorAll('[data-open]'", handlerStart);
+    const handler = page.slice(handlerStart, handlerEnd);
+    const reloadIndex = handler.indexOf('await load();');
+    const linkIndex = handler.indexOf("latestInvitation.innerHTML=");
+    assert.ok(reloadIndex >= 0 && linkIndex > reloadIndex, 'le lien doit être inséré après le re-rendu de la page');
   });
 
   test('annonce le résultat de l’invitation aux technologies d’assistance', () => {
