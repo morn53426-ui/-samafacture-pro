@@ -161,6 +161,7 @@ async function initializeDatabaseOnce() {
  */
 async function runMigrations(conn) {
   // v8 : registre persistant du quota mensuel, rétrocompatible avec les bases v7.
+  // v9 : jour d'ancrage du calendrier des factures récurrentes (fin de mois stable).
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
