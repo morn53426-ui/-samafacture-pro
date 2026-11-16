@@ -125,11 +125,35 @@ jobs:
           "$BROWSER_PATH" --version
           echo "PUPPETEER_EXECUTABLE_PATH=$BROWSER_PATH" >> "$GITHUB_ENV"
 
-      - name: Diagnostiquer les avis npm sans modifier les versions
+      - name: Diagnostiquer et bloquer les dépendances vulnérables
         working-directory: server
         run: |
           npm audit --json > npm-audit.json || true
-          node -e "const a=require('./npm-audit.json'); console.log(JSON.stringify({metadata:a.metadata?.vulnerabilities,packages:Object.entries(a.vulnerabilities||{}).map(([name,v])=>({name,severity:v.severity,isDirect:v.isDirect,range:v.range,fixAvailable:v.fixAvailable,via:(v.via||[]).map(x=>typeof x==='string'?x:{name:x.name,title:x.title,url:x.url,range:x.range})}))},null,2))"
+          node <<'NODE'
+          const audit = require('./npm-audit.json');
+          const vulnerabilities = audit.metadata?.vulnerabilities;
+          if (!vulnerabilities) {
+            throw new Error('npm audit n’a pas fourni de métadonnées valides ; contrôle de sécurité non vérifiable.');
+          }
+          const packages = Object.entries(audit.vulnerabilities || {}).map(([name, value]) => ({
+            name,
+            severity: value.severity,
+            isDirect: value.isDirect,
+            range: value.range,
+            fixAvailable: value.fixAvailable,
+            via: (value.via || []).map(item => typeof item === 'string'
+              ? item
+              : { name: item.name, title: item.title, url: item.url, range: item.range })
+          }));
+          console.log(JSON.stringify({ metadata: vulnerabilities, packages }, null, 2));
+          const total = ['info', 'low', 'moderate', 'high', 'critical']
+            .reduce((sum, level) => sum + Number(vulnerabilities[level] || 0), 0);
+          if (total > 0) {
+            console.error('CI bloquée : npm a signalé ' + total + ' vulnérabilité(s). Corrigez-les ou documentez une exception approuvée avant fusion.');
+            process.exit(1);
+          }
+          console.log('Aucune vulnérabilité npm détectée.');
+          NODE
       - name: Vérifier le script de recette staging
         working-directory: server
         run: node --check scripts/staging-smoke.js
