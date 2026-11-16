@@ -842,6 +842,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   );
   const concurrentVerificationUrl = new URL(decryptEmailPayload(concurrentOutbox.payload_enc).verification_url);
   const concurrentVerificationToken = concurrentVerificationUrl.searchParams.get('verification_token');
+  assert.match(concurrentVerificationToken || '', /^[a-f0-9]{64}$/i);
   const concurrentAcceptances = await Promise.all([
     request(app)
       .post('/api/pro/company-group/invitations/accept/verify')
