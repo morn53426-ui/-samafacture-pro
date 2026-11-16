@@ -7,7 +7,9 @@ const { decryptEmailPayload } = require('./utils/email-outbox-crypto');
 
 const MAX_ATTEMPTS = 8;
 const RETRY_DELAYS_SECONDS = [60, 300, 1800, 7200, 21600, 43200, 86400];
-const DEFAULT_BATCH_SIZE = 10;
+// SMTP est borné à 30 s par message ; un lot de 5 conserve une marge confortable
+// sous le bail de 5 minutes, même avec un traitement séquentiel.
+const DEFAULT_BATCH_SIZE = 5;
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 
 function retryDelaySeconds(attempt) {
