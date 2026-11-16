@@ -75,6 +75,34 @@ function emailStatusLabel(item){
   if(status==='queued')return 'Email placé dans la file d’envoi';
   return 'État de l’email indisponible';
 }
+async function copyInvitationLink(invitationId,button){
+  button.disabled=true;
+  try{
+    const result=await Api.get('/pro/company-group/invitations/'+invitationId+'/link');
+    const link=String(result.invitation_url||'');
+    if(!link)throw new Error('Le lien sécurisé n’est plus disponible.');
+    if(navigator.clipboard?.writeText && window.isSecureContext){
+      await navigator.clipboard.writeText(link);
+    }else{
+      const field=document.createElement('textarea');
+      field.value=link;
+      field.setAttribute('readonly','');
+      field.style.position='fixed';
+      field.style.left='-9999px';
+      document.body.appendChild(field);
+      field.select();
+      const copied=document.execCommand('copy');
+      field.remove();
+      if(!copied)throw new Error('La copie automatique est indisponible sur ce navigateur.');
+    }
+    message('Lien sécurisé copié. Transmettez-le au propriétaire de la société invitée.');
+  }catch(err){
+    message(err.message||'Impossible de récupérer le lien sécurisé.','error');
+  }finally{
+    button.disabled=false;
+  }
+}
+
 function renderCreate(){
   root.innerHTML=`
     <section class="group-panel">
@@ -160,7 +188,7 @@ function renderGroup(data,dashboard){
       </form>
       <div id="latest-invitation" style="margin-top:14px"></div>
       ${invitations.length?`<h3 style="margin:20px 0 0">Invitations en attente</h3><div class="group-invite-list">${invitations.map(item=>`
-        <div class="group-invite"><div><strong>${escapeHtml(item.invited_email)}</strong><small class="group-muted">Expire le ${escapeHtml(formatDate(item.expire_at))}</small><small class="group-muted">${escapeHtml(emailStatusLabel(item))}</small></div><button class="btn btn-outline group-danger" type="button" data-revoke="${Number(item.id)}">Révoquer</button></div>`).join('')}</div>`:''}
+        <div class="group-invite"><div><strong>${escapeHtml(item.invited_email)}</strong><small class="group-muted">Expire le ${escapeHtml(formatDate(item.expire_at))}</small><small class="group-muted">${escapeHtml(emailStatusLabel(item))}</small></div><div class="group-actions"><button class="btn btn-outline" type="button" data-copy-invitation="${Number(item.id)}">Copier le lien</button>${item.email_statut==='failed'?'<button class="btn btn-outline" type="button" data-retry-email="'+Number(item.id)+'">Relancer l’email</button>':''}<button class="btn btn-outline group-danger" type="button" data-revoke="${Number(item.id)}">Révoquer</button></div></div>`).join('')}</div>`:''}
     </section>`;
   document.getElementById('invite-company-form').addEventListener('submit',async event=>{
     event.preventDefault();
@@ -195,6 +223,22 @@ function renderGroup(data,dashboard){
     button.disabled=true;
     try{await Api.del('/pro/company-group/companies/'+id);await load();}
     catch(err){message(err.message,'error');button.disabled=false;}
+  }));
+  root.querySelectorAll('[data-copy-invitation]').forEach(button=>button.addEventListener('click',async()=>{
+    await copyInvitationLink(button.dataset.copyInvitation,button);
+  }));
+  root.querySelectorAll('[data-retry-email]').forEach(button=>button.addEventListener('click',async()=>{
+    const id=button.dataset.retryEmail;
+    if(!confirm('Remettre cet email dans la file d’envoi ?'))return;
+    button.disabled=true;
+    try{
+      const result=await Api.post('/pro/company-group/invitations/'+id+'/retry-email',{});
+      message(result.message||'Email remis dans la file d’envoi sécurisée.');
+      await load();
+    }catch(err){
+      message(err.message||'Impossible de relancer cet email.','error');
+      button.disabled=false;
+    }
   }));
   root.querySelectorAll('[data-revoke]').forEach(button=>button.addEventListener('click',async()=>{
     button.disabled=true;
