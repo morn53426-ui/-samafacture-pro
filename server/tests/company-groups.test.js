@@ -63,6 +63,29 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
+test('la migration du schéma v10 crée les tables multi-sociétés', async () => {
+  const [[meta]] = await pool.query(
+    'SELECT version FROM _samafacture_schema_meta WHERE id = 1 LIMIT 1'
+  );
+  assert.ok(Number(meta?.version) >= 10, 'la base de test doit avoir appliqué la migration v10');
+
+  const [tables] = await pool.query(
+    `SELECT TABLE_NAME
+     FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME IN (
+         'pro_company_groups',
+         'pro_company_group_companies',
+         'pro_company_group_invitations'
+       )`
+  );
+  assert.deepEqual(
+    tables.map(row => row.TABLE_NAME).sort(),
+    ['pro_company_group_companies', 'pro_company_group_invitations', 'pro_company_groups'],
+    'les trois tables de la migration 006 doivent être présentes'
+  );
+});
+
 test('le plan Entreprise permet de créer un groupe, inviter une société et lui déléguer un accès explicite', async () => {
   const denied = await request(app)
     .post('/api/pro/company-group')
