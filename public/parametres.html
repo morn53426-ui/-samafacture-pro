@@ -1048,10 +1048,28 @@
   function closeInvoiceTemplatePreview() {
     const modal = document.getElementById('invoice-template-preview-modal');
     if (!modal || modal.style.display === 'none') return;
+
     modal.style.display = 'none';
     const trigger = invoiceTemplatePreviewState.triggerElement;
+    const templateId = invoiceTemplatePreviewState.templateId;
     invoiceTemplatePreviewState.triggerElement = null;
-    if (trigger?.isConnected) trigger.focus();
+
+    // Attendre que le navigateur ait retiré la fenêtre de l’arbre de rendu
+    // avant de restaurer le focus, notamment après une fermeture au clavier.
+    requestAnimationFrame(() => {
+      const currentTrigger = Array.from(
+        document.querySelectorAll('[data-open-template-preview]')
+      ).find(element => element.dataset.openTemplatePreview === templateId);
+      const target = trigger?.isConnected ? trigger : currentTrigger;
+      if (!target) return;
+
+      target.focus({ preventScroll: true });
+      // Si le nœud initial a été remplacé pendant l’ouverture, reprendre
+      // le focus sur le bouton actuellement présent dans la galerie.
+      if (document.activeElement !== target && currentTrigger && currentTrigger !== target) {
+        currentTrigger.focus({ preventScroll: true });
+      }
+    });
   }
 
   function handleInvoiceTemplatePreviewKeydown(event) {
