@@ -3,6 +3,7 @@
 Date : 16 novembre 2026  
 Branche : `feat/enterprise-multi-company-foundation-20261116`  
 Dernier commit de code testé : `cff824b30959e4f13bb59e0fcf80307c37bf1199`  
+Dernier commit documentaire : `e06db56425c1e0e6b5afd8406ccc9e3b131c0460` (mise à jour de ce rapport)  
 Branche de référence synchronisée : `main` à `70750be430c83c4bf3ff369ad453c7b1fd1af511`
 
 ## Périmètre
@@ -80,7 +81,7 @@ Exécutions :
 ## État des PR et décision
 
 - PR #56 : ouverte, non fusionnée, CI du commit `11a0a3baa0a90965850247d5e9bab54f614b4268` réussi ; elle doit être fusionnée avant #60 pour respecter l'ordre des changements récurrents et PDF.
-- PR #60 : ouverte, brouillon, tête `cff824b30959e4f13bb59e0fcf80307c37bf1199`, base `main`, avance de 78 commits et retard de 0 commit au contrôle. Le CI run 724 est entièrement réussi. Les deux remarques automatisées de revue relatives à l'ordre des migrations et à la variable `outsiderRecipient` sont obsolètes et leurs corrections sont incluses dans la révision testée.
+- PR #60 : ouverte, brouillon, tête actuelle `e06db56425c1e0e6b5afd8406ccc9e3b131c0460`, base `main`, avance de 79 commits et retard de 0 commit au contrôle. Le dernier commit de code fonctionnel `cff824b30959e4f13bb59e0fcf80307c37bf1199` est entièrement validé par le CI run 724. Le commit de tête qui suit ne modifie que ce rapport d'audit ; son propre CI est lancé séparément. Les deux remarques automatisées de revue relatives à l'ordre des migrations et à la variable `outsiderRecipient` sont obsolètes et leurs corrections sont incluses dans la révision de code testée.
 - La fusion reste suspendue : protections de branche `main` non vérifiées par les permissions/intégrations actuellement disponibles et revue humaine indépendante encore requise. Aucune fusion automatique n'a été effectuée.
 
 Aucun prélèvement mensuel automatique ni aucune disponibilité commerciale internationale générale ne doivent être annoncés avant validation des critères produit, fournisseur, réglementaires et opérationnels.
