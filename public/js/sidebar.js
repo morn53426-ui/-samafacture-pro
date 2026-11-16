@@ -328,10 +328,25 @@ function bindWorkspaceNotificationDismiss() {
     if (!event.target.closest('.app-notification')) closeWorkspaceNotifications();
   });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') {
-      closeWorkspaceNotifications();
-      document.getElementById('workspace-notification-toggle')?.focus();
-    }
+    if (event.key !== 'Escape') return;
+
+    const panel = document.getElementById('workspace-notification-panel');
+    if (!panel || panel.hidden) return;
+
+    // Un dialogue actif (aperçu A4, confirmation, etc.) doit traiter Échap en priorité.
+    // Ne pas déplacer le focus vers la cloche lorsque les notifications sont déjà fermées.
+    const anotherDialogIsOpen = Array.from(
+      document.querySelectorAll('[role="dialog"], [id$="modal"]')
+    ).some(dialog =>
+      dialog !== panel &&
+      !dialog.hidden &&
+      getComputedStyle(dialog).display !== 'none'
+    );
+    if (anotherDialogIsOpen) return;
+
+    closeWorkspaceNotifications();
+    const toggle = document.getElementById('workspace-notification-toggle');
+    if (toggle?.isConnected) toggle.focus({ preventScroll: true });
   });
 }
 
