@@ -819,6 +819,53 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .set('Authorization', 'Bearer ' + groupOwnerToken);
   assert.equal(groupAfterLeave.status, 200);
   assert.equal(groupAfterLeave.body.societes.length, 1);
+
+  // Deux confirmations simultanées avec le même jeton ne doivent créer qu'un seul rattachement.
+  const concurrentInvitation = await request(app)
+    .post('/api/pro/company-group/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: outsider.email });
+  assert.equal(concurrentInvitation.status, 201, concurrentInvitation.text);
+  const concurrentInviteToken = new URL(concurrentInvitation.body.invitation_url).searchParams.get('token');
+  const concurrentChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + outsiderToken)
+    .send({ token: concurrentInviteToken });
+  assert.equal(concurrentChallenge.status, 202, concurrentChallenge.text);
+  const [[concurrentProof]] = await pool.query(
+    'SELECT id FROM pro_company_group_invitation_verifications WHERE invitation_id = ?',
+    [concurrentInvitation.body.id]
+  );
+  const [[concurrentOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [concurrentProof.id]
+  );
+  const concurrentVerificationUrl = new URL(decryptEmailPayload(concurrentOutbox.payload_enc).verification_url);
+  const concurrentVerificationToken = concurrentVerificationUrl.searchParams.get('verification_token');
+  const concurrentAcceptances = await Promise.all([
+    request(app)
+      .post('/api/pro/company-group/invitations/accept/verify')
+      .set('Authorization', 'Bearer ' + outsiderToken)
+      .send({ token: concurrentInviteToken, verification_token: concurrentVerificationToken }),
+    request(app)
+      .post('/api/pro/company-group/invitations/accept/verify')
+      .set('Authorization', 'Bearer ' + outsiderToken)
+      .send({ token: concurrentInviteToken, verification_token: concurrentVerificationToken })
+  ]);
+  assert.deepEqual(
+    concurrentAcceptances.map(result => result.status).sort((a, b) => a - b),
+    [200, 404],
+    'une seule requête concurrente peut accepter et consommer le jeton'
+  );
+  const [[concurrentMembershipCount]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_company_group_companies WHERE company_owner_id = ?',
+    [outsiderId]
+  );
+  assert.equal(Number(concurrentMembershipCount.total), 1, 'une seule ligne de rattachement doit exister');
+  const leaveConcurrent = await request(app)
+    .delete('/api/pro/company-group/leave')
+    .set('Authorization', 'Bearer ' + outsiderToken);
+  assert.equal(leaveConcurrent.status, 200, leaveConcurrent.text);
 });
 
 after(async () => {
