@@ -41,6 +41,8 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
  }
  const next='invitation.html?'+nextParams.toString();
 
+ if(!Api.token()) history.replaceState(null,'','invitation.html');
+
  function showSuccess(result){
    if(!isCompanyGroup) localStorage.setItem('sf_company_owner',String(result.entreprise_id));
    else localStorage.setItem('sf_company_group_member','true');
@@ -88,7 +90,7 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
      button.textContent='Réessayer';
    }
  });
-})();;
+})();
 </script>
 </body>
 </html>
