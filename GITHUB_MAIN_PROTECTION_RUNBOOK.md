@@ -1,6 +1,6 @@
 # Protection de la branche main — action administrateur requise
 
-**État constaté lors de l'audit du 16 novembre 2026 :** les vérifications GitHub disponibles à l'audit précédent indiquaient `protected=false` pour `main` et aucun ruleset retourné. L'intégration GitHub utilisée pour cet audit ne fournit pas d'action permettant de créer/modifier les protections de branche. Ce document ne signifie donc pas que la protection a été activée.
+**État vérifié le 16 novembre 2026 : la branche `main` n'est pas protégée.** La lecture GitHub de `GET /repos/morn53426-ui/-samafacture-pro/branches/main` retourne `protected: false`, `protection.enabled: false` et `required_status_checks.enforcement_level: off` avec une liste de contrôles vide. La lecture `GET /repos/morn53426-ui/-samafacture-pro/rulesets?includes_parents=true` retourne une liste vide. La lecture directe du détail `.../branches/main/protection` renvoie HTTP 403 à l'intégration utilisée, et aucune action disponible ne permet de créer ou modifier ces règles. L'indicateur de branche confirme que les protections ne sont actuellement pas actives ; seul un administrateur du dépôt peut les configurer.
 
 ## Réglages à appliquer par un administrateur du dépôt
 
