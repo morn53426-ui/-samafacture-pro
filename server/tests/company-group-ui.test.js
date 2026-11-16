@@ -9,8 +9,29 @@ const page = fs.readFileSync(
   path.join(__dirname, '..', '..', 'public', 'groupe-entreprise.html'),
   'utf8'
 );
+const invitationPage = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'public', 'invitation.html'),
+  'utf8'
+);
 
 describe('Retour visuel des invitations Entreprise', () => {
+  test('ne termine pas le rattachement d’un groupe avant la preuve email indépendante', () => {
+    assert.match(invitationPage, /verification_required/);
+    assert.match(invitationPage, /Se connecter avec l’adresse email/i);
+    assert.match(invitationPage, /confirmation sera envoyée à cette adresse/i);
+  });
+
+  test('préserve le jeton de preuve pendant la connexion puis le consomme via la route dédiée', () => {
+    assert.match(invitationPage, /nextParams\.set\('verification_token',verificationToken\)/);
+    assert.match(invitationPage, /\/pro\/company-group\/invitations\/accept\/verify/);
+    assert.match(invitationPage, /history\.replaceState\(null,'','invitation\.html'\)/);
+  });
+
+  test('ne laisse pas les jetons de vérification dans le referer ou la barre d’adresse après lecture', () => {
+    assert.match(invitationPage, /name="referrer" content="no-referrer"/);
+    assert.match(invitationPage, /history\.replaceState/);
+  });
+
   test('affiche un état email confirmé uniquement lorsque le serveur le confirme', () => {
     assert.match(page, /result\.email_envoye\s*\?/);
     assert.match(page, /Email envoyé et confirmé\./);
