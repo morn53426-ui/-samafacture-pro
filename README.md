@@ -318,6 +318,8 @@ Le paiement en ligne des plans payants (Starter, Pro, Entreprise) est actuelleme
 
 Ces flux sont des **paiements uniques en XOF**. Le backend ne met pas en place de prélèvement ultérieur, ne renouvelle pas automatiquement les formules et n'applique pas d'expiration automatique aux plans payés. Les moyens réellement exposés par l'API pour le checkout des plans sont Wave et PayDunya lorsque les identifiants correspondants sont configurés.
 
+Les décisions, vérifications fournisseur et exigences préalables à la facturation récurrente sont consignées dans [ABONNEMENTS_RECURRENTES_DECISIONS.md](ABONNEMENTS_RECURRENTES_DECISIONS.md). Aucune facturation récurrente n'est actuellement activée.
+
 Les moyens inscrits manuellement lors de l'enregistrement d'un règlement de facture (par exemple espèces, virement, paiement mobile ou carte) sont des informations de suivi comptable ; ils ne prouvent pas l'existence d'un checkout en ligne ou d'une connexion directe à chaque fournisseur.
 
 Les plans payants ne peuvent être activés que par un paiement confirmé côté serveur. Tant qu'aucun fournisseur n'est configuré dans `server/.env`, les boutons de paiement restent masqués ; le compte peut seulement revenir au plan Gratuit. Une requête API directe ne permet pas de s'attribuer Starter, Pro ou Entreprise.
