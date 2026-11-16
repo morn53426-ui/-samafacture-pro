@@ -737,7 +737,7 @@ router.get('/company-group', async (req, res, next) => {
        FROM pro_company_group_invitations i
        LEFT JOIN email_outbox e
          ON e.entity_type = 'company_group_invitation' AND e.entity_id = i.id
-       WHERE i.group_id = ? AND i.statut = 'envoyee'
+       WHERE i.group_id = ? AND i.statut = 'envoyee' AND i.expire_at > NOW()
        ORDER BY i.created_at DESC LIMIT 100`,
       [group.id]
     );
