@@ -268,7 +268,7 @@ router.delete('/:id', async (req, res, next) => {
  */
 router.post('/:id/generer', async (req, res, next) => {
   try {
-    const facture = await genererFactureDepuisModele(req.params.id, req.tenantId);
+    const facture = await genererFactureDepuisModele(req.params.id, req.tenantId, { onlyIfDue: false });
     if (!facture) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
     res.status(201).json({ facture });
   } catch (err) {
@@ -282,7 +282,7 @@ router.post('/:id/generer', async (req, res, next) => {
  * logique de numérotation atomique que la création manuelle. Exportée pour être appelée
  * aussi bien depuis la route "générer maintenant" que depuis le vérificateur périodique.
  */
-async function genererFactureDepuisModele(id, userId) {
+async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}) {
   const conn = await pool.getConnection();
   let transactionCommitted = false;
   try {
@@ -290,13 +290,25 @@ async function genererFactureDepuisModele(id, userId) {
     // Même ordre de verrouillage que les autres créations : compte, puis modèle.
     await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
 
-    // SELECT ... FOR UPDATE verrouille la ligne le temps de la transaction : si le
-    // vérificateur périodique et un appel manuel (ou deux workers en mode cluster)
-    // tentent de générer la même facture en même temps, le second attend que le premier
-    // termine, puis constate que la date a déjà été avancée et ne génère rien en double.
+    // SELECT ... FOR UPDATE sérialise les générations du même modèle. Le scheduler
+    // recontrôle l'échéance après le verrou (onlyIfDue) et saute une échéance déjà traitée.
+    // Une action manuelle explicite peut toujours créer une facture supplémentaire.
     const [rows] = await conn.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ? FOR UPDATE', [id, userId]);
     const modele = rows[0];
     if (!modele) {
+      await conn.rollback();
+      return null;
+    }
+
+    // Un passage du scheduler peut avoir sélectionné ce modèle avant qu'une génération
+    // manuelle ou un autre passage n'obtienne le verrou et n'avance l'échéance. Recontrôler
+    // la date sous verrou évite de générer une seconde facture pour la même échéance.
+    const [[scheduleState]] = await conn.query(
+      'SELECT prochaine_date <= CURDATE() AS due FROM factures_recurrentes WHERE id = ? AND user_id = ?',
+      [modele.id, userId]
+    );
+    const scheduledDateDue = Number(scheduleState?.due) === 1;
+    if (onlyIfDue && !scheduledDateDue) {
       await conn.rollback();
       return null;
     }
@@ -343,11 +355,7 @@ async function genererFactureDepuisModele(id, userId) {
 
     await insererLignesFacture(conn, factureId, computedLignes);
 
-    const [[scheduleState]] = await conn.query(
-      'SELECT prochaine_date <= CURDATE() AS due FROM factures_recurrentes WHERE id = ? AND user_id = ?',
-      [modele.id, userId]
-    );
-    if (Number(scheduleState?.due) === 1) {
+    if (scheduledDateDue) {
       const nextDate = addInterval(modele.prochaine_date, modele.frequence, modele.jour_ancre);
       await conn.query(
         `UPDATE factures_recurrentes SET prochaine_date = ?, derniere_generation = NOW(), factures_generees = factures_generees + 1 WHERE id = ? AND user_id = ?`,
