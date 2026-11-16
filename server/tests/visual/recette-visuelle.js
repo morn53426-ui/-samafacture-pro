@@ -488,24 +488,24 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
           style.opacity !== '0' && element.getClientRects().length > 0 &&
           !element.closest('[aria-hidden="true"]');
       };
+      const hasText = value => typeof value === 'string' && value.trim().length > 0;
       const hasName = element => {
-        const ariaLabel = element.getAttribute('aria-label');
-        if (ariaLabel && ariaLabel.trim()) return true;
+        if (hasText(element.getAttribute('aria-label'))) return true;
         const labelledBy = (element.getAttribute('aria-labelledby') || '')
           .split(/\\s+/).filter(Boolean);
-        if (labelledBy.some(id => document.getElementById(id)?.textContent.trim())) return true;
-        const title = element.getAttribute('title');
-        if (title && title.trim()) return true;
+        if (labelledBy.some(id => hasText(document.getElementById(id)?.textContent))) return true;
+        if (hasText(element.getAttribute('title'))) return true;
         if (element.matches('input, select, textarea')) {
           const id = element.id;
           const associated = id && document.querySelector('label[for="' + CSS.escape(id) + '"]');
-          if (associated?.textContent.trim() || element.closest('label')?.textContent.trim()) return true;
-          if (/^(button|submit|reset)$/i.test(element.type || '') && element.value.trim()) return true;
+          if (hasText(associated?.textContent) || hasText(element.closest('label')?.textContent)) return true;
+          if (/^(button|submit|reset)$/i.test(element.type || '') && hasText(element.value)) return true;
           return false;
         }
-        if (element.textContent.trim()) return true;
+        if (hasText(element.textContent)) return true;
         return Array.from(element.querySelectorAll('img[alt], svg[aria-label], svg title'))
-          .some(child => (child.getAttribute('alt') || child.getAttribute('aria-label') || child.textContent || '').trim());
+          .some(child => hasText(child.getAttribute('alt')) ||
+            hasText(child.getAttribute('aria-label')) || hasText(child.textContent));
       };
       const interactive = Array.from(document.querySelectorAll(
         'a[href], button, input:not([type="hidden"]), select, textarea, [role="button"], [role="link"]'
