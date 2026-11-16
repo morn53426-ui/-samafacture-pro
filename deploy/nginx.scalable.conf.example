@@ -33,11 +33,11 @@ http {
 
     upstream samafacture_api {
         zone samafacture_api 64k;
-        keepalive 32;
+        # ip_hash doit précéder keepalive pour conserver l'algorithme de routage sticky.
         # Avec Docker Compose, le DNS du service app peut retourner plusieurs réplicas.
-        # ip_hash conserve une même connexion Socket.IO sur la même instance ; Redis assure
-        # la diffusion des événements entre instances.
+        # Redis assure la diffusion des événements entre instances.
         ip_hash;
+        keepalive 32;
         server app:4000 resolve;
     }
 
