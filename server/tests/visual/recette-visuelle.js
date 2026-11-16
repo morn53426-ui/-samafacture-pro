@@ -1157,7 +1157,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   page.on('request', (request) => {
     if (request.url().includes('/api/clients')) clientRequests.push(request.url());
   });
-  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
+  await page.setViewport({ width: 320, height: 844, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
   const initialNotifications = await page.evaluate(() => ({
@@ -1229,7 +1229,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   // Le panneau doit rester dans l'écran même lorsque l'espace sous la cloche
   // est inférieur à l'ancienne hauteur minimale de 140 px.
   await page.click('#workspace-notification-toggle');
-  await page.setViewport({ width: 390, height: 180, deviceScaleFactor: 1 });
+  await page.setViewport({ width: 320, height: 180, deviceScaleFactor: 1 });
   await page.evaluate(() => {
     const toggle = document.getElementById('workspace-notification-toggle');
     toggle.style.position = 'fixed';
@@ -1244,10 +1244,20 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   await page.click('#workspace-notification-toggle');
   const shortViewportPanel = await page.$eval('#workspace-notification-panel', element => {
     const rect = element.getBoundingClientRect();
-    return { top: rect.top, bottom: rect.bottom, viewportHeight: window.innerHeight, height: rect.height };
+    return {
+      top: rect.top, bottom: rect.bottom,
+      left: rect.left, right: rect.right,
+      viewportHeight: window.innerHeight, viewportWidth: window.innerWidth,
+      height: rect.height
+    };
   });
-  assert.ok(shortViewportPanel.top >= 0 && shortViewportPanel.bottom <= shortViewportPanel.viewportHeight + 1,
-    'Le panneau de notifications doit rester visible dans un viewport mobile court : ' + JSON.stringify(shortViewportPanel));
+  assert.ok(
+    shortViewportPanel.top >= 0 &&
+    shortViewportPanel.bottom <= shortViewportPanel.viewportHeight + 1 &&
+    shortViewportPanel.left >= 0 &&
+    shortViewportPanel.right <= shortViewportPanel.viewportWidth + 1,
+    'Le panneau de notifications doit rester entièrement dans un viewport mobile étroit et court : ' + JSON.stringify(shortViewportPanel)
+  );
   assert.ok(shortViewportPanel.height > 0,
     'Le panneau ne doit pas devenir invisible dans un viewport mobile court.');
   const shortViewportScroll = await page.$eval('#workspace-notification-panel', element => {
