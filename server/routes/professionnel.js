@@ -61,10 +61,8 @@ async function invoiceOwned(userId, invoiceId) {
 }
 
 async function assertEnterpriseGroupOwner(req, res) {
-  if (actor(req) !== owner(req) || req.companyMembership) {
-    res.status(403).json({ error: 'Seul le propriétaire du compte principal peut administrer le groupe de sociétés.' });
-    return false;
-  }
+  // Le groupe appartient toujours au compte de connexion (actor), même si l'utilisateur
+  // a actuellement sélectionné une filiale via X-SF-Company-Owner.
   const [rows] = await pool.query('SELECT plan FROM users WHERE id = ? LIMIT 1', [actor(req)]);
   if (!rows.length || !isEnterprisePlan(rows[0].plan)) {
     res.status(403).json({
@@ -781,7 +779,10 @@ router.post('/company-group/invitations', async (req, res, next) => {
       subject: 'Invitation à rejoindre un groupe de sociétés SamaFacture Pro',
       text: 'Le groupe « ' + group.nom + ' » vous invite à rattacher votre société à son espace de gestion. Acceptez uniquement si vous autorisez explicitement le propriétaire du groupe à accéder à votre société : ' + invitationUrl
     });
-    await audit(req, 'groupe.societes.invitation_creee', 'invitation_groupe', result.insertId, { email });
+    await pool.query(
+      'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [actor(req), actor(req), 'groupe.societes.invitation_creee', 'invitation_groupe', String(result.insertId), JSON.stringify({ email }), req.ip || null]
+    );
     res.status(201).json({
       id: result.insertId,
       email,
@@ -889,8 +890,42 @@ router.delete('/company-group/companies/:companyOwnerId', async (req, res, next)
       [group.id, companyOwnerId]
     );
     if (!result.affectedRows) return res.status(404).json({ error: 'Société rattachée introuvable.' });
-    await audit(req, 'groupe.societe.retir ee'.replace(' ', ''), 'societe', companyOwnerId, { group_id: group.id });
+    await pool.query(
+      'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [actor(req), actor(req), 'groupe.societe.retiree', 'societe', String(companyOwnerId), JSON.stringify({ group_id: group.id }), req.ip || null]
+    );
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+
+router.delete('/company-group/leave', async (req, res, next) => {
+  try {
+    // Cette action est exécutée par le propriétaire de la société qui avait accepté
+    // l'invitation ; elle retire uniquement cette société non principale de son groupe.
+    if (actor(req) !== Number(req.user.id)) return res.status(403).json({ error: 'Compte propriétaire requis.' });
+    const [[link]] = await pool.query(
+      `SELECT gc.id, gc.group_id, gc.is_primary, g.owner_user_id
+       FROM pro_company_group_companies gc
+       JOIN pro_company_groups g ON g.id = gc.group_id
+       WHERE gc.company_owner_id = ?
+       LIMIT 1`,
+      [actor(req)]
+    );
+    if (!link) return res.status(404).json({ error: 'Cette société ne fait partie d’aucun groupe.' });
+    if (Number(link.is_primary) === 1 || Number(link.owner_user_id) === actor(req)) {
+      return res.status(409).json({ error: 'La société principale ne peut pas quitter son propre groupe. Supprimez le groupe depuis sa gestion.' });
+    }
+    const [result] = await pool.query(
+      'DELETE FROM pro_company_group_companies WHERE id = ? AND company_owner_id = ? AND is_primary = 0',
+      [link.id, actor(req)]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'Rattachement introuvable.' });
+    await pool.query(
+      'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [link.owner_user_id, actor(req), 'groupe.societe.quitte', 'societe', String(actor(req)), JSON.stringify({ group_id: link.group_id }), req.ip || null]
+    );
+    res.json({ success: true, message: 'Votre société a quitté le groupe. Ses données restent dans son compte indépendant.' });
   } catch (err) { next(err); }
 });
 

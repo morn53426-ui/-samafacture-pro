@@ -89,8 +89,7 @@ function permissionForRequest(req) {
   if (base.endsWith('/depenses')) return method === 'GET' ? 'expenses.read' : 'expenses.write';
   if (base.endsWith('/rapports')) return 'reports.read';
   if (base.endsWith('/factures-recurrentes')) return method === 'GET' ? 'invoices.read' : 'invoices.write';
-  if (base.endsWith('/pro') && path.startsWith('/company-group/invitations/accept')) return null;
-  if (base.endsWith('/pro') && path.startsWith('/company-group')) return 'company_group.manage';
+  if (base.endsWith('/pro') && path.startsWith('/company-group')) return null;
   if (base.endsWith('/factures')) {
     if (/\/paiements(?:\/|$)/.test(path)) return method === 'GET' ? 'payments.read' : 'payments.write';
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
