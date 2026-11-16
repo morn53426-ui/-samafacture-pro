@@ -16,6 +16,22 @@ describe('Partage de factures et devis par WhatsApp', () => {
     assert.equal(normaliserTelephoneWhatsApp('77 123 45 67', 'GH'), '', 'un numéro local étranger ne doit pas être traité comme sénégalais');
   });
 
+  test('ne devine pas le pays d’un numéro local lorsque le pays du client est inconnu', () => {
+    assert.equal(normaliserTelephoneWhatsApp('77 123 45 67'), '');
+
+    const share = construireLienWhatsApp({
+      id: 43,
+      verification_code: 'a1b2c3d4e6',
+      type: 'facture',
+      numero: 'FAC-2026-0043',
+      total: 10000,
+      client_telephone: '77 123 45 67'
+    }, { baseUrl: 'https://samafacture.example/factures.html' });
+
+    assert.equal(share.telephone, '');
+    assert.equal(new URL(share.whatsappUrl).pathname, '/');
+  });
+
   test('prépare un message de facture avec un lien de consultation protégé', () => {
     const share = construireLienWhatsApp({
       id: 42,
