@@ -163,6 +163,8 @@ distincte.
 
 ## Sécurité et fiabilité
 
+La configuration des règles de protection de `main` et des contrôles requis avant fusion est documentée dans [GITHUB_MAIN_PROTECTION_RUNBOOK.md](GITHUB_MAIN_PROTECTION_RUNBOOK.md) ; elle doit être activée et vérifiée par un administrateur du dépôt.
+
 Les points suivants ont été audités et corrigés :
 - **Protection XSS** : toutes les données saisies par les utilisateurs (noms, notes, commentaires...) sont échappées avant affichage.
 - **Clé JWT** : générée automatiquement et sauvegardée dans `.env` en développement ; en production, un `JWT_SECRET` explicite d'au moins 32 caractères est obligatoire et le serveur refuse de démarrer avec la valeur de démonstration.
