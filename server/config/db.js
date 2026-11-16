@@ -406,9 +406,9 @@ async function runMigrations(conn) {
   const companyGroupVerificationPath = path.join(__dirname, '..', 'database', 'migrations', '008_company_group_email_proof.sql');
   const companyGroupVerificationSql = fs.readFileSync(companyGroupVerificationPath, 'utf8');
   const companyGroupVerificationStatements = companyGroupVerificationSql
-    .split(/\\r?\\n/)
+    .split(/\r?\n/)
     .filter(line => !line.trim().startsWith('--'))
-    .join('\\n')
+    .join('\n')
     .split(';')
     .map(statement => statement.trim())
     .filter(Boolean);
