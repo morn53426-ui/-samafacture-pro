@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { decryptEmailPayload } = require('../utils/email-outbox-crypto');
 const { dispatchPendingEmails } = require('../email-outbox');
 const {
@@ -501,7 +502,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   const verificationUrl = new URL(proofEmail.verification_url);
   let verificationToken = verificationUrl.searchParams.get('verification_token');
   assert.match(verificationToken || '', /^[a-f0-9]{64}$/i);
-  assert.notEqual(proofRow.token_hash, verificationToken, 'la base ne doit stocker que le hash du jeton');
+  assert.equal(proofRow.token_hash, crypto.createHash('sha256').update(verificationToken).digest('hex'), 'la base doit stocker le SHA-256 du jeton, jamais sa valeur brute');
   assert.doesNotMatch(proofOutbox.payload_enc, new RegExp(verificationToken));
 
   const [[membershipBeforeProof]] = await pool.query(
