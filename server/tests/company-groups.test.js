@@ -9,6 +9,7 @@ const {
   nettoyerUtilisateur,
   teardownTestEnvironment
 } = require('./setup');
+const { CURRENT_SCHEMA_VERSION, upgradeExistingSchema } = require('../config/db');
 
 let groupOwnerId;
 let subsidiaryOwnerId;
@@ -63,6 +64,38 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
+test('une base existante en v9 applique la migration 006 des groupes multi-sociétés', async () => {
+  assert.equal(CURRENT_SCHEMA_VERSION, 10);
+
+  // Simule une installation existante v9 : les tables ajoutées par la migration
+  // 006 sont absentes alors que le marqueur de schéma existe déjà.
+  await pool.query('DROP TABLE IF EXISTS pro_company_group_invitations');
+  await pool.query('DROP TABLE IF EXISTS pro_company_group_companies');
+  await pool.query('DROP TABLE IF EXISTS pro_company_groups');
+  await pool.query('UPDATE _samafacture_schema_meta SET version = 9 WHERE id = 1');
+
+  const conn = await pool.getConnection();
+  try {
+    assert.equal(await upgradeExistingSchema(conn, 9), true);
+  } finally {
+    conn.release();
+  }
+
+  const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
+  assert.equal(Number(meta.version), 10);
+
+  const [tables] = await pool.query(
+    `SELECT TABLE_NAME FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME IN (?, ?, ?)`,
+    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations']
+  );
+  assert.deepEqual(
+    tables.map(row => row.TABLE_NAME).sort(),
+    ['pro_company_group_companies', 'pro_company_group_invitations', 'pro_company_groups']
+  );
+});
+
 test('le plan Entreprise permet de créer un groupe, inviter une société et lui déléguer un accès explicite', async () => {
   const denied = await request(app)
     .post('/api/pro/company-group')
@@ -82,6 +115,12 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .set('Authorization', 'Bearer ' + groupOwnerToken)
     .send({ nom: 'Deuxième groupe' });
   assert.equal(duplicate.status, 409);
+
+  const invalidInvitation = await request(app)
+    .post('/api/pro/company-group/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: 'adresse invalide' });
+  assert.equal(invalidInvitation.status, 400, invalidInvitation.text);
 
   const invitation = await request(app)
     .post('/api/pro/company-group/invitations')
