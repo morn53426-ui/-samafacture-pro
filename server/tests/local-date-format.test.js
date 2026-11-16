@@ -22,6 +22,10 @@ function loadFormatDate(user) {
     window: { location, SAMAFACTURE_API_URL: '/api' },
     location,
     localStorage,
+    document: {
+      readyState: 'loading',
+      addEventListener() {}
+    },
     console,
     fetch: async () => { throw new Error('Unexpected network access in formatter test'); }
   };
