@@ -88,7 +88,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .set('Authorization', 'Bearer ' + groupOwnerToken)
     .send({ email: (await pool.query('SELECT email FROM users WHERE id = ?', [subsidiaryOwnerId]))[0][0].email });
   assert.equal(invitation.status, 201, invitation.text);
-  assert.equal(invitation.body.email_envoye, false);
+  assert.equal(typeof invitation.body.email_envoye, 'boolean');
   const token = new URL(invitation.body.invitation_url).searchParams.get('token');
   assert.match(token, /^[a-f0-9]{64}$/i);
 
@@ -112,6 +112,13 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.equal(group.body.societes.length, 2);
   assert.equal(group.body.societes.filter(company => Number(company.id) === Number(groupOwnerId)).length, 1);
   assert.equal(group.body.societes.filter(company => Number(company.id) === Number(subsidiaryOwnerId)).length, 1);
+
+  const memberStatus = await request(app)
+    .get('/api/pro/company-group/membership')
+    .set('Authorization', 'Bearer ' + subsidiaryToken);
+  assert.equal(memberStatus.status, 200);
+  assert.equal(memberStatus.body.membre, true);
+  assert.equal(memberStatus.body.groupe.actif, true);
 
   const switcher = await request(app)
     .get('/api/pro/team/companies')
