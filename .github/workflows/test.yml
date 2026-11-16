@@ -73,6 +73,7 @@ jobs:
           }
           console.log('Dépendance PDF validée : app healthy avant le worker PDF.');
           NODE
+          docker run --rm -v "$PWD/deploy/nginx.scalable.conf.example:/etc/nginx/nginx.conf:ro" nginx:1.27-alpine nginx -t
           rm -f .env
 
       - name: Installer Node.js
