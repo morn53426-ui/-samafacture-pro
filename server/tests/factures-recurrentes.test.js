@@ -57,6 +57,35 @@ describe('Factures récurrentes : cohérence des calculs avec la création manue
     assert.equal(Number(generee.body.facture.total), Number(manuelle.body.facture.total));
   });
 
+  test("une génération manuelle anticipée ne décale pas la prochaine échéance planifiée", async () => {
+    const futureDate = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const modele = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Génération manuelle anticipée',
+        frequence: 'mensuelle',
+        prochaine_date: futureDate,
+        lignes: [{ designation: 'Maintenance', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(modele.status, 201);
+    assert.equal(Number(modele.body.recurrente.jour_ancre), Number(futureDate.slice(-2)));
+
+    const generee = await request(app)
+      .post(`/api/factures-recurrentes/${modele.body.recurrente.id}/generer`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(generee.status, 201);
+
+    const liste = await request(app)
+      .get('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`);
+    const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
+    assert.ok(updated);
+    assert.equal(String(updated.prochaine_date).slice(0, 10), futureDate,
+      'la génération manuelle ne doit pas avancer une échéance encore future');
+  });
+
   test('générer une facture récurrente inexistante renvoie 404', async () => {
     const res = await request(app)
       .post('/api/factures-recurrentes/999999999/generer')
