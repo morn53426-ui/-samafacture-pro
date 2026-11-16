@@ -1006,6 +1006,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.deepEqual(selection, { value: 'nova', selected: true },
       'Le bouton Utiliser ce modèle doit actualiser la sélection enregistrable.');
 
+    await page.waitForFunction(() =>
+      document.activeElement?.getAttribute('data-open-template-preview') === 'nova'
+    );
     const focusAfterSelection = await page.evaluate(() =>
       document.activeElement?.getAttribute('data-open-template-preview') || ''
     );
