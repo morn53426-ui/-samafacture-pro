@@ -764,6 +764,7 @@ router.post('/company-group', async (req, res, next) => {
 });
 
 router.post('/company-group/invitations', async (req, res, next) => {
+  let conn;
   try {
     if (!await assertEnterpriseGroupOwner(req, res)) return;
     const email = String(req.body.email || '').trim().toLowerCase();
@@ -773,54 +774,82 @@ router.post('/company-group/invitations', async (req, res, next) => {
     if (email === String(req.user.email || '').toLowerCase()) {
       return res.status(400).json({ error: 'La société principale appartient déjà à ce groupe.' });
     }
-    const [[group]] = await pool.query(
-      'SELECT id, nom FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // Verrouille la ligne du groupe : toutes les créations d'invitations du même
+    // groupe passent ainsi l'une après l'autre, y compris entre plusieurs workers.
+    const [[group]] = await conn.query(
+      'SELECT id, nom FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1 FOR UPDATE',
       [actor(req)]
     );
-    if (!group) return res.status(409).json({ error: 'Créez d’abord le groupe de sociétés.' });
+    if (!group) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Créez d’abord le groupe de sociétés.' });
+    }
 
-    const [[recipient]] = await pool.query('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
+    const [[recipient]] = await conn.query('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
     if (recipient) {
-      const [[alreadyLinked]] = await pool.query(
+      const [[alreadyLinked]] = await conn.query(
         'SELECT id FROM pro_company_group_companies WHERE company_owner_id = ? LIMIT 1',
         [recipient.id]
       );
-      if (alreadyLinked) return res.status(409).json({ error: 'Ce compte société appartient déjà à un groupe.' });
+      if (alreadyLinked) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'Ce compte société appartient déjà à un groupe.' });
+      }
     }
-    const [[pending]] = await pool.query(
-      `SELECT id FROM pro_company_group_invitations
-       WHERE group_id = ? AND invited_email = ? AND statut = 'envoyee' AND expire_at > NOW()
-       LIMIT 1`,
-      [group.id, email]
+
+    const [[pending]] = await conn.query(
+      'SELECT id FROM pro_company_group_invitations WHERE group_id = ? AND invited_email = ? AND statut = ? AND expire_at > NOW() LIMIT 1 FOR UPDATE',
+      [group.id, email, 'envoyee']
     );
-    if (pending) return res.status(409).json({ error: 'Une invitation active existe déjà pour cette adresse.' });
+    if (pending) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Une invitation active existe déjà pour cette adresse.' });
+    }
 
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expires = new Date(Date.now() + 7 * 86400000);
-    const [result] = await pool.query(
+    const [result] = await conn.query(
       'INSERT INTO pro_company_group_invitations (group_id, invited_email, token_hash, expire_at) VALUES (?, ?, ?, ?)',
       [group.id, email, tokenHash, expires]
     );
+    await conn.commit();
+
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
     const invitationUrl = base + '/invitation.html?type=company-group&token=' + token;
-    const mailResult = await sendMail({
-      to: email,
-      subject: 'Invitation à rejoindre un groupe de sociétés SamaFacture Pro',
-      text: 'Le groupe « ' + group.nom + ' » vous invite à rattacher votre société à son espace de gestion. Acceptez uniquement si vous autorisez explicitement le propriétaire du groupe à accéder à votre société : ' + invitationUrl
-    });
-    await pool.query(
-      'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [actor(req), actor(req), 'groupe.societes.invitation_creee', 'invitation_groupe', String(result.insertId), JSON.stringify({ email }), req.ip || null]
-    );
+    let mailResult = { sent: false };
+    try {
+      mailResult = await sendMail({
+        to: email,
+        subject: 'Invitation à rejoindre un groupe de sociétés SamaFacture Pro',
+        text: 'Le groupe « ' + group.nom + ' » vous invite à rattacher votre société à son espace de gestion. Acceptez uniquement si vous autorisez explicitement le propriétaire du groupe à accéder à votre société : ' + invitationUrl
+      }) || { sent: false };
+    } catch (mailError) {
+      // L'invitation est déjà enregistrée : remettre le lien au propriétaire pour
+      // qu'il puisse le transmettre manuellement au lieu de masquer un succès partiel.
+      console.warn('Envoi de l’invitation au groupe non confirmé ; lien remis pour copie manuelle.');
+      mailResult = { sent: false };
+    }
+
+    await audit(req, 'groupe.societes.invitation_creee', 'invitation_groupe', result.insertId, { email });
     res.status(201).json({
       id: result.insertId,
       email,
       invitation_url: invitationUrl,
-      email_envoye: Boolean(mailResult && mailResult.sent),
+      email_envoye: Boolean(mailResult.sent),
+      avertissement: mailResult.sent ? null : 'Envoi email non confirmé. Copiez et transmettez le lien d’invitation manuellement.',
       expire_le: expires
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.post('/company-group/invitations/accept', async (req, res, next) => {
