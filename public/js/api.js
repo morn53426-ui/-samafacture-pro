@@ -148,21 +148,28 @@ function formatDate(iso) {
   const timeZone = user.fuseau_horaire || 'UTC';
   const format = user.format_date || 'dd/MM/yyyy';
   const source = String(iso);
-  let date;
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(source);
   if (dateOnly) {
-    const [year, month, day] = source.split('-').map(Number);
-    // Noon UTC preserves the intended calendar date across supported timezones.
-    date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-  } else {
-    // MySQL DATETIME strings are stored in UTC. Safari/iOS does not reliably parse
-    // the space separator, so normalize it and state the UTC offset explicitly.
-    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/.test(source)
-      ? source.replace(' ', 'T') + 'Z'
-      : source;
-    date = new Date(normalized);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(source);
+    const year = Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+    const check = new Date(Date.UTC(year, month - 1, day));
+    if (check.getUTCFullYear() !== year || check.getUTCMonth() + 1 !== month || check.getUTCDate() !== day) {
+      return iso;
+    }
+    // A SQL DATE is a civil calendar date, not an instant. Format its components
+    // directly so UTC offsets (including dates far east/west of UTC) cannot shift the day.
+    if (format === 'yyyy-MM-dd') return source;
+    if (format === 'MM/dd/yyyy') return String(month).padStart(2, '0') + '/' + String(day).padStart(2, '0') + '/' + year;
+    return String(day).padStart(2, '0') + '/' + String(month).padStart(2, '0') + '/' + year;
   }
-  if (!date || Number.isNaN(date.getTime())) return iso;
+
+  // MySQL DATETIME strings are stored in UTC. Safari/iOS does not reliably parse
+  // the space separator, so normalize it and state the UTC offset explicitly.
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/.test(source)
+    ? source.replace(' ', 'T') + 'Z'
+    : source;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return iso;
   if (format === 'yyyy-MM-dd') {
     return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).format(date);
   }
