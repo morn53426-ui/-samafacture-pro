@@ -21,6 +21,15 @@ const MIGRATE_LEGACY_JOB_SCRIPT = [
   "return redis.call('XADD', KEYS[2], '*', 'job', raw)"
 ].join('\n');
 
+// HSET the owner metadata first, then XADD. If XADD returns a command error (for
+// example because Redis is out of memory), delete the hash before returning the error.
+const ENQUEUE_PDF_JOB_SCRIPT = [
+  "redis.call('HSET', KEYS[1], 'id', ARGV[1], 'status', 'queued', 'userId', ARGV[2], 'factureId', ARGV[3], 'createdAt', ARGV[4])",
+  "local entry = redis.pcall('XADD', KEYS[2], '*', 'job', ARGV[5])",
+  "if type(entry) == 'table' and entry.err then redis.call('DEL', KEYS[1]); return redis.error_reply(entry.err) end",
+  'return entry'
+].join('\\n');
+
 async function ensurePdfConsumerGroup(redis = getRedisClient()) {
   if (!redis) throw new Error('Redis indisponible pour initialiser la file PDF.');
   try {
@@ -57,18 +66,13 @@ async function enqueuePdfJob({ factureId, user }) {
   };
   const key = JOB_PREFIX + id;
 
-  // Keep owner metadata for as long as the stream entry is pending.
-  // MULTI/EXEC publishes the hash and stream entry together.
-  const transaction = redis.multi();
-  transaction.hSet(key, {
-    id,
-    status: 'queued',
-    userId: String(user.id),
-    factureId: String(factureId),
-    createdAt: job.createdAt
+  // A single Lua script keeps the metadata and stream entry consistent. If XADD
+  // fails after HSET, the script removes the just-created metadata hash and returns
+  // the original Redis error; no queued job is silently accepted.
+  await redis.eval(ENQUEUE_PDF_JOB_SCRIPT, {
+    keys: [key, STREAM_KEY],
+    arguments: [id, String(user.id), String(factureId), job.createdAt, JSON.stringify(job)]
   });
-  transaction.xAdd(STREAM_KEY, '*', { job: JSON.stringify(job) });
-  await transaction.exec();
   return id;
 }
 
@@ -127,6 +131,7 @@ async function getPdfPath(id) {
 
 module.exports = {
   enqueuePdfJob,
+  ENQUEUE_PDF_JOB_SCRIPT,
   getPdfJob,
   getPdfPath,
   ensurePdfConsumerGroup,
