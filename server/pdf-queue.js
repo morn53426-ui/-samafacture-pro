@@ -16,9 +16,12 @@ let pendingCursor = '0-0';
 // Lua makes the legacy LPOP + XADD indivisible: a worker crash cannot lose an item
 // between removing it from the old list and inserting it into the durable stream.
 const MIGRATE_LEGACY_JOB_SCRIPT = [
-  "local raw = redis.call('LPOP', KEYS[1])",
+  "local raw = redis.call('LINDEX', KEYS[1], 0)",
   'if not raw then return nil end',
-  "return redis.call('XADD', KEYS[2], '*', 'job', raw)"
+  "local entry = redis.pcall('XADD', KEYS[2], '*', 'job', raw)",
+  "if type(entry) == 'table' and entry.err then return redis.error_reply(entry.err) end",
+  "redis.call('LPOP', KEYS[1])",
+  'return entry'
 ].join('\n');
 
 // HSET the owner metadata first, then XADD. If XADD returns a command error (for
