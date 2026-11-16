@@ -299,6 +299,10 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
       await conn.rollback();
       return null;
     }
+    if (onlyIfDue && Number(modele.actif) !== 1) {
+      await conn.rollback();
+      return null;
+    }
 
     // Un passage du scheduler peut avoir sélectionné ce modèle avant qu'une génération
     // manuelle ou un autre passage n'obtienne le verrou et n'avance l'échéance. Recontrôler
