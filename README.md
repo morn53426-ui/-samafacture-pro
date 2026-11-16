@@ -182,7 +182,7 @@ Réglages disponibles dans `.env` (tous facultatifs, voir `.env.example`) :
 ```
 BACKUP_ENABLED=true          # false pour désactiver complètement
 BACKUP_HOUR=2                # heure de déclenchement (0-23)
-BACKUP_RETENTION_DAYS=14     # nombre de jours conservés
+BACKUP_RETENTION_DAYS=14     # nombre de jours conservés (valeur invalide/non positive : 14 jours)
 BACKUP_DIR=./backups         # dossier de destination
 BACKUP_ENCRYPTION_KEY=       # production : `openssl rand -hex 32`, à conserver hors du VPS
 MYSQLDUMP_PATH=mysqldump     # chemin complet si mysqldump n'est pas dans le PATH système
