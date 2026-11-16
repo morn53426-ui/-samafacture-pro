@@ -293,12 +293,6 @@ function positionWorkspaceNotificationPanel() {
   maxHeight = Math.max(0, Math.min(maxHeight, viewportHeight - safeGutter * 2));
   top = Math.max(safeGutter, Math.min(top, viewportHeight - safeGutter - maxHeight));
 
-  // Réserver l'espace de l'en-tête et donner le reste à la liste défilante.
-  // Sans cette contrainte, le max-height du panneau pouvait couper le bas de la liste
-  // au lieu de réduire sa zone de scroll dans les viewports courts.
-  const headerHeight = panel.querySelector('.app-notification-panel-head')?.getBoundingClientRect().height || 0;
-  if (list) list.style.maxHeight = Math.round(Math.max(0, maxHeight - headerHeight)) + 'px';
-
   panel.style.position = 'fixed';
   panel.style.top = Math.round(top) + 'px';
   panel.style.left = Math.round(left) + 'px';
@@ -306,6 +300,12 @@ function positionWorkspaceNotificationPanel() {
   panel.style.width = Math.round(width) + 'px';
   panel.style.maxWidth = Math.round(width) + 'px';
   panel.style.maxHeight = Math.round(maxHeight) + 'px';
+
+  // Mesurer l'en-tête après avoir appliqué la largeur finale : son texte peut
+  // passer sur plusieurs lignes sur les téléphones étroits. Réserver son espace
+  // et donner tout le reste à la liste défilante pour éviter de la couper.
+  const headerHeight = panel.querySelector('.app-notification-panel-head')?.getBoundingClientRect().height || 0;
+  if (list) list.style.maxHeight = Math.round(Math.max(0, maxHeight - headerHeight)) + 'px';
 }
 
 function toggleWorkspaceNotifications(event) {
