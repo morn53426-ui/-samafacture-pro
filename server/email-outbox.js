@@ -61,7 +61,7 @@ async function claimPendingEmails(batchSize = DEFAULT_BATCH_SIZE) {
   }
 }
 
-async function isEmailJobDeliverable(job) {
+async function isEmailJobDeliverable(job, message) {
   if (job.entity_type === 'company_group_invitation') {
     const [[invitation]] = await pool.query(
       `SELECT id
@@ -74,14 +74,23 @@ async function isEmailJobDeliverable(job) {
   }
 
   if (job.entity_type === 'company_group_invitation_verification') {
+    let proofToken = '';
+    try {
+      proofToken = new URL(String(message?.verification_url || '')).searchParams.get('verification_token') || '';
+    } catch (_) {
+      return false;
+    }
+    if (!/^[a-f0-9]{64}$/i.test(proofToken)) return false;
+    const proofHash = crypto.createHash('sha256').update(proofToken).digest('hex');
     const [[verification]] = await pool.query(
       `SELECT v.id
        FROM pro_company_group_invitation_verifications v
        JOIN pro_company_group_invitations i ON i.id = v.invitation_id
-       WHERE v.id = ? AND v.used_at IS NULL AND v.expires_at > NOW()
+       WHERE v.id = ? AND v.token_hash = ?
+         AND v.used_at IS NULL AND v.expires_at > NOW()
          AND i.statut = 'envoyee' AND i.expire_at > NOW()
        LIMIT 1`,
-      [job.entity_id]
+      [job.entity_id, proofHash]
     );
     return Boolean(verification);
   }
@@ -152,7 +161,12 @@ async function dispatchPendingEmails({ sender = sendMail, batchSize = DEFAULT_BA
 
   for (const job of jobs) {
     try {
-      if (!await isEmailJobDeliverable(job)) {
+      // Déchiffre d'abord les preuves afin de lier la tâche à la version courante du jeton.
+      // Un ancien email repris après une demande de renvoi ne doit pas livrer un lien déjà remplacé.
+      const message = job.entity_type === 'company_group_invitation_verification'
+        ? decryptEmailPayload(job.payload_enc)
+        : null;
+      if (!await isEmailJobDeliverable(job, message)) {
         await markEmailCancelled(job);
         summary.cancelled += 1;
         continue;
@@ -169,8 +183,8 @@ async function dispatchPendingEmails({ sender = sendMail, batchSize = DEFAULT_BA
         console.warn('Email outbox #' + job.id + ' abandonné : ' + exhausted.code);
         continue;
       }
-      const message = decryptEmailPayload(job.payload_enc);
-      const result = await sender(message);
+      const deliveryMessage = message || decryptEmailPayload(job.payload_enc);
+      const result = await sender(deliveryMessage);
       if (!result || result.sent !== true) {
         const error = new Error('Email delivery was not confirmed.');
         error.code = result?.reason || 'email_not_confirmed';
