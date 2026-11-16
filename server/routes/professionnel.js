@@ -1010,32 +1010,38 @@ router.delete('/company-group/invitations/:invitationId', async (req, res, next)
   try {
     if (!await assertEnterpriseGroupOwner(req, res)) return;
     if (!idOk(req.params.invitationId)) return res.status(400).json({ error: 'Identifiant d’invitation invalide.' });
-    const [[group]] = await pool.query(
-      'SELECT id FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
-      [actor(req)]
-    );
-    if (!group) return res.status(404).json({ error: 'Groupe de sociétés introuvable.' });
-
     conn = await pool.getConnection();
     await conn.beginTransaction();
-    const [result] = await conn.query(
-      "UPDATE pro_company_group_invitations SET statut = 'revoquee' WHERE id = ? AND group_id = ? AND statut = 'envoyee'",
+
+    const [[group]] = await conn.query(
+      'SELECT id FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1 FOR UPDATE',
+      [actor(req)]
+    );
+    if (!group) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Groupe de sociétés introuvable.' });
+    }
+    const [[invitation]] = await conn.query(
+      "SELECT id FROM pro_company_group_invitations WHERE id = ? AND group_id = ? AND statut = 'envoyee' LIMIT 1 FOR UPDATE",
       [req.params.invitationId, group.id]
     );
-    if (!result.affectedRows) {
+    if (!invitation) {
       await conn.rollback();
       return res.status(404).json({ error: 'Invitation active introuvable.' });
     }
+
     await conn.query(
-      `UPDATE email_outbox
-       SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL,
-           dernier_code_erreur = 'invitation_revoked', updated_at = NOW()
-       WHERE entity_type = 'company_group_invitation' AND entity_id = ?
-         AND statut IN ('queued', 'retry', 'processing')`,
-      [req.params.invitationId]
+      "UPDATE pro_company_group_invitations SET statut = 'revoquee' WHERE id = ? AND group_id = ? AND statut = 'envoyee'",
+      [invitation.id, group.id]
+    );
+    // Les messages pas encore remis ne doivent plus partir après révocation.
+    // Un message déjà pris en charge par SMTP peut être impossible à rappeler.
+    const [cancelled] = await conn.query(
+      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, updated_at = NOW() WHERE entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry', 'processing')",
+      [invitation.id]
     );
     await conn.commit();
-    res.json({ success: true });
+    res.json({ success: true, email_annule: Number(cancelled.affectedRows) > 0 });
   } catch (err) {
     if (conn) { try { await conn.rollback(); } catch (_) {} }
     next(err);
