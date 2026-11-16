@@ -312,12 +312,48 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .send({ token });
   assert.equal(wrongOwner.status, 403);
 
+  // Simule une remise déjà réclamée, mais dont le worker a été interrompu
+  // avant SMTP. L'acceptation ne doit pas falsifier son état en "annulé" :
+  // le worker doit reprendre le bail, constater l'invitation acceptée, puis annuler.
+  await pool.query(
+    `UPDATE email_outbox
+     SET statut = 'processing',
+         verrouille_le = DATE_SUB(NOW(), INTERVAL 10 MINUTE),
+         lock_token = '00000000-0000-4000-8000-000000000002'
+     WHERE id = ?`,
+    [queuedEmail.id]
+  );
+
   const accepted = await request(app)
     .post('/api/pro/company-group/invitations/accept')
     .set('Authorization', 'Bearer ' + subsidiaryToken)
     .send({ token });
   assert.equal(accepted.status, 200, accepted.text);
   assert.equal(accepted.body.groupe_id, created.body.id);
+  const [[outboxAfterAcceptance]] = await pool.query(
+    'SELECT statut FROM email_outbox WHERE id = ?',
+    [queuedEmail.id]
+  );
+  assert.equal(outboxAfterAcceptance.statut, 'processing', 'l’API ne doit pas annuler une remise SMTP déjà réclamée');
+
+  let acceptedInvitationEmailSent = false;
+  const acceptedInvitationDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async () => {
+      acceptedInvitationEmailSent = true;
+      return { sent: true };
+    }
+  });
+  assert.deepEqual(acceptedInvitationDelivery, {
+    claimed: 1, sent: 0, retried: 0, failed: 0, cancelled: 1
+  });
+  assert.equal(acceptedInvitationEmailSent, false, 'le worker ne doit pas transmettre un lien déjà accepté');
+  const [[acceptedOutbox]] = await pool.query(
+    'SELECT statut, dernier_code_erreur FROM email_outbox WHERE id = ?',
+    [queuedEmail.id]
+  );
+  assert.equal(acceptedOutbox.statut, 'cancelled');
+  assert.equal(acceptedOutbox.dernier_code_erreur, 'entity_inactive');
 
   const group = await request(app)
     .get('/api/pro/company-group')
