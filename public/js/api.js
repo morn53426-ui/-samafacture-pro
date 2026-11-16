@@ -179,10 +179,9 @@ function formatDate(iso) {
   // The selected date pattern takes precedence over the language of the interface.
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone }).format(date);
 }
-function dateCivileAujourdhui(timeZone) {
+function dateCivileAujourdhui(timeZone, now = new Date()) {
   const user = Api.currentUser() || {};
   const zone = timeZone || user.fuseau_horaire || 'Africa/Dakar';
-  const now = new Date();
 
   function formatInZone(candidateZone) {
     const parts = Object.fromEntries(
