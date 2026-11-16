@@ -1297,8 +1297,42 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   });
   assert.ok(shortViewportScroll.clientHeight > 0 && shortViewportScroll.scrollHeight > shortViewportScroll.clientHeight,
     'La liste doit conserver un défilement interne lorsque le panneau est réduit : ' + JSON.stringify(shortViewportScroll));
+
+  // Vérifie aussi les coordonnées non nulles du viewport visuel, par exemple
+  // après un défilement ou un zoom pendant que le clavier reste ouvert.
+  await page.evaluate(() => {
+    window.__sfTestVisualViewportOffsetTop = 96;
+    window.__sfTestVisualViewportOffsetLeft = 24;
+    const toggle = document.getElementById('workspace-notification-toggle');
+    toggle.style.top = '120px';
+    window.visualViewport.dispatchEvent(new Event('scroll'));
+  });
+  const offsetViewportPanel = await page.$eval('#workspace-notification-panel', element => {
+    const rect = element.getBoundingClientRect();
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      viewportTop: window.visualViewport.offsetTop,
+      viewportLeft: window.visualViewport.offsetLeft,
+      viewportBottom: window.visualViewport.offsetTop + window.visualViewport.height,
+      viewportRight: window.visualViewport.offsetLeft + window.visualViewport.width
+    };
+  });
+  assert.ok(offsetViewportPanel.top >= offsetViewportPanel.viewportTop,
+    'Le panneau doit respecter le décalage vertical du viewport visuel : ' + JSON.stringify(offsetViewportPanel));
+  assert.ok(offsetViewportPanel.bottom <= offsetViewportPanel.viewportBottom + 1,
+    'Le panneau doit rester sous la limite basse du viewport visuel décalé : ' + JSON.stringify(offsetViewportPanel));
+  assert.ok(offsetViewportPanel.left >= offsetViewportPanel.viewportLeft,
+    'Le panneau doit respecter le décalage horizontal du viewport visuel : ' + JSON.stringify(offsetViewportPanel));
+  assert.ok(offsetViewportPanel.right <= offsetViewportPanel.viewportRight + 1,
+    'Le panneau doit rester dans la limite droite du viewport visuel décalé : ' + JSON.stringify(offsetViewportPanel));
+
   await page.evaluate(() => {
     window.__sfTestVisualViewportHeight = null;
+    window.__sfTestVisualViewportOffsetTop = 0;
+    window.__sfTestVisualViewportOffsetLeft = 0;
     window.visualViewport.dispatchEvent(new Event('resize'));
     const toggle = document.getElementById('workspace-notification-toggle');
     toggle.style.removeProperty('position');
