@@ -50,6 +50,10 @@ test('PayDunya limite le checkout au canal Orange Money Sénégal sélectionné'
   await verifierCanal(t, 'orange-money-senegal');
 });
 
+test('PayDunya limite le checkout au canal Wave Sénégal sélectionné', async t => {
+  await verifierCanal(t, 'wave-senegal');
+});
+
 test('PayDunya limite le checkout au canal carte bancaire sélectionné', async t => {
   await verifierCanal(t, 'card');
 });
