@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 9;
+const CURRENT_SCHEMA_VERSION = 10;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -160,6 +160,7 @@ async function initializeDatabaseOnce() {
  * Chaque ajout est protégé : une colonne déjà présente ne provoque pas d'erreur.
  */
 async function runMigrations(conn) {
+  // v10 : applique la migration 006 des groupes multi-sociétés aux bases déjà initialisées en v9.
   // v8 : registre persistant du quota mensuel, rétrocompatible avec les bases v7.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
