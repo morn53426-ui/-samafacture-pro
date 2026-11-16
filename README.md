@@ -182,7 +182,7 @@ Réglages disponibles dans `.env` (tous facultatifs, voir `.env.example`) :
 ```
 BACKUP_ENABLED=true          # false pour désactiver complètement
 BACKUP_HOUR=2                # heure de déclenchement (0-23)
-BACKUP_RETENTION_DAYS=14     # nombre de jours conservés
+BACKUP_RETENTION_DAYS=14     # nombre de jours conservés (valeur invalide/non positive : 14 jours)
 BACKUP_DIR=./backups         # dossier de destination
 BACKUP_ENCRYPTION_KEY=       # production : `openssl rand -hex 32`, à conserver hors du VPS
 MYSQLDUMP_PATH=mysqldump     # chemin complet si mysqldump n'est pas dans le PATH système
@@ -206,8 +206,13 @@ Restaurez dans une base cible vide, après avoir remis la même `BACKUP_ENCRYPTI
 cd server
 npm run restore -- ./backups/nom-de-sauvegarde.sql.gz.enc
 ```
-La commande vérifie le tag d'authentification AES-GCM avant d'envoyer le SQL à MySQL. Une ancienne sauvegarde non chiffrée `.sql.gz` peut également être restaurée. Ne perdez jamais la clé : les archives chiffrées deviennent irrécupérables sans elle.
+La commande vérifie le tag d'authentification AES-GCM, puis décompresse et valide toute l'archive gzip avant d'envoyer la moindre instruction SQL à MySQL. Elle contrôle également que la base cible ne contient aucun objet SQL (tables, vues, procédures, fonctions, événements ou déclencheurs) ; si elle n'est pas vide, la restauration est bloquée pour éviter d'écraser des données par accident. Une ancienne sauvegarde non chiffrée `.sql.gz` peut également être restaurée, et son intégrité gzip est vérifiée avant import.
 
+Pour remplacer volontairement une base déjà utilisée, activez explicitement le mode dangereux après avoir vérifié le nom de la base et conservé une sauvegarde séparée :
+```bash
+RESTORE_ALLOW_NON_EMPTY=true npm run restore -- ./backups/nom-de-sauvegarde.sql.gz.enc
+```
+Ne perdez jamais la clé : les archives chiffrées deviennent irrécupérables sans elle.
 ### ⚠️ Ce que l'automatisation ne fait PAS
 
 Les sauvegardes automatiques restent **sur le même disque dur** que la base de données elle-même. En cas de panne matérielle, de vol de l'ordinateur, ou d'incendie, elles seraient perdues en même temps que tout le reste. **Copiez régulièrement le dossier `server/backups/` hors de cette machine** :

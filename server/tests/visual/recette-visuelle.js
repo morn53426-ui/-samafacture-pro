@@ -947,6 +947,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       const modal = document.getElementById('invoice-template-preview-modal');
       return modal && getComputedStyle(modal).display !== 'none';
     }, { timeout: 5000 });
+    await page.waitForFunction(() =>
+      document.activeElement?.id === 'invoice-template-preview-close'
+    );
     const initialDialogFocus = await page.evaluate(() => document.activeElement?.id || '');
     assert.equal(initialDialogFocus, 'invoice-template-preview-close',
       'À l’ouverture, le focus clavier doit entrer dans la fenêtre d’aperçu.');
