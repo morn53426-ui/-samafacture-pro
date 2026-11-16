@@ -23,6 +23,14 @@ function runMigrationInNewProcess() {
 test('une base déjà en version 7 applique les migrations du quota v8 et de l’ancre récurrente v9', async () => {
   await setupTestDatabase();
   await pool.query('DROP TABLE IF EXISTS facture_usage_mensuelle');
+  const [quotaIndex] = await pool.query(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures'
+       AND INDEX_NAME = 'idx_factures_user_type_created_at'`
+  );
+  if (quotaIndex.length) {
+    await pool.query('ALTER TABLE factures DROP INDEX idx_factures_user_type_created_at');
+  }
   const [anchorColumn] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures_recurrentes'
