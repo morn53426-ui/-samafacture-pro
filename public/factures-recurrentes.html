@@ -136,29 +136,6 @@
     renderTable();
   }
 
-  function dateCivileAujourdhui(timeZone) {
-    function getParts(zone) {
-      return Object.fromEntries(
-        new Intl.DateTimeFormat('en-US', {
-          timeZone: zone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }).formatToParts(new Date())
-          .filter(part => ['year', 'month', 'day'].includes(part.type))
-          .map(part => [part.type, part.value])
-      );
-    }
-
-    let parts;
-    try {
-      parts = getParts(timeZone || 'Africa/Dakar');
-    } catch (_) {
-      parts = getParts('Africa/Dakar');
-    }
-    return parts.year + '-' + parts.month + '-' + parts.day;
-  }
-
   function renderTable() {
     document.getElementById('recurrentes-body').innerHTML = recurrentes.length ? recurrentes.map(r => `
       <tr>
