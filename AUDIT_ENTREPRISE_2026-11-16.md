@@ -2,7 +2,7 @@
 
 Date : 16 novembre 2026  
 Branche : `feat/enterprise-multi-company-foundation-20261116`  
-Dernier commit de code testé : `6adac3c457e090ad1edfad2b88a57251b82a6d08`  
+Dernier commit de code testé : `84e2e0c74bbe242b7c7e39374af3e98a740d117e`  
 Mise à jour de l'audit : 16 novembre 2026 (rapport actualisé après validation du socle Entreprise et de la file PDF)  
 Branche de référence synchronisée : `main` à `70750be430c83c4bf3ff369ad453c7b1fd1af511`
 
@@ -59,7 +59,7 @@ Le test d'upgrade simule une base existante en version 8, retire les objets intr
 
 ## Vérifications GitHub Actions
 
-Révision de code testée : `6adac3c457e090ad1edfad2b88a57251b82a6d08` (tête de code de la PR #60 validée par le run 732 ; les commits suivants ne modifient que ce rapport)
+Révision de code testée : `84e2e0c74bbe242b7c7e39374af3e98a740d117e` (tête actuelle de la PR #60 validée par le run 736 ; les commits suivants sont documentaires)
 
 - Tests Node.js/MySQL : **325 réussis, 0 échec**, 50 suites.
 - `npm audit` : **0 vulnérabilité**.
@@ -69,9 +69,9 @@ Révision de code testée : `6adac3c457e090ad1edfad2b88a57251b82a6d08` (tête de
 - Archive source ZIP : construite avec succès.
 
 Exécutions :
-- [Tests automatisés Entreprise — run 732](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43937603519) : 325 tests réussis, 0 échec, 50 suites.
-- [Package source ZIP Entreprise — run 486](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43937603522).
-- [Validation PDF #56 — run 730](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43936717405) : 374 tests réussis, 0 échec, 47 suites ; Redis Streams smoke test et restauration réelle MySQL réussis ; 119 captures responsive sur 7 largeurs ; 0 vulnérabilité npm.
+- [Tests automatisés Entreprise — run 736](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43941503899) : 325 tests réussis, 0 échec, 50 suites.
+- [Package source ZIP Entreprise — run 490](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43941503977).
+- [Validation PDF #56 — run 735](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43941457794) : 374 tests réussis, 0 échec, 47 suites ; Redis Streams smoke test et restauration réelle MySQL réussis ; 119 captures responsive sur 7 largeurs ; 0 vulnérabilité npm.
 - La tête actuelle de #56 confirme aussi la décision documentaire de renouvellement mensuel automatique ; le CI run 730 sur cette tête est entièrement réussi.
 
 ## Limites et risques restant à traiter
