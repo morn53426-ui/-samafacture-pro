@@ -18,6 +18,13 @@ test("l'interface indique le prérequis SMTP et l'absence de reprise automatique
   assert.match(page, /renvoyer depuis la facture/);
 });
 
+test("un modèle existant peut être rouvert et modifié depuis la liste", () => {
+  assert.match(page, /onclick="modifierRecurrente\(\$\{r\.id\}\)"/);
+  assert.match(page, /function modifierRecurrente\(id\)/);
+  assert.match(page, /Api\.put\(\`\/factures-recurrentes\/\$\{id\}\`, payload\)/);
+  assert.match(page, /document\.getElementById\('envoi_auto_email'\)\.checked = Number\(modele\.envoi_auto_email\) === 1/);
+});
+
 test("la liste signale les modèles pour lesquels l'envoi automatique est activé", () => {
   assert.match(page, /Email auto activé/);
   assert.match(page, /Number\(r\.envoi_auto_email\) === 1/);
