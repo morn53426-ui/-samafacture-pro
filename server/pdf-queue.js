@@ -8,6 +8,11 @@ const STREAM_KEY = process.env.PDF_STREAM_KEY || 'samafacture:pdf:stream';
 const GROUP_NAME = process.env.PDF_STREAM_GROUP || 'samafacture:pdf:workers';
 const JOB_PREFIX = process.env.PDF_JOB_PREFIX || 'samafacture:pdf:job:';
 const JOB_TTL = Number(process.env.PDF_JOB_TTL_SECONDS) || 3600;
+const DEFAULT_FILE_RETENTION_SECONDS = JOB_TTL + 24 * 60 * 60;
+const requestedFileRetention = Number(process.env.PDF_FILE_RETENTION_SECONDS);
+const PDF_FILE_RETENTION_SECONDS = Number.isSafeInteger(requestedFileRetention) && requestedFileRetention >= JOB_TTL
+  ? requestedFileRetention
+  : DEFAULT_FILE_RETENTION_SECONDS;
 const CLAIM_IDLE_MS = Number(process.env.PDF_JOB_CLAIM_IDLE_MS) || 1800000;
 const JOB_DIR = process.env.PDF_JOBS_DIR || path.join(__dirname, 'pdf-jobs');
 const MAX_PENDING_SCAN_PAGES = 25;
@@ -119,6 +124,40 @@ async function acknowledgePdfJob(redis, entryId) {
   await transaction.exec();
 }
 
+async function cleanupExpiredPdfFiles({
+  now = Date.now(),
+  retentionMs = PDF_FILE_RETENTION_SECONDS * 1000
+} = {}) {
+  if (!Number.isFinite(now) || !Number.isFinite(retentionMs) || retentionMs < 0) {
+    throw new TypeError('Paramètres de rétention PDF invalides.');
+  }
+
+  let entries;
+  try {
+    entries = await fs.readdir(JOB_DIR, { withFileTypes: true });
+  } catch (err) {
+    if (err && err.code === 'ENOENT') return { removed: 0 };
+    throw err;
+  }
+
+  const pdfName = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.pdf$/i;
+  let removed = 0;
+  for (const entry of entries) {
+    // Do not follow symlinks or touch unrelated files in a shared volume.
+    if (!entry.isFile() || !pdfName.test(entry.name)) continue;
+    const file = path.join(JOB_DIR, entry.name);
+    const stat = await fs.stat(file).catch(() => null);
+    if (!stat || !stat.isFile() || now - stat.mtimeMs < retentionMs) continue;
+    try {
+      await fs.unlink(file);
+      removed += 1;
+    } catch (err) {
+      if (!err || err.code !== 'ENOENT') throw err;
+    }
+  }
+  return { removed };
+}
+
 async function getPdfJob(id, userId) {
   const redis = getRedisClient();
   if (!redis || !isRedisReady()) throw new Error('Redis indisponible.');
@@ -138,6 +177,8 @@ module.exports = {
   MIGRATE_LEGACY_JOB_SCRIPT,
   getPdfJob,
   getPdfPath,
+  cleanupExpiredPdfFiles,
+  PDF_FILE_RETENTION_SECONDS,
   ensurePdfConsumerGroup,
   migrateLegacyPdfQueue,
   claimNextPdfJob,
