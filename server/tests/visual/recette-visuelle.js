@@ -1248,6 +1248,14 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   });
   assert.ok(shortViewportPanel.top >= 0 && shortViewportPanel.bottom <= shortViewportPanel.viewportHeight + 1,
     'Le panneau de notifications doit rester visible dans un viewport mobile court : ' + JSON.stringify(shortViewportPanel));
+  assert.ok(shortViewportPanel.height > 0,
+    'Le panneau ne doit pas devenir invisible dans un viewport mobile court.');
+  const shortViewportScroll = await page.$eval('#workspace-notification-panel', element => {
+    const list = element.querySelector('.app-notification-list');
+    return { clientHeight: list.clientHeight, scrollHeight: list.scrollHeight };
+  });
+  assert.ok(shortViewportScroll.clientHeight > 0 && shortViewportScroll.scrollHeight > shortViewportScroll.clientHeight,
+    'La liste doit conserver un défilement interne lorsque le panneau est réduit : ' + JSON.stringify(shortViewportScroll));
   await page.evaluate(() => {
     const toggle = document.getElementById('workspace-notification-toggle');
     toggle.style.removeProperty('position');
