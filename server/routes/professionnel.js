@@ -767,7 +767,7 @@ router.post('/company-group/invitations', async (req, res, next) => {
   try {
     if (!await assertEnterpriseGroupOwner(req, res)) return;
     const email = String(req.body.email || '').trim().toLowerCase();
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: 'Adresse email invalide.' });
     }
     if (email === String(req.user.email || '').toLowerCase()) {
@@ -802,7 +802,7 @@ router.post('/company-group/invitations', async (req, res, next) => {
       'INSERT INTO pro_company_group_invitations (group_id, invited_email, token_hash, expire_at) VALUES (?, ?, ?, ?)',
       [group.id, email, tokenHash, expires]
     );
-    const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\\/$/, '');
+    const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
     const invitationUrl = base + '/invitation.html?type=company-group&token=' + token;
     const mailResult = await sendMail({
       to: email,
