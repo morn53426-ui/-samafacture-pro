@@ -16,6 +16,7 @@ const state = {
   groups: new Set(),
   expireCalls: 0,
   failExec: false,
+  failXAdd: false,
   nextId: 1
 };
 
@@ -99,17 +100,34 @@ const fakeRedis = {
   },
 
   async eval(script, options) {
-    const legacyKey = options.keys[0];
+    const firstKey = options.keys[0];
     const streamKey = options.keys[1];
-    const legacy = state.lists.get(legacyKey) || [];
+
+    if (script.includes("redis.pcall('XADD'")) {
+      const [id, userId, factureId, createdAt, rawJob] = options.arguments;
+      state.hashes.set(firstKey, {
+        id, status: 'queued', userId, factureId, createdAt
+      });
+      if (state.failXAdd) {
+        state.hashes.delete(firstKey);
+        throw new Error('XADD failed');
+      }
+      const entries = state.streams.get(streamKey) || [];
+      const entryId = 'queued-' + state.nextId++;
+      entries.push({ id: entryId, message: { job: rawJob } });
+      state.streams.set(streamKey, entries);
+      return entryId;
+    }
+
+    const legacy = state.lists.get(firstKey) || [];
     const raw = legacy.shift();
-    state.lists.set(legacyKey, legacy);
+    state.lists.set(firstKey, legacy);
     if (!raw) return null;
     const entries = state.streams.get(streamKey) || [];
-    const id = 'legacy-' + state.nextId++;
-    entries.push({ id, message: { job: raw } });
+    const entryId = 'legacy-' + state.nextId++;
+    entries.push({ id: entryId, message: { job: raw } });
     state.streams.set(streamKey, entries);
-    return id;
+    return entryId;
   }
 };
 
@@ -165,20 +183,20 @@ test('conserve les métadonnées du propriétaire tant que le PDF est en attente
   assert.ok(state.hashes.has(JOB_PREFIX + id));
 });
 
-test('une transaction échouée ne laisse ni hash ni entrée de stream partielle', async () => {
+test('un échec de XADD est renvoyé et ne laisse pas le hash propriétaire orphelin', async () => {
   const hashCountBefore = state.hashes.size;
   const streamCountBefore = (state.streams.get(STREAM_KEY) || []).length;
-  state.failExec = true;
+  state.failXAdd = true;
   try {
     await assert.rejects(
       enqueuePdfJob({
         factureId: 99,
         user: { id: 8, email: 'autre@example.test', role: 'user', nom: 'Autre client' }
       }),
-      /EXEC failed/
+      /XADD failed/
     );
   } finally {
-    state.failExec = false;
+    state.failXAdd = false;
   }
   assert.equal(state.hashes.size, hashCountBefore);
   assert.equal((state.streams.get(STREAM_KEY) || []).length, streamCountBefore);
