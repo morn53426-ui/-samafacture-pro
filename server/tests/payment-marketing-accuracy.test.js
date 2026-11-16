@@ -25,4 +25,6 @@ test('la politique indique les prestataires réellement utilisés et conserve la
   assert.match(privacy, /prestataire effectivement choisi et configuré \(Wave ou PayDunya\)/);
   assert.match(privacy, /aucun checkout Stripe n'est intégré/);
   assert.match(privacy, /Modèle à valider avant publication/);
+  assert.match(privacy, /Dans l'offre hébergée, l'infrastructure est administrée par l'exploitant du service/);
+  assert.doesNotMatch(privacy, /base de données que vous contrôlez/);
 });
