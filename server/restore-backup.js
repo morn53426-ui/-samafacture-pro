@@ -92,7 +92,7 @@ async function verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseNa
     });
   });
 
-  if (!/^\\d+$/.test(output)) {
+  if (!/^\d+$/.test(output)) {
     throw new Error('mysql n’a pas renvoyé un nombre valide pendant la vérification de la base cible.');
   }
   const count = Number(output);
