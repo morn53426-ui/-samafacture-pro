@@ -50,14 +50,14 @@ async function main() {
   }
 }
 
-async function shutdown() {
+async function shutdown(exitCode = 0) {
   if (stopping) return;
   stopping = true;
   await closeBrowser().catch(() => {});
   await closeRedis().catch(() => {});
   await pool.end().catch(() => {});
-  process.exit(0);
+  process.exit(exitCode);
 }
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
-main().catch(async err => { console.error('❌ Worker PDF arrêté :', err); await shutdown(); });
+process.on('SIGTERM', () => { void shutdown(0); });
+process.on('SIGINT', () => { void shutdown(0); });
+main().catch(async err => { console.error('❌ Worker PDF arrêté :', err); await shutdown(1); });
