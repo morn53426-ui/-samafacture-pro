@@ -29,7 +29,7 @@ async function resolveTenant(req, res, next) {
     req.companyMembership = null;
     req.permissions = ROLE_PERMISSIONS.proprietaire;
 
-    const isInviteAcceptance = (req.baseUrl || '').endsWith('/pro') && (req.path || '').startsWith('/team/invitations/accept');
+    const isInviteAcceptance = (req.baseUrl || '').endsWith('/pro') && ((req.path || '').startsWith('/team/invitations/accept') || (req.path || '').startsWith('/company-group/invitations/accept'));
     // La sélection d’entreprise est transmise par toutes les routes API authentifiées,
     // pas uniquement /pro : clients, factures, produits, rapports et assistant doivent
     // tous lire le même espace lorsque le membre a sélectionné une entreprise.

@@ -8,6 +8,7 @@ const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { encryptSecret, decryptSecret } = require('../utils/pro-webhooks');
 const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydunya } = require('../config/payments');
 const net = require('net');
+const { isEnterprisePlan } = require('../utils/plans');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -57,6 +58,22 @@ async function clientOwned(userId, clientId) {
 async function invoiceOwned(userId, invoiceId) {
   const [rows] = await pool.query('SELECT * FROM factures WHERE id = ? AND user_id = ? LIMIT 1', [invoiceId, userId]);
   return rows[0] || null;
+}
+
+async function assertEnterpriseGroupOwner(req, res) {
+  if (actor(req) !== owner(req) || req.companyMembership) {
+    res.status(403).json({ error: 'Seul le propriétaire du compte principal peut administrer le groupe de sociétés.' });
+    return false;
+  }
+  const [rows] = await pool.query('SELECT plan FROM users WHERE id = ? LIMIT 1', [actor(req)]);
+  if (!rows.length || !isEnterprisePlan(rows[0].plan)) {
+    res.status(403).json({
+      error: 'La gestion multi-sociétés est réservée à la formule Entreprise.',
+      code: 'PLAN_ENTREPRISE_REQUIS'
+    });
+    return false;
+  }
+  return true;
 }
 
 /* ----------------------------- VENTES ---------------------------------- */
@@ -624,8 +641,348 @@ router.delete('/team/:memberId', async (req, res, next) => {
 });
 router.get('/team/companies', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT m.owner_user_id AS id, u.entreprise_nom, u.nom, m.role FROM pro_team_members m JOIN users u ON u.id = m.owner_user_id WHERE m.member_user_id = ? AND m.active = 1', [actor(req)]);
-    res.json({ entreprises: rows, entreprise_active: owner(req), permissions: req.permissions || [] });
+    const [teamRows] = await pool.query(
+      'SELECT m.owner_user_id AS id, u.entreprise_nom, u.nom, m.role, \'equipe\' AS source FROM pro_team_members m JOIN users u ON u.id = m.owner_user_id WHERE m.member_user_id = ? AND m.active = 1',
+      [actor(req)]
+    );
+    const [groupRows] = await pool.query(
+      `SELECT gc.company_owner_id AS id, u.entreprise_nom, u.nom,
+              'administrateur' AS role, 'groupe' AS source,
+              gc.is_primary, gc.linked_at
+       FROM pro_company_group_companies gc
+       JOIN pro_company_groups g ON g.id = gc.group_id
+       JOIN users u ON u.id = gc.company_owner_id
+       WHERE g.owner_user_id = ?
+       ORDER BY gc.is_primary DESC, u.entreprise_nom ASC`,
+      [actor(req)]
+    );
+    const byId = new Map();
+    for (const item of [...teamRows, ...groupRows]) byId.set(Number(item.id), item);
+    res.json({
+      entreprises: [...byId.values()],
+      entreprise_active: owner(req),
+      permissions: req.permissions || []
+    });
+  } catch (err) { next(err); }
+});
+
+
+/* ---------------------- GROUPE MULTI-SOCIÉTÉS (ENTREPRISE) ------------- */
+router.get('/company-group', async (req, res, next) => {
+  try {
+    if (!await assertEnterpriseGroupOwner(req, res)) return;
+    const [groups] = await pool.query(
+      'SELECT id, owner_user_id, nom, created_at, updated_at FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
+      [actor(req)]
+    );
+    if (!groups.length) return res.json({ groupe: null, societes: [], invitations: [] });
+    const group = groups[0];
+    const [companies] = await pool.query(
+      `SELECT gc.id AS liaison_id, gc.company_owner_id AS id, gc.is_primary, gc.linked_at,
+              u.nom AS contact_nom, u.email, u.entreprise_nom, u.entreprise_ninea,
+              u.entreprise_rccm, u.pays_code, u.devise
+       FROM pro_company_group_companies gc
+       JOIN users u ON u.id = gc.company_owner_id
+       WHERE gc.group_id = ?
+       ORDER BY gc.is_primary DESC, u.entreprise_nom ASC`,
+      [group.id]
+    );
+    const [invitations] = await pool.query(
+      `SELECT id, invited_email, statut, expire_at, created_at
+       FROM pro_company_group_invitations
+       WHERE group_id = ? AND statut = 'envoyee'
+       ORDER BY created_at DESC LIMIT 100`,
+      [group.id]
+    );
+    res.json({ groupe: group, societes: companies, invitations });
+  } catch (err) { next(err); }
+});
+
+router.post('/company-group', async (req, res, next) => {
+  let conn;
+  try {
+    if (!await assertEnterpriseGroupOwner(req, res)) return;
+    const nom = String(req.body.nom || '').trim().slice(0, 190);
+    if (!nom) return res.status(400).json({ error: 'Le nom du groupe est obligatoire.' });
+    const [[existing]] = await pool.query(
+      'SELECT id FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
+      [actor(req)]
+    );
+    if (existing) return res.status(409).json({ error: 'Un groupe de sociétés existe déjà pour ce compte.' });
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [groupResult] = await conn.query(
+      'INSERT INTO pro_company_groups (owner_user_id, nom) VALUES (?, ?)',
+      [actor(req), nom]
+    );
+    await conn.query(
+      'INSERT INTO pro_company_group_companies (group_id, company_owner_id, is_primary) VALUES (?, ?, 1)',
+      [groupResult.insertId, actor(req)]
+    );
+    await conn.query(
+      'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [actor(req), actor(req), 'groupe.societes.cree', 'groupe_societes', String(groupResult.insertId), JSON.stringify({ nom }), req.ip || null]
+    );
+    await conn.commit();
+    res.status(201).json({ id: groupResult.insertId, nom, societe_principale_id: actor(req) });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Un groupe de sociétés existe déjà pour ce compte ou cette société.' });
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+router.post('/company-group/invitations', async (req, res, next) => {
+  try {
+    if (!await assertEnterpriseGroupOwner(req, res)) return;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Adresse email invalide.' });
+    }
+    if (email === String(req.user.email || '').toLowerCase()) {
+      return res.status(400).json({ error: 'La société principale appartient déjà à ce groupe.' });
+    }
+    const [[group]] = await pool.query(
+      'SELECT id, nom FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
+      [actor(req)]
+    );
+    if (!group) return res.status(409).json({ error: 'Créez d’abord le groupe de sociétés.' });
+
+    const [[recipient]] = await pool.query('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
+    if (recipient) {
+      const [[alreadyLinked]] = await pool.query(
+        'SELECT id FROM pro_company_group_companies WHERE company_owner_id = ? LIMIT 1',
+        [recipient.id]
+      );
+      if (alreadyLinked) return res.status(409).json({ error: 'Ce compte société appartient déjà à un groupe.' });
+    }
+    const [[pending]] = await pool.query(
+      `SELECT id FROM pro_company_group_invitations
+       WHERE group_id = ? AND invited_email = ? AND statut = 'envoyee' AND expire_at > NOW()
+       LIMIT 1`,
+      [group.id, email]
+    );
+    if (pending) return res.status(409).json({ error: 'Une invitation active existe déjà pour cette adresse.' });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expires = new Date(Date.now() + 7 * 86400000);
+    const [result] = await pool.query(
+      'INSERT INTO pro_company_group_invitations (group_id, invited_email, token_hash, expire_at) VALUES (?, ?, ?, ?)',
+      [group.id, email, tokenHash, expires]
+    );
+    const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\\/$/, '');
+    const invitationUrl = base + '/invitation.html?type=company-group&token=' + token;
+    const mailResult = await sendMail({
+      to: email,
+      subject: 'Invitation à rejoindre un groupe de sociétés SamaFacture Pro',
+      text: 'Le groupe « ' + group.nom + ' » vous invite à rattacher votre société à son espace de gestion. Acceptez uniquement si vous autorisez explicitement le propriétaire du groupe à accéder à votre société : ' + invitationUrl
+    });
+    await audit(req, 'groupe.societes.invitation_creee', 'invitation_groupe', result.insertId, { email });
+    res.status(201).json({
+      id: result.insertId,
+      email,
+      invitation_url: invitationUrl,
+      email_envoye: Boolean(mailResult && mailResult.sent),
+      expire_le: expires
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/company-group/invitations/accept', async (req, res, next) => {
+  let conn;
+  try {
+    if (actor(req) !== owner(req) || req.companyMembership) {
+      return res.status(403).json({ error: 'Connectez-vous au compte propriétaire de la société à rattacher.' });
+    }
+    const token = String(req.body.token || '');
+    if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(400).json({ error: 'Jeton d’invitation invalide.' });
+    if (!req.user.email) return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email vérifiée.' });
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [invites] = await conn.query(
+      `SELECT i.id, i.group_id, i.invited_email, i.statut, i.expire_at,
+              g.owner_user_id, g.nom AS group_name, u.plan AS owner_plan
+       FROM pro_company_group_invitations i
+       JOIN pro_company_groups g ON g.id = i.group_id
+       JOIN users u ON u.id = g.owner_user_id
+       WHERE i.token_hash = ? AND i.statut = 'envoyee' AND i.expire_at > NOW()
+       LIMIT 1 FOR UPDATE`,
+      [tokenHash]
+    );
+    const invite = invites[0];
+    if (!invite) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Invitation expirée, révoquée ou déjà utilisée.' });
+    }
+    if (String(invite.invited_email).toLowerCase() !== String(req.user.email).toLowerCase()) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Connectez-vous avec l’adresse email qui a reçu cette invitation.' });
+    }
+    if (!isEnterprisePlan(invite.owner_plan)) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Le compte propriétaire du groupe n’a plus la formule Entreprise active.' });
+    }
+    if (Number(invite.owner_user_id) === actor(req)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'La société principale ne peut pas être ajoutée une seconde fois.' });
+    }
+    const [[alreadyLinked]] = await conn.query(
+      'SELECT id FROM pro_company_group_companies WHERE company_owner_id = ? LIMIT 1 FOR UPDATE',
+      [actor(req)]
+    );
+    if (alreadyLinked) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Cette société est déjà rattachée à un groupe.' });
+    }
+    const [company] = await conn.query('SELECT id FROM users WHERE id = ? LIMIT 1', [actor(req)]);
+    if (!company.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Compte société introuvable.' });
+    }
+    await conn.query(
+      'INSERT INTO pro_company_group_companies (group_id, company_owner_id, is_primary) VALUES (?, ?, 0)',
+      [invite.group_id, actor(req)]
+    );
+    await conn.query(
+      "UPDATE pro_company_group_invitations SET statut = 'acceptee', accepted_company_owner_id = ?, accepted_at = NOW() WHERE id = ? AND statut = 'envoyee'",
+      [actor(req), invite.id]
+    );
+    await conn.query(
+      'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [invite.owner_user_id, actor(req), 'groupe.societe.invitation_acceptee', 'societe', String(actor(req)), JSON.stringify({ group_id: invite.group_id, group_name: invite.group_name }), req.ip || null]
+    );
+    await conn.commit();
+    res.json({
+      success: true,
+      groupe_id: invite.group_id,
+      entreprise_id: Number(invite.owner_user_id),
+      message: 'Votre société a rejoint le groupe. Le propriétaire du groupe peut maintenant ouvrir cet espace avec les droits administrateur.'
+    });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Cette société appartient déjà à un groupe.' });
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+router.delete('/company-group/companies/:companyOwnerId', async (req, res, next) => {
+  try {
+    if (!await assertEnterpriseGroupOwner(req, res)) return;
+    if (!idOk(req.params.companyOwnerId)) return res.status(400).json({ error: 'Identifiant de société invalide.' });
+    const companyOwnerId = Number(req.params.companyOwnerId);
+    if (companyOwnerId === actor(req)) return res.status(400).json({ error: 'La société principale ne peut pas être retirée du groupe.' });
+    const [[group]] = await pool.query(
+      'SELECT id FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
+      [actor(req)]
+    );
+    if (!group) return res.status(404).json({ error: 'Groupe de sociétés introuvable.' });
+    const [result] = await pool.query(
+      'DELETE FROM pro_company_group_companies WHERE group_id = ? AND company_owner_id = ? AND is_primary = 0',
+      [group.id, companyOwnerId]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'Société rattachée introuvable.' });
+    await audit(req, 'groupe.societe.retir ee'.replace(' ', ''), 'societe', companyOwnerId, { group_id: group.id });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/company-group/invitations/:invitationId', async (req, res, next) => {
+  try {
+    if (!await assertEnterpriseGroupOwner(req, res)) return;
+    if (!idOk(req.params.invitationId)) return res.status(400).json({ error: 'Identifiant d’invitation invalide.' });
+    const [[group]] = await pool.query(
+      'SELECT id FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
+      [actor(req)]
+    );
+    if (!group) return res.status(404).json({ error: 'Groupe de sociétés introuvable.' });
+    const [result] = await pool.query(
+      "UPDATE pro_company_group_invitations SET statut = 'revoquee' WHERE id = ? AND group_id = ? AND statut = 'envoyee'",
+      [req.params.invitationId, group.id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'Invitation active introuvable.' });
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.get('/company-group/dashboard', async (req, res, next) => {
+  try {
+    if (!await assertEnterpriseGroupOwner(req, res)) return;
+    const [[group]] = await pool.query(
+      'SELECT id, nom FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
+      [actor(req)]
+    );
+    if (!group) return res.status(404).json({ error: 'Groupe de sociétés introuvable.' });
+    const [companies] = await pool.query(
+      `SELECT gc.company_owner_id AS id, gc.is_primary, u.entreprise_nom, u.nom AS contact_nom,
+              u.pays_code, u.devise
+       FROM pro_company_group_companies gc
+       JOIN users u ON u.id = gc.company_owner_id
+       WHERE gc.group_id = ?
+       ORDER BY gc.is_primary DESC, u.entreprise_nom ASC`,
+      [group.id]
+    );
+    const ids = companies.map(company => Number(company.id));
+    if (!ids.length) return res.json({ groupe: group, societes: [], factures_par_devise: [], depenses_par_devise: [] });
+    const slots = ids.map(() => '?').join(', ');
+    const [invoiceRows] = await pool.query(
+      `SELECT user_id, devise, COUNT(*) AS nombre_factures,
+              COALESCE(SUM(total),0) AS total_facture,
+              COALESCE(SUM(montant_paye),0) AS total_encaisse
+       FROM factures
+       WHERE user_id IN (${slots}) AND type = 'facture'
+       GROUP BY user_id, devise`,
+      ids
+    );
+    const [expenseRows] = await pool.query(
+      `SELECT d.user_id, u.devise, COUNT(*) AS nombre_depenses,
+              COALESCE(SUM(d.montant),0) AS total_depenses
+       FROM depenses d
+       JOIN users u ON u.id = d.user_id
+       WHERE d.user_id IN (${slots})
+       GROUP BY d.user_id, u.devise`,
+      ids
+    );
+    const companiesWithTotals = companies.map(company => ({
+      ...company,
+      factures: invoiceRows.filter(row => Number(row.user_id) === Number(company.id)).map(row => ({
+        devise: row.devise, nombre: Number(row.nombre_factures), total: Number(row.total_facture), encaisse: Number(row.total_encaisse)
+      })),
+      depenses: expenseRows.filter(row => Number(row.user_id) === Number(company.id)).map(row => ({
+        devise: row.devise, nombre: Number(row.nombre_depenses), total: Number(row.total_depenses)
+      }))
+    }));
+    const invoiceCurrencies = new Map();
+    for (const row of invoiceRows) {
+      const key = row.devise || 'INCONNUE';
+      const item = invoiceCurrencies.get(key) || { devise: key, nombre_factures: 0, total_facture: 0, total_encaisse: 0 };
+      item.nombre_factures += Number(row.nombre_factures || 0);
+      item.total_facture += Number(row.total_facture || 0);
+      item.total_encaisse += Number(row.total_encaisse || 0);
+      invoiceCurrencies.set(key, item);
+    }
+    const expenseCurrencies = new Map();
+    for (const row of expenseRows) {
+      const key = row.devise || 'INCONNUE';
+      const item = expenseCurrencies.get(key) || { devise: key, nombre_depenses: 0, total_depenses: 0 };
+      item.nombre_depenses += Number(row.nombre_depenses || 0);
+      item.total_depenses += Number(row.total_depenses || 0);
+      expenseCurrencies.set(key, item);
+    }
+    res.json({
+      groupe: group,
+      societes: companiesWithTotals,
+      factures_par_devise: [...invoiceCurrencies.values()],
+      depenses_par_devise: [...expenseCurrencies.values()],
+      note: 'Les montants sont regroupés par devise ; aucune conversion de change ou consolidation comptable n’est réalisée.'
+    });
   } catch (err) { next(err); }
 });
 
