@@ -2,6 +2,7 @@ const { pool } = require('./db');
 const { captureException } = require('./monitoring');
 const { sendMail, isSmtpConfigured } = require('./mailer');
 const { deliverPendingWebhooks } = require('../utils/pro-webhooks');
+const { localDateString } = require('../utils/local-date');
 
 /**
  * Marque comme "expirée" toute tentative de paiement d'abonnement restée bloquée en
@@ -51,8 +52,17 @@ async function verifierFacturesRecurrentes() {
   const baseUrl = (process.env.APP_URL || 'http://localhost:4000').replace(/\/$/, '');
   try {
     await withMysqlAdvisoryLock('samafacture:recurring-invoices', async () => {
-      const [dues] = await pool.query(
-        `SELECT id, user_id, envoi_auto_email FROM factures_recurrentes WHERE actif = 1 AND prochaine_date <= CURDATE()`
+      // Les dates d'échéance sont civiles et propres à chaque entreprise.
+      // UTC_DATE()+1 inclut les comptes dont le jour local a déjà basculé ; le filtre
+      // JS applique ensuite le vrai jour du fuseau du compte, sans dépendre des tz tables MySQL.
+      const [candidates] = await pool.query(
+        `SELECT r.id, r.user_id, r.envoi_auto_email, r.prochaine_date, u.fuseau_horaire
+         FROM factures_recurrentes r
+         JOIN users u ON u.id = r.user_id
+         WHERE r.actif = 1 AND r.prochaine_date <= DATE_ADD(UTC_DATE(), INTERVAL 1 DAY)`
+      );
+      const dues = candidates.filter(row =>
+        String(row.prochaine_date).slice(0, 10) <= localDateString(row.fuseau_horaire)
       );
       for (const { id, user_id, envoi_auto_email } of dues) {
         try {
