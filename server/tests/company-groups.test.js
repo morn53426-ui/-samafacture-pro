@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
+const { decryptEmailPayload } = require('../utils/email-outbox-crypto');
+const { dispatchPendingEmails } = require('../email-outbox');
 const {
   app,
   pool,
@@ -83,9 +85,10 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base existante en version 9 reçoit la migration v10 des groupes multi-sociétés', async () => {
+test('une base existante en version 9 reçoit les migrations v10 et v11 des groupes et de l’outbox email', async () => {
   // Simule une installation déjà initialisée en v9 : seules les nouvelles tables
   // de la migration 006 sont absentes. Les tables historiques et leurs données restent intactes.
+  await pool.query('DROP TABLE IF EXISTS email_outbox');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitations');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_companies');
   await pool.query('DROP TABLE IF EXISTS pro_company_groups');
@@ -96,16 +99,16 @@ test('une base existante en version 9 reçoit la migration v10 des groupes multi
   assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v9 → v10 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.ok(Number(meta.version) >= 10, 'la version du schéma doit être avancée après migration');
+  assert.ok(Number(meta.version) >= 11, 'la version du schéma doit être avancée jusqu’à v11 après migration');
 
   const [tables] = await pool.query(
-    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?)',
-    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations']
+    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?)',
+    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations', 'email_outbox']
   );
   assert.deepEqual(
     tables.map(row => row.TABLE_NAME).sort(),
-    ['pro_company_group_companies', 'pro_company_group_invitations', 'pro_company_groups'],
-    'les trois tables de la migration 006 doivent être recréées sur une base v9'
+    ['email_outbox', 'pro_company_group_companies', 'pro_company_group_invitations', 'pro_company_groups'],
+    'les tables des migrations 006 et 007 doivent être recréées sur une base v9'
   );
 });
 
@@ -147,12 +150,76 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   );
   const invitation = invitationResponses.find(response => response.status === 201);
   assert.ok(invitation, 'une invitation doit être créée');
-  assert.equal(typeof invitation.body.email_envoye, 'boolean');
-  if (!invitation.body.email_envoye) {
-    assert.ok(invitation.body.avertissement, 'un échec ou une absence SMTP doit être signalé');
-  }
+  assert.equal(invitation.body.email_envoye, false, 'un email en file ne doit pas être présenté comme envoyé');
+  assert.equal(invitation.body.email_en_file, true);
+  assert.equal(invitation.body.email_statut, 'queued');
+  assert.match(invitation.body.avertissement, /file d’envoi sécurisée/i);
   const token = new URL(invitation.body.invitation_url).searchParams.get('token');
   assert.match(token, /^[a-f0-9]{64}$/i);
+
+  const [[queuedEmail]] = await pool.query(
+    `SELECT id, statut, tentatives, payload_enc
+     FROM email_outbox
+     WHERE entity_type = 'company_group_invitation' AND entity_id = ?`,
+    [invitation.body.id]
+  );
+  assert.ok(queuedEmail, 'l’invitation et le message email doivent être persistés ensemble');
+  assert.equal(queuedEmail.statut, 'queued');
+  assert.match(queuedEmail.payload_enc, /^v1:[a-f0-9]+:[a-f0-9]+:[a-f0-9]+$/i);
+  const decryptedEmail = decryptEmailPayload(queuedEmail.payload_enc);
+  assert.equal(decryptedEmail.to, recipient.email);
+  assert.match(decryptedEmail.text, new RegExp(token));
+  assert.doesNotMatch(queuedEmail.payload_enc, new RegExp(token));
+
+  // Simule un worker interrompu : son bail est expiré et une autre instance reprend la tâche.
+  await pool.query(
+    `UPDATE email_outbox
+     SET statut = 'processing', tentatives = 0,
+         verrouille_le = DATE_SUB(NOW(), INTERVAL 10 MINUTE),
+         lock_token = '00000000-0000-4000-8000-000000000000'
+     WHERE id = ?`,
+    [queuedEmail.id]
+  );
+  const failedDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async () => {
+      const error = new Error('SMTP diagnostic must not be persisted');
+      error.code = 'ECONNECTION';
+      throw error;
+    }
+  });
+  assert.deepEqual(failedDelivery, { claimed: 1, sent: 0, retried: 1, failed: 0 });
+  const [[retryRow]] = await pool.query(
+    'SELECT statut, tentatives, dernier_code_erreur FROM email_outbox WHERE id = ?',
+    [queuedEmail.id]
+  );
+  assert.equal(retryRow.statut, 'retry');
+  assert.equal(Number(retryRow.tentatives), 1);
+  assert.equal(retryRow.dernier_code_erreur, 'ECONNECTION');
+  assert.notEqual(retryRow.dernier_code_erreur, 'SMTP diagnostic must not be persisted');
+
+  await pool.query(
+    'UPDATE email_outbox SET prochaine_tentative = DATE_SUB(NOW(), INTERVAL 1 SECOND) WHERE id = ?',
+    [queuedEmail.id]
+  );
+  let deliveredPayload;
+  const successfulDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async payload => {
+      deliveredPayload = payload;
+      return { sent: true };
+    }
+  });
+  assert.deepEqual(successfulDelivery, { claimed: 1, sent: 1, retried: 0, failed: 0 });
+  assert.equal(deliveredPayload.to, recipient.email);
+  assert.match(deliveredPayload.text, new RegExp(token));
+  const [[sentRow]] = await pool.query(
+    'SELECT statut, tentatives, envoye_le FROM email_outbox WHERE id = ?',
+    [queuedEmail.id]
+  );
+  assert.equal(sentRow.statut, 'sent');
+  assert.equal(Number(sentRow.tentatives), 2);
+  assert.ok(sentRow.envoye_le, 'la date d’envoi doit être enregistrée');
 
   const wrongOwner = await request(app)
     .post('/api/pro/company-group/invitations/accept')
