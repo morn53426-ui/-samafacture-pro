@@ -8,10 +8,15 @@ const page = fs.readFileSync(
   'utf8'
 );
 
-test("le formulaire utilise la date civile du navigateur, pas la date UTC", () => {
-  assert.match(page, /maintenant\.getFullYear\(\)/);
-  assert.match(page, /maintenant\.getMonth\(\) \+ 1/);
-  assert.match(page, /maintenant\.getDate\(\)/);
-  assert.match(page, /document\.getElementById\('prochaine_date'\)\.value = dateLocale/);
+test("le formulaire charge le fuseau horaire enregistré pour le compte", () => {
+  assert.match(page, /Api\.get\('\/auth\/me'\)/);
+  assert.match(page, /accountTimezone = user\?\.fuseau_horaire \|\| 'Africa\/Dakar'/);
+});
+
+test("la date initiale est calculée dans le fuseau IANA du compte", () => {
+  assert.match(page, /new Intl\.DateTimeFormat\('en-US'/);
+  assert.match(page, /timeZone: zone/);
+  assert.match(page, /dateCivileAujourdhui\(accountTimezone\)/);
+  assert.match(page, /parts\.year \+ '-' \+ parts\.month \+ '-' \+ parts\.day/);
   assert.doesNotMatch(page, /prochaine_date['"]\)\.value = new Date\(\)\.toISOString/);
 });
