@@ -741,7 +741,9 @@
 </div>
 
 
-<div id="invoice-template-preview-modal" class="invoice-template-preview-modal" style="display:none;" aria-label="Aperçu détaillé du modèle de facture">
+<div id="invoice-template-preview-modal" class="invoice-template-preview-modal" style="display:none;"
+     role="dialog" aria-modal="true" aria-labelledby="invoice-template-preview-name"
+     aria-describedby="invoice-template-preview-description" tabindex="-1">
   <section class="invoice-template-preview-dialog" role="document">
     <header class="invoice-template-preview-dialog-head">
       <div>
@@ -792,7 +794,8 @@
     lignes: [],
     templateId: 'classique',
     documentType: 'facture',
-    scale: 1
+    scale: 1,
+    triggerElement: null
   };
 
   // Déclarée avant toute fonction d'initialisation qui l'utilise.
@@ -1026,19 +1029,72 @@
   function openInvoiceTemplatePreview(templateId) {
     const meta = INVOICE_TEMPLATE_META.find(item => item.id === templateId);
     if (!meta) return;
+    const modal = document.getElementById('invoice-template-preview-modal');
+    invoiceTemplatePreviewState.triggerElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     invoiceTemplatePreviewState.templateId = templateId;
     invoiceTemplatePreviewState.documentType = 'facture';
     renderInvoiceTemplatePreviewDocument();
-    const modal = document.getElementById('invoice-template-preview-modal');
     modal.style.display = 'flex';
-    requestAnimationFrame(fitInvoiceTemplatePreview);
+    requestAnimationFrame(() => {
+      fitInvoiceTemplatePreview();
+      document.getElementById('invoice-template-preview-close')?.focus();
+    });
   }
 
   function closeInvoiceTemplatePreview() {
     const modal = document.getElementById('invoice-template-preview-modal');
-    if (modal) modal.style.display = 'none';
+    if (!modal || modal.style.display === 'none') return;
+    modal.style.display = 'none';
+    const trigger = invoiceTemplatePreviewState.triggerElement;
+    invoiceTemplatePreviewState.triggerElement = null;
+    if (trigger?.isConnected) trigger.focus();
   }
 
+  function handleInvoiceTemplatePreviewKeydown(event) {
+    const modal = document.getElementById('invoice-template-preview-modal');
+    if (!modal || getComputedStyle(modal).display === 'none') return;
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeInvoiceTemplatePreview();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+
+    const selector = [
+      'a[href]', 'area[href]', 'input:not([disabled])', 'select:not([disabled])',
+      'textarea:not([disabled])', 'button:not([disabled])',
+      '[contenteditable="true"]', '[tabindex]:not([tabindex="-1"])'
+    ].join(',');
+    const focusable = Array.from(modal.querySelectorAll(selector)).filter(element =>
+      !element.hidden &&
+      element.getAttribute('aria-hidden') !== 'true' &&
+      element.getClientRects().length > 0 &&
+      getComputedStyle(element).visibility !== 'hidden'
+    );
+
+    if (!focusable.length) {
+      event.preventDefault();
+      modal.focus();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!modal.contains(document.activeElement)) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  document.addEventListener('keydown', handleInvoiceTemplatePreviewKeydown);
   document.getElementById('invoice-template-preview-close')?.addEventListener('click', closeInvoiceTemplatePreview);
   document.getElementById('invoice-template-preview-modal')?.addEventListener('click', event => {
     if (event.target === event.currentTarget) closeInvoiceTemplatePreview();
