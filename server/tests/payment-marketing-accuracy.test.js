@@ -24,7 +24,8 @@ test('le checkout PayDunya ne prétend pas sélectionner Orange Money ou la cart
   const subscription = read('public/abonnement.html');
   assert.match(subscription, /Payer avec PayDunya/);
   assert.doesNotMatch(subscription, /Orange Money \/ Carte/);
-  assert.match(subscription, /Type de paiement[\\s\\S]*?Paiement unique/);
+  assert.match(subscription, /Type de paiement/);
+  assert.match(subscription, /<dd>Paiement unique<\\/dd>/);
 });
 
 test('la politique indique les prestataires réellement utilisés et conserve la mention de validation juridique', () => {
