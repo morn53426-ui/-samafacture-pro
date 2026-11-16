@@ -11,7 +11,7 @@ La livraison est *au moins une fois*, pas exactement une fois. Si un worker s'ar
 ## Réessais et délai de visibilité
 
 - Délai de visibilité par défaut : 30 minutes (`PDF_JOB_CLAIM_IDLE_MS=1800000`).
-- Rétention du PDF sur disque : 25 heures par défaut (`PDF_FILE_RETENTION_SECONDS=90000`), soit au moins 24 heures de marge au-delà du TTL des métadonnées de tâche (1 heure par défaut). Le worker supprime toutes les 15 minutes uniquement les fichiers réguliers dont le nom est un UUID suivi de `.pdf` et dont l'âge dépasse cette rétention ; les autres fichiers et les liens symboliques sont ignorés.
+- Rétention du PDF sur disque : 25 heures par défaut (`PDF_FILE_RETENTION_SECONDS=90000`). Le hash Redis qui contient le propriétaire et le statut de téléchargement est désormais conservé au moins aussi longtemps que le fichier (`max(PDF_JOB_TTL_SECONDS, PDF_FILE_RETENTION_SECONDS)`) ; le propriétaire peut donc télécharger le PDF pendant toute la fenêtre de rétention. Le worker supprime toutes les 15 minutes uniquement les fichiers réguliers dont le nom est un UUID suivi de `.pdf` et dont l'âge dépasse cette rétention ; les autres fichiers et les liens symboliques sont ignorés.
 - Nombre maximal de tentatives : 3 (`PDF_JOB_MAX_ATTEMPTS=3`).
 - Une erreur transitoire conserve l'entrée dans la PEL sans `XACK`. Elle est réclamée après le délai d'inactivité.
 - Après la dernière tentative, le statut passe à `failed`, le hash conserve le résultat pendant `PDF_JOB_TTL_SECONDS`, puis l'entrée est acquittée et supprimée.
