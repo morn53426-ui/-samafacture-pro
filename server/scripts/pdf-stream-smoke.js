@@ -13,6 +13,8 @@ const legacy = 'samafacture:pdf:legacy-smoke:' + suffix;
 const metadata = 'samafacture:pdf:job:smoke:' + suffix;
 const badStream = 'samafacture:pdf:wrong-type:' + suffix;
 const failedMetadata = 'samafacture:pdf:job:failed-smoke:' + suffix;
+const badLegacy = 'samafacture:pdf:legacy-failure:' + suffix;
+const badMigrationTarget = 'samafacture:pdf:migration-wrong-type:' + suffix;
 const client = createClient({ url });
 
 client.on('error', err => {
@@ -72,9 +74,20 @@ async function main() {
     assert.equal(migrated.length, 1);
     assert.equal(migrated[0].message.job, legacyJob);
 
-    console.log('Redis Streams smoke test réussi : group, Lua enqueue, XREADGROUP, XAUTOCLAIM, XACK/XDEL et migration Lua.');
+    await client.rPush(badLegacy, legacyJob);
+    await client.set(badMigrationTarget, 'not-a-stream');
+    await assert.rejects(
+      client.eval(MIGRATE_LEGACY_JOB_SCRIPT, {
+        keys: [badLegacy, badMigrationTarget],
+        arguments: []
+      }),
+      /WRONGTYPE/
+    );
+    assert.equal(await client.lLen(badLegacy), 1, 'une erreur XADD ne doit pas retirer l’ancienne tâche');
+
+    console.log('Redis Streams smoke test réussi : Lua enqueue, récupération pending, ack, migration et compensation d’erreur.');
   } finally {
-    await client.del([stream, legacy, metadata, badStream, failedMetadata]);
+    await client.del([stream, legacy, metadata, badStream, failedMetadata, badLegacy, badMigrationTarget]);
     await client.quit();
   }
 }
