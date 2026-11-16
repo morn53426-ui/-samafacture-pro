@@ -17,7 +17,7 @@ const invitationPage = fs.readFileSync(
 describe('Retour visuel des invitations Entreprise', () => {
   test('ne termine pas le rattachement d’un groupe avant la preuve email indépendante', () => {
     assert.match(invitationPage, /verification_required/);
-    assert.match(invitationPage, /Se connecter avec l’adresse email/i);
+    assert.match(invitationPage, /Connectez-vous avec l’adresse email/i);
     assert.match(invitationPage, /confirmation sera envoyée à cette adresse/i);
   });
 
