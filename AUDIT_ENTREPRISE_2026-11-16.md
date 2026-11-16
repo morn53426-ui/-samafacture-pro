@@ -2,7 +2,7 @@
 
 Date : 16 novembre 2026  
 Branche : `feat/enterprise-multi-company-foundation-20261116`  
-Dernier commit de code testé : `cff824b30959e4f13bb59e0fcf80307c37bf1199`  
+Dernier commit de code testé : `6adac3c457e090ad1edfad2b88a57251b82a6d08`  
 Mise à jour de l'audit : 16 novembre 2026 (rapport actualisé après validation du socle Entreprise et de la file PDF)  
 Branche de référence synchronisée : `main` à `70750be430c83c4bf3ff369ad453c7b1fd1af511`
 
@@ -69,8 +69,8 @@ Révision testée : `cff824b30959e4f13bb59e0fcf80307c37bf1199` (tête de la PR #
 - Archive source ZIP : construite avec succès.
 
 Exécutions :
-- [Tests automatisés Entreprise — run 724](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43934033844) : 325 tests réussis, 0 échec, 50 suites.
-- [Package source ZIP Entreprise — run 478](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43934033962).
+- [Tests automatisés Entreprise — run 732](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43937603519) : 325 tests réussis, 0 échec, 50 suites.
+- [Package source ZIP Entreprise — run 486](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43937603522).
 - [Validation PDF #56 — run 729](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43936062465) : 374 tests réussis, 0 échec, 47 suites ; Redis Streams smoke test et restauration réelle MySQL réussis ; 119 captures responsive sur 7 largeurs ; 0 vulnérabilité npm.
 - La tête actuelle de #56 confirme aussi la décision documentaire de renouvellement mensuel automatique ; le CI run 730 sur cette tête est entièrement réussi.
 
@@ -89,7 +89,7 @@ Exécutions :
 ## État des PR et décision
 
 - PR #56 : ouverte, non fusionnée, tête actuelle `73120ef76062f01bfa1cf72022acbe00e26cd78a`. Le CI run 730 valide cette tête : 374 tests réussis, 0 échec, 47 suites, smoke Redis Streams, restauration réelle MySQL, recette Chromium 119 captures/7 largeurs et 0 vulnérabilité npm. Elle doit être fusionnée avant #60 pour respecter l'ordre des changements PDF, dates et migrations.
-- PR #60 : ouverte, brouillon, base `main`. Le dernier commit de code fonctionnel `cff824b30959e4f13bb59e0fcf80307c37bf1199` est entièrement validé par le CI run 724 (325/325). Les commits qui suivent portent uniquement sur ce rapport d'audit ; ils ne modifient pas la logique applicative. Les deux remarques automatisées de revue relatives à l'ordre des migrations et à la variable `outsiderRecipient` sont obsolètes, résolues et corrigées dans la révision de code testée.
+- PR #60 : ouverte, brouillon, base `main`. Le dernier commit de code testé `6adac3c457e090ad1edfad2b88a57251b82a6d08` est entièrement validé par le CI run 732 (325/325). Le rapport d'audit lui-même est documentaire et ne modifie pas la logique applicative. Les deux remarques automatisées de revue relatives à l'ordre des migrations et à la variable `outsiderRecipient` sont obsolètes, résolues et corrigées dans la révision de code testée.
 - La fusion reste suspendue : protections de branche `main` non vérifiées par les permissions/intégrations actuellement disponibles et revue humaine indépendante encore requise. Aucune fusion automatique n'a été effectuée.
 
 Aucun prélèvement mensuel automatique ni aucune disponibilité commerciale internationale générale ne doivent être annoncés avant validation des critères produit, fournisseur, réglementaires et opérationnels.
