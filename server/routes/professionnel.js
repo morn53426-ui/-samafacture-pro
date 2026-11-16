@@ -9,6 +9,7 @@ const { encryptSecret, decryptSecret } = require('../utils/pro-webhooks');
 const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydunya } = require('../config/payments');
 const net = require('net');
 const { isEnterprisePlan } = require('../utils/plans');
+const { encryptEmailPayload } = require('../utils/email-outbox-crypto');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -716,10 +717,14 @@ router.get('/company-group', async (req, res, next) => {
       [group.id]
     );
     const [invitations] = await pool.query(
-      `SELECT id, invited_email, statut, expire_at, created_at
-       FROM pro_company_group_invitations
-       WHERE group_id = ? AND statut = 'envoyee'
-       ORDER BY created_at DESC LIMIT 100`,
+      `SELECT i.id, i.invited_email, i.statut, i.expire_at, i.created_at,
+              e.statut AS email_statut, e.tentatives AS tentatives_email,
+              e.envoye_le AS email_envoye_le, e.dernier_code_erreur AS email_code_erreur
+       FROM pro_company_group_invitations i
+       LEFT JOIN email_outbox e
+         ON e.entity_type = 'company_group_invitation' AND e.entity_id = i.id
+       WHERE i.group_id = ? AND i.statut = 'envoyee'
+       ORDER BY i.created_at DESC LIMIT 100`,
       [group.id]
     );
     res.json({ groupe: group, societes: companies, invitations });
@@ -813,35 +818,39 @@ router.post('/company-group/invitations', async (req, res, next) => {
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expires = new Date(Date.now() + 7 * 86400000);
+    const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
+    const invitationUrl = base + '/invitation.html?type=company-group&token=' + token;
+    const subject = 'Invitation à rejoindre un groupe de sociétés SamaFacture Pro';
+    const text = 'Le groupe « ' + group.nom + ' » vous invite à rattacher votre société à son espace de gestion. Acceptez uniquement si vous autorisez explicitement le propriétaire du groupe à accéder à votre société : ' + invitationUrl;
+
     const [result] = await conn.query(
       'INSERT INTO pro_company_group_invitations (group_id, invited_email, token_hash, expire_at) VALUES (?, ?, ?, ?)',
       [group.id, email, tokenHash, expires]
     );
-    await conn.commit();
 
-    const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
-    const invitationUrl = base + '/invitation.html?type=company-group&token=' + token;
-    let mailResult = { sent: false };
-    try {
-      mailResult = await sendMail({
-        to: email,
-        subject: 'Invitation à rejoindre un groupe de sociétés SamaFacture Pro',
-        text: 'Le groupe « ' + group.nom + ' » vous invite à rattacher votre société à son espace de gestion. Acceptez uniquement si vous autorisez explicitement le propriétaire du groupe à accéder à votre société : ' + invitationUrl
-      }) || { sent: false };
-    } catch {
-      // L'invitation est déjà enregistrée : remettre le lien au propriétaire pour
-      // qu'il puisse le transmettre manuellement au lieu de masquer un succès partiel.
-      console.warn('Envoi de l’invitation au groupe non confirmé ; lien remis pour copie manuelle.');
-      mailResult = { sent: false };
-    }
+    // L'invitation et son email chiffré sont enregistrés dans la même transaction :
+    // aucun lien/jeton brut ne reste en clair dans la base ou les journaux.
+    const payloadEnc = encryptEmailPayload({ to: email, subject, text });
+    const idempotencyKey = crypto.createHash('sha256')
+      .update('company-group-invitation:' + result.insertId)
+      .digest('hex');
+    await conn.query(
+      `INSERT INTO email_outbox
+       (owner_user_id, entity_type, entity_id, idempotency_key, payload_enc, statut, prochaine_tentative)
+       VALUES (?, 'company_group_invitation', ?, ?, ?, 'queued', NOW())`,
+      [actor(req), result.insertId, idempotencyKey, payloadEnc]
+    );
+    await conn.commit();
 
     await audit(req, 'groupe.societes.invitation_creee', 'invitation_groupe', result.insertId, { email });
     res.status(201).json({
       id: result.insertId,
       email,
       invitation_url: invitationUrl,
-      email_envoye: Boolean(mailResult.sent),
-      avertissement: mailResult.sent ? null : 'Envoi email non confirmé. Copiez et transmettez le lien d’invitation manuellement.',
+      email_envoye: false,
+      email_en_file: true,
+      email_statut: 'queued',
+      avertissement: 'Email placé dans la file d’envoi sécurisée. Il sera envoyé en arrière-plan et réessayé automatiquement en cas d’indisponibilité temporaire du serveur SMTP.',
       expire_le: expires
     });
   } catch (err) {
