@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 10;
+const CURRENT_SCHEMA_VERSION = 11;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -373,6 +373,20 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of companyGroupsStatements) {
+    await conn.query(statement);
+  }
+
+  // Outbox email durable : contenu chiffré, idempotence et reprise après interruption.
+  const emailOutboxPath = path.join(__dirname, '..', 'database', 'migrations', '007_email_outbox.sql');
+  const emailOutboxSql = fs.readFileSync(emailOutboxPath, 'utf8');
+  const emailOutboxStatements = emailOutboxSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of emailOutboxStatements) {
     await conn.query(statement);
   }
 
