@@ -82,9 +82,8 @@ async function buildDashboard(userId) {
   // the thousands of newly-created accounts used by load tests.
   if (Number(summary?.invoice_count || 0) === 0) {
     // Compte neuf / sans facture : conserver la liste des derniers clients tout en
-    // n'effectuant qu'UN seul aller-retour MySQL. Sous un test de charge avec 1000
-    // utilisateurs distincts, deux requêtes par utilisateur saturent inutilement la
-    // file du pool alors que la majorité des comptes n'ont aucune facture.
+    // évitant les quatre lectures métier supplémentaires. Le fuseau et l'agrégat résumé
+    // sont deux lectures légères, puis une seule lecture récupère les derniers clients.
         const [rows] = await pool.query(
       `SELECT 'client' AS row_type, c.id, c.user_id, c.nom, c.email, c.telephone, c.adresse, c.created_at
          FROM clients c
