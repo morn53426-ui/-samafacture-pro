@@ -2,7 +2,7 @@
 
 ## Transport et garanties
 
-Les nouvelles tâches sont ajoutées au stream Redis `samafacture:pdf:stream` dans le consumer group `samafacture:pdf:workers`. Le hash `samafacture:pdf:job:<id>` conserve le propriétaire et le statut ; sa création et l'ajout du message sont effectués dans un même `MULTI/EXEC`.
+Les nouvelles tâches sont ajoutées au stream Redis `samafacture:pdf:stream` dans le consumer group `samafacture:pdf:workers`. Le hash `samafacture:pdf:job:<id>` conserve le propriétaire et le statut ; un script Lua écrit le hash puis ajoute l'entrée au stream. Si `XADD` échoue, le script supprime le hash provisoire et renvoie l'erreur Redis.
 
 Le worker lit avec `XREADGROUP`. Une entrée reste dans la Pending Entries List (PEL) jusqu'à ce que le rendu soit enregistré dans un état terminal. Le worker écrit `completed` ou `failed`, applique le TTL au hash, puis exécute `XACK` et `XDEL`. Si le processus s'arrête avant l'acquittement, le message reste pending et peut être repris avec `XAUTOCLAIM` par un autre worker.
 
