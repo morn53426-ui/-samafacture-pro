@@ -47,10 +47,29 @@ async function resolveTenant(req, res, next) {
           'SELECT owner_user_id, role, permissions_json FROM pro_team_members WHERE member_user_id = ? AND owner_user_id = ? AND active = 1 LIMIT 1',
           [req.actorId, selectedOwner]
         );
-        if (!rows.length) return res.status(403).json({ error: 'Vous ne faites pas partie de cette entreprise.' });
-        req.tenantId = Number(rows[0].owner_user_id);
-        req.companyMembership = rows[0];
-        req.permissions = parsePermissions(rows[0].permissions_json, rows[0].role);
+        if (rows.length) {
+          req.tenantId = Number(rows[0].owner_user_id);
+          req.companyMembership = rows[0];
+          req.permissions = parsePermissions(rows[0].permissions_json, rows[0].role);
+        } else {
+          // Accès groupe : le propriétaire du groupe ne peut ouvrir une société liée
+          // qu'après l'acceptation explicite de l'invitation par le propriétaire de celle-ci.
+          const [groupRows] = await pool.query(
+            `SELECT gc.company_owner_id AS owner_user_id,
+                    'administrateur' AS role,
+                    '["*"]' AS permissions_json,
+                    g.id AS company_group_id
+             FROM pro_company_group_companies gc
+             JOIN pro_company_groups g ON g.id = gc.group_id
+             WHERE g.owner_user_id = ? AND gc.company_owner_id = ?
+             LIMIT 1`,
+            [req.actorId, selectedOwner]
+          );
+          if (!groupRows.length) return res.status(403).json({ error: 'Vous ne faites pas partie de cette entreprise.' });
+          req.tenantId = Number(groupRows[0].owner_user_id);
+          req.companyMembership = groupRows[0];
+          req.permissions = ['*'];
+        }
       }
     }
     next();
@@ -70,6 +89,8 @@ function permissionForRequest(req) {
   if (base.endsWith('/depenses')) return method === 'GET' ? 'expenses.read' : 'expenses.write';
   if (base.endsWith('/rapports')) return 'reports.read';
   if (base.endsWith('/factures-recurrentes')) return method === 'GET' ? 'invoices.read' : 'invoices.write';
+  if (base.endsWith('/pro') && path.startsWith('/company-group/invitations/accept')) return null;
+  if (base.endsWith('/pro') && path.startsWith('/company-group')) return 'company_group.manage';
   if (base.endsWith('/factures')) {
     if (/\/paiements(?:\/|$)/.test(path)) return method === 'GET' ? 'payments.read' : 'payments.write';
     return method === 'GET' ? 'invoices.read' : 'invoices.write';

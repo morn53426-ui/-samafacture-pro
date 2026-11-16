@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -357,6 +357,21 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of phaseFiveToSevenStatements) {
+    await conn.query(statement);
+  }
+
+
+  // Groupes multi-sociétés : chaque filiale reste un compte/tenant indépendant.
+  const companyGroupsPath = path.join(__dirname, '..', 'database', 'migrations', '006_company_groups.sql');
+  const companyGroupsSql = fs.readFileSync(companyGroupsPath, 'utf8');
+  const companyGroupsStatements = companyGroupsSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of companyGroupsStatements) {
     await conn.query(statement);
   }
 
