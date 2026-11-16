@@ -59,10 +59,24 @@ describe('Protection de la restauration', () => {
 
     await assert.rejects(
       restaurer(archivePath),
-      /contient déjà 3 table\(s\) ou vue\(s\)/
+      /contient déjà 3 objet\(s\) SQL/
     );
     assert.equal(fs.existsSync(importLog), false,
       'aucune commande d’import ne doit être lancée pour une base non vide');
+  });
+
+  test('rejette une archive gzip corrompue avant tout import', async () => {
+    process.env.RESTORE_TABLE_COUNT = '0';
+    await fs.promises.unlink(importLog).catch(() => {});
+
+    const corruptArchive = path.join(tempRoot, 'backup-corrupt.sql.gz');
+    const compressed = zlib.gzipSync('CREATE TABLE restore_fixture (id INT);\\n');
+    compressed[compressed.length - 8] ^= 0x01;
+    await fs.promises.writeFile(corruptArchive, compressed);
+
+    await assert.rejects(restaurer(corruptArchive));
+    assert.equal(fs.existsSync(importLog), false,
+      'aucune instruction SQL ne doit parvenir à MySQL si le CRC gzip est invalide');
   });
 
   test('autorise la restauration lorsque la base cible est vide', async () => {
