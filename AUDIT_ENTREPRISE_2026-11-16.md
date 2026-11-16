@@ -3,7 +3,7 @@
 Date : 16 novembre 2026  
 Branche : `feat/enterprise-multi-company-foundation-20261116`  
 Dernier commit de code testé : `cff824b30959e4f13bb59e0fcf80307c37bf1199`  
-Dernier commit documentaire : `e06db56425c1e0e6b5afd8406ccc9e3b131c0460` (mise à jour de ce rapport)  
+Mise à jour de l'audit : 16 novembre 2026 (rapport actualisé après validation du socle Entreprise et de la file PDF)  
 Branche de référence synchronisée : `main` à `70750be430c83c4bf3ff369ad453c7b1fd1af511`
 
 ## Périmètre
@@ -11,6 +11,13 @@ Branche de référence synchronisée : `main` à `70750be430c83c4bf3ff369ad453c7
 Revue du socle multi-sociétés, des migrations SQL, de l'isolation tenant, des invitations/acceptations/révocations, du tableau de bord Entreprise, de la file email durable, des retours d'interface et des garde-fous de paiement. Cette revue technique ne constitue pas une validation juridique, fiscale ou de sécurité indépendante.
 
 ## Corrections apportées
+
+### File PDF durable (PR #56)
+
+- Les nouvelles tâches sont publiées dans Redis Streams avec un hash de métadonnées propriétaire et un consumer group ; le worker conserve les entrées en PEL tant qu'elles ne sont pas terminales, puis écrit le statut avant `XACK`/`XDEL`.
+- Les tâches pending sont récupérables par `XAUTOCLAIM`. L'ancienne file Redis List est migrée vers le stream via un script Lua qui n'effectue `LPOP` qu'après `XADD` réussi.
+- **Correctif de rétention ajouté dans la PR #56 :** le TTL du hash qui contient l'autorisation de téléchargement est désormais au moins égal à la rétention du fichier PDF (`max(PDF_JOB_TTL_SECONDS, PDF_FILE_RETENTION_SECONDS)`). La valeur par défaut permet ainsi l'accès au propriétaire pendant les 25 heures de rétention du PDF ; auparavant le hash pouvait expirer après une heure et rendre le fichier existant inaccessible.
+- Un test de non-régression vérifie l'égalité entre TTL des métadonnées d'accès et durée de rétention du fichier. La génération reste *au moins une fois* : une nouvelle tentative de rendu peut se produire si un worker tombe avant l'écriture de l'état terminal.
 
 ### Groupe multi-sociétés et invitations concurrentes
 
@@ -62,9 +69,10 @@ Révision testée : `cff824b30959e4f13bb59e0fcf80307c37bf1199` (tête de la PR #
 - Archive source ZIP : construite avec succès.
 
 Exécutions :
-- [Tests automatisés — run 724](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43934033844)
-- [Package source ZIP — run 478](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43934033962)
-- [Captures de la recette visuelle](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43934033844)
+- [Tests automatisés Entreprise — run 724](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43934033844) : 325 tests réussis, 0 échec, 50 suites.
+- [Package source ZIP Entreprise — run 478](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43934033962).
+- [Validation PDF #56 — run 729](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43936062465) : 374 tests réussis, 0 échec, 47 suites ; Redis Streams smoke test et restauration réelle MySQL réussis ; 119 captures responsive sur 7 largeurs ; 0 vulnérabilité npm.
+- La tête actuelle de #56 contient ensuite un commit documentaire qui confirme le renouvellement mensuel automatique ; son run 730 est en cours au dernier contrôle.
 
 ## Limites et risques restant à traiter
 
@@ -74,14 +82,14 @@ Exécutions :
 4. **Scalabilité Entreprise :** la liste des sociétés et les agrégats ne sont pas paginés et aucun quota produit définitif (sociétés, sièges, stockage, API/automations) n'est appliqué.
 5. **Droits :** le propriétaire du groupe obtient des droits administrateur sur chaque filiale acceptée ; les rôles granulaires par société ne sont pas encore implémentés.
 6. **Comptabilité multi-devise/OHADA :** l'agrégation reste séparée par devise ; aucune conversion de change, consolidation légale ou certification fiscale nationale n'est effectuée.
-7. **Abonnements mensuels renouvelables :** ils ne sont pas activés. Le backend bloque la souscription par HTTP 503 tant qu'un mandat de débit récurrent, le prix mensuel, le consentement, les notifications, les retries, la grâce, la résiliation et les scénarios d'impayé ne sont pas validés. Les montants actuels du backend sont des paiements ponctuels ; les prix du plan d'entreprise restent des hypothèses commerciales.
+7. **Abonnements mensuels renouvelables :** la cible produit est confirmée : périodicité mensuelle et renouvellement automatique jusqu'à résiliation explicite. Elle n'est pas activée. Le backend bloque la souscription par HTTP 503 tant qu'un prestataire autorisant réellement le débit récurrent, un mandat/consentement vérifiable, les prix, les notifications, les retries, la grâce, la résiliation et les scénarios d'impayé ne sont pas validés. En développement local, aucun prélèvement réel ne doit être exécuté ; les paiements ponctuels ne doivent pas être présentés comme des abonnements.
 8. **Recette navigateur/conformité :** la recette responsive vérifie Chromium ; Firefox, Safari et une certification WCAG complète ne sont pas couverts.
 9. **Protection GitHub :** les protections de `main` n'ont pas pu être confirmées par l'intégration disponible ; la fusion ne doit pas être effectuée sur la base de ce seul audit.
 
 ## État des PR et décision
 
-- PR #56 : ouverte, non fusionnée, CI du commit `11a0a3baa0a90965850247d5e9bab54f614b4268` réussi ; elle doit être fusionnée avant #60 pour respecter l'ordre des changements récurrents et PDF.
-- PR #60 : ouverte, brouillon, tête actuelle `e06db56425c1e0e6b5afd8406ccc9e3b131c0460`, base `main`, avance de 79 commits et retard de 0 commit au contrôle. Le dernier commit de code fonctionnel `cff824b30959e4f13bb59e0fcf80307c37bf1199` est entièrement validé par le CI run 724. Le commit de tête qui suit ne modifie que ce rapport d'audit ; son propre CI est lancé séparément. Les deux remarques automatisées de revue relatives à l'ordre des migrations et à la variable `outsiderRecipient` sont obsolètes et leurs corrections sont incluses dans la révision de code testée.
+- PR #56 : ouverte, non fusionnée, tête actuelle `73120ef76062f01bfa1cf72022acbe00e26cd78a`. Le commit fonctionnel/testé `960b8d3a4233ac3f62f0fdf07e1de4e07243bbd8` est validé par le CI run 729 ; la tête actuelle ajoute uniquement la décision documentaire sur l'abonnement mensuel et son run 730 est en cours. Elle doit être fusionnée avant #60 pour respecter l'ordre des changements PDF, dates et migrations.
+- PR #60 : ouverte, brouillon, base `main`. Le dernier commit de code fonctionnel `cff824b30959e4f13bb59e0fcf80307c37bf1199` est entièrement validé par le CI run 724 (325/325). Les commits qui suivent portent uniquement sur ce rapport d'audit ; ils ne modifient pas la logique applicative. Les deux remarques automatisées de revue relatives à l'ordre des migrations et à la variable `outsiderRecipient` sont obsolètes, résolues et corrigées dans la révision de code testée.
 - La fusion reste suspendue : protections de branche `main` non vérifiées par les permissions/intégrations actuellement disponibles et revue humaine indépendante encore requise. Aucune fusion automatique n'a été effectuée.
 
 Aucun prélèvement mensuel automatique ni aucune disponibilité commerciale internationale générale ne doivent être annoncés avant validation des critères produit, fournisseur, réglementaires et opérationnels.
