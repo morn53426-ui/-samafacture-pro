@@ -60,7 +60,7 @@ Le test d'upgrade de la branche dédiée simule une base v8, retire les objets v
 
 ## Vérifications GitHub Actions
 
-Révision de référence de la PR #60 : `df9c229ad0a2e19a4d4e0d43207aab9bdb4b6ee5`. La correction de preuve email est une nouvelle branche et doit obtenir sa propre validation CI.
+Révision de référence de la PR #60 : `df9c229ad0a2e19a4d4e0d43207aab9bdb4b6ee5`. La correction de preuve email est une branche empilée sur la PR #60. Le workflow `Tests automatisés` accepte désormais aussi les PR dont la base est `feat/enterprise-multi-company-foundation-20261116`, afin que cette correction et ses tests soient réellement exécutés par CI.
 
 - Tests Node.js/MySQL : **325 réussis, 0 échec**, 50 suites.
 - `npm audit` : **0 vulnérabilité**.
