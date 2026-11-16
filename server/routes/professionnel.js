@@ -1034,14 +1034,23 @@ router.delete('/company-group/invitations/:invitationId', async (req, res, next)
       "UPDATE pro_company_group_invitations SET statut = 'revoquee' WHERE id = ? AND group_id = ? AND statut = 'envoyee'",
       [invitation.id, group.id]
     );
-    // Les messages pas encore remis ne doivent plus partir après révocation.
-    // Un message déjà pris en charge par SMTP peut être impossible à rappeler.
+    // Annule seulement les messages qui n'ont pas encore été réclamés.
+    // Un message déjà en cours de remise SMTP peut être impossible à rappeler.
     const [cancelled] = await conn.query(
-      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, updated_at = NOW() WHERE entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry', 'processing')",
+      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, updated_at = NOW() WHERE entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry')",
+      [invitation.id]
+    );
+    const [[emailState]] = await conn.query(
+      "SELECT statut FROM email_outbox WHERE entity_type = 'company_group_invitation' AND entity_id = ? LIMIT 1",
       [invitation.id]
     );
     await conn.commit();
-    res.json({ success: true, email_annule: Number(cancelled.affectedRows) > 0 });
+    res.json({
+      success: true,
+      email_annule: Number(cancelled.affectedRows) > 0,
+      email_en_cours: emailState?.statut === 'processing',
+      email_deja_envoye: emailState?.statut === 'sent'
+    });
   } catch (err) {
     if (conn) { try { await conn.rollback(); } catch (_) {} }
     next(err);
