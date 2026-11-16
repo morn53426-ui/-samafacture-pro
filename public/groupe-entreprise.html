@@ -170,12 +170,17 @@ function renderGroup(data,dashboard){
       const emailStatus=result.email_envoye
         ? '<span>Email envoyé et confirmé.</span>'
         : '<span>'+escapeHtml(result.avertissement||'Invitation créée. Son email sera traité par la file d’envoi sécurisée.')+'</span>';
-      document.getElementById('latest-invitation').innerHTML=
-        '<div class="group-note" role="status" aria-live="polite">Invitation créée pour '+
-        escapeHtml(result.email)+'. <a href="'+escapeHtml(result.invitation_url)+
-        '" target="_blank" rel="noopener">Ouvrir le lien sécurisé</a>'+
-        '<p class="group-invitation-mail-status">'+emailStatus+'</p></div>';
       await load();
+      // Le rechargement du groupe reconstruit le DOM : afficher le lien après ce
+      // re-rendu pour que le propriétaire puisse le copier avant de quitter la page.
+      const latestInvitation=document.getElementById('latest-invitation');
+      if(latestInvitation){
+        latestInvitation.innerHTML=
+          '<div class="group-note" role="status" aria-live="polite">Invitation créée pour '+
+          escapeHtml(result.email)+'. <a href="'+escapeHtml(result.invitation_url)+
+          '" target="_blank" rel="noopener">Ouvrir le lien sécurisé</a>'+
+          '<p class="group-invitation-mail-status">'+emailStatus+'</p></div>';
+      }
     }catch(err){message(err.message,'error');}
     finally{button.disabled=false;}
   });
