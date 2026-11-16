@@ -1,6 +1,8 @@
 // Restaure une sauvegarde gzip (.sql.gz) ou chiffrée (.sql.gz.enc).
 // Utiliser une base cible vide et vérifier la sauvegarde avant toute restauration.
 // Usage : npm run restore -- /chemin/vers/samafacture-....sql.gz.enc
+require('dotenv').config();
+
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
