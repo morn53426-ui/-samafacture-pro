@@ -1,7 +1,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 const { genererFactureDepuisModele } = require('../routes/factures-recurrentes');
 
 // Vérifie que la génération automatique d'une facture récurrente calcule exactement les
@@ -147,6 +147,42 @@ describe('Factures récurrentes : cohérence des calculs avec la création manue
       .set('Authorization', `Bearer ${token}`);
     const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
     assert.equal(Number(updated.factures_generees), 0);
+  });
+
+  test("le scheduler ne génère pas un modèle désactivé après sa sélection initiale", async () => {
+    const [[dateDb]] = await pool.query('SELECT CURDATE() AS today');
+    const today = String(dateDb.today).slice(0, 10);
+    const modele = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Modèle mis en pause pendant le scheduler',
+        frequence: 'mensuelle',
+        prochaine_date: today,
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(modele.status, 201);
+
+    const pause = await request(app)
+      .put(`/api/factures-recurrentes/${modele.body.recurrente.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ actif: false });
+    assert.equal(pause.status, 200);
+
+    const facture = await genererFactureDepuisModele(
+      modele.body.recurrente.id,
+      userId,
+      { onlyIfDue: true }
+    );
+    assert.equal(facture, null, 'le scheduler doit respecter la pause après avoir obtenu le verrou');
+
+    const liste = await request(app)
+      .get('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`);
+    const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
+    assert.equal(Number(updated.factures_generees), 0);
+    assert.equal(Number(updated.actif), 0);
   });
 
   test('générer une facture récurrente inexistante renvoie 404', async () => {
