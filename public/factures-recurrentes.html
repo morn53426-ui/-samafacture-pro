@@ -82,6 +82,17 @@
         </select>
       </div>
       <div class="field"><label>Commentaires</label><textarea id="commentaires"></textarea></div>
+      <div class="field">
+        <label for="envoi_auto_email">
+          <input type="checkbox" id="envoi_auto_email" />
+          Envoyer automatiquement chaque facture générée au client
+        </label>
+        <small>
+          Option désactivée par défaut. Nécessite un serveur SMTP configuré et une adresse email client.
+          Si un envoi échoue, la facture reste créée mais l'email n'est pas retenté automatiquement :
+          vous devrez le renvoyer depuis la facture.
+        </small>
+      </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end;">
         <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
@@ -123,7 +134,10 @@
         <td data-label="Fréquence">${freqLabels[r.frequence] || r.frequence}</td>
         <td data-label="Prochaine génération">${formatDate(r.prochaine_date)}</td>
         <td data-label="Générées" class="mono">${r.factures_generees}</td>
-        <td data-label="Statut"><span class="badge ${r.actif ? 'badge-payee' : 'badge-annulee'}">${r.actif ? 'Active' : 'En pause'}</span></td>
+        <td data-label="Statut">
+          <span class="badge ${r.actif ? 'badge-payee' : 'badge-annulee'}">${r.actif ? 'Active' : 'En pause'}</span>
+          ${Number(r.envoi_auto_email) === 1 ? '<small class="subscription-overline">Email auto activé</small>' : ''}
+        </td>
         <td style="text-align:right; white-space:nowrap;">
           <button class="btn btn-sm btn-outline" onclick="genererMaintenant(${r.id})" title="Générer une facture immédiatement">${Icon('file-plus')} Générer maintenant</button>
           <button class="btn btn-sm btn-outline" onclick="toggleActif(${r.id}, ${r.actif ? 0 : 1})">${Icon(r.actif ? 'pause-circle' : 'play-circle')} ${r.actif ? 'Mettre en pause' : 'Réactiver'}</button>
@@ -203,6 +217,7 @@
       frais_livraison: parseFloat(document.getElementById('frais_livraison').value) || 0,
       mode_paiement: document.getElementById('mode_paiement').value,
       commentaires: document.getElementById('commentaires').value,
+      envoi_auto_email: document.getElementById('envoi_auto_email').checked,
       lignes
     };
     const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Enregistrement…');
