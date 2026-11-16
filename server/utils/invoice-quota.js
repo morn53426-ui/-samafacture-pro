@@ -1,15 +1,16 @@
 'use strict';
 
 const { FREE_MONTHLY_INVOICE_LIMIT, isPaidPlan } = require('./plans');
+const { localDateString } = require('./local-date');
 
 /**
  * Réserve une facture dans le registre du mois courant.
  * À appeler à l'intérieur de la transaction qui écrit la facture.
  * Le verrou du compte sérialise les créations concurrentes, quelle que soit leur API d'origine.
  */
-async function reserveMonthlyInvoiceQuota(conn, userId) {
+async function reserveMonthlyInvoiceQuota(conn, userId, { now = new Date() } = {}) {
   const [users] = await conn.query(
-    'SELECT plan FROM users WHERE id = ? FOR UPDATE',
+    'SELECT plan, fuseau_horaire FROM users WHERE id = ? FOR UPDATE',
     [userId]
   );
   if (!users.length) {
@@ -19,11 +20,11 @@ async function reserveMonthlyInvoiceQuota(conn, userId) {
   }
 
   const paidPlan = isPaidPlan(users[0].plan);
-  const [[periodRow]] = await conn.query(
-    "SELECT DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01') AS period_start"
-  );
-  const periodStart = periodRow?.period_start;
-  if (!periodStart) throw new Error('Impossible de déterminer la période du quota de facturation.');
+  const currentLocalDate = localDateString(users[0].fuseau_horaire || 'Africa/Dakar', now);
+  const periodStart = currentLocalDate.slice(0, 7) + '-01';
+  if (!/^\\d{4}-\\d{2}-01$/.test(periodStart)) {
+    throw new Error('Impossible de déterminer la période locale du quota de facturation.');
+  }
 
   // Le compte est déjà verrouillé avec SELECT ... FOR UPDATE ci-dessus : une seule
   // transaction peut initialiser ce compteur pour cet utilisateur/mois à la fois.
