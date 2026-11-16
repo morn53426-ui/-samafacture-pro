@@ -49,17 +49,17 @@
     <form id="recurrente-form">
       <input type="hidden" id="recurrente-id" />
       <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px;">
-        <div class="field"><label>Libellé *</label><input type="text" id="libelle" required placeholder="Abonnement maintenance mensuelle" /></div>
-        <div class="field"><label>Client *</label><select id="client_id" required></select></div>
+        <div class="field"><label for="libelle">Libellé *</label><input type="text" id="libelle" required placeholder="Abonnement maintenance mensuelle" /></div>
+        <div class="field"><label for="client_id">Client *</label><select id="client_id" required></select></div>
         <div class="field">
-          <label>Fréquence</label>
+          <label for="frequence">Fréquence</label>
           <select id="frequence">
             <option value="hebdomadaire">Hebdomadaire</option>
             <option value="mensuelle" selected>Mensuelle</option>
             <option value="annuelle">Annuelle</option>
           </select>
         </div>
-        <div class="field"><label>Première génération</label><input type="date" id="prochaine_date" required /></div>
+        <div class="field"><label for="prochaine_date">Première génération</label><input type="date" id="prochaine_date" required /></div>
       </div>
 
       <h3 style="margin-top:6px;">Articles</h3>
@@ -70,18 +70,18 @@
       <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addLigne()">+ Ajouter une ligne</button>
 
       <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px; margin-top:18px;">
-        <div class="field"><label>Remise</label><input type="number" id="remise" min="0" step="1" value="0" /></div>
-        <div class="field"><label>Frais de livraison</label><input type="number" id="frais_livraison" min="0" step="1" value="0" /></div>
+        <div class="field"><label for="remise">Remise</label><input type="number" id="remise" min="0" step="1" value="0" /></div>
+        <div class="field"><label for="frais_livraison">Frais de livraison</label><input type="number" id="frais_livraison" min="0" step="1" value="0" /></div>
       </div>
       <div class="field">
-        <label>Mode de paiement</label>
+        <label for="mode_paiement">Mode de paiement</label>
         <select id="mode_paiement">
           <option value="">—</option>
           <option>Espèces</option><option>Wave</option><option>Orange Money</option>
           <option>PayDunya</option><option>Virement bancaire</option><option>Chèque</option><option>Carte bancaire</option>
         </select>
       </div>
-      <div class="field"><label>Commentaires</label><textarea id="commentaires"></textarea></div>
+      <div class="field"><label for="commentaires">Commentaires</label><textarea id="commentaires"></textarea></div>
       <div class="field">
         <label for="envoi_auto_email">
           <input type="checkbox" id="envoi_auto_email" />
@@ -214,16 +214,16 @@
     row.id = id;
     row.innerHTML = `
       <td>
-        <select style="margin-bottom:4px;" onchange="applyProduit('${id}', this)">
+        <select aria-label="Produit du catalogue (optionnel)" style="margin-bottom:4px;" onchange="applyProduit('${id}', this)">
           <option value="">Produit du catalogue (optionnel)</option>
           ${produitOptions}
         </select>
-        <input type="text" class="ligne-designation" placeholder="Désignation" required />
+        <input type="text" class="ligne-designation" aria-label="Désignation de l’article" placeholder="Désignation" required />
       </td>
-      <td><input type="number" class="ligne-qte" value="1" min="0" step="1" /></td>
-      <td><input type="number" class="ligne-pu" value="0" min="0" step="1" /></td>
-      <td><input type="number" class="ligne-tva" value="0" min="0" max="100" step="1" /></td>
-      <td><button type="button" class="btn btn-sm btn-danger" onclick="document.getElementById('${id}').remove()">${Icon('x')}</button></td>
+      <td><input type="number" class="ligne-qte" aria-label="Quantité" value="1" min="0" step="1" /></td>
+      <td><input type="number" class="ligne-pu" aria-label="Prix unitaire" value="0" min="0" step="1" /></td>
+      <td><input type="number" class="ligne-tva" aria-label="TVA en pourcentage" value="0" min="0" max="100" step="1" /></td>
+      <td><button type="button" class="btn btn-sm btn-danger" aria-label="Supprimer la ligne ${ligneCount}" onclick="document.getElementById('${id}').remove()">${Icon('x')}</button></td>
     `;
     document.getElementById('lignes-body').appendChild(row);
   }
