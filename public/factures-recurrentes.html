@@ -139,6 +139,7 @@
           ${Number(r.envoi_auto_email) === 1 ? '<small class="subscription-overline">Email auto activé</small>' : ''}
         </td>
         <td style="text-align:right; white-space:nowrap;">
+          <button class="btn btn-sm btn-outline" onclick="modifierRecurrente(${r.id})" title="Modifier ce modèle">${Icon('edit-2')} Modifier</button>
           <button class="btn btn-sm btn-outline" onclick="genererMaintenant(${r.id})" title="Générer une facture immédiatement">${Icon('file-plus')} Générer maintenant</button>
           <button class="btn btn-sm btn-outline" onclick="toggleActif(${r.id}, ${r.actif ? 0 : 1})">${Icon(r.actif ? 'pause-circle' : 'play-circle')} ${r.actif ? 'Mettre en pause' : 'Réactiver'}</button>
           <button class="btn btn-sm btn-danger" onclick="deleteRecurrente(${r.id})">${Icon('trash-2')} Supprimer</button>
@@ -159,6 +160,41 @@
     document.getElementById('modal').style.display = 'flex';
   }
   function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+  function modifierRecurrente(id) {
+    const modele = recurrentes.find(item => Number(item.id) === Number(id));
+    if (!modele) return;
+
+    document.getElementById('modal-title').textContent = 'Modifier la facture récurrente';
+    document.getElementById('recurrente-form').reset();
+    document.getElementById('recurrente-id').value = modele.id;
+    document.getElementById('modal-error').innerHTML = '';
+    document.getElementById('client_id').innerHTML = clients
+      .map(client => `<option value="${client.id}">${escapeHtml(client.nom)}</option>`)
+      .join('');
+    document.getElementById('libelle').value = modele.libelle || '';
+    document.getElementById('client_id').value = String(modele.client_id);
+    document.getElementById('frequence').value = modele.frequence || 'mensuelle';
+    document.getElementById('prochaine_date').value = String(modele.prochaine_date || '').slice(0, 10);
+    document.getElementById('remise').value = modele.remise ?? 0;
+    document.getElementById('frais_livraison').value = modele.frais_livraison ?? 0;
+    document.getElementById('mode_paiement').value = modele.mode_paiement || '';
+    document.getElementById('commentaires').value = modele.commentaires || '';
+    document.getElementById('envoi_auto_email').checked = Number(modele.envoi_auto_email) === 1;
+
+    document.getElementById('lignes-body').innerHTML = '';
+    (Array.isArray(modele.lignes) ? modele.lignes : []).forEach(ligne => {
+      addLigne();
+      const row = document.getElementById('l' + ligneCount);
+      row.querySelector('.ligne-designation').value = ligne.designation || '';
+      row.querySelector('.ligne-qte').value = ligne.quantite ?? 1;
+      row.querySelector('.ligne-pu').value = ligne.prix_unitaire ?? 0;
+      row.querySelector('.ligne-tva').value = ligne.tva ?? 0;
+    });
+    if (!document.getElementById('lignes-body').children.length) addLigne();
+
+    document.getElementById('modal').style.display = 'flex';
+  }
 
   function addLigne() {
     ligneCount++;
