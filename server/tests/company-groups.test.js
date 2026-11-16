@@ -251,6 +251,61 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.equal(expiredOutbox.statut, 'cancelled');
   assert.equal(expiredOutbox.dernier_code_erreur, 'entity_inactive');
 
+  // Un worker doit aussi abandonner une tâche devenue invalide avant sa remise SMTP.
+  const [[outsider]] = await pool.query('SELECT email FROM users WHERE id = ?', [outsiderId]);
+  const staleInvitation = await request(app)
+    .post('/api/pro/company-group/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: outsider.email });
+  assert.equal(staleInvitation.status, 201, staleInvitation.text);
+  const [[staleOutbox]] = await pool.query(
+    "SELECT id FROM email_outbox WHERE entity_type = 'company_group_invitation' AND entity_id = ?",
+    [staleInvitation.body.id]
+  );
+  await pool.query(
+    "UPDATE pro_company_group_invitations SET statut = 'revoquee' WHERE id = ?",
+    [staleInvitation.body.id]
+  );
+  let staleMessageSent = false;
+  const staleDispatch = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async () => {
+      staleMessageSent = true;
+      return { sent: true };
+    }
+  });
+  assert.deepEqual(staleDispatch, {
+    claimed: 1, sent: 0, retried: 0, failed: 0, cancelled: 1
+  });
+  assert.equal(staleMessageSent, false);
+  const [[staleCancelled]] = await pool.query(
+    'SELECT statut FROM email_outbox WHERE id = ?',
+    [staleOutbox.id]
+  );
+  assert.equal(staleCancelled.statut, 'cancelled');
+
+  // L'API de révocation annule atomiquement un email qui n'a pas encore été réclamé.
+  const revocableInvitation = await request(app)
+    .post('/api/pro/company-group/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: outsider.email });
+  assert.equal(revocableInvitation.status, 201, revocableInvitation.text);
+  const [[revocableOutbox]] = await pool.query(
+    "SELECT id FROM email_outbox WHERE entity_type = 'company_group_invitation' AND entity_id = ?",
+    [revocableInvitation.body.id]
+  );
+  const revoked = await request(app)
+    .delete('/api/pro/company-group/invitations/' + revocableInvitation.body.id)
+    .set('Authorization', 'Bearer ' + groupOwnerToken);
+  assert.equal(revoked.status, 200, revoked.text);
+  assert.equal(revoked.body.email_annule, true);
+  assert.equal(revoked.body.email_en_cours, false);
+  const [[revokedOutbox]] = await pool.query(
+    'SELECT statut FROM email_outbox WHERE id = ?',
+    [revocableOutbox.id]
+  );
+  assert.equal(revokedOutbox.statut, 'cancelled');
+
   const wrongOwner = await request(app)
     .post('/api/pro/company-group/invitations/accept')
     .set('Authorization', 'Bearer ' + outsiderToken)
