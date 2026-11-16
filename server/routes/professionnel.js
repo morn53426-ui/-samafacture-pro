@@ -9,6 +9,7 @@ const { encryptSecret, decryptSecret } = require('../utils/pro-webhooks');
 const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydunya } = require('../config/payments');
 const net = require('net');
 const { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, SUPPORTED_TIMEZONES } = require('../config/localization');
+const { localDateString } = require('../utils/local-date');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -701,12 +702,24 @@ router.get('/reports/margins', async (req, res, next) => {
 
 router.get('/reports/forecast', async (req, res, next) => {
   try {
+    const userId = owner(req);
+    const [accounts] = await pool.query(
+      'SELECT fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    const localToday = localDateString(accounts?.[0]?.fuseau_horaire || 'Africa/Dakar');
     const [rows] = await pool.query(
-      "SELECT DATE_FORMAT(p.date_paiement, '%Y-%m') AS mois, SUM(p.montant) AS encaissements, COUNT(*) AS nb_paiements FROM paiements p JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id WHERE p.user_id = ? AND f.type = 'facture' AND f.statut != 'annulee' AND p.date_paiement >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH) GROUP BY mois ORDER BY mois",
-      [owner(req)]
+      "SELECT DATE_FORMAT(p.date_paiement, '%Y-%m') AS mois, SUM(p.montant) AS encaissements, COUNT(*) AS nb_paiements FROM paiements p JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id WHERE p.user_id = ? AND f.type = 'facture' AND f.statut != 'annulee' AND p.date_paiement >= DATE_SUB(?, INTERVAL 6 MONTH) GROUP BY mois ORDER BY mois",
+      [userId, localToday]
     );
     const monthlyAverage = rows.length ? rows.reduce((s, r) => s + Number(r.encaissements || 0), 0) / 6 : 0;
-    const forecast = [1,2,3].map(i => ({ mois: new Date(new Date().getFullYear(), new Date().getMonth() + i, 1).toISOString().slice(0, 7), encaissements_estimes: Math.round(monthlyAverage * 100) / 100 }));
+    const [yearPart, monthPart] = localToday.slice(0, 7).split('-').map(Number);
+    const forecast = [1, 2, 3].map(i => {
+      const monthIndex = yearPart * 12 + monthPart - 1 + i;
+      const year = Math.floor(monthIndex / 12);
+      const month = String(monthIndex % 12 + 1).padStart(2, '0');
+      return { mois: year + '-' + month, encaissements_estimes: Math.round(monthlyAverage * 100) / 100 };
+    });
     res.json({ historique: rows, moyenne_mensuelle_6_mois: monthlyAverage, previsions: forecast, methode: 'Moyenne simple des encaissements des six derniers mois, sans saisonnalité ni correction statistique.' });
   } catch (err) { next(err); }
 });
