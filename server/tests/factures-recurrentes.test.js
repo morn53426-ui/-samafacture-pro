@@ -116,6 +116,39 @@ describe('Factures récurrentes : cohérence des calculs avec la création manue
     assert.equal(String(updated.prochaine_date).slice(0, 10), futureDate);
   });
 
+  test("le planificateur respecte la mise en pause même si le modèle était déjà sélectionné", async () => {
+    const modele = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Modèle mis en pause',
+        frequence: 'mensuelle',
+        prochaine_date: new Date().toISOString().slice(0, 10),
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(modele.status, 201);
+
+    const pause = await request(app)
+      .put(`/api/factures-recurrentes/${modele.body.recurrente.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ actif: false });
+    assert.equal(Number(pause.body.recurrente.actif), 0);
+
+    const facture = await genererFactureDepuisModele(
+      modele.body.recurrente.id,
+      userId,
+      { onlyIfDue: true }
+    );
+    assert.equal(facture, null, 'un modèle mis en pause ne doit pas être généré par le scheduler');
+
+    const liste = await request(app)
+      .get('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`);
+    const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
+    assert.equal(Number(updated.factures_generees), 0);
+  });
+
   test('générer une facture récurrente inexistante renvoie 404', async () => {
     const res = await request(app)
       .post('/api/factures-recurrentes/999999999/generer')
