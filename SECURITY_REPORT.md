@@ -113,7 +113,7 @@ journalisait également `req.originalUrl` sans filtrage.
 Corrections :
 - Morgan utilise désormais des jetons dédiés : les query strings sont retirées, les codes des
   routes publiques `/api/public/consulter/:id/:code` et `/api/public/verifier/:id/:code`
-  sont remplacés par `[redacted]`, et le referrer est limité à son origine.
+  ainsi que le jeton de `/api/public/paiement/:token`, sont remplacés par `[redacted]`, et le referrer est limité à son origine.
 - Le journal du gestionnaire d'erreurs utilise le même assainissement.
 - Le format d'accès Nginx utilise `$uri` (sans arguments), masque le dernier segment des routes
   publiques de vérification/consultation et ne journalise que l'origine du referrer.
