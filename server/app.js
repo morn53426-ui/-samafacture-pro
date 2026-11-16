@@ -26,6 +26,7 @@ const { initDatabase, pool } = require('./config/db');
 const { initSocket, closeSocket } = require('./realtime');
 const { initRedis, closeRedis, getRedisClient, ensureRedisConnected, isRedisConfigured } = require('./config/redis');
 const { closeBrowser } = require('./utils/pdf');
+const { startEmailOutboxWorker } = require('./email-outbox');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const authRoutes = require('./routes/auth');
@@ -472,6 +473,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 async function start() {
+  let stopEmailOutboxWorker = async () => {};
   try {
     // En production multi-instance, Redis doit être prêt avant d'accepter des requêtes :
     // rate-limit partagé + diffusion Socket.IO entre conteneurs. Sans REDIS_URL, le mode
@@ -497,6 +499,11 @@ async function start() {
       startScheduler();
       startBackupScheduler();
     }
+    // Chaque worker peut dépiler l'outbox : les lignes sont réclamées sous
+    // transaction avec SKIP LOCKED, donc un message ne peut être traité que par
+    // un seul worker à la fois. Cela permet aussi de reprendre après le redémarrage
+    // d'un worker sans dépendre d'un leader fixe.
+    stopEmailOutboxWorker = startEmailOutboxWorker();
   } catch (err) {
     console.error('Impossible de se connecter à MySQL / initialiser la base :', err.message);
     console.error('Vérifiez que WAMPserver est démarré (icône verte) et que le fichier .env contient les bons identifiants.');
@@ -519,6 +526,7 @@ async function start() {
   function shutdown(signal) {
     console.log(`\n${signal} reçu — arrêt propre du serveur...`);
     server.close(async () => {
+      try { await stopEmailOutboxWorker(); } catch (e) { console.warn('Arrêt worker email incomplet :', e.message); }
       try { await closeSocket(); } catch (e) { /* déjà fermé */ }
       try { await closeBrowser(); } catch (e) { /* déjà fermé */ }
       try { await closeRedis(); } catch (e) { /* déjà fermé */ }
