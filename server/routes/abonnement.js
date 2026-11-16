@@ -70,15 +70,18 @@ function baseUrl(req) {
  */
 router.get('/moyens-disponibles', requireAuth, (req, res) => {
   res.json({
-    wave: waveConfigured(),
-    paydunya: paydunyaConfigured(),
-    tarifs: TARIFS,
+    // Le checkout actuellement intégré par Wave/PayDunya est ponctuel : ne pas afficher
+    // ses boutons tant que le renouvellement mensuel autorisé n'est pas opérationnel.
+    wave: false,
+    paydunya: false,
+    tarifs: {},
     facturation: {
-      mode: 'paiement_unique',
-      renouvellement_automatique: false,
+      mode: 'mensuel_renouvellement_automatique_en_preparation',
+      renouvellement_automatique: true,
       expiration_automatique: false,
-      acces_jusqua_changement_manuel: true,
-      activation: 'apres_confirmation'
+      acces_jusqua_changement_manuel: false,
+      activation: 'apres_confirmation',
+      disponible: false
     }
   });
 });
@@ -114,6 +117,10 @@ router.post('/payer', requireAuth, async (req, res, next) => {
     const { plan, fournisseur } = req.body;
     if (!TARIFS[plan]) return res.status(400).json({ error: 'Plan invalide.' });
     if (!['wave', 'paydunya'].includes(fournisseur)) return res.status(400).json({ error: 'Moyen de paiement invalide.' });
+    return res.status(503).json({
+      error: 'Les formules payantes seront facturées mensuellement avec renouvellement automatique. Le paiement récurrent n’est pas encore activé ; aucun paiement ponctuel ne sera lancé.',
+      code: 'PAIEMENT_RECURRENT_NON_CONFIGURE'
+    });
     if (fournisseur === 'wave' && !waveConfigured()) return res.status(503).json({ error: "Le paiement Wave n'est pas configuré sur ce serveur." });
     if (fournisseur === 'paydunya' && !paydunyaConfigured()) return res.status(503).json({ error: "Le paiement par Orange Money / carte n'est pas configuré sur ce serveur." });
 

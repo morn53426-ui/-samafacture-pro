@@ -47,9 +47,9 @@
         <div>
           <span class="subscription-overline">NOS FORMULES</span>
           <h2 id="offers-title">Comparez les offres</h2>
-          <p>Les montants affichés correspondent à un paiement unique. Le détail est présenté avant chaque redirection.</p>
+          <p>Les formules payantes sont prévues au mois, avec renouvellement automatique après consentement. Le parcours de paiement récurrent est encore en préparation.</p>
         </div>
-        <div class="subscription-billing-note"><span class="ic" aria-hidden="true"><i data-icon="credit-card"></i></span> Paiement ponctuel en FCFA</div>
+        <div class="subscription-billing-note"><span class="ic" aria-hidden="true"><i data-icon="repeat"></i></span> Abonnement mensuel</div>
       </div>
       <div id="plan-cards" class="subscription-plan-grid">
         <div class="subscription-loading card"><span class="loading-spinner"></span> Chargement des offres…</div>
@@ -81,7 +81,7 @@
         </div>
         <label class="subscription-checkout-consent" for="checkout-agreement">
           <input type="checkbox" id="checkout-agreement" onchange="actualiserConfirmationPaiement()" />
-          <span>J’ai compris qu’il s’agit d’un paiement ponctuel, sans renouvellement automatique et sans échéance automatique actuellement définie.</span>
+          <span>J’autorise le renouvellement mensuel automatique après consultation du prix, des conditions et des modalités de résiliation.</span>
         </label>
         <div id="checkout-message" aria-live="polite"></div>
         <div class="subscription-checkout-actions">
@@ -152,10 +152,12 @@
       nom: 'Starter',
       description: 'Pour une activité qui se développe.',
       icon: 'trending-up',
+      comingSoon: true,
       features: [
         'Factures illimitées',
         'Devis illimités',
-        'Gestion des clients et produits'
+        'Gestion des clients et produits',
+        'Abonnement mensuel avec renouvellement automatique'
       ]
     },
     {
@@ -164,11 +166,13 @@
       description: 'Pour travailler avec des outils avancés.',
       icon: 'sparkles',
       popular: true,
+      comingSoon: true,
       features: [
         'Tous les avantages Starter',
         'Signature électronique',
         '3 modèles premium de facture',
-        'Export Excel'
+        'Export Excel',
+        'Abonnement mensuel avec renouvellement automatique'
       ]
     },
     {
@@ -180,7 +184,10 @@
       features: [
         'Avantages du plan Pro',
         'Modèles exclusifs Entreprise',
-        'Options multi-sociétés en préparation'
+        'Gestion multi-sociétés',
+        'Tableau de bord consolidé',
+        'Droits et accès par société',
+        'Abonnement mensuel avec renouvellement automatique'
       ]
     }
   ];
@@ -201,13 +208,13 @@
     const price = plan.id === 'gratuit' ? 0 : Number(moyens.tarifs?.[plan.id] || 0);
     const priceHtml = isFree
       ? '<span class="plan-price-free">Gratuit</span>'
-      : '<span class="plan-price-value">' + formatMontant(price, 'FCFA') + '</span><span class="plan-price-period">paiement unique</span>';
+      : '<span class="plan-price-value">Tarif mensuel à confirmer</span><span class="plan-price-period">par mois · renouvellement automatique prévu</span>';
 
     let actions = '';
     if (isCurrent) {
       actions = '<div class="plan-current-action"><span class="ic">' + Icon('check-circle') + '</span> Votre formule actuelle</div>';
     } else if (isSoon) {
-      actions = '<button type="button" class="btn btn-outline plan-action" disabled><span class="ic">' + Icon('clock') + '</span> Bientôt disponible</button>';
+      actions = '<button type="button" class="btn btn-outline plan-action" disabled><span class="ic">' + Icon('clock') + '</span> Abonnement mensuel en préparation</button>';
     } else if (isFree) {
       actions = '<div class="plan-free-note">Inclus sans frais</div>';
     } else {
@@ -287,7 +294,7 @@
         facturation.acces_jusqua_changement_manuel !== true ||
         facturation.activation !== 'apres_confirmation') {
       document.getElementById('plan-msg').innerHTML =
-        '<div class="error-box">Les conditions de facturation ne sont pas disponibles. Le paiement est temporairement bloqué.</div>';
+        '<div class="error-box">Le paiement mensuel et son renouvellement automatique ne sont pas encore activés. Aucun paiement ne sera lancé.</div>';
       return;
     }
     if (!Number.isSafeInteger(montant) || montant <= 0) {
@@ -302,7 +309,7 @@
     document.getElementById('checkout-provider').textContent =
       fournisseur === 'wave' ? 'Wave' : 'Orange Money / Carte via PayDunya';
     document.getElementById('checkout-disclosure-copy').textContent =
-      'Le paiement est ponctuel, sans prélèvement ultérieur. Le plan reste associé au compte jusqu’à un changement manuel ; aucune date d’expiration automatique n’est gérée actuellement.';
+      'L’offre cible est mensuelle et renouvelable automatiquement. Le renouvellement ne sera activé qu’après validation d’un mandat accepté par le prestataire et consentement explicite.';
     document.getElementById('checkout-activation-copy').textContent =
       'Le plan est activé uniquement après confirmation du règlement par le fournisseur et validation côté serveur.';
     document.getElementById('checkout-agreement').checked = false;
