@@ -22,7 +22,15 @@ const money = (value) => {
   if (!Number.isFinite(amount) || amount <= 0 || amount > 999999999999) return null;
   return Math.round((amount + Number.EPSILON) * 100) / 100;
 };
-const safeDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? value : new Date().toISOString().slice(0, 10);
+async function safeDateForUser(value, userId) {
+  const valid = optionalIsoDate(value);
+  if (valid) return valid;
+  const [accounts] = await pool.query(
+    'SELECT fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+    [userId]
+  );
+  return localDateString(accounts?.[0]?.fuseau_horaire || 'Africa/Dakar');
+}
 function optionalText(value, maxLength) {
   if (value === undefined || value === null) return null;
   return String(value).trim().slice(0, maxLength) || null;
@@ -97,7 +105,7 @@ router.post('/orders', async (req, res, next) => {
     const orderNumber = randomRef('CMD');
     const [result] = await pool.query(
       'INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, date_livraison_prevue, devise, total, lignes_json, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, clientId, orderNumber, 'confirmee', safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, String(req.body.devise || 'FCFA').slice(0, 10), total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
+      [uid, clientId, orderNumber, 'confirmee', await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, String(req.body.devise || 'FCFA').slice(0, 10), total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
     );
     await audit(req, 'commande.creee', 'commande', result.insertId, { numero: orderNumber });
     res.status(201).json({ id: result.insertId, total, lignes: normalized });
@@ -125,7 +133,7 @@ router.post('/orders/:id/delivery-note', async (req, res, next) => {
     const numero = randomRef('BL');
     const [result] = await pool.query(
       'INSERT INTO pro_bons_livraison (user_id, commande_id, numero, date_livraison, destinataire, adresse_livraison, lignes_json, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, order.id, numero, safeDate(req.body.date_livraison), clientRows[0]?.nom || null, req.body.adresse_livraison || clientRows[0]?.adresse || null, order.lignes_json, String(req.body.notes || '').slice(0, 2000) || null]
+      [uid, order.id, numero, await safeDateForUser(req.body.date_livraison, uid), clientRows[0]?.nom || null, req.body.adresse_livraison || clientRows[0]?.adresse || null, order.lignes_json, String(req.body.notes || '').slice(0, 2000) || null]
     );
     await pool.query('UPDATE pro_commandes SET statut = ? WHERE id = ? AND user_id = ?', ['preparee', order.id, uid]);
     await audit(req, 'bon_livraison.cree', 'bon_livraison', result.insertId, { commande_id: order.id, numero });
@@ -164,7 +172,7 @@ router.post('/credit-notes', async (req, res, next) => {
       return res.status(400).json({ error: 'Le montant de cet avoir dépasse le montant encore disponible sur la facture.' });
     }
     const numero = randomRef('AVR');
-    const [result] = await conn.query('INSERT INTO pro_avoirs (user_id, facture_id, numero, date_emission, montant, motif) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, numero, safeDate(req.body.date_emission), amount, motif]);
+    const [result] = await conn.query('INSERT INTO pro_avoirs (user_id, facture_id, numero, date_emission, montant, motif) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, numero, await safeDateForUser(req.body.date_emission, uid), amount, motif]);
     await conn.commit();
     await audit(req, 'avoir.cree', 'avoir', result.insertId, { facture_id: invoiceId, montant: amount, numero });
     res.status(201).json({ id: result.insertId, numero, statut: 'brouillon', montant: amount });
@@ -224,7 +232,7 @@ router.post('/deposits', async (req, res, next) => {
     const numero = randomRef('ACP');
     const [result] = await conn.query(
       'INSERT INTO pro_acomptes (user_id, facture_id, numero, date_emission, montant) VALUES (?, ?, ?, ?, ?)',
-      [uid, invoiceId, numero, safeDate(req.body.date_emission), amount]
+      [uid, invoiceId, numero, await safeDateForUser(req.body.date_emission, uid), amount]
     );
     await conn.commit();
     await audit(req, 'acompte.cree', 'acompte', result.insertId, { facture_id: invoiceId, montant: amount });
@@ -404,7 +412,11 @@ router.put('/refunds/:id/status', async (req, res, next) => {
         return res.status(409).json({ error: 'Le montant remboursé dépasse les encaissements encore comptabilisés sur la facture.' });
       }
       const remainingPaid = Math.max(0, Number(invoice.montant_paye) - Number(refund.montant));
-      const today = new Date().toISOString().slice(0, 10);
+      const [accountRows] = await conn.query(
+        'SELECT fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+        [owner(req)]
+      );
+      const today = localDateString(accountRows?.[0]?.fuseau_horaire || 'Africa/Dakar');
       const newInvoiceStatus = invoice.statut === 'annulee'
         ? 'annulee'
         : (remainingPaid + 0.001 >= Number(invoice.total)
@@ -1171,7 +1183,7 @@ router.post('/purchase-orders', async (req, res, next) => {
     await conn.beginTransaction();
     const [created] = await conn.query(
       "INSERT INTO pro_commandes_fournisseurs (user_id, fournisseur_id, numero, statut, date_commande, date_livraison_prevue, devise, total_ht, total_tva, total_ttc, notes) VALUES (?, ?, ?, 'confirmee', ?, ?, ?, ?, ?, ?, ?)",
-      [uid, supplierId, numero, safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, orderCurrency, totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
+      [uid, supplierId, numero, await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, orderCurrency, totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
     );
     for (const line of normalized) {
       await conn.query(
@@ -1206,7 +1218,7 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
     const reference = randomRef('REC');
     const [receipt] = await conn.query(
       'INSERT INTO pro_receptions_achats (user_id, commande_id, entrepot_id, reference, date_reception, acteur_user_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [uid, order.id, warehouseId, reference, safeDate(req.body.date_reception), actor(req)]
+      [uid, order.id, warehouseId, reference, await safeDateForUser(req.body.date_reception, uid), actor(req)]
     );
     const [orderLines] = await conn.query('SELECT * FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? FOR UPDATE', [order.id, uid]);
     for (const received of lines) {
