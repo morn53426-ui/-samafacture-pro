@@ -163,14 +163,29 @@
         </div>
         <div class="ligne-mobile-field">
           <label class="ligne-mobile-label" for="${id}-designation">Désignation</label>
-          <input id="${id}-designation" type="text" class="ligne-designation" placeholder="Désignation" />
+          <input id="${id}-designation" type="text" class="ligne-designation" placeholder="Désignation" autocomplete="off" />
         </div>
       </td>
-      <td data-label="Quantité"><input type="number" class="ligne-qte ligne-input-sm" value="1" min="0" step="1" oninput="recalc()" /></td>
-      <td data-label="Prix unitaire"><input type="number" class="ligne-pu ligne-input-sm" value="0" min="0" step="1" oninput="recalc()" /></td>
-      <td data-label="TVA (%)"><input type="number" class="ligne-tva ligne-input-sm" value="0" min="0" max="100" step="1" oninput="recalc()" /></td>
-      <td data-label="Total" class="mono ligne-total">0</td>
-      <td data-label="Actions"><button type="button" class="btn btn-sm btn-danger" onclick="removeLigne('${id}')">${Icon('x')}</button></td>
+      <td data-label="Quantité">
+        <div class="ligne-mobile-field">
+          <label class="ligne-mobile-label" for="${id}-quantite">Quantité</label>
+          <input id="${id}-quantite" type="number" class="ligne-qte ligne-input-sm" value="1" min="0" step="1" inputmode="decimal" oninput="recalc()" />
+        </div>
+      </td>
+      <td data-label="Prix unitaire">
+        <div class="ligne-mobile-field">
+          <label class="ligne-mobile-label" for="${id}-prix">Prix unitaire en FCFA</label>
+          <input id="${id}-prix" type="number" class="ligne-pu ligne-input-sm" value="0" min="0" step="1" inputmode="decimal" oninput="recalc()" />
+        </div>
+      </td>
+      <td data-label="TVA (%)">
+        <div class="ligne-mobile-field">
+          <label class="ligne-mobile-label" for="${id}-tva">TVA en pourcentage</label>
+          <input id="${id}-tva" type="number" class="ligne-tva ligne-input-sm" value="0" min="0" max="100" step="1" inputmode="decimal" oninput="recalc()" />
+        </div>
+      </td>
+      <td data-label="Total" class="mono ligne-total" aria-label="Total de la ligne">0</td>
+      <td data-label="Actions"><button type="button" class="btn btn-sm btn-danger" aria-label="Supprimer la ligne ${ligneCount}" onclick="removeLigne('${id}')">${Icon('x')}</button></td>
     `;
     document.getElementById('lignes-body').appendChild(row);
   }
