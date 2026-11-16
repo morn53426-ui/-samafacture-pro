@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 const { genererFactureDepuisModele } = require('../routes/factures-recurrentes');
+const { localDateString } = require('../utils/local-date');
 
 // Vérifie que la génération automatique d'une facture récurrente calcule exactement les
 // mêmes totaux qu'une facture créée manuellement avec les mêmes lignes et la même remise —
@@ -183,6 +184,27 @@ describe('Factures récurrentes : cohérence des calculs avec la création manue
     const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
     assert.equal(Number(updated.factures_generees), 0);
     assert.equal(Number(updated.actif), 0);
+  });
+
+  test("la première échéance par défaut utilise la date civile du fuseau du compte", async () => {
+    const [[account]] = await pool.query(
+      'SELECT fuseau_horaire FROM users WHERE id = ?',
+      [userId]
+    );
+    const expectedDate = localDateString(account.fuseau_horaire || 'Africa/Dakar');
+    const response = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Date initiale selon fuseau du compte',
+        frequence: 'mensuelle',
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+
+    assert.equal(response.status, 201);
+    assert.equal(String(response.body.recurrente.prochaine_date).slice(0, 10), expectedDate);
+    assert.equal(Number(response.body.recurrente.jour_ancre), Number(expectedDate.slice(-2)));
   });
 
   test('générer une facture récurrente inexistante renvoie 404', async () => {
