@@ -8,7 +8,7 @@ Pour l'API publique versionnée, ses permissions, ses exemples de requêtes et l
 
 Pour configurer et utiliser les modèles complets de factures et devis, consultez [GUIDE_MODELES_FACTURES_DEVIS.md](GUIDE_MODELES_FACTURES_DEVIS.md).
 
-Pour consulter la stratégie commerciale, les offres envisagées, le plan d'acquisition des 100 premiers clients et la feuille de route d'internationalisation, consultez [PLAN_ENTREPRISE_SAMAFACTURE_PRO.md](PLAN_ENTREPRISE_SAMAFACTURE_PRO.md).
+Pour consulter la stratégie commerciale, les offres envisagées, le plan d'acquisition des 100 premiers clients et la feuille de route d'internationalisation, consultez [PLAN_ENTREPRISE_SAMAFACTURE_PRO.md](PLAN_ENTREPRISE_SAMAFACTURE_PRO.md). Pour exécuter le premier test de marché au Sénégal, utilisez le [guide opérationnel du pilote commercial](PLAN_PILOTE_COMMERCIAL_SENEGAL.md).
 
 ## Ce qui est inclus
 
