@@ -153,6 +153,8 @@ const {
   acknowledgePdfJob,
   getPdfPath,
   JOB_PREFIX,
+  JOB_TTL,
+  PDF_FILE_RETENTION_SECONDS,
   QUEUE_KEY,
   STREAM_KEY,
   GROUP_NAME
@@ -164,6 +166,14 @@ after(() => {
   fs.rmSync(jobsDir, { recursive: true, force: true });
   if (originalJobsDir === undefined) delete process.env.PDF_JOBS_DIR;
   else process.env.PDF_JOBS_DIR = originalJobsDir;
+});
+
+test('conserve les droits de téléchargement au moins aussi longtemps que le fichier PDF', () => {
+  assert.equal(
+    JOB_TTL,
+    PDF_FILE_RETENTION_SECONDS,
+    'les métadonnées propriétaire/statut ne doivent pas expirer avant le fichier PDF'
+  );
 });
 
 test('conserve les métadonnées du propriétaire tant que le PDF est en attente dans le stream', async () => {
