@@ -8,12 +8,18 @@ const QUEUE_KEY = process.env.PDF_QUEUE_KEY || 'samafacture:pdf:queue';
 const STREAM_KEY = process.env.PDF_STREAM_KEY || 'samafacture:pdf:stream';
 const GROUP_NAME = process.env.PDF_STREAM_GROUP || 'samafacture:pdf:workers';
 const JOB_PREFIX = process.env.PDF_JOB_PREFIX || 'samafacture:pdf:job:';
-const JOB_TTL = Number(process.env.PDF_JOB_TTL_SECONDS) || 3600;
-const DEFAULT_FILE_RETENTION_SECONDS = JOB_TTL + 24 * 60 * 60;
+const configuredJobTtl = Number(process.env.PDF_JOB_TTL_SECONDS);
+const BASE_JOB_TTL = Number.isSafeInteger(configuredJobTtl) && configuredJobTtl > 0
+  ? configuredJobTtl
+  : 3600;
+const DEFAULT_FILE_RETENTION_SECONDS = BASE_JOB_TTL + 24 * 60 * 60;
 const requestedFileRetention = Number(process.env.PDF_FILE_RETENTION_SECONDS);
-const PDF_FILE_RETENTION_SECONDS = Number.isSafeInteger(requestedFileRetention) && requestedFileRetention >= JOB_TTL
+const PDF_FILE_RETENTION_SECONDS = Number.isSafeInteger(requestedFileRetention) && requestedFileRetention >= BASE_JOB_TTL
   ? requestedFileRetention
   : DEFAULT_FILE_RETENTION_SECONDS;
+// The job hash stores both owner authorization and download status. Keep it at least
+// as long as the PDF itself, otherwise the file still exists but its owner gets 404.
+const JOB_TTL = Math.max(BASE_JOB_TTL, PDF_FILE_RETENTION_SECONDS);
 const CLAIM_IDLE_MS = Number(process.env.PDF_JOB_CLAIM_IDLE_MS) || 1800000;
 const JOB_DIR = process.env.PDF_JOBS_DIR || path.join(__dirname, 'pdf-jobs');
 const MAX_PENDING_SCAN_PAGES = 25;
