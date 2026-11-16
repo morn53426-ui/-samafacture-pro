@@ -62,15 +62,31 @@ async function claimPendingEmails(batchSize = DEFAULT_BATCH_SIZE) {
 }
 
 async function isEmailJobDeliverable(job) {
-  if (job.entity_type !== 'company_group_invitation') return true;
-  const [[invitation]] = await pool.query(
-    `SELECT id
-     FROM pro_company_group_invitations
-     WHERE id = ? AND statut = 'envoyee' AND expire_at > NOW()
-     LIMIT 1`,
-    [job.entity_id]
-  );
-  return Boolean(invitation);
+  if (job.entity_type === 'company_group_invitation') {
+    const [[invitation]] = await pool.query(
+      `SELECT id
+       FROM pro_company_group_invitations
+       WHERE id = ? AND statut = 'envoyee' AND expire_at > NOW()
+       LIMIT 1`,
+      [job.entity_id]
+    );
+    return Boolean(invitation);
+  }
+
+  if (job.entity_type === 'company_group_invitation_verification') {
+    const [[verification]] = await pool.query(
+      `SELECT v.id
+       FROM pro_company_group_invitation_verifications v
+       JOIN pro_company_group_invitations i ON i.id = v.invitation_id
+       WHERE v.id = ? AND v.used_at IS NULL AND v.expires_at > NOW()
+         AND i.statut = 'envoyee' AND i.expire_at > NOW()
+       LIMIT 1`,
+      [job.entity_id]
+    );
+    return Boolean(verification);
+  }
+
+  return true;
 }
 
 async function markEmailCancelled(job) {
