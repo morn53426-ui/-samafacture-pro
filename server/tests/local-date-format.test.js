@@ -74,6 +74,23 @@ test('la date par défaut des formulaires suit le fuseau de l’entreprise', () 
   assert.equal(dateCivileAujourdhui('Pacific/Kiritimati', instant), '2026-11-17');
 });
 
+test('les formulaires de facture, dépense, récurrence et achat utilisent la date civile partagée', () => {
+  const root = path.join(__dirname, '..', '..', 'public');
+  const invoice = fs.readFileSync(path.join(root, 'nouvelle-facture.html'), 'utf8');
+  const expense = fs.readFileSync(path.join(root, 'depenses.html'), 'utf8');
+  const recurring = fs.readFileSync(path.join(root, 'factures-recurrentes.html'), 'utf8');
+  const purchasing = fs.readFileSync(path.join(root, 'achats.html'), 'utf8');
+
+  assert.match(invoice, /date_emission'\)\.value = dateCivileAujourdhui\(\)/);
+  assert.match(expense, /date_depense'\)\.value = dateCivileAujourdhui\(\)/);
+  assert.match(recurring, /dateCivileAujourdhui\(accountTimezone\)/);
+  assert.match(purchasing, /const today=dateCivileAujourdhui\(\)/);
+
+  assert.doesNotMatch(invoice, /date_emission'\)\.value = new Date\(\)\.toISOString/);
+  assert.doesNotMatch(expense, /date_depense'\)\.value = new Date\(\)\.toISOString/);
+  assert.doesNotMatch(purchasing, /const today=new Date\(\)\.toISOString/);
+});
+
 test('une date SQL DATE invalide reste affichée telle quelle', () => {
   assert.equal(
     loadFormatDate({ format_date: 'dd/MM/yyyy' }).formatDate('2026-02-31'),
