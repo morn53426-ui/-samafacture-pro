@@ -179,6 +179,33 @@ function formatDate(iso) {
   // The selected date pattern takes precedence over the language of the interface.
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone }).format(date);
 }
+function dateCivileAujourdhui(timeZone) {
+  const user = Api.currentUser() || {};
+  const zone = timeZone || user.fuseau_horaire || 'Africa/Dakar';
+  const now = new Date();
+
+  function formatInZone(candidateZone) {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: candidateZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(now)
+        .filter(part => ['year', 'month', 'day'].includes(part.type))
+        .map(part => [part.type, part.value])
+    );
+    return parts.year + '-' + parts.month + '-' + parts.day;
+  }
+
+  try {
+    return formatInZone(zone);
+  } catch (_) {
+    // Une ancienne configuration de fuseau invalide ne doit pas bloquer la saisie.
+    return formatInZone('UTC');
+  }
+}
+
 function statutBadge(statut) {
   const map = {
     payee: ['badge-payee', 'Payée'],
