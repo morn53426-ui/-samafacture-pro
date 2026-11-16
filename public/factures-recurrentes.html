@@ -113,17 +113,50 @@
   let clients = [];
   let produits = [];
   let ligneCount = 0;
+  let accountTimezone = 'Africa/Dakar';
 
   const freqLabels = { hebdomadaire: 'Hebdomadaire', mensuelle: 'Mensuelle', annuelle: 'Annuelle' };
 
   async function load() {
-    const [{ recurrentes: rows }, { clients: c }, { produits: p }] = await Promise.all([
-      Api.get('/factures-recurrentes'), Api.get('/clients'), Api.get('/produits')
+    const [
+      { recurrentes: rows },
+      { clients: c },
+      { produits: p },
+      { user }
+    ] = await Promise.all([
+      Api.get('/factures-recurrentes'),
+      Api.get('/clients'),
+      Api.get('/produits'),
+      Api.get('/auth/me')
     ]);
     recurrentes = rows;
     clients = c;
     produits = p;
+    accountTimezone = user?.fuseau_horaire || 'Africa/Dakar';
     renderTable();
+  }
+
+  function dateCivileAujourdhui(timeZone) {
+    function getParts(zone) {
+      return Object.fromEntries(
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: zone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit'
+        }).formatToParts(new Date())
+          .filter(part => ['year', 'month', 'day'].includes(part.type))
+          .map(part => [part.type, part.value])
+      );
+    }
+
+    let parts;
+    try {
+      parts = getParts(timeZone || 'Africa/Dakar');
+    } catch (_) {
+      parts = getParts('Africa/Dakar');
+    }
+    return parts.year + '-' + parts.month + '-' + parts.day;
   }
 
   function renderTable() {
@@ -153,13 +186,7 @@
     document.getElementById('recurrente-form').reset();
     document.getElementById('recurrente-id').value = '';
     document.getElementById('modal-error').innerHTML = '';
-    const maintenant = new Date();
-    const dateLocale = [
-      maintenant.getFullYear(),
-      String(maintenant.getMonth() + 1).padStart(2, '0'),
-      String(maintenant.getDate()).padStart(2, '0')
-    ].join('-');
-    document.getElementById('prochaine_date').value = dateLocale;
+    document.getElementById('prochaine_date').value = dateCivileAujourdhui(accountTimezone);
     document.getElementById('client_id').innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.nom)}</option>`).join('');
     document.getElementById('lignes-body').innerHTML = '';
     addLigne();
