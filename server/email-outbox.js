@@ -86,9 +86,11 @@ async function isEmailJobDeliverable(job, message) {
       `SELECT v.id
        FROM pro_company_group_invitation_verifications v
        JOIN pro_company_group_invitations i ON i.id = v.invitation_id
+       JOIN users account ON account.id = v.company_owner_id
        WHERE v.id = ? AND v.token_hash = ?
          AND v.used_at IS NULL AND v.expires_at > NOW()
          AND i.statut = 'envoyee' AND i.expire_at > NOW()
+         AND LOWER(account.email) = LOWER(i.invited_email)
        LIMIT 1`,
       [job.entity_id, proofHash]
     );
