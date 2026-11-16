@@ -30,10 +30,10 @@ describe('Protection de la restauration', () => {
       'cat >/dev/null',
       'exit 0',
       ''
-    ].join('\\n');
+    ].join(String.fromCharCode(10));
     await fs.promises.writeFile(fakeMysql, script, { mode: 0o700 });
     await fs.promises.chmod(fakeMysql, 0o700);
-    await fs.promises.writeFile(archivePath, zlib.gzipSync('CREATE TABLE restore_fixture (id INT);\\n'));
+    await fs.promises.writeFile(archivePath, zlib.gzipSync('CREATE TABLE restore_fixture (id INT);\n'));
 
     process.env.MYSQL_PATH = fakeMysql;
     process.env.DB_NAME = 'samafacture_restore_test';
@@ -59,7 +59,7 @@ describe('Protection de la restauration', () => {
 
     await assert.rejects(
       restaurer(archivePath),
-      /contient déjà 3 table\\(s\\) ou vue\\(s\\)/
+      /contient déjà 3 table\(s\) ou vue\(s\)/
     );
     assert.equal(fs.existsSync(importLog), false,
       'aucune commande d’import ne doit être lancée pour une base non vide');
@@ -71,7 +71,7 @@ describe('Protection de la restauration', () => {
 
     await restaurer(archivePath);
 
-    assert.equal(await fs.promises.readFile(importLog, 'utf8'), 'import\\n');
+    assert.equal(await fs.promises.readFile(importLog, 'utf8'), 'import\n');
   });
 
   test('un remplacement de base non vide exige le consentement explicite', async () => {
@@ -81,7 +81,7 @@ describe('Protection de la restauration', () => {
 
     await restaurer(archivePath);
 
-    assert.equal(await fs.promises.readFile(importLog, 'utf8'), 'import\\n');
+    assert.equal(await fs.promises.readFile(importLog, 'utf8'), 'import\n');
     delete process.env.RESTORE_ALLOW_NON_EMPTY;
   });
 });
