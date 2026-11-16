@@ -193,6 +193,8 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   );
   const invitation = invitationResponses.find(response => response.status === 201);
   assert.ok(invitation, 'une invitation doit être créée');
+  assert.match(invitation.headers['cache-control'] || '', /no-store/i);
+  assert.equal(invitation.headers.pragma, 'no-cache');
   assert.equal(invitation.body.email_envoye, false, 'un email en file ne doit pas être présenté comme envoyé');
   assert.equal(invitation.body.email_en_file, true);
   assert.equal(invitation.body.email_statut, 'queued');
@@ -219,6 +221,8 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .get('/api/pro/company-group/invitations/' + invitation.body.id + '/link')
     .set('Authorization', 'Bearer ' + groupOwnerToken);
   assert.equal(recoveredLink.status, 200, recoveredLink.text);
+  assert.match(recoveredLink.headers['cache-control'] || '', /no-store/i);
+  assert.equal(recoveredLink.headers.pragma, 'no-cache');
   assert.equal(recoveredLink.body.invitation_url, invitation.body.invitation_url);
   const forbiddenLink = await request(app)
     .get('/api/pro/company-group/invitations/' + invitation.body.id + '/link')
