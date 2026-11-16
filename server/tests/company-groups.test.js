@@ -169,7 +169,57 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   const decryptedEmail = decryptEmailPayload(queuedEmail.payload_enc);
   assert.equal(decryptedEmail.to, recipient.email);
   assert.match(decryptedEmail.text, new RegExp(token));
+  assert.equal(decryptedEmail.invitation_url, invitation.body.invitation_url);
   assert.doesNotMatch(queuedEmail.payload_enc, new RegExp(token));
+
+  const recoveredLink = await request(app)
+    .get('/api/pro/company-group/invitations/' + invitation.body.id + '/link')
+    .set('Authorization', 'Bearer ' + groupOwnerToken);
+  assert.equal(recoveredLink.status, 200, recoveredLink.text);
+  assert.equal(recoveredLink.body.invitation_url, invitation.body.invitation_url);
+  const forbiddenLink = await request(app)
+    .get('/api/pro/company-group/invitations/' + invitation.body.id + '/link')
+    .set('Authorization', 'Bearer ' + outsiderToken);
+  assert.equal(forbiddenLink.status, 403);
+
+  // Un propriétaire peut relancer un email définitivement échoué tant que le lien est actif.
+  const retryRecipient = emailDeTest('group-email-retry');
+  const retryInvitation = await request(app)
+    .post('/api/pro/company-group/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: retryRecipient });
+  assert.equal(retryInvitation.status, 201, retryInvitation.text);
+  const [[retryOutboxBefore]] = await pool.query(
+    `SELECT id FROM email_outbox
+     WHERE entity_type = 'company_group_invitation' AND entity_id = ?`,
+    [retryInvitation.body.id]
+  );
+  await pool.query(
+    `UPDATE email_outbox
+     SET statut = 'failed', tentatives = 8, dernier_code_erreur = 'ECONNECTION'
+     WHERE id = ?`,
+    [retryOutboxBefore.id]
+  );
+  const retryResponse = await request(app)
+    .post('/api/pro/company-group/invitations/' + retryInvitation.body.id + '/retry-email')
+    .set('Authorization', 'Bearer ' + groupOwnerToken);
+  assert.equal(retryResponse.status, 202, retryResponse.text);
+  assert.equal(retryResponse.body.email_statut, 'queued');
+  const [[retryQueued]] = await pool.query(
+    'SELECT statut, tentatives, dernier_code_erreur FROM email_outbox WHERE id = ?',
+    [retryOutboxBefore.id]
+  );
+  assert.equal(retryQueued.statut, 'queued');
+  assert.equal(Number(retryQueued.tentatives), 0);
+  assert.equal(retryQueued.dernier_code_erreur, null);
+  const retrySent = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async payload => {
+      assert.equal(payload.to, retryRecipient);
+      return { sent: true };
+    }
+  });
+  assert.deepEqual(retrySent, { claimed: 1, sent: 1, retried: 0, failed: 0, cancelled: 0 });
 
   // Simule un worker interrompu : son bail est expiré et une autre instance reprend la tâche.
   await pool.query(
