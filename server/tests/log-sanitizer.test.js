@@ -30,6 +30,13 @@ describe('Journalisation HTTP sans secrets dans les URL', () => {
     );
   });
 
+  test('masque aussi le jeton des liens de paiement publics', () => {
+    assert.equal(
+      sanitizeRequestTargetForLog('/api/public/paiement/abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'),
+      '/api/public/paiement/[redacted]'
+    );
+  });
+
   test('conserve un chemin non sensible sans sa query string', () => {
     assert.equal(
       sanitizeRequestTargetForLog('/api/factures?page=2&limit=20'),
@@ -66,6 +73,10 @@ describe('Journalisation HTTP sans secrets dans les URL', () => {
     assert.ok(format, 'le format sf_safe doit être défini');
     assert.match(config, /map\s+\$uri\s+\$sf_log_uri/);
     assert.match(config, /\[redacted\]/);
+    assert.ok(
+      config.includes('~*^(/api/public/paiement)/[^/]+$ $1/[redacted];'),
+      'le jeton des liens de paiement publics doit être masqué par Nginx'
+    );
     assert.match(config, /map\s+\$http_referer\s+\$sf_log_referer/);
     assert.match(config, /access_log\s+\/dev\/stdout\s+sf_safe/);
     assert.match(format[1], /\$sf_log_uri/);
