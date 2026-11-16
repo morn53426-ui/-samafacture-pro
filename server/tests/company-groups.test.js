@@ -1,6 +1,8 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+const { spawnSync } = require('node:child_process');
+const path = require('node:path');
 const {
   app,
   pool,
@@ -34,6 +36,24 @@ async function register(prefix, companyName) {
   return response.body;
 }
 
+
+function runMigrationInNewProcess() {
+  const script = [
+    "const { initDatabase, pool } = require('./config/db');",
+    "initDatabase()",
+    "  .then(() => pool.end())",
+    "  .then(() => process.exit(0))",
+    "  .catch((err) => { console.error(err); process.exit(1); });"
+  ].join("\n");
+  return spawnSync(process.execPath, ['-e', script], {
+    cwd: path.join(__dirname, '..'),
+    env: { ...process.env, NODE_ENV: 'test' },
+    encoding: 'utf8',
+    timeout: 45000
+  });
+}
+
+
 before(async () => {
   await setupTestDatabase();
 
@@ -63,26 +83,29 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('la migration du schéma v10 crée les tables multi-sociétés', async () => {
-  const [[meta]] = await pool.query(
-    'SELECT version FROM _samafacture_schema_meta WHERE id = 1 LIMIT 1'
-  );
-  assert.ok(Number(meta?.version) >= 10, 'la base de test doit avoir appliqué la migration v10');
+test('une base existante en version 9 reçoit la migration v10 des groupes multi-sociétés', async () => {
+  // Simule une installation déjà initialisée en v9 : seules les nouvelles tables
+  // de la migration 006 sont absentes. Les tables historiques et leurs données restent intactes.
+  await pool.query('DROP TABLE IF EXISTS pro_company_group_invitations');
+  await pool.query('DROP TABLE IF EXISTS pro_company_group_companies');
+  await pool.query('DROP TABLE IF EXISTS pro_company_groups');
+  await pool.query('UPDATE _samafacture_schema_meta SET version = 9 WHERE id = 1');
+
+  const child = runMigrationInNewProcess();
+  assert.equal(child.error, undefined, child.error?.message);
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v9 → v10 a échoué.');
+
+  const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
+  assert.ok(Number(meta.version) >= 10, 'la version du schéma doit être avancée après migration');
 
   const [tables] = await pool.query(
-    `SELECT TABLE_NAME
-     FROM information_schema.TABLES
-     WHERE TABLE_SCHEMA = DATABASE()
-       AND TABLE_NAME IN (
-         'pro_company_groups',
-         'pro_company_group_companies',
-         'pro_company_group_invitations'
-       )`
+    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?)',
+    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations']
   );
   assert.deepEqual(
     tables.map(row => row.TABLE_NAME).sort(),
     ['pro_company_group_companies', 'pro_company_group_invitations', 'pro_company_groups'],
-    'les trois tables de la migration 006 doivent être présentes'
+    'les trois tables de la migration 006 doivent être recréées sur une base v9'
   );
 });
 
@@ -106,12 +129,28 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .send({ nom: 'Deuxième groupe' });
   assert.equal(duplicate.status, 409);
 
-  const invitation = await request(app)
-    .post('/api/pro/company-group/invitations')
-    .set('Authorization', 'Bearer ' + groupOwnerToken)
-    .send({ email: (await pool.query('SELECT email FROM users WHERE id = ?', [subsidiaryOwnerId]))[0][0].email });
-  assert.equal(invitation.status, 201, invitation.text);
+  const [[recipient]] = await pool.query('SELECT email FROM users WHERE id = ?', [subsidiaryOwnerId]);
+  const invitationResponses = await Promise.all([
+    request(app)
+      .post('/api/pro/company-group/invitations')
+      .set('Authorization', 'Bearer ' + groupOwnerToken)
+      .send({ email: recipient.email }),
+    request(app)
+      .post('/api/pro/company-group/invitations')
+      .set('Authorization', 'Bearer ' + groupOwnerToken)
+      .send({ email: recipient.email })
+  ]);
+  assert.deepEqual(
+    invitationResponses.map(response => response.status).sort((a, b) => a - b),
+    [201, 409],
+    'deux créations simultanées ne doivent produire qu’une invitation active'
+  );
+  const invitation = invitationResponses.find(response => response.status === 201);
+  assert.ok(invitation, 'une invitation doit être créée');
   assert.equal(typeof invitation.body.email_envoye, 'boolean');
+  if (!invitation.body.email_envoye) {
+    assert.ok(invitation.body.avertissement, 'un échec ou une absence SMTP doit être signalé');
+  }
   const token = new URL(invitation.body.invitation_url).searchParams.get('token');
   assert.match(token, /^[a-f0-9]{64}$/i);
 
