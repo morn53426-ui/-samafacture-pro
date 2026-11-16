@@ -61,6 +61,18 @@ async function claimPendingEmails(batchSize = DEFAULT_BATCH_SIZE) {
   }
 }
 
+function extractEmailVerificationToken(verificationUrl) {
+  try {
+    const url = new URL(String(verificationUrl || ''));
+    const fragment = new URLSearchParams(url.hash.replace(/^#/, ''));
+    // Le fragment est utilisé pour les nouveaux liens : il n'est jamais envoyé dans le GET.
+    // La query string reste lue temporairement pour les emails plus anciens encore valides.
+    return fragment.get('verification_token') || url.searchParams.get('verification_token') || '';
+  } catch (_) {
+    return '';
+  }
+}
+
 async function isEmailJobDeliverable(job, message) {
   if (job.entity_type === 'company_group_invitation') {
     const [[invitation]] = await pool.query(
@@ -74,12 +86,7 @@ async function isEmailJobDeliverable(job, message) {
   }
 
   if (job.entity_type === 'company_group_invitation_verification') {
-    let proofToken = '';
-    try {
-      proofToken = new URL(String(message?.verification_url || '')).searchParams.get('verification_token') || '';
-    } catch (_) {
-      return false;
-    }
+    const proofToken = extractEmailVerificationToken(message?.verification_url);
     if (!/^[a-f0-9]{64}$/i.test(proofToken)) return false;
     const proofHash = crypto.createHash('sha256').update(proofToken).digest('hex');
     const [[verification]] = await pool.query(
@@ -258,6 +265,7 @@ module.exports = {
   RETRY_DELAYS_SECONDS,
   retryDelaySeconds,
   safeErrorCode,
+  extractEmailVerificationToken,
   claimPendingEmails,
   isEmailJobDeliverable,
   markEmailCancelled,

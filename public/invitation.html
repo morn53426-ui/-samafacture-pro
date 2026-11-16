@@ -81,7 +81,7 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
  }
 
  if(!Api.token()){
-   root.innerHTML='<h1>Vous avez été invité</h1><p>Connectez-vous avec l’adresse email qui a reçu l’invitation. Pour un groupe de sociétés, la confirmation finale sera traitée après connexion.</p><a class="btn btn-primary" style="width:100%" href="login.html?next='+encodeURIComponent(next)+'">Se connecter pour accepter</a><a style="display:block;text-align:center;margin-top:14px;color:var(--emerald)" href="register.html?next='+encodeURIComponent(next)+'">Créer un compte</a>';
+   root.innerHTML='<h1>Vous avez été invité</h1><p>Connectez-vous avec l’adresse email qui a reçu l’invitation. Pour un groupe de sociétés, une seconde confirmation sera envoyée à cette adresse avant tout rattachement.</p><a class="btn btn-primary" style="width:100%" href="login.html?next='+encodeURIComponent(next)+'">Se connecter pour accepter</a><a style="display:block;text-align:center;margin-top:14px;color:var(--emerald)" href="register.html?next='+encodeURIComponent(next)+'">Créer un compte</a>';
    return;
  }
 
