@@ -158,7 +158,14 @@ function renderGroup(data,dashboard){
     button.disabled=true;
     try{
       const result=await Api.post('/pro/company-group/invitations',{email:document.getElementById('company-email').value.trim()});
-      document.getElementById('latest-invitation').innerHTML='<div class="group-note">Invitation créée pour '+escapeHtml(result.email)+'. <a href="'+escapeHtml(result.invitation_url)+'" target="_blank" rel="noopener">Ouvrir le lien sécurisé</a> · Email envoyé : '+(result.email_envoye?'Oui':'Non (SMTP à configurer)')+'</div>';
+      const emailStatus=result.email_envoye
+        ? '<span>Email envoyé et confirmé.</span>'
+        : '<span>'+escapeHtml(result.avertissement||'Envoi email non confirmé. Copiez et transmettez le lien manuellement.')+'</span>';
+      document.getElementById('latest-invitation').innerHTML=
+        '<div class="group-note" role="status" aria-live="polite">Invitation créée pour '+
+        escapeHtml(result.email)+'. <a href="'+escapeHtml(result.invitation_url)+
+        '" target="_blank" rel="noopener">Ouvrir le lien sécurisé</a>'+
+        '<p class="group-invitation-mail-status">'+emailStatus+'</p></div>';
       await load();
     }catch(err){message(err.message,'error');}
     finally{button.disabled=false;}
