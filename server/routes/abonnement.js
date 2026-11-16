@@ -22,6 +22,7 @@ const TARIFS = {
 // Canaux PayDunya autorisés pour l'écran d'abonnement.
 // Les identifiants sont ceux de l'API officielle (invoice.channels).
 const CANAUX_PAYDUNYA = Object.freeze({
+  wave: 'wave-senegal',
   orange_money: 'orange-money-senegal',
   carte_bancaire: 'card'
 });
