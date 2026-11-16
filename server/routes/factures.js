@@ -5,6 +5,7 @@ const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
+const { localDateString } = require('../utils/local-date');
 const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { escapeHtmlEmail, sanitizeEmailHeader } = require('../utils/email-escape');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
@@ -16,7 +17,7 @@ const { queueWebhookEvent } = require('../utils/pro-webhooks');
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
 
-async function nextNumero(conn, userId, type) {
+async function nextNumero(conn, userId, type, year = new Date().getFullYear()) {
   const prefix = type === 'devis' ? 'DEV' : 'FAC';
   const year = new Date().getFullYear();
 
@@ -513,8 +514,9 @@ router.post('/', async (req, res, next) => {
       }
     }
 
-    const [companyRows] = await pool.query('SELECT devise FROM users WHERE id = ?', [req.tenantId]);
+    const [companyRows] = await pool.query('SELECT devise, fuseau_horaire FROM users WHERE id = ?', [req.tenantId]);
     const companyCurrency = String(companyRows[0]?.devise || 'FCFA').toUpperCase();
+    const companyLocalDate = localDateString(companyRows[0]?.fuseau_horaire || 'Africa/Dakar');
     const documentCurrency = String(devise || companyCurrency).toUpperCase();
     const supportedCurrencies = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
     if (!supportedCurrencies.includes(documentCurrency)) return res.status(400).json({ error: 'Devise de document non prise en charge.' });
@@ -560,12 +562,12 @@ router.post('/', async (req, res, next) => {
         });
       }
     }
-    const numero = await nextNumero(conn, req.tenantId, docType);
+    const numero = await nextNumero(conn, req.tenantId, docType, Number(companyLocalDate.slice(0, 4)));
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        req.tenantId, client_id, numero, docType, date_emission || new Date().toISOString().slice(0, 10),
+        req.tenantId, client_id, numero, docType, date_emission || companyLocalDate,
         date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
         documentCurrency, remiseAppliquee, fraisLivraisonValides, mode_paiement || null,
         commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
