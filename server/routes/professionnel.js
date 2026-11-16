@@ -1151,8 +1151,7 @@ router.post('/purchase-orders', async (req, res, next) => {
     const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [uid]);
     const companyCurrency = String(company?.devise || 'FCFA').toUpperCase();
     const orderCurrency = String(req.body.devise || companyCurrency).toUpperCase();
-    const supportedCurrencies = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
-    if (!supportedCurrencies.includes(orderCurrency)) return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
+    if (!SUPPORTED_CURRENCIES.includes(orderCurrency)) return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
     if (orderCurrency !== companyCurrency) return res.status(409).json({ error: 'La devise de la commande doit correspondre à la devise de base de l’entreprise. Les conversions ne sont pas encore activées.' });
     if (!idOk(supplierId) || !lines.length || lines.length > 100) return res.status(400).json({ error: 'Fournisseur et 1 à 100 lignes obligatoires.' });
     const [[supplier]] = await pool.query('SELECT id FROM pro_fournisseurs WHERE id = ? AND user_id = ? AND actif = 1', [supplierId, uid]);
