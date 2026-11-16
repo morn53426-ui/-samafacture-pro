@@ -46,5 +46,5 @@ test('sendMail sans SMTP ne journalise ni destinataire, ni sujet, ni lien secret
 test("l'exemple d'environnement n'annonce plus l'affichage d'un lien de réinitialisation dans les logs", () => {
   const example = fs.readFileSync(path.join(__dirname, '..', '.env.example'), 'utf8');
   assert.match(example, /aucun email\s+n'est envoyé/i);
-  assert.doesNotMatch(example, /lien de\s*réinitialisation s'affiche dans la console/i);
+  assert.doesNotMatch(example, /réinitialisation s'affiche dans la console/i);
 });
