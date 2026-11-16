@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 11;
+const CURRENT_SCHEMA_VERSION = 12;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -160,9 +160,11 @@ async function initializeDatabaseOnce() {
  * Chaque ajout est protégé : une colonne déjà présente ne provoque pas d'erreur.
  */
 async function runMigrations(conn) {
-  // v10 : applique la migration 006 des groupes multi-sociétés aux bases déjà initialisées en v9.
-  // v11 : applique la migration 007 de l'outbox email durable aux bases existantes en v10.
   // v8 : registre persistant du quota mensuel, rétrocompatible avec les bases v7.
+  // v9 : jour d'ancrage des factures récurrentes (date mensuelle stable).
+  // v10 : index de parcours des échéances actives.
+  // v11 : groupes multi-sociétés (migration 006).
+  // v12 : outbox email chiffrée et durable (migration 007).
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -209,6 +211,7 @@ async function runMigrations(conn) {
     { table: 'factures', column: 'conditions_reglement', definition: 'TEXT' },
     { table: 'paiements', column: 'idempotency_key', definition: 'VARCHAR(100)' },
     { table: 'factures_recurrentes', column: 'envoi_auto_email', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
+    { table: 'factures_recurrentes', column: 'jour_ancre', definition: 'TINYINT UNSIGNED NULL AFTER prochaine_date' },
     { table: 'abonnement_paiements', column: 'internal_reference', definition: "VARCHAR(64) NOT NULL DEFAULT ''" }
   ];
 
@@ -222,6 +225,12 @@ async function runMigrations(conn) {
       await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
     }
   }
+
+  // Les échéances existantes conservent leur prochain jour comme ancre mensuelle.
+  // Une valeur déjà définie n'est jamais recalculée lors des redémarrages.
+  await conn.query(
+    'UPDATE factures_recurrentes SET jour_ancre = DAY(prochaine_date) WHERE jour_ancre IS NULL'
+  );
 
   // Élargit entreprise_logo si la colonne existe encore avec l'ancien type TEXT (~65 Ko max,
   // trop petit pour un logo encodé en base64). MEDIUMTEXT supporte jusqu'à 16 Mo.
@@ -294,6 +303,7 @@ async function runMigrations(conn) {
     { table: 'clients', name: 'idx_clients_user_created', columns: '(user_id, created_at)' },
     // Liste et rapport des dépenses, triés/filtrés par date.
     { table: 'depenses', name: 'idx_depenses_user_date', columns: '(user_id, date_depense)' },
+    { table: 'factures_recurrentes', name: 'idx_factures_recurrentes_active_due', columns: '(actif, prochaine_date)' },
     { table: 'factures', name: 'uk_factures_user_idempotency', columns: '(user_id, idempotency_key)', unique: true },
     { table: 'paiements', name: 'uk_paiements_user_idempotency', columns: '(user_id, idempotency_key)', unique: true }
   ];
