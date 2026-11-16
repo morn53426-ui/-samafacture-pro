@@ -466,6 +466,16 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .send({ token });
   assert.equal(wrongOwner.status, 403);
 
+  // Un JWT conservé après changement d'adresse ne doit pas suffire : l'API relit l'email courant en base.
+  const changedAccountEmail = emailDeTest('group-email-changed');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [changedAccountEmail, subsidiaryOwnerId]);
+  const staleSessionChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token });
+  assert.equal(staleSessionChallenge.status, 403, 'une ancienne adresse présente dans le JWT ne doit pas autoriser une invitation');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [recipient.email, subsidiaryOwnerId]);
+
   // Le lien d'invitation seul ne suffit plus : une preuve indépendante est envoyée à la boîte invitée.
   const pendingAcceptance = await request(app)
     .post('/api/pro/company-group/invitations/accept')
@@ -568,6 +578,15 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .set('Authorization', 'Bearer ' + outsiderToken)
     .send({ token, verification_token: verificationToken });
   assert.equal(wrongAccountProof.status, 403);
+
+  // Un changement d'adresse après l'envoi invalide aussi un JWT encore signé avec l'ancienne adresse.
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [changedAccountEmail, subsidiaryOwnerId]);
+  const staleSessionProof = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(staleSessionProof.status, 403, 'une preuve email ne doit pas rattacher un compte qui a changé d’adresse');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [recipient.email, subsidiaryOwnerId]);
 
   // Simule une remise initiale déjà réclamée puis interrompue. Après acceptation vérifiée,
   // le worker doit reprendre le bail, constater l'invitation acceptée et annuler l'ancien email.
