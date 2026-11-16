@@ -20,17 +20,25 @@ function runMigrationInNewProcess() {
   });
 }
 
-test('une base déjà en version 7 reçoit la table et l’index du quota en version 8', async () => {
+test('une base déjà en version 7 applique les migrations du quota v8 et de l’ancre récurrente v9', async () => {
   await setupTestDatabase();
   await pool.query('DROP TABLE IF EXISTS facture_usage_mensuelle');
+  const [anchorColumn] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures_recurrentes'
+       AND COLUMN_NAME = 'jour_ancre'`
+  );
+  if (anchorColumn.length) {
+    await pool.query('ALTER TABLE factures_recurrentes DROP COLUMN jour_ancre');
+  }
   await pool.query('UPDATE _samafacture_schema_meta SET version = 7 WHERE id = 1');
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v8 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v9 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 8);
+  assert.equal(Number(meta.version), 9);
 
   const [tables] = await pool.query(
     `SELECT TABLE_NAME FROM information_schema.TABLES
@@ -44,6 +52,13 @@ test('une base déjà en version 7 reçoit la table et l’index du quota en ver
        AND INDEX_NAME = 'idx_factures_user_type_created_at'`
   );
   assert.equal(indexes.length, 1, 'L’index de recherche du quota doit être créé.');
+
+  const [anchorColumns] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures_recurrentes'
+       AND COLUMN_NAME = 'jour_ancre'`
+  );
+  assert.equal(anchorColumns.length, 1, 'La colonne du jour d’ancrage doit être recréée par la migration v9.');
 });
 
 after(teardownTestEnvironment);
