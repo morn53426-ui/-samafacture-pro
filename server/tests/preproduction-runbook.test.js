@@ -12,7 +12,7 @@ test('la recette staging crée et distingue les deux fichiers .env', () => {
   assert.match(recipe, /cp server\/\.env\.example server\/\.env/);
   assert.match(recipe, /--env-file \.env/);
   assert.doesNotMatch(recipe, /--env-file server\/\.env/);
-  assert.match(recipe, /env_file: \.\/server\/\.env/);
+  assert.match(recipe, /server\\\/\\.env/);
 });
 
 test('la recette staging utilise le profil HTTPS et un projet Compose isolé', () => {
