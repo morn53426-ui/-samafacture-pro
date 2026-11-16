@@ -16,11 +16,12 @@ http {
     resolver 127.0.0.11 valid=5s ipv6=off;
     map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 
-    # Ne journalise ni les query strings (reset token, code de consultation), ni les
-    # codes publics dans le chemin, ni le chemin complet du Referer.
+    # Ne journalise ni les query strings (reset token), ni les codes publics de facture/devis,
+    # ni les jetons des liens de paiement placés dans le chemin, ni le Referer complet.
     map $uri $sf_log_uri {
         default $uri;
         ~*^(/api/public/(?:consulter|verifier)/[^/]+)/[^/]+$ $1/[redacted];
+        ~*^(/api/public/paiement)/[^/]+$ $1/[redacted];
     }
     map $http_referer $sf_log_referer {
         default "-";
