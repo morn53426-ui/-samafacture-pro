@@ -125,6 +125,36 @@ test('une tâche déjà terminée est acquittée sans régénération', async ()
   assert.deepEqual(redis.acked, ['stream-1']);
 });
 
+test("une défaillance de XACK après completed ne régénère pas le PDF lors de la reprise", async () => {
+  const redis = createRedis();
+  let renderCalls = 0;
+  let shouldFailAck = true;
+  const deps = dependencies(
+    redis,
+    async () => {
+      renderCalls += 1;
+      return Buffer.from('%PDF-once');
+    },
+    async () => '/pdf/job.pdf'
+  );
+  deps.acknowledge = async id => {
+    if (shouldFailAck) {
+      shouldFailAck = false;
+      throw new Error('XACK temporarily unavailable');
+    }
+    redis.acked.push(id);
+  };
+
+  await assert.rejects(processPdfQueueEntry(deps), /XACK temporarily unavailable/);
+  assert.equal(redis.hash.status, 'completed');
+  assert.equal(renderCalls, 1);
+
+  const recovered = await processPdfQueueEntry(deps);
+  assert.equal(recovered, 'completed');
+  assert.equal(renderCalls, 1, 'le résultat terminal déjà écrit ne doit pas être recalculé');
+  assert.deepEqual(redis.acked, ['stream-1']);
+});
+
 test('refuse un identifiant de tâche qui pourrait sortir du répertoire PDF', async () => {
   const redis = createRedis();
   let renderCalls = 0;
