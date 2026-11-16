@@ -307,7 +307,29 @@ L'application pousse des notifications instantanées au navigateur, sans recharg
 
 **Pour être bien référencé**, pensez à renseigner `APP_URL` avec votre vrai nom de domaine une fois en ligne (pas `localhost`), et à soumettre `sitemap.xml` à [Google Search Console](https://search.google.com/search-console).
 
-## Paiement des abonnements (Wave, Orange Money, carte bancaire)
+## Paiement ponctuel des plans (Wave et PayDunya)
+
+Le parcours actuellement livré permet un **paiement ponctuel** d'un plan Starter, Pro ou Entreprise via une session Wave ou une facture PayDunya. L'activation du plan intervient uniquement après confirmation côté fournisseur et validation côté serveur. Tant qu'aucun prestataire n'est configuré dans `server/.env`, les boutons de paiement restent masqués ; le compte peut seulement revenir au plan Gratuit. Une requête API directe ne permet pas de s'attribuer un plan payant.
+
+**Important — ce n'est pas encore un abonnement récurrent :** le code actuel ne crée ni mandat de prélèvement, ni échéance mensuelle, ni renouvellement automatique, ni expiration/suspension automatique d'un plan. Le client paie une fois et le plan reste associé au compte jusqu'à un changement manuel. Ne pas présenter le parcours actuel comme un abonnement mensuel renouvelable.
+
+Le tarif codé est un montant par achat ponctuel : Starter 5 000 FCFA, Pro 15 000 FCFA et Entreprise 35 000 FCFA. Ces montants ne sont donc pas des prix mensuels actifs. Les prix mensuels indicatifs proposés dans le document `PLAN_ENTREPRISE_SAMAFACTURE_PRO.md` restent des hypothèses commerciales à valider et ne doivent pas être affichés comme des tarifs récurrents avant l'implémentation et les tests du cycle d'abonnement.
+
+### Configurer Wave
+1. Créez un compte sur [business.wave.com](https://business.wave.com), section "Developers".
+2. Récupérez votre clé API et votre secret de signature de webhook.
+3. Renseignez `WAVE_API_KEY` et `WAVE_SIGNING_SECRET` dans `.env`.
+4. Configurez l'URL de webhook dans le tableau de bord Wave : `https://votredomaine.com/api/abonnement/webhook/wave`.
+
+### Configurer PayDunya (Orange Money + carte)
+1. Créez un compte sur [paydunya.com](https://paydunya.com).
+2. Créez une "App" dans le tableau de bord pour obtenir vos clés.
+3. Renseignez `PAYDUNYA_MASTER_KEY`, `PAYDUNYA_PRIVATE_KEY`, `PAYDUNYA_PUBLIC_KEY`, `PAYDUNYA_TOKEN`.
+4. Laissez `PAYDUNYA_MODE=test` tant que votre compte n'est pas validé en mode réel.
+
+**Avant d'activer la facturation mensuelle automatique :** choisir un prestataire et un produit qui autorisent réellement les paiements récurrents, vérifier contractuellement la possibilité de débiter le moyen de paiement enregistré, puis implémenter le consentement explicite, la création/révocation du mandat, les échéances mensuelles, les retries/idempotence, les webhooks signés, les notifications d'impayé, la grâce, la suspension, la résiliation et l'historique des factures d'abonnement. Tester les parcours dans l'environnement sandbox du fournisseur avant toute mise en production.
+
+**⚠️ Important** : les API et les conditions des fournisseurs peuvent évoluer. Vérifiez leur documentation et les capacités réellement activées sur votre compte marchand avant une mise en production.
 
 Le passage à un plan payant (Starter, Pro, Entreprise) peut se faire réellement via :
 - **Wave for Business** — paiement direct
@@ -329,7 +351,6 @@ Les plans payants ne peuvent être activés que par un flux de paiement confirm�
 
 **⚠️ Important** : les API Wave et PayDunya (endpoints, formats de réponse) peuvent évoluer. Le code suit leur documentation au moment de son écriture — vérifiez-la avant une mise en production réelle, en particulier les URLs d'API et le format des webhooks.
 
-Les tarifs des plans (5 000 / 15 000 / 35 000 FCFA par mois pour Starter/Pro/Entreprise) sont définis dans `server/routes/abonnement.js` — à ajuster selon votre marché.
 
 ## Authentification : Google et mot de passe oublié
 
