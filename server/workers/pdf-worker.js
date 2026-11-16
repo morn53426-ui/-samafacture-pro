@@ -1,63 +1,91 @@
 require('dotenv').config();
+const os = require('os');
+const crypto = require('crypto');
 const fs = require('fs/promises');
 const { pool } = require('../config/db');
 const { waitForDatabase } = require('../config/database-readiness');
 const { initRedis, closeRedis, getRedisClient } = require('../config/redis');
 const { genererPdfFacture, closeBrowser } = require('../utils/pdf');
-const { QUEUE_KEY, JOB_PREFIX, JOB_TTL, getPdfPath, JOB_DIR } = require('../pdf-queue');
+const {
+  ensurePdfConsumerGroup,
+  migrateLegacyPdfQueue,
+  claimNextPdfJob,
+  acknowledgePdfJob,
+  getPdfPath,
+  JOB_TTL,
+  JOB_DIR,
+  JOB_PREFIX,
+  STREAM_KEY
+} = require('../pdf-queue');
+const { processPdfQueueEntry } = require('../pdf-worker-job');
 
 let stopping = false;
+let cleaning = false;
+const consumerName = os.hostname() + '-' + process.pid + '-' + crypto.randomUUID();
 
-async function processJob(raw) {
-  const job = JSON.parse(raw);
-  const redis = getRedisClient();
-  const key = JOB_PREFIX + job.id;
-  try {
-    await redis.hSet(key, { status: 'processing', startedAt: new Date().toISOString() });
-    await fs.mkdir(JOB_DIR, { recursive: true });
-    const pdf = await genererPdfFacture(job.factureId, job.user);
-    const file = await getPdfPath(job.id);
-    await fs.writeFile(file, pdf);
-    await redis.hSet(key, { status: 'completed', file: file, completedAt: new Date().toISOString(), size: String(pdf.length) });
-    await redis.expire(key, JOB_TTL);
-  } catch (err) {
-    console.error(`PDF job ${job.id} échoué :`, err.message);
-    await redis.hSet(key, { status: 'failed', error: 'La génération du PDF a échoué.', failedAt: new Date().toISOString() });
-    await redis.expire(key, JOB_TTL);
-  }
+async function processJob(entry, redis) {
+  return processPdfQueueEntry({
+    entry,
+    redis,
+    acknowledge: entryId => acknowledgePdfJob(redis, entryId),
+    renderPdf: genererPdfFacture,
+    async savePdf(id, pdf) {
+      await fs.mkdir(JOB_DIR, { recursive: true });
+      const file = await getPdfPath(id);
+      await fs.writeFile(file, pdf, { mode: 0o600 });
+      return file;
+    },
+    jobPrefix: JOB_PREFIX,
+    jobTtl: JOB_TTL,
+    maxAttempts: Number(process.env.PDF_JOB_MAX_ATTEMPTS) || 3
+  });
+}
+
+async function cleanup(exitCode = 0) {
+  if (cleaning) return;
+  cleaning = true;
+  await closeBrowser().catch(() => {});
+  await closeRedis().catch(() => {});
+  await pool.end().catch(() => {});
+  process.exitCode = exitCode;
 }
 
 async function main() {
   // L'application initialise le schéma avant d'être déclarée healthy par Compose.
-  // Le worker PDF ne doit pas relancer initDatabase() : cela ferait concurrence au
-  // processus primaire et peut faire expirer GET_LOCK pendant une migration longue.
-  // Il vérifie uniquement la connexion et tolère un démarrage MySQL légèrement retardé.
+  // Le worker PDF vérifie uniquement MySQL et ne lance pas les migrations en concurrence.
   await waitForDatabase(pool, {
     onRetry(err, attempt, maxAttempts) {
-      console.warn(`MySQL pas encore disponible pour le worker PDF (${attempt}/${maxAttempts}) : ${err.message}`);
+      console.warn('MySQL pas encore disponible pour le worker PDF (' + attempt + '/' + maxAttempts + ') : ' + err.message);
     }
   });
-  console.log('✅ Connexion MySQL vérifiée pour le worker PDF.');
+  console.log('Connexion MySQL vérifiée pour le worker PDF.');
 
   await initRedis();
-  if (!getRedisClient()) throw new Error('REDIS_URL est obligatoire pour le worker PDF.');
-  await fs.mkdir(JOB_DIR, { recursive: true });
-  console.log(`📄 Worker PDF prêt — queue=${QUEUE_KEY}`);
   const redis = getRedisClient();
+  if (!redis) throw new Error('REDIS_URL est obligatoire pour le worker PDF.');
+
+  await ensurePdfConsumerGroup(redis);
+  const migrated = await migrateLegacyPdfQueue(redis);
+  if (migrated) {
+    console.log(migrated + ' ancienne(s) tâche(s) PDF migrée(s) vers Redis Streams.');
+  }
+
+  await fs.mkdir(JOB_DIR, { recursive: true });
+  console.log('Worker PDF prêt — stream=' + STREAM_KEY + ', consumer=' + consumerName);
+
   while (!stopping) {
-    const item = await redis.blPop(QUEUE_KEY, 5);
-    if (item?.element) await processJob(item.element);
+    const entry = await claimNextPdfJob(redis, consumerName);
+    if (entry) await processJob(entry, redis);
   }
 }
 
-async function shutdown(exitCode = 0) {
-  if (stopping) return;
-  stopping = true;
-  await closeBrowser().catch(() => {});
-  await closeRedis().catch(() => {});
-  await pool.end().catch(() => {});
-  process.exit(exitCode);
-}
-process.on('SIGTERM', () => { void shutdown(0); });
-process.on('SIGINT', () => { void shutdown(0); });
-main().catch(async err => { console.error('❌ Worker PDF arrêté :', err); await shutdown(1); });
+process.on('SIGTERM', () => { stopping = true; });
+process.on('SIGINT', () => { stopping = true; });
+
+main()
+  .then(() => cleanup(0))
+  .catch(async err => {
+    console.error('Worker PDF arrêté :', err);
+    stopping = true;
+    await cleanup(1);
+  });
