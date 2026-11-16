@@ -11,6 +11,8 @@ const stream = 'samafacture:pdf:smoke:' + suffix;
 const group = 'workers:' + suffix;
 const legacy = 'samafacture:pdf:legacy-smoke:' + suffix;
 const metadata = 'samafacture:pdf:job:smoke:' + suffix;
+const badStream = 'samafacture:pdf:wrong-type:' + suffix;
+const failedMetadata = 'samafacture:pdf:job:failed-smoke:' + suffix;
 const client = createClient({ url });
 
 client.on('error', err => {
@@ -32,8 +34,6 @@ async function main() {
     const hash = await client.hGetAll(metadata);
     assert.equal(hash.userId, 'ci-user', 'le hash doit conserver le propriétaire');
 
-    const badStream = 'samafacture:pdf:wrong-type:' + suffix;
-    const failedMetadata = metadata + ':failed';
     await client.rPush(badStream, 'this key is intentionally a list');
     await assert.rejects(
       client.eval(ENQUEUE_PDF_JOB_SCRIPT, {
