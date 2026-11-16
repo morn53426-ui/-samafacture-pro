@@ -19,14 +19,17 @@ function sanitizeRequestTargetForLog(requestTarget) {
 
   const segments = pathname.split('/');
   const route = String(segments[3] || '').toLowerCase();
-  const isPublicCodeRoute =
+  const isPublicApiRoute =
     String(segments[1] || '').toLowerCase() === 'api' &&
-    String(segments[2] || '').toLowerCase() === 'public' &&
+    String(segments[2] || '').toLowerCase() === 'public';
+  const isPublicCodeRoute = isPublicApiRoute &&
     (route === 'consulter' || route === 'verifier') &&
     Boolean(segments[4]) &&
     Boolean(segments[5]);
+  const isPublicPaymentLinkRoute = isPublicApiRoute && route === 'paiement' && Boolean(segments[4]);
 
   if (isPublicCodeRoute) segments[5] = '[redacted]';
+  if (isPublicPaymentLinkRoute) segments[4] = '[redacted]';
   return segments.join('/') || '/';
 }
 
