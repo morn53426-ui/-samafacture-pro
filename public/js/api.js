@@ -324,7 +324,9 @@ function _fermerModaleAccessible() {
 }
 
 function _initAccessibiliteModales() {
-  document.querySelectorAll('[id$="modal"]').forEach((modale) => {
+  // Les dialogues qui gèrent eux-mêmes leur focus et la touche Échap sont exclus
+  // du gestionnaire générique pour éviter deux pièges de focus concurrents.
+  document.querySelectorAll('[id$="modal"]:not([data-focus-managed="true"])').forEach((modale) => {
     let visible = getComputedStyle(modale).display !== 'none';
     new MutationObserver(() => {
       const maintenantVisible = getComputedStyle(modale).display !== 'none';
@@ -340,10 +342,16 @@ if (document.readyState === 'loading') {
   _initAccessibiliteModales();
 }
 
-// Ferme n'importe quelle modale ouverte avec la touche Échap.
+// Ferme les modales génériques avec Échap. Les dialogues qui ont leur propre
+// gestion clavier (data-focus-managed) doivent traiter la touche eux-mêmes.
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  document.querySelectorAll('[id$="modal"]').forEach((m) => {
+  const focusManagedDialogIsOpen = Array.from(
+    document.querySelectorAll('[data-focus-managed="true"]')
+  ).some(modale => getComputedStyle(modale).display !== 'none');
+  if (focusManagedDialogIsOpen) return;
+
+  document.querySelectorAll('[id$="modal"]:not([data-focus-managed="true"])').forEach((m) => {
     if (getComputedStyle(m).display !== 'none') m.style.display = 'none';
   });
 });

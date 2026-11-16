@@ -252,6 +252,46 @@ function renderWorkspaceNotifications() {
   `).join('') : '<div class="app-notification-empty">Aucune notification reçue pendant cette session.</div>';
 }
 
+function positionWorkspaceNotificationPanel() {
+  const panel = document.getElementById('workspace-notification-panel');
+  const toggle = document.getElementById('workspace-notification-toggle');
+  if (!panel || !toggle || panel.hidden) return;
+
+  const properties = ['position', 'top', 'left', 'right', 'width', 'max-width', 'max-height'];
+  if (window.innerWidth > 640) {
+    properties.forEach(property => panel.style.removeProperty(property));
+    return;
+  }
+
+  const rect = toggle.getBoundingClientRect();
+  const gutter = 12;
+  const width = Math.max(180, Math.min(360, window.innerWidth - gutter * 2));
+  const left = Math.max(gutter, Math.min(
+    rect.right - width,
+    window.innerWidth - width - gutter
+  ));
+  const availableBelow = Math.max(0, window.innerHeight - rect.bottom - 20);
+  const availableAbove = Math.max(0, rect.top - 20);
+  let top;
+  let maxHeight;
+
+  if (availableBelow >= 220 || availableBelow >= availableAbove) {
+    top = rect.bottom + 8;
+    maxHeight = Math.min(430, Math.max(140, availableBelow));
+  } else {
+    maxHeight = Math.min(430, Math.max(140, availableAbove));
+    top = Math.max(gutter, rect.top - maxHeight - 8);
+  }
+
+  panel.style.position = 'fixed';
+  panel.style.top = Math.round(top) + 'px';
+  panel.style.left = Math.round(left) + 'px';
+  panel.style.right = 'auto';
+  panel.style.width = Math.round(width) + 'px';
+  panel.style.maxWidth = Math.round(width) + 'px';
+  panel.style.maxHeight = Math.round(Math.min(maxHeight, window.innerHeight - gutter * 2)) + 'px';
+}
+
 function toggleWorkspaceNotifications(event) {
   event?.stopPropagation();
   const panel = document.getElementById('workspace-notification-panel');
@@ -261,6 +301,7 @@ function toggleWorkspaceNotifications(event) {
   panel.hidden = !shouldOpen;
   toggle.setAttribute('aria-expanded', String(shouldOpen));
   if (shouldOpen) {
+    positionWorkspaceNotificationPanel();
     workspaceNotifications.forEach(item => { item.read = true; });
     renderWorkspaceNotifications();
   }
@@ -281,14 +322,31 @@ function clearWorkspaceNotifications() {
 function bindWorkspaceNotificationDismiss() {
   if (window.__sfNotificationDismissBound) return;
   window.__sfNotificationDismissBound = true;
+  window.addEventListener('resize', positionWorkspaceNotificationPanel);
+  window.addEventListener('orientationchange', positionWorkspaceNotificationPanel);
   document.addEventListener('click', event => {
     if (!event.target.closest('.app-notification')) closeWorkspaceNotifications();
   });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') {
-      closeWorkspaceNotifications();
-      document.getElementById('workspace-notification-toggle')?.focus();
-    }
+    if (event.key !== 'Escape') return;
+
+    const panel = document.getElementById('workspace-notification-panel');
+    if (!panel || panel.hidden) return;
+
+    // Un dialogue actif (aperçu A4, confirmation, etc.) doit traiter Échap en priorité.
+    // Ne pas déplacer le focus vers la cloche lorsque les notifications sont déjà fermées.
+    const anotherDialogIsOpen = Array.from(
+      document.querySelectorAll('[role="dialog"], [id$="modal"]')
+    ).some(dialog =>
+      dialog !== panel &&
+      !dialog.hidden &&
+      getComputedStyle(dialog).display !== 'none'
+    );
+    if (anotherDialogIsOpen) return;
+
+    closeWorkspaceNotifications();
+    const toggle = document.getElementById('workspace-notification-toggle');
+    if (toggle?.isConnected) toggle.focus({ preventScroll: true });
   });
 }
 
