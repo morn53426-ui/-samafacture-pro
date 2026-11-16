@@ -51,9 +51,12 @@
 
     <h3>2. Comment vos données sont stockées</h3>
     <p style="color:var(--ink-soft);">
-      Les mots de passe sont chiffrés (hachage bcrypt) et ne sont jamais stockés en clair. L'accès à votre
-      compte est protégé par un jeton de session (JWT) transmis à chaque requête. Vos données sont
-      hébergées dans une base de données que vous contrôlez.
+      Les mots de passe sont stockés sous forme de hachage bcrypt et ne sont pas conservés en clair.
+      L'accès au compte utilise un jeton de session (JWT) et, selon le parcours, un cookie HttpOnly.
+      Dans l'offre hébergée, l'infrastructure est administrée par l'exploitant du service ; dans une
+      installation auto-hébergée, elle dépend de l'administrateur de cette installation. Le lieu exact
+      d'hébergement, les prestataires et les durées de conservation doivent être indiqués dans la version
+      définitive de cette politique.
     </p>
 
     <h3>3. Utilisation des données</h3>
