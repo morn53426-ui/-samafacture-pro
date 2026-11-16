@@ -130,5 +130,35 @@ describe('Sauvegardes automatiques', () => {
       delete process.env.BACKUP_ENCRYPTION_KEY;
     }
   });
+  test('une rétention invalide ne supprime pas les sauvegardes existantes', async () => {
+    const savedRetention = process.env.BACKUP_RETENTION_DAYS;
+    const savedKey = process.env.BACKUP_ENCRYPTION_KEY;
+    const savedMode = process.env.NODE_ENV;
+    const savedDumpPath = process.env.MYSQLDUMP_PATH;
+    const archiveExistante = path.join(BACKUP_DIR, 'samafacture-protection-retention.sql.gz');
+
+    process.env.BACKUP_RETENTION_DAYS = '-1';
+    process.env.NODE_ENV = 'test';
+    delete process.env.BACKUP_ENCRYPTION_KEY;
+    ecrireFauxDump(0);
+    process.env.MYSQLDUMP_PATH = fakeDump;
+    await fs.promises.writeFile(archiveExistante, 'archive de test', { mode: 0o600 });
+
+    try {
+      await effectuerSauvegarde();
+      await fs.promises.access(archiveExistante, fs.constants.R_OK);
+    } finally {
+      await fs.promises.unlink(archiveExistante).catch(() => {});
+      if (savedRetention === undefined) delete process.env.BACKUP_RETENTION_DAYS;
+      else process.env.BACKUP_RETENTION_DAYS = savedRetention;
+      if (savedKey === undefined) delete process.env.BACKUP_ENCRYPTION_KEY;
+      else process.env.BACKUP_ENCRYPTION_KEY = savedKey;
+      if (savedMode === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = savedMode;
+      if (savedDumpPath === undefined) delete process.env.MYSQLDUMP_PATH;
+      else process.env.MYSQLDUMP_PATH = savedDumpPath;
+    }
+  });
+
 });
 
