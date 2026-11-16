@@ -55,20 +55,78 @@ async function preparerFluxGzip(sourcePath) {
   }
 }
 
+async function verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseName) {
+  if (process.env.RESTORE_ALLOW_NON_EMPTY === 'true') {
+    console.warn('⚠️ RESTORE_ALLOW_NON_EMPTY=true : la vérification de la base cible non vide est désactivée.');
+    return;
+  }
+
+  const query = 'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()';
+  const args = [
+    ...connectionArgs,
+    `--database=${databaseName}`,
+    '--batch',
+    '--skip-column-names',
+    `--execute=${query}`
+  ];
+  const output = await new Promise((resolve, reject) => {
+    const mysql = spawn(mysqlBin, args, {
+      env: { ...process.env, MYSQL_PWD: process.env.DB_PASSWORD || '' },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let stdout = '';
+    let stderr = '';
+    mysql.stdout.on('data', chunk => {
+      if (stdout.length < 1024) stdout += chunk.toString().slice(0, 1024 - stdout.length);
+    });
+    mysql.stderr.on('data', chunk => {
+      if (stderr.length < 4096) stderr += chunk.toString().slice(0, 4096 - stderr.length);
+    });
+    mysql.once('error', err => reject(new Error(`Impossible de vérifier la base cible avec mysql : ${err.message}`)));
+    mysql.once('close', (code, signal) => {
+      if (code !== 0) {
+        reject(new Error(`Vérification de la base cible impossible (code ${code ?? 'inconnu'}, signal ${signal || 'aucun'}) : ${stderr.slice(0, 500)}`));
+      } else {
+        resolve(stdout.trim());
+      }
+    });
+  });
+
+  if (!/^\\d+$/.test(output)) {
+    throw new Error('mysql n’a pas renvoyé un nombre valide pendant la vérification de la base cible.');
+  }
+  const count = Number(output);
+  if (!Number.isSafeInteger(count)) {
+    throw new Error('Le nombre d’objets de la base cible dépasse la plage prise en charge.');
+  }
+  if (count > 0) {
+    throw new Error(
+      `La base cible "${databaseName}" contient déjà ${count} table(s) ou vue(s). Restauration interrompue pour éviter d’écraser des données. Utilisez une base vide ou définissez explicitement RESTORE_ALLOW_NON_EMPTY=true après avoir vérifié la cible.`
+    );
+  }
+}
+
 async function restaurer(sourcePath) {
   if (!sourcePath) throw new Error('Indiquez le chemin du fichier de sauvegarde.');
   const absolutePath = path.resolve(sourcePath);
   await fs.promises.access(absolutePath, fs.constants.R_OK);
-  const prepared = await preparerFluxGzip(absolutePath);
 
+  const mysqlBin = process.env.MYSQL_PATH || 'mysql';
+  const databaseName = process.env.DB_NAME || 'samafacture';
+  const connectionArgs = [
+    `--host=${process.env.DB_HOST || 'localhost'}`,
+    `--port=${process.env.DB_PORT || 3306}`,
+    `--user=${process.env.DB_USER || 'root'}`
+  ];
+
+  // Une restauration contenant des DROP TABLE ne doit jamais remplacer par accident
+  // une base déjà utilisée. L'exception exige une variable d'environnement explicite.
+  await verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseName);
+
+  const prepared = await preparerFluxGzip(absolutePath);
   try {
-    const args = [
-      `--host=${process.env.DB_HOST || 'localhost'}`,
-      `--port=${process.env.DB_PORT || 3306}`,
-      `--user=${process.env.DB_USER || 'root'}`,
-      process.env.DB_NAME || 'samafacture'
-    ];
-    const mysql = spawn(process.env.MYSQL_PATH || 'mysql', args, {
+    const args = [...connectionArgs, `--database=${databaseName}`];
+    const mysql = spawn(mysqlBin, args, {
       env: { ...process.env, MYSQL_PWD: process.env.DB_PASSWORD || '' },
       stdio: ['pipe', 'inherit', 'inherit']
     });
@@ -95,7 +153,6 @@ async function restaurer(sourcePath) {
     if (prepared.temporary) await fs.promises.unlink(prepared.gzipPath).catch(() => {});
   }
 }
-
 if (require.main === module) {
   restaurer(process.argv[2])
     .then(() => console.log('Restauration terminée.'))
