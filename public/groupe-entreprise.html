@@ -65,6 +65,15 @@ function message(text,kind='info'){
 function money(value,currency){
   return formatMontant(Number(value||0),currency||'FCFA');
 }
+function emailStatusLabel(item){
+  const status=item.email_statut;
+  if(status==='sent')return 'Email envoyé'+(item.email_envoye_le?' le '+formatDate(item.email_envoye_le):'');
+  if(status==='processing')return 'Envoi email en cours';
+  if(status==='retry')return 'Envoi temporairement bloqué — nouvelle tentative programmée';
+  if(status==='failed')return 'Échec après plusieurs tentatives ('+Number(item.tentatives_email||0)+')';
+  if(status==='queued')return 'Email placé dans la file d’envoi';
+  return 'État de l’email indisponible';
+}
 function renderCreate(){
   root.innerHTML=`
     <section class="group-panel">
@@ -150,7 +159,7 @@ function renderGroup(data,dashboard){
       </form>
       <div id="latest-invitation" style="margin-top:14px"></div>
       ${invitations.length?`<h3 style="margin:20px 0 0">Invitations en attente</h3><div class="group-invite-list">${invitations.map(item=>`
-        <div class="group-invite"><div><strong>${escapeHtml(item.invited_email)}</strong><small class="group-muted">Expire le ${escapeHtml(formatDate(item.expire_at))}</small></div><button class="btn btn-outline group-danger" type="button" data-revoke="${Number(item.id)}">Révoquer</button></div>`).join('')}</div>`:''}
+        <div class="group-invite"><div><strong>${escapeHtml(item.invited_email)}</strong><small class="group-muted">Expire le ${escapeHtml(formatDate(item.expire_at))}</small><small class="group-muted">${escapeHtml(emailStatusLabel(item))}</small></div><button class="btn btn-outline group-danger" type="button" data-revoke="${Number(item.id)}">Révoquer</button></div>`).join('')}</div>`:''}
     </section>`;
   document.getElementById('invite-company-form').addEventListener('submit',async event=>{
     event.preventDefault();
@@ -160,7 +169,7 @@ function renderGroup(data,dashboard){
       const result=await Api.post('/pro/company-group/invitations',{email:document.getElementById('company-email').value.trim()});
       const emailStatus=result.email_envoye
         ? '<span>Email envoyé et confirmé.</span>'
-        : '<span>'+escapeHtml(result.avertissement||'Envoi email non confirmé. Copiez et transmettez le lien manuellement.')+'</span>';
+        : '<span>'+escapeHtml(result.avertissement||'Invitation créée. Son email sera traité par la file d’envoi sécurisée.')+'</span>';
       document.getElementById('latest-invitation').innerHTML=
         '<div class="group-note" role="status" aria-live="polite">Invitation créée pour '+
         escapeHtml(result.email)+'. <a href="'+escapeHtml(result.invitation_url)+
