@@ -87,8 +87,9 @@ before(async () => {
 
 test('une base v8 reçoit les migrations v9 à v12 sans perdre les données existantes', async () => {
   // Simule strictement l'état de main : schéma v8 sans colonne/index v9-v10,
-  // ni tables multi-sociétés v11 et outbox v12.
+  // ni tables multi-sociétés v11, outbox v12 et preuve email v13.
   await pool.query('DROP TABLE IF EXISTS email_outbox');
+  await pool.query('DROP TABLE IF EXISTS pro_company_group_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitations');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_companies');
   await pool.query('DROP TABLE IF EXISTS pro_company_groups');
@@ -122,7 +123,7 @@ test('une base v8 reçoit les migrations v9 à v12 sans perdre les données exis
   assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v12 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 12, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12');
+  assert.equal(Number(meta.version), 13, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12 → v13');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -145,13 +146,13 @@ test('une base v8 reçoit les migrations v9 à v12 sans perdre les données exis
   assert.equal(dueIndexes.length, 1, 'l’index d’échéances actives de la migration v10 doit être créé');
 
   const [tables] = await pool.query(
-    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?)',
-    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations', 'email_outbox']
+    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?, ?)',
+    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations', 'email_outbox', 'pro_company_group_invitation_verifications']
   );
   assert.deepEqual(
     tables.map(row => row.TABLE_NAME).sort(),
-    ['email_outbox', 'pro_company_group_companies', 'pro_company_group_invitations', 'pro_company_groups'],
-    'les tables de groupes v11 et de l’outbox v12 doivent être créées'
+    ['email_outbox', 'pro_company_group_companies', 'pro_company_group_invitation_verifications', 'pro_company_group_invitations', 'pro_company_groups'],
+    'les tables de groupes v11, de l’outbox v12 et de preuve email v13 doivent être créées'
   );
 });
 
@@ -465,9 +466,79 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .send({ token });
   assert.equal(wrongOwner.status, 403);
 
-  // Simule une remise déjà réclamée, mais dont le worker a été interrompu
-  // avant SMTP. L'acceptation ne doit pas falsifier son état en "annulé" :
-  // le worker doit reprendre le bail, constater l'invitation acceptée, puis annuler.
+  // Le lien d'invitation seul ne suffit plus : une preuve indépendante est envoyée à la boîte invitée.
+  const pendingAcceptance = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token });
+  assert.equal(pendingAcceptance.status, 202, pendingAcceptance.text);
+  assert.equal(pendingAcceptance.body.verification_required, true);
+  assert.match(pendingAcceptance.headers['cache-control'] || '', /no-store/i);
+
+  const [[proofRow]] = await pool.query(
+    'SELECT id, token_hash, expires_at, used_at FROM pro_company_group_invitation_verifications WHERE invitation_id = ?',
+    [invitation.body.id]
+  );
+  assert.ok(proofRow);
+  assert.ok(!proofRow.used_at);
+  const [[proofOutbox]] = await pool.query(
+    "SELECT id, statut, payload_enc FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [proofRow.id]
+  );
+  assert.equal(proofOutbox.statut, 'queued');
+  const proofEmail = decryptEmailPayload(proofOutbox.payload_enc);
+  assert.equal(proofEmail.to, recipient.email);
+  const verificationUrl = new URL(proofEmail.verification_url);
+  const verificationToken = verificationUrl.searchParams.get('verification_token');
+  assert.match(verificationToken || '', /^[a-f0-9]{64}$/i);
+  assert.notEqual(proofRow.token_hash, verificationToken, 'la base ne doit stocker que le hash du jeton');
+  assert.doesNotMatch(proofOutbox.payload_enc, new RegExp(verificationToken));
+
+  const [[membershipBeforeProof]] = await pool.query(
+    'SELECT id FROM pro_company_group_companies WHERE company_owner_id = ?',
+    [subsidiaryOwnerId]
+  );
+  assert.equal(membershipBeforeProof, undefined, 'aucun rattachement ne doit exister avant la preuve email');
+
+  const wrongProof = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token, verification_token: '0'.repeat(64) });
+  assert.equal(wrongProof.status, 404);
+
+  const cooldown = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token });
+  assert.equal(cooldown.status, 202);
+  const [[proofOutboxCount]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [proofRow.id]
+  );
+  assert.equal(Number(proofOutboxCount.total), 1, 'un nouvel email ne doit pas être créé pendant le délai anti-abus');
+
+  let deliveredVerificationPayload;
+  const verificationDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async payload => {
+      deliveredVerificationPayload = payload;
+      return { sent: true };
+    }
+  });
+  assert.deepEqual(verificationDelivery, { claimed: 1, sent: 1, retried: 0, failed: 0, cancelled: 0 });
+  assert.equal(deliveredVerificationPayload.to, recipient.email);
+  assert.equal(deliveredVerificationPayload.verification_url, proofEmail.verification_url);
+  const [[proofSent]] = await pool.query('SELECT statut FROM email_outbox WHERE id = ?', [proofOutbox.id]);
+  assert.equal(proofSent.statut, 'sent');
+
+  const wrongAccountProof = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + outsiderToken)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(wrongAccountProof.status, 403);
+
+  // Simule une remise initiale déjà réclamée puis interrompue. Après acceptation vérifiée,
+  // le worker doit reprendre le bail, constater l'invitation acceptée et annuler l'ancien email.
   await pool.query(
     `UPDATE email_outbox
      SET statut = 'processing',
@@ -478,16 +549,30 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   );
 
   const accepted = await request(app)
-    .post('/api/pro/company-group/invitations/accept')
+    .post('/api/pro/company-group/invitations/accept/verify')
     .set('Authorization', 'Bearer ' + subsidiaryToken)
-    .send({ token });
+    .send({ token, verification_token: verificationToken });
   assert.equal(accepted.status, 200, accepted.text);
   assert.equal(accepted.body.groupe_id, created.body.id);
+  assert.match(accepted.body.message, /Adresse email confirmée/i);
+
+  const replay = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(replay.status, 404, 'une preuve consommée ne doit jamais être réutilisable');
+
+  const [[proofUsed]] = await pool.query(
+    'SELECT used_at FROM pro_company_group_invitation_verifications WHERE id = ?',
+    [proofRow.id]
+  );
+  assert.ok(proofUsed.used_at, 'la preuve doit être consommée au moment du rattachement');
+
   const [[outboxAfterAcceptance]] = await pool.query(
     'SELECT statut FROM email_outbox WHERE id = ?',
     [queuedEmail.id]
   );
-  assert.equal(outboxAfterAcceptance.statut, 'processing', 'l’API ne doit pas annuler une remise SMTP déjà réclamée');
+  assert.equal(outboxAfterAcceptance.statut, 'processing', 'l’API ne doit pas falsifier une remise SMTP déjà réclamée');
 
   let acceptedInvitationEmailSent = false;
   const acceptedInvitationDelivery = await dispatchPendingEmails({
@@ -500,7 +585,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.deepEqual(acceptedInvitationDelivery, {
     claimed: 1, sent: 0, retried: 0, failed: 0, cancelled: 1
   });
-  assert.equal(acceptedInvitationEmailSent, false, 'le worker ne doit pas transmettre un lien déjà accepté');
+  assert.equal(acceptedInvitationEmailSent, false, 'le worker ne doit pas transmettre un lien d’invitation déjà accepté');
   const [[acceptedOutbox]] = await pool.query(
     'SELECT statut, dernier_code_erreur FROM email_outbox WHERE id = ?',
     [queuedEmail.id]
