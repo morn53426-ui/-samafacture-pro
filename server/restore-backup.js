@@ -8,6 +8,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const zlib = require('zlib');
 const { pipeline } = require('stream/promises');
+const { Writable } = require('stream');
 
 const MAGIC = Buffer.from('SFBK1');
 
@@ -61,7 +62,13 @@ async function verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseNa
     return;
   }
 
-  const query = 'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()';
+  const query = [
+    'SELECT',
+    '(SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()) +',
+    '(SELECT COUNT(*) FROM information_schema.routines WHERE routine_schema = DATABASE()) +',
+    '(SELECT COUNT(*) FROM information_schema.events WHERE event_schema = DATABASE()) +',
+    '(SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema = DATABASE())'
+  ].join(' ');
   const args = [
     ...connectionArgs,
     `--database=${databaseName}`,
@@ -101,9 +108,24 @@ async function verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseNa
   }
   if (count > 0) {
     throw new Error(
-      `La base cible "${databaseName}" contient déjà ${count} table(s) ou vue(s). Restauration interrompue pour éviter d’écraser des données. Utilisez une base vide ou définissez explicitement RESTORE_ALLOW_NON_EMPTY=true après avoir vérifié la cible.`
+      `La base cible "${databaseName}" contient déjà ${count} objet(s) SQL (tables, vues, routines, événements ou déclencheurs). Restauration interrompue pour éviter d’écraser des données. Utilisez une base vide ou définissez explicitement RESTORE_ALLOW_NON_EMPTY=true après avoir vérifié la cible.`
     );
   }
+}
+
+async function verifierArchiveGzipValide(gzipPath) {
+  // Lire et décompresser toute l'archive avant l'import. Une erreur de CRC/flux
+  // ne doit pas arriver après que MySQL ait déjà exécuté une partie du dump.
+  const sink = new Writable({
+    write(_chunk, _encoding, callback) {
+      callback();
+    }
+  });
+  await pipeline(
+    fs.createReadStream(gzipPath),
+    zlib.createGunzip(),
+    sink
+  );
 }
 
 async function restaurer(sourcePath) {
@@ -125,6 +147,7 @@ async function restaurer(sourcePath) {
 
   const prepared = await preparerFluxGzip(absolutePath);
   try {
+    await verifierArchiveGzipValide(prepared.gzipPath);
     const args = [...connectionArgs, `--database=${databaseName}`];
     const mysql = spawn(mysqlBin, args, {
       env: { ...process.env, MYSQL_PWD: process.env.DB_PASSWORD || '' },
