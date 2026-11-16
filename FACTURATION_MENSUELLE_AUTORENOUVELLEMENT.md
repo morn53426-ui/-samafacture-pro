@@ -36,6 +36,27 @@ Sources :
 
 **Conclusion opérationnelle :** demander à PayDunya si Collect fournit, pour un abonnement SaaS, un mandat réutilisable ou un mécanisme de débit périodique autorisé, ou s'il automatise uniquement l'envoi d'une nouvelle demande que le client doit payer. Demander également les conditions d'annulation, de révocation, de retry, de notification, de remboursement et de disponibilité pays par pays.
 
+### Flutterwave — candidat à valider pour les cartes
+
+La documentation officielle Flutterwave décrit des plans de paiement mensuels qui déclenchent les débits suivants après la première transaction. Le prestataire gère les cycles suivants, envoie des rappels, effectue trois nouvelles tentatives après un échec (à 30 minutes d'intervalle), puis annule l'abonnement après trois échecs consécutifs. Des webhooks sont prévus pour les débits réussis/échoués et l'annulation.
+
+**Limite importante :** l'intégration d'un plan de paiement récurrent est réservée aux cartes. Elle ne permet pas de présenter Wave, Orange Money ou Free Money comme des moyens de prélèvement mensuel automatique. Ces moyens peuvent rester des options de paiement ponctuel si une politique distincte le prévoit.
+
+Flutterwave indique être licencié pour accompagner les entreprises sénégalaises et présente l'acceptation des cartes Visa/Mastercard et du mobile money local. Cela ne garantit toutefois pas à lui seul l'activation d'un compte marchand précis, ni la disponibilité d'un plan récurrent en XOF pour ce compte.
+
+**Conclusion opérationnelle :** Flutterwave devient le premier candidat à tester pour les abonnements mensuels par carte, sous réserve de :
+- validation écrite de l'accès aux Payment Plans pour le compte marchand SamaFacture Pro domicilié au Sénégal ;
+- confirmation de l'acceptation des plans et débits récurrents en XOF ;
+- validation sandbox de la souscription initiale, des renouvellements, des webhooks, de l'annulation et des échecs ;
+- confirmation des modalités de règlement marchand, frais, chargebacks et gestion des cartes expirées.
+
+Aucun bouton ni prélèvement Flutterwave ne doit être activé avant cette validation. Aucun client ne doit être basculé d'un paiement Wave/Orange Money ponctuel vers une facturation par carte sans consentement explicite.
+
+Sources officielles :
+- https://developer.flutterwave.com/docs/recurring-payments/payment-plans
+- https://developer.flutterwave.com/docs/payment-methods
+- https://flutterwave.com/eu/blog/bonjour-senegal-flutterwave-is-now-licensed-to-power-payments-for-senegalese-businesses
+
 ## Distinction à préserver
 
 Trois mécanismes ne doivent pas être confondus :
