@@ -86,7 +86,13 @@ async function runMysqldump(outputPath, encryptionKey = null) {
 
 /** Supprime les sauvegardes locales expirées ; le nettoyage ne doit pas invalider un dump valide. */
 async function nettoyerAnciennesSauvegardes() {
-  const retentionJours = Number(process.env.BACKUP_RETENTION_DAYS) || 14;
+  const valeurRetention = Number(process.env.BACKUP_RETENTION_DAYS ?? 14);
+  // Une valeur nulle ou négative ferait passer la limite dans le futur et supprimerait
+  // immédiatement toutes les archives existantes. Toute valeur non positive/invalide
+  // revient donc à la rétention sûre par défaut de 14 jours.
+  const retentionJours = Number.isSafeInteger(valeurRetention) && valeurRetention > 0
+    ? valeurRetention
+    : 14;
   const limite = Date.now() - retentionJours * 24 * 60 * 60 * 1000;
   const fichiers = await fs.promises.readdir(BACKUP_DIR).catch(() => []);
   for (const fichier of fichiers) {
