@@ -22,7 +22,7 @@ async function reserveMonthlyInvoiceQuota(conn, userId, { now = new Date() } = {
   const paidPlan = isPaidPlan(users[0].plan);
   const currentLocalDate = localDateString(users[0].fuseau_horaire || 'Africa/Dakar', now);
   const periodStart = currentLocalDate.slice(0, 7) + '-01';
-  if (!/^\\d{4}-\\d{2}-01$/.test(periodStart)) {
+  if (!/^\d{4}-\d{2}-01$/.test(periodStart)) {
     throw new Error('Impossible de déterminer la période locale du quota de facturation.');
   }
 
