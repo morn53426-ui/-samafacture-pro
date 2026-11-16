@@ -122,7 +122,7 @@
   let produits = [];
   let ligneCount = 0;
 
-  document.getElementById('date_emission').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('date_emission').value = dateCivileAujourdhui();
 
   async function init() {
     const [{ clients: c }, { produits: p }] = await Promise.all([Api.get('/clients'), Api.get('/produits')]);
