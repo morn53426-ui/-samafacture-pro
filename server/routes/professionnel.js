@@ -1029,11 +1029,17 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
     }
     const token = String(req.body.token || '');
     if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(400).json({ error: 'Jeton d’invitation invalide.' });
-    if (!req.user.email) return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
-
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    const [[currentAccount]] = await conn.query(
+      'SELECT email FROM users WHERE id = ? LIMIT 1 FOR UPDATE',
+      [actor(req)]
+    );
+    if (!currentAccount?.email) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
+    }
     const [invites] = await conn.query(
       "SELECT i.id, i.group_id, i.invited_email, i.statut, i.expire_at, g.owner_user_id, g.nom AS group_name, u.plan AS owner_plan\n" +
       "FROM pro_company_group_invitations i JOIN pro_company_groups g ON g.id = i.group_id JOIN users u ON u.id = g.owner_user_id\n" +
@@ -1045,7 +1051,7 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Invitation expirée, révoquée ou déjà utilisée.' });
     }
-    if (String(invite.invited_email).toLowerCase() !== String(req.user.email).toLowerCase()) {
+    if (String(invite.invited_email).toLowerCase() !== String(currentAccount.email).toLowerCase()) {
       await conn.rollback();
       return res.status(403).json({ error: 'Connectez-vous avec l’adresse email qui a reçu cette invitation.' });
     }
@@ -1159,12 +1165,18 @@ router.post('/company-group/invitations/accept/verify', async (req, res, next) =
     if (!/^[a-f0-9]{64}$/i.test(token) || !/^[a-f0-9]{64}$/i.test(verificationToken)) {
       return res.status(400).json({ error: 'Lien de vérification invalide.' });
     }
-    if (!req.user.email) return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
-
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const verificationHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    const [[currentAccount]] = await conn.query(
+      'SELECT email FROM users WHERE id = ? LIMIT 1 FOR UPDATE',
+      [actor(req)]
+    );
+    if (!currentAccount?.email) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
+    }
     const [invites] = await conn.query(
       "SELECT i.id, i.group_id, i.invited_email, i.statut, i.expire_at, g.owner_user_id, g.nom AS group_name, u.plan AS owner_plan\n" +
       "FROM pro_company_group_invitations i JOIN pro_company_groups g ON g.id = i.group_id JOIN users u ON u.id = g.owner_user_id\n" +
@@ -1176,7 +1188,7 @@ router.post('/company-group/invitations/accept/verify', async (req, res, next) =
       await conn.rollback();
       return res.status(404).json({ error: 'Invitation expirée, révoquée ou déjà utilisée.' });
     }
-    if (String(invite.invited_email).toLowerCase() !== String(req.user.email).toLowerCase()) {
+    if (String(invite.invited_email).toLowerCase() !== String(currentAccount.email).toLowerCase()) {
       await conn.rollback();
       return res.status(403).json({ error: 'Connectez-vous avec le compte associé à l’adresse email invitée.' });
     }
