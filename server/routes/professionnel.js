@@ -923,6 +923,14 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
       [actor(req), invite.id]
     );
     await conn.query(
+      `UPDATE email_outbox
+       SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL,
+           dernier_code_erreur = 'invitation_accepted', updated_at = NOW()
+       WHERE entity_type = 'company_group_invitation' AND entity_id = ?
+         AND statut IN ('queued', 'retry', 'processing')`,
+      [invite.id]
+    );
+    await conn.query(
       'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [invite.owner_user_id, actor(req), 'groupe.societe.invitation_acceptee', 'societe', String(actor(req)), JSON.stringify({ group_id: invite.group_id, group_name: invite.group_name }), req.ip || null]
     );
@@ -998,6 +1006,7 @@ router.delete('/company-group/leave', async (req, res, next) => {
 });
 
 router.delete('/company-group/invitations/:invitationId', async (req, res, next) => {
+  let conn;
   try {
     if (!await assertEnterpriseGroupOwner(req, res)) return;
     if (!idOk(req.params.invitationId)) return res.status(400).json({ error: 'Identifiant d’invitation invalide.' });
@@ -1006,13 +1015,33 @@ router.delete('/company-group/invitations/:invitationId', async (req, res, next)
       [actor(req)]
     );
     if (!group) return res.status(404).json({ error: 'Groupe de sociétés introuvable.' });
-    const [result] = await pool.query(
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [result] = await conn.query(
       "UPDATE pro_company_group_invitations SET statut = 'revoquee' WHERE id = ? AND group_id = ? AND statut = 'envoyee'",
       [req.params.invitationId, group.id]
     );
-    if (!result.affectedRows) return res.status(404).json({ error: 'Invitation active introuvable.' });
+    if (!result.affectedRows) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Invitation active introuvable.' });
+    }
+    await conn.query(
+      `UPDATE email_outbox
+       SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL,
+           dernier_code_erreur = 'invitation_revoked', updated_at = NOW()
+       WHERE entity_type = 'company_group_invitation' AND entity_id = ?
+         AND statut IN ('queued', 'retry', 'processing')`,
+      [req.params.invitationId]
+    );
+    await conn.commit();
     res.json({ success: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.get('/company-group/dashboard', async (req, res, next) => {
