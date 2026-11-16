@@ -2,6 +2,7 @@ const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+const { genererFactureDepuisModele } = require('../routes/factures-recurrentes');
 
 // Vérifie que la génération automatique d'une facture récurrente calcule exactement les
 // mêmes totaux qu'une facture créée manuellement avec les mêmes lignes et la même remise —
@@ -84,6 +85,35 @@ describe('Factures récurrentes : cohérence des calculs avec la création manue
     assert.ok(updated);
     assert.equal(String(updated.prochaine_date).slice(0, 10), futureDate,
       'la génération manuelle ne doit pas avancer une échéance encore future');
+  });
+
+  test("le planificateur ignore un modèle qui n'est plus dû après l'obtention du verrou", async () => {
+    const futureDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const modele = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Contrôle de l’échéance sous verrou',
+        frequence: 'mensuelle',
+        prochaine_date: futureDate,
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(modele.status, 201);
+
+    const facture = await genererFactureDepuisModele(
+      modele.body.recurrente.id,
+      userId,
+      { onlyIfDue: true }
+    );
+    assert.equal(facture, null, 'le scheduler ne doit pas traiter un modèle encore futur');
+
+    const liste = await request(app)
+      .get('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`);
+    const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
+    assert.equal(Number(updated.factures_generees), 0);
+    assert.equal(String(updated.prochaine_date).slice(0, 10), futureDate);
   });
 
   test('générer une facture récurrente inexistante renvoie 404', async () => {
