@@ -71,6 +71,7 @@ function emailStatusLabel(item){
   if(status==='processing')return 'Envoi email en cours';
   if(status==='retry')return 'Envoi temporairement bloqué — nouvelle tentative programmée';
   if(status==='failed')return 'Échec après plusieurs tentatives ('+Number(item.tentatives_email||0)+')';
+  if(status==='cancelled')return 'Envoi annulé : invitation acceptée, révoquée ou expirée';
   if(status==='queued')return 'Email placé dans la file d’envoi';
   return 'État de l’email indisponible';
 }
