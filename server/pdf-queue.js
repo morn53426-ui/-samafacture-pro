@@ -28,7 +28,7 @@ const ENQUEUE_PDF_JOB_SCRIPT = [
   "local entry = redis.pcall('XADD', KEYS[2], '*', 'job', ARGV[5])",
   "if type(entry) == 'table' and entry.err then redis.call('DEL', KEYS[1]); return redis.error_reply(entry.err) end",
   'return entry'
-].join('\\n');
+].join('\n');
 
 async function ensurePdfConsumerGroup(redis = getRedisClient()) {
   if (!redis) throw new Error('Redis indisponible pour initialiser la file PDF.');
