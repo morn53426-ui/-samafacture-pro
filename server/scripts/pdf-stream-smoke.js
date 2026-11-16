@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { createClient } = require('redis');
+const { ENQUEUE_PDF_JOB_SCRIPT } = require('../pdf-queue');
 
 const url = process.env.REDIS_URL;
 if (!url) throw new Error('REDIS_URL est obligatoire pour le smoke test Redis Streams.');
@@ -21,15 +22,20 @@ async function main() {
   try {
     await client.xGroupCreate(stream, group, '0-0', { MKSTREAM: true });
 
-    const transaction = client.multi();
-    transaction.hSet(metadata, { status: 'queued', userId: 'ci-user' });
-    transaction.xAdd(stream, '*', { job: JSON.stringify({ id: suffix }) });
-    const transactionResult = await transaction.exec();
-    assert.equal(transactionResult.length, 2, 'MULTI/EXEC doit exécuter les deux écritures');
+    const createdAt = new Date().toISOString();
+    const rawJob = JSON.stringify({ id: suffix, factureId: 42, user: { id: 'ci-user' } });
+    const entryId = await client.eval(ENQUEUE_PDF_JOB_SCRIPT, {
+      keys: [metadata, stream],
+      arguments: [suffix, 'ci-user', '42', createdAt, rawJob]
+    });
+    assert.ok(entryId, 'le script Lua doit publier une entrée');
+    const hash = await client.hGetAll(metadata);
+    assert.equal(hash.userId, 'ci-user', 'le hash doit conserver le propriétaire');
 
     const fresh = await client.xReadGroup(group, 'consumer-a', [{ key: stream, id: '>' }], { COUNT: 1 });
     assert.ok(fresh && fresh.length === 1 && fresh[0].messages.length === 1, 'XREADGROUP doit livrer une nouvelle tâche');
     const first = fresh[0].messages[0];
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     const reclaimed = await client.xAutoClaim(stream, group, 'consumer-b', 0, '0-0', { COUNT: 1 });
     assert.ok(reclaimed.messages.length === 1, 'XAUTOCLAIM doit réclamer la tâche pending');
@@ -54,7 +60,7 @@ async function main() {
     assert.equal(migrated.length, 1);
     assert.equal(migrated[0].message.job, legacyJob);
 
-    console.log('Redis Streams smoke test réussi : group, MULTI/EXEC, XREADGROUP, XAUTOCLAIM, XACK/XDEL et migration Lua.');
+    console.log('Redis Streams smoke test réussi : group, Lua enqueue, XREADGROUP, XAUTOCLAIM, XACK/XDEL et migration Lua.');
   } finally {
     await client.del([stream, legacy, metadata]);
     await client.quit();
