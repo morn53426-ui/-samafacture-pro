@@ -847,6 +847,24 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'Les champs doivent conserver une largeur utilisable dans la fiche mobile : ' + JSON.stringify(layout));
     assert.equal(layout.quantityLabel, 'Quantité',
       'Le champ quantité doit garder son libellé sur mobile : ' + JSON.stringify(layout));
+    const accessibleLineFields = await page.$eval('.invoice-lines-table tbody tr', row => {
+      const fields = [
+        ['.ligne-designation', 'Désignation'],
+        ['.ligne-qte', 'Quantité'],
+        ['.ligne-pu', 'Prix unitaire en FCFA'],
+        ['.ligne-tva', 'TVA en pourcentage']
+      ];
+      return fields.map(([selector, expected]) => {
+        const input = row.querySelector(selector);
+        return {
+          id: input?.id || '',
+          label: input?.labels ? Array.from(input.labels).map(label => label.textContent.trim()).join(' ') : '',
+          expected
+        };
+      });
+    });
+    assert.ok(accessibleLineFields.every(field => field.id && field.label === field.expected),
+      'Chaque champ d’article doit posséder un label HTML associé : ' + JSON.stringify(accessibleLineFields));
     assert.ok(layout.tableWidth <= layout.wrapperWidth + 1 &&
       layout.scrollWidth <= layout.clientWidth + 1,
       'La fiche article doit tenir sur la largeur du téléphone, sans défilement latéral : ' +
@@ -907,11 +925,32 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
 
   if (pageDefinition.name === 'parametres' && [320, 1440].includes(viewport.width)) {
     await page.waitForSelector('[data-open-template-preview="nova"]', { timeout: 15000 });
+    const dialogSemantics = await page.$eval('#invoice-template-preview-modal', modal => ({
+      role: modal.getAttribute('role'),
+      modal: modal.getAttribute('aria-modal'),
+      labelledBy: modal.getAttribute('aria-labelledby'),
+      describedBy: modal.getAttribute('aria-describedby'),
+      heading: document.getElementById(modal.getAttribute('aria-labelledby'))?.textContent.trim(),
+      description: document.getElementById(modal.getAttribute('aria-describedby'))?.textContent.trim()
+    }));
+    assert.deepEqual(dialogSemantics, {
+      role: 'dialog',
+      modal: 'true',
+      labelledBy: 'invoice-template-preview-name',
+      describedBy: 'invoice-template-preview-description',
+      heading: 'Modèle de facture',
+      description: 'Exemple avec les informations de votre entreprise.'
+    }, 'La fenêtre d’aperçu doit exposer un nom et une description aux technologies d’assistance.');
+
     await page.click('[data-open-template-preview="nova"]');
     await page.waitForFunction(() => {
       const modal = document.getElementById('invoice-template-preview-modal');
       return modal && getComputedStyle(modal).display !== 'none';
     }, { timeout: 5000 });
+    const initialDialogFocus = await page.evaluate(() => document.activeElement?.id || '');
+    assert.equal(initialDialogFocus, 'invoice-template-preview-close',
+      'À l’ouverture, le focus clavier doit entrer dans la fenêtre d’aperçu.');
+
     const fittedPreview = await page.evaluate(() => {
       const modal = document.getElementById('invoice-template-preview-modal');
       const stage = document.getElementById('invoice-template-preview-stage');
@@ -966,6 +1005,34 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     }));
     assert.deepEqual(selection, { value: 'nova', selected: true },
       'Le bouton Utiliser ce modèle doit actualiser la sélection enregistrable.');
+
+    const focusAfterSelection = await page.evaluate(() =>
+      document.activeElement?.getAttribute('data-open-template-preview') || ''
+    );
+    assert.equal(focusAfterSelection, 'nova',
+      'La fermeture de l’aperçu doit rendre le focus au modèle qui l’a ouvert.');
+
+    await page.click('[data-open-template-preview="nova"]');
+    await page.waitForFunction(() =>
+      getComputedStyle(document.getElementById('invoice-template-preview-modal')).display !== 'none'
+    );
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await page.evaluate(() => document.activeElement?.id || ''),
+      'invoice-template-preview-use',
+      'Maj+Tab depuis le premier contrôle doit rester dans la fenêtre et aller au dernier contrôle.');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement?.id || ''),
+      'invoice-template-preview-close',
+      'Tab depuis le dernier contrôle doit revenir au premier contrôle.');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() =>
+      getComputedStyle(document.getElementById('invoice-template-preview-modal')).display === 'none'
+    );
+    const focusAfterEscape = await page.evaluate(() =>
+      document.activeElement?.getAttribute('data-open-template-preview') || ''
+    );
+    assert.equal(focusAfterEscape, 'nova',
+      'La touche Échap doit fermer l’aperçu et rendre le focus à son déclencheur.');
   }
 
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
