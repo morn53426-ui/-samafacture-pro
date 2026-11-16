@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { createClient } = require('redis');
-const { ENQUEUE_PDF_JOB_SCRIPT } = require('../pdf-queue');
+const { ENQUEUE_PDF_JOB_SCRIPT, MIGRATE_LEGACY_JOB_SCRIPT } = require('../pdf-queue');
 
 const url = process.env.REDIS_URL;
 if (!url) throw new Error('REDIS_URL est obligatoire pour le smoke test Redis Streams.');
@@ -32,6 +32,18 @@ async function main() {
     const hash = await client.hGetAll(metadata);
     assert.equal(hash.userId, 'ci-user', 'le hash doit conserver le propriétaire');
 
+    const badStream = 'samafacture:pdf:wrong-type:' + suffix;
+    const failedMetadata = metadata + ':failed';
+    await client.rPush(badStream, 'this key is intentionally a list');
+    await assert.rejects(
+      client.eval(ENQUEUE_PDF_JOB_SCRIPT, {
+        keys: [failedMetadata, badStream],
+        arguments: [suffix + '-failed', 'ci-user', '42', createdAt, rawJob]
+      }),
+      /WRONGTYPE/
+    );
+    assert.equal(await client.exists(failedMetadata), 0, 'un XADD refusé doit supprimer le hash créé par le script');
+
     const fresh = await client.xReadGroup(group, 'consumer-a', [{ key: stream, id: '>' }], { COUNT: 1 });
     assert.ok(fresh && fresh.length === 1 && fresh[0].messages.length === 1, 'XREADGROUP doit livrer une nouvelle tâche');
     const first = fresh[0].messages[0];
@@ -51,7 +63,7 @@ async function main() {
     const legacyJob = JSON.stringify({ id: 'legacy-' + suffix });
     await client.rPush(legacy, legacyJob);
     const migratedId = await client.eval(
-      "local raw = redis.call('LPOP', KEYS[1]); if not raw then return nil end; return redis.call('XADD', KEYS[2], '*', 'job', raw)",
+      MIGRATE_LEGACY_JOB_SCRIPT,
       { keys: [legacy, stream], arguments: [] }
     );
     assert.ok(migratedId, 'le script de migration doit créer une entrée stream');
@@ -62,7 +74,7 @@ async function main() {
 
     console.log('Redis Streams smoke test réussi : group, Lua enqueue, XREADGROUP, XAUTOCLAIM, XACK/XDEL et migration Lua.');
   } finally {
-    await client.del([stream, legacy, metadata]);
+    await client.del([stream, legacy, metadata, badStream, failedMetadata]);
     await client.quit();
   }
 }
