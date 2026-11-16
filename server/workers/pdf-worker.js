@@ -23,6 +23,13 @@ let stopping = false;
 let cleaning = false;
 const consumerName = os.hostname() + '-' + process.pid + '-' + crypto.randomUUID();
 
+async function nettoyerFichiersPdfExpires() {
+  const result = await cleanupExpiredPdfFiles();
+  if (result.removed) {
+    console.log(result.removed + ' ancien(s) fichier(s) PDF temporaire(s) supprimé(s).');
+  }
+}
+
 async function processJob(entry, redis) {
   return processPdfQueueEntry({
     entry,
@@ -71,6 +78,13 @@ async function main() {
   }
 
   await fs.mkdir(JOB_DIR, { recursive: true });
+  await nettoyerFichiersPdfExpires();
+  const pdfCleanupTimer = setInterval(() => {
+    void nettoyerFichiersPdfExpires().catch(err => {
+      console.warn('Nettoyage périodique des PDF différé :', err.message);
+    });
+  }, 15 * 60 * 1000);
+  pdfCleanupTimer.unref();
   console.log('Worker PDF prêt — stream=' + STREAM_KEY + ', consumer=' + consumerName);
 
   while (!stopping) {
