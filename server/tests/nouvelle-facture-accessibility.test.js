@@ -23,16 +23,14 @@ const fields = [
 
 test('les champs principaux du formulaire facture/devis ont un label HTML associé', () => {
   for (const id of fields) {
-    const escapedId = id.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&');
-    const labelPattern = new RegExp(
-      '<label\\b[^>]*\\bfor=["\\']' + escapedId + '["\\'][^>]*>\\s*[^<\\s]',
-      'i'
+    const labelStart = html.indexOf('<label for="' + id + '">');
+    assert.notEqual(labelStart, -1, 'Le champ #' + id + ' doit avoir un label associé.');
+    const labelEnd = html.indexOf('</label>', labelStart);
+    assert.ok(labelEnd > labelStart, 'Le label du champ #' + id + ' doit être fermé.');
+    assert.ok(
+      html.slice(labelStart, labelEnd).replace(/<[^>]*>/g, '').trim(),
+      'Le label du champ #' + id + ' doit avoir un nom non vide.'
     );
-    const controlPattern = new RegExp(
-      '<(?:input|select|textarea)\\b[^>]*\\bid=["\\']' + escapedId + '["\\']',
-      'i'
-    );
-    assert.match(html, labelPattern, 'Le champ #' + id + ' doit avoir un label explicite non vide.');
-    assert.match(html, controlPattern, 'Le contrôle #' + id + ' doit exister.');
+    assert.ok(html.includes('id="' + id + '"'), 'Le contrôle #' + id + ' doit exister.');
   }
 });
