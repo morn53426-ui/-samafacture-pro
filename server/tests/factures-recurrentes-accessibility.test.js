@@ -22,9 +22,13 @@ const labelledFields = [
 
 test('les champs du formulaire récurrent ont des libellés explicitement associés', () => {
   for (const id of labelledFields) {
-    const labelPattern = new RegExp('<label\\s+for="' + id + '"[^>]*>\\s*[^<]+</label>', 'i');
+    const labelStart = html.indexOf('<label for="' + id + '"');
+    assert.notEqual(labelStart, -1, 'Le champ #' + id + ' doit avoir un label associé.');
+    const labelEnd = html.indexOf('</label>', labelStart);
+    assert.ok(labelEnd > labelStart, 'Le label du champ #' + id + ' doit être fermé.');
+    const labelText = html.slice(labelStart, labelEnd).replace(/<[^>]*>/g, '').trim();
+    assert.ok(labelText, 'Le label du champ #' + id + ' doit avoir un nom non vide.');
     const controlPattern = new RegExp('<(?:input|select|textarea)\\b[^>]*\\bid="' + id + '"', 'i');
-    assert.match(html, labelPattern, 'Le champ #' + id + ' doit avoir un label explicite non vide.');
     assert.match(html, controlPattern, 'Le contrôle #' + id + ' doit exister.');
   }
 });
