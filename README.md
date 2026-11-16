@@ -206,7 +206,7 @@ Restaurez dans une base cible vide, après avoir remis la même `BACKUP_ENCRYPTI
 cd server
 npm run restore -- ./backups/nom-de-sauvegarde.sql.gz.enc
 ```
-La commande vérifie le tag d'authentification AES-GCM avant d'envoyer le SQL à MySQL. Elle contrôle également que la base cible ne contient aucune table ni vue ; si elle n'est pas vide, la restauration est bloquée pour éviter d'écraser des données par accident. Une ancienne sauvegarde non chiffrée `.sql.gz` peut également être restaurée.
+La commande vérifie le tag d'authentification AES-GCM, puis décompresse et valide toute l'archive gzip avant d'envoyer la moindre instruction SQL à MySQL. Elle contrôle également que la base cible ne contient aucun objet SQL (tables, vues, procédures, fonctions, événements ou déclencheurs) ; si elle n'est pas vide, la restauration est bloquée pour éviter d'écraser des données par accident. Une ancienne sauvegarde non chiffrée `.sql.gz` peut également être restaurée, et son intégrité gzip est vérifiée avant import.
 
 Pour remplacer volontairement une base déjà utilisée, activez explicitement le mode dangereux après avoir vérifié le nom de la base et conservé une sauvegarde séparée :
 ```bash
