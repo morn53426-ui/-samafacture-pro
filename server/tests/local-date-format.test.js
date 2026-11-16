@@ -30,11 +30,11 @@ function loadFormatDate(user) {
     fetch: async () => { throw new Error('Unexpected network access in formatter test'); }
   };
   vm.runInNewContext(source, context, { filename: 'public/js/api.js' });
-  return context.formatDate;
+  return context;
 }
 
 test('une date SQL DATE reste le même jour pour les fuseaux proches de la limite UTC', () => {
-  const formatDate = loadFormatDate({
+  const { formatDate } = loadFormatDate({
     locale: 'fr-FR',
     fuseau_horaire: 'Pacific/Kiritimati',
     format_date: 'dd/MM/yyyy'
@@ -44,21 +44,21 @@ test('une date SQL DATE reste le même jour pour les fuseaux proches de la limit
 
 test('les trois formats de date n’ajoutent ni ne retirent un jour', () => {
   assert.equal(
-    loadFormatDate({ format_date: 'dd/MM/yyyy' })('2026-11-16'),
+    loadFormatDate({ format_date: 'dd/MM/yyyy' }).formatDate('2026-11-16'),
     '16/11/2026'
   );
   assert.equal(
-    loadFormatDate({ format_date: 'yyyy-MM-dd' })('2026-11-16'),
+    loadFormatDate({ format_date: 'yyyy-MM-dd' }).formatDate('2026-11-16'),
     '2026-11-16'
   );
   assert.equal(
-    loadFormatDate({ format_date: 'MM/dd/yyyy' })('2026-11-16'),
+    loadFormatDate({ format_date: 'MM/dd/yyyy' }).formatDate('2026-11-16'),
     '11/16/2026'
   );
 });
 
 test('un MySQL DATETIME UTC reste converti vers le fuseau du compte', () => {
-  const formatDate = loadFormatDate({
+  const { formatDate } = loadFormatDate({
     locale: 'fr-FR',
     fuseau_horaire: 'Europe/Paris',
     format_date: 'dd/MM/yyyy'
@@ -66,9 +66,17 @@ test('un MySQL DATETIME UTC reste converti vers le fuseau du compte', () => {
   assert.equal(formatDate('2026-11-16 23:30:00'), '17/11/2026');
 });
 
+test('la date par défaut des formulaires suit le fuseau de l’entreprise', () => {
+  const { dateCivileAujourdhui } = loadFormatDate({ fuseau_horaire: 'Africa/Dakar' });
+  const instant = new Date('2026-11-16T23:30:00.000Z');
+  assert.equal(dateCivileAujourdhui(undefined, instant), '2026-11-16');
+  assert.equal(dateCivileAujourdhui('Europe/Paris', instant), '2026-11-17');
+  assert.equal(dateCivileAujourdhui('Pacific/Kiritimati', instant), '2026-11-17');
+});
+
 test('une date SQL DATE invalide reste affichée telle quelle', () => {
   assert.equal(
-    loadFormatDate({ format_date: 'dd/MM/yyyy' })('2026-02-31'),
+    loadFormatDate({ format_date: 'dd/MM/yyyy' }).formatDate('2026-02-31'),
     '2026-02-31'
   );
 });
