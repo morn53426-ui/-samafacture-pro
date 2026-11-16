@@ -213,13 +213,13 @@
     } else {
       const providers = [];
       if (moyens.wave) {
-        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\\'' + plan.id + '\\', \\'wave\\', \\'wave\\')">' + Icon('smartphone') + ' Payer avec Wave</button>');
+        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'wave\', \'wave\')">' + Icon('smartphone') + ' Payer avec Wave</button>');
       } else if (moyens.paydunya) {
-        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\\'' + plan.id + '\\', \\'paydunya\\', \\'wave\\')">' + Icon('smartphone') + ' Payer avec Wave</button>');
+        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', \'wave\')">' + Icon('smartphone') + ' Payer avec Wave</button>');
       }
       if (moyens.paydunya) {
-        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\\'' + plan.id + '\\', \\'paydunya\\', \\'orange_money\\')">' + Icon('smartphone') + ' Payer avec Orange Money</button>');
-        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\\'' + plan.id + '\\', \\'paydunya\\', \\'carte_bancaire\\')">' + Icon('credit-card') + ' Payer par carte bancaire</button>');
+        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', \'orange_money\')">' + Icon('smartphone') + ' Payer avec Orange Money</button>');
+        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', \'carte_bancaire\')">' + Icon('credit-card') + ' Payer par carte bancaire</button>');
       }
       actions = providers.length
         ? '<div class="plan-payment-actions">' + providers.join('') + '</div>'
