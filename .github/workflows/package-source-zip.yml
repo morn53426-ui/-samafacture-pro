@@ -2,7 +2,7 @@ name: Package complete source ZIP
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/enterprise-multi-company-foundation-20261116]
     types: [opened, synchronize, reopened]
 
 permissions:

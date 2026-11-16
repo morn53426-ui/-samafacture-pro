@@ -2,7 +2,7 @@ name: Tests automatisés
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/enterprise-multi-company-foundation-20261116]
   push:
     branches: [main]
 
