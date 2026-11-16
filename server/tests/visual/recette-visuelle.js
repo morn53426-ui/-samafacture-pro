@@ -1241,7 +1241,10 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
         'info');
     }
   });
-  await page.click('#workspace-notification-toggle');
+  await page.evaluate(() => {
+    closeWorkspaceNotifications();
+    toggleWorkspaceNotifications();
+  });
   assert.equal(await page.$eval('#workspace-notification-panel', element => !element.hidden), true,
     'Le panneau doit être ouvert avant de vérifier ses limites.');
   const shortViewportPanel = await page.$eval('#workspace-notification-panel', element => {
