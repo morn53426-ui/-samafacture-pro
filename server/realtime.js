@@ -13,7 +13,7 @@ async function resolveSocketTenant(userId, requestedOwner, query = pool.query.bi
   const actorId = Number(userId);
   if (!Number.isSafeInteger(actorId) || actorId <= 0) throw new Error('Utilisateur Socket.IO invalide.');
   if (requestedOwner === undefined || requestedOwner === null || requestedOwner === '') return actorId;
-  if (!/^\\d+$/.test(String(requestedOwner))) throw new Error('Sélection d’entreprise invalide.');
+  if (!/^\d+$/.test(String(requestedOwner))) throw new Error('Sélection d’entreprise invalide.');
 
   const selectedOwner = Number(requestedOwner);
   if (!Number.isSafeInteger(selectedOwner) || selectedOwner <= 0) throw new Error('Sélection d’entreprise invalide.');
