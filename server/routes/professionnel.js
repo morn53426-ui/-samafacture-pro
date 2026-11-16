@@ -927,7 +927,7 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
        SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL,
            dernier_code_erreur = 'invitation_accepted', updated_at = NOW()
        WHERE entity_type = 'company_group_invitation' AND entity_id = ?
-         AND statut IN ('queued', 'retry', 'processing')`,
+         AND statut IN ('queued', 'retry')`,
       [invite.id]
     );
     await conn.query(
