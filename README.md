@@ -331,25 +331,6 @@ Le tarif codé est un montant par achat ponctuel : Starter 5 000 FCFA, Pro 15 00
 
 **⚠️ Important** : les API et les conditions des fournisseurs peuvent évoluer. Vérifiez leur documentation et les capacités réellement activées sur votre compte marchand avant une mise en production.
 
-Le passage à un plan payant (Starter, Pro, Entreprise) peut se faire réellement via :
-- **Wave for Business** — paiement direct
-- **PayDunya** — agrégateur qui gère en une seule intégration Orange Money **et** la carte bancaire (Visa/Mastercard)
-
-Les plans payants ne peuvent être activés que par un flux de paiement confirmé côté serveur. Tant qu'aucun prestataire n'est configuré dans `server/.env`, les boutons de paiement restent masqués ; le compte peut seulement revenir au plan Gratuit. Une requête API directe ne permet pas de s'attribuer Starter, Pro ou Entreprise.
-
-### Configurer Wave
-1. Créez un compte sur [business.wave.com](https://business.wave.com), section "Developers" (validation sous 48–72h, NINEA requis)
-2. Récupérez votre clé API et votre secret de signature de webhook
-3. Renseignez `WAVE_API_KEY` et `WAVE_SIGNING_SECRET` dans `.env`
-4. Configurez l'URL de webhook dans le tableau de bord Wave : `https://votredomaine.com/api/abonnement/webhook/wave`
-
-### Configurer PayDunya (Orange Money + carte)
-1. Créez un compte sur [paydunya.com](https://paydunya.com)
-2. Créez une "App" dans le tableau de bord pour obtenir vos 4 clés
-3. Renseignez `PAYDUNYA_MASTER_KEY`, `PAYDUNYA_PRIVATE_KEY`, `PAYDUNYA_PUBLIC_KEY`, `PAYDUNYA_TOKEN`
-4. Laissez `PAYDUNYA_MODE=test` tant que votre compte n'est pas validé en mode réel (aucun argent réel ne circule en mode test)
-
-**⚠️ Important** : les API Wave et PayDunya (endpoints, formats de réponse) peuvent évoluer. Le code suit leur documentation au moment de son écriture — vérifiez-la avant une mise en production réelle, en particulier les URLs d'API et le format des webhooks.
 
 
 ## Authentification : Google et mot de passe oublié
