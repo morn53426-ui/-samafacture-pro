@@ -29,6 +29,7 @@ Pour configurer et utiliser les modèles complets de factures et devis, consulte
   - Checklist de préparation conformité (à compléter et faire valider) : [CONFORMITE_DONNEES_CHECKLIST.md](CONFORMITE_DONNEES_CHECKLIST.md)
   - Interface responsive : menu latéral escamotable sur mobile/tablette, tableaux et grilles adaptatifs
   - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature électronique, factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle) — les échéances mensuelles/annuelles conservent le jour d'ancrage, et une génération manuelle anticipée ne décale pas la prochaine échéance planifiée.
+  - **Email automatique des factures récurrentes (opt-in)** : case à cocher par modèle, désactivée par défaut. Nécessite un SMTP opérationnel et l'adresse email du client ; si l'envoi échoue, la facture demeure créée mais l'email n'est pas remis en file ni retenté automatiquement à ce stade.
   - **Partage WhatsApp manuel** des factures et devis depuis les listes et le détail : message prérempli et lien sécurisé de consultation ; l'utilisateur vérifie puis confirme l'envoi dans WhatsApp
 
 ## Installation avec WAMPserver
