@@ -751,6 +751,34 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   );
   assert.equal(expiredProofOutboxState.statut, 'cancelled');
 
+  // Le worker ne doit pas envoyer une preuve à l'ancienne adresse après un changement de compte.
+  const freshChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + starterToken)
+    .send({ token: expiryInviteToken });
+  assert.equal(freshChallenge.status, 202, freshChallenge.text);
+  const [[freshProof]] = await pool.query(
+    'SELECT id FROM pro_company_group_invitation_verifications WHERE invitation_id = ?',
+    [expiryInvitation.body.id]
+  );
+  const [[freshProofOutbox]] = await pool.query(
+    "SELECT id FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [freshProof.id]
+  );
+  const changedStarterEmail = emailDeTest('group-starter-email-changed');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [changedStarterEmail, starterId]);
+  const changedAddressDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async () => ({ sent: true })
+  });
+  assert.deepEqual(changedAddressDelivery, { claimed: 1, sent: 0, retried: 0, failed: 0, cancelled: 1 });
+  const [[changedAddressOutbox]] = await pool.query(
+    'SELECT statut FROM email_outbox WHERE id = ?',
+    [freshProofOutbox.id]
+  );
+  assert.equal(changedAddressOutbox.statut, 'cancelled');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [starterRecipient.email, starterId]);
+
   const [[outsiderRecipient]] = await pool.query('SELECT email FROM users WHERE id = ?', [outsiderId]);
   const secondInvitation = await request(app)
     .post('/api/pro/company-group/invitations')
