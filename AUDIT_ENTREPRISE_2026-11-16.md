@@ -1,72 +1,80 @@
-# Audit technique — socle Entreprise et invitations multi-sociétés
+# Audit technique — socle Entreprise, invitations et abonnement mensuel
 
 Date : 16 novembre 2026  
-Branche examinée : `feat/enterprise-multi-company-foundation-20261116`  
-Branche de référence : `main` à `c298062b75a9f475c79db3febd55a8523e2743ae`
+Branche : `feat/enterprise-multi-company-foundation-20261116`  
+Dernier commit de code testé : `0e0b304faecbe2d623ffdd813cf62e40cf8bdea6`  
+Branche de référence synchronisée : `main` à `70750be430c83c4bf3ff369ad453c7b1fd1af511`
 
 ## Périmètre
 
-Revue ciblée de la migration multi-sociétés, du middleware de sélection de tenant, du cycle d'invitation, de l'acceptation et de la révocation, du tableau de bord Entreprise, des retours d'interface et du garde-fou de paiement des plans SaaS.
+Revue du socle multi-sociétés, des migrations SQL, de l'isolation tenant, des invitations/acceptations/révocations, du tableau de bord Entreprise, de la file email durable, des retours d'interface et des garde-fous de paiement. Cette revue technique ne constitue pas une validation juridique, fiscale ou de sécurité indépendante.
 
 ## Corrections apportées
 
-### Création concurrente des invitations
+### Groupe multi-sociétés et invitations concurrentes
 
-Le contrôle d'une invitation en attente et son insertion étaient séparés. Deux requêtes concurrentes pouvaient donc créer des invitations actives pour la même adresse.
+- Les sociétés restent des comptes/tenants distincts ; aucune facture, écriture, dépense ou fiche client historique n'est déplacée.
+- La création d'invitation utilise une transaction et verrouille la ligne du groupe avec `SELECT ... FOR UPDATE`. Deux créations concurrentes pour le même destinataire ne peuvent donc pas créer deux invitations actives ; la seconde requête reçoit HTTP 409.
+- L'acceptation vérifie l'adresse email du compte, l'état du plan Entreprise et le fait que la société n'appartient pas déjà à un groupe. Le propriétaire doit accepter explicitement le rattachement.
+- La révocation est transactionnelle et annule les messages encore en file. Un email déjà pris en charge par le transport SMTP ne peut pas être rappelé.
 
-La création utilise maintenant une transaction MySQL et verrouille la ligne du groupe avec `SELECT ... FOR UPDATE`. Les créations au sein d'un même groupe sont sérialisées entre les processus. Une deuxième demande pour une invitation encore active reçoit HTTP 409. L'acceptation conserve son verrouillage transactionnel et la contrainte unique du propriétaire de société reste le dernier garde-fou.
+### Outbox email durable
 
-### Échec SMTP et retour d'interface
+La migration 007 ajoute `email_outbox`, et le schéma passe à la version 11. L'invitation et son email chiffré sont enregistrés dans la même transaction SQL.
 
-Après enregistrement de l'invitation, si SMTP échoue ou si l'envoi n'est pas confirmé, l'API retourne toujours le lien sécurisé au propriétaire avec `email_envoye: false` et un avertissement explicite. Le jeton brut n'est pas stocké en base : seul son hash SHA-256 est conservé.
+- Le contenu contenant l'adresse et le lien d'invitation est chiffré en AES-256-GCM. Seul le hash SHA-256 du jeton d'invitation est conservé dans la table d'invitations.
+- La clé de chiffrement utilise `DATA_ENCRYPTION_KEY` (clé de production requise) ; `JWT_SECRET` sert uniquement de solution de repli pour les environnements qui n'ont pas configuré la clé dédiée.
+- Le worker réserve les tâches avec `FOR UPDATE SKIP LOCKED`, utilise un bail de cinq minutes et récupère les tâches dont le worker précédent a disparu.
+- Les erreurs SMTP sont journalisées sous forme de codes bornés, sans destinataire, lien ou contenu de message.
+- Le délai de connexion et de salutation SMTP est limité à 10 secondes, et le délai de socket à 30 secondes.
+- Les délais de reprise progressent de 1 min, 5 min, 30 min, 2 h, 6 h, 12 h puis 24 h, avec un plafond de huit tentatives. Une tâche reprise après un crash au huitième essai est passée en échec sans neuvième appel SMTP.
+- Les emails des invitations expirées, révoquées ou acceptées sont annulés lorsqu'ils sont encore en attente ou récupérés après expiration du bail.
+- Le worker email est démarré dans les processus applicatifs et arrêté pendant l'arrêt propre du serveur.
 
-L'interface Entreprise n'affirme plus à tort que SMTP n'est pas configuré pour chaque échec d'envoi. Elle affiche l'avertissement exact du serveur, échappe son contenu avant insertion HTML et annonce le résultat à l'aide de `role="status"` et `aria-live="polite"`. Quatre tests ciblés vérifient le retour accessible, le message de repli, l'échappement du lien et la protection `rel="noopener"`.
+**Garantie réelle : livraison au moins une fois, pas exactement une fois.** Si le serveur SMTP accepte le message puis que le processus s'arrête avant d'enregistrer l'état `sent`, la reprise peut renvoyer le même email. Ce comportement est préférable à la perte silencieuse du message, mais peut produire un doublon. SMTP ne fournit pas à lui seul une clé d'idempotence de bout en bout.
 
-Limite restante : il n'existe pas encore de file d'outbox durable. Une interruption brutale du processus entre le commit SQL et l'envoi SMTP peut laisser une invitation enregistrée sans notification email. Une outbox chiffrée avec reprise et idempotence reste la prochaine évolution recommandée.
+### Retour d'interface et accessibilité
 
-### Migration v9 vers v10
+La page Entreprise distingue les états en file, en traitement, en reprise, envoyé, échoué et annulé. L'avertissement affiché n'affirme plus à tort que SMTP est absent ; il reflète le résultat de l'API. Le résultat est annoncé à l'aide de `role="status"` et `aria-live="polite"`, et le lien est échappé avant insertion dans le DOM.
 
-Le test de migration ne se limite plus à vérifier que les tables existent après une installation neuve. Il simule une base déjà marquée v9, retire les trois tables propres aux groupes multi-sociétés, relance l'initialisation dans un processus Node séparé puis vérifie :
-- la progression du marqueur de schéma vers v10 ;
-- la recréation des trois tables de groupes, rattachements et invitations ;
-- la conservation des tables historiques (aucune suppression de données métier n'est incluse dans ce scénario).
+### Exactitude des agrégats financiers
 
-### Exactitude des agrégats financiers du groupe
+Le tableau de bord du groupe exclut les factures au statut `annulee` des nombres, du total facturé et du montant encaissé. Le test d'intégration utilise une facture active de 1 000 FCFA dont 250 FCFA sont encaissés, et une facture annulée de 9 000 FCFA ; seuls la facture active et ses montants sont consolidés.
 
-Le tableau de bord exclut maintenant les factures au statut `annulee` de ses nombres, montants facturés et montants encaissés. Le test d'intégration crée une facture active de 1 000 FCFA avec 250 FCFA encaissés et une facture annulée de 9 000 FCFA. Il vérifie que seuls une facture, 1 000 FCFA facturés et 250 FCFA encaissés apparaissent dans les agrégats de la filiale et du groupe.
+### Migrations
 
-### Tests de concurrence
-
-Le test d'intégration envoie simultanément deux demandes d'invitation vers la même adresse et exige exactement une réponse HTTP 201 et une réponse HTTP 409. Il vérifie aussi qu'un envoi non confirmé est accompagné d'un avertissement.
+Le test d'upgrade simule une base existante en version 9, retire les tables des migrations 006/007, réexécute l'initialisation dans un autre processus et vérifie le passage à la version 11 ainsi que la recréation des tables de groupe et d'outbox.
 
 ## Vérifications GitHub Actions
 
-Commit de code testé : `4eb41da4b3bdf774d4fc4fb198dedca3493e6fb5`
+Révision testée : `0e0b304faecbe2d623ffdd813cf62e40cf8bdea6`
 
-- Tests Node.js/MySQL : 316 réussis, 0 échec, 0 ignoré.
-- Le scénario d'upgrade d'une base existante v9 vers v10 a réussi.
-- Contrôle `npm audit` : aucune vulnérabilité détectée.
-- Smoke test du cluster : deux workers démarrés ; MySQL prêt et Redis opérationnel.
-- Recette visuelle Chromium : 119 captures sur 7 largeurs, dataset extrême (`worst`).
-- Construction Docker et contrôle d'absence des fichiers secrets locaux : réussis.
-- Installation des dépendances, détection Chromium, validation Compose et recette documentaire staging : réussies.
+- Tests Node.js/MySQL : **322 réussis, 0 échec**, 50 suites.
+- `npm audit` : **0 vulnérabilité**.
+- Smoke test du démarrage en cluster : **2 workers**, MySQL prêt et Redis opérationnel.
+- Recette visuelle Chromium : **119 captures**, 7 largeurs, dataset extrême `worst`.
+- Construction Docker, vérification de l'absence de secrets locaux, `npm ci`, détection Chromium et validation staging : réussies.
 - Archive source ZIP : construite avec succès.
 
 Exécutions :
-- [Tests automatisés — run 675](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43914084796)
-- [Package source ZIP — run 430](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43914084947)
-- [Captures de la recette visuelle](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43914084796/artifacts/14247869474)
+- [Tests automatisés — run 708](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43925954252)
+- [Package source ZIP — run 462](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43925954154)
+- [Captures de la recette visuelle](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/43925954252/artifacts/14255458288)
 
 ## Limites et risques restant à traiter
 
-1. L'envoi des invitations nécessite une outbox durable et chiffrée pour couvrir les arrêts de processus après commit et avant email.
-2. Les agrégations chargent toutes les sociétés liées sans pagination ni limite technique ; les quotas et la stratégie de pagination doivent être définis.
-3. Le propriétaire du groupe obtient des droits administrateur après acceptation ; les rôles granulaires par filiale ne sont pas implémentés.
-4. La consolidation reste descriptive par devise : aucune conversion de change ni consolidation comptable légale/OHADA n'est effectuée.
-5. Les abonnements SaaS mensuels renouvelables automatiquement ne sont pas activés. Le checkout ponctuel Wave/PayDunya ne vaut pas mandat de débit récurrent. Le endpoint de paiement reste en garde-fou HTTP 503 jusqu'à validation d'un produit récurrent, des tarifs, du consentement et des tests fournisseur.
-6. Les scripts du projet ne déclarent pas de commandes dédiées de lint/formatage. Firefox, Safari et une certification WCAG ne sont pas couverts par cette recette Chromium.
-7. Les protections GitHub de `main` n'ont pas été confirmées par l'intégration disponible ; aucune fusion n'est autorisée par cet audit.
+1. **Idempotence de livraison SMTP :** un doublon reste possible en cas de crash après acceptation du message par SMTP et avant l'acquittement SQL. L'outbox garantit une reprise, pas exactement une livraison.
+2. **Récupération du lien d'invitation :** le lien est retourné lors de la création et peut être copié à ce moment-là, mais la page de liste ne permet pas encore de le récupérer après un rechargement. Prévoir un endpoint propriétaire authentifié, limité aux invitations actives, qui déchiffre le lien à la demande.
+3. **Relance manuelle :** les emails définitivement échoués sont visibles en statut, mais le propriétaire ne dispose pas encore d'une action de relance ou de correction SMTP depuis l'interface.
+4. **Rotation de clé :** la clé `DATA_ENCRYPTION_KEY` doit rester stable tant qu'il existe des messages chiffrés en attente. Une procédure de rotation et de re-chiffrement versionnée reste à définir.
+5. **Concurrence acceptation/révocation :** une remise déjà en cours chez SMTP ne peut pas être annulée. Le worker vérifie l'état de l'invitation avant l'envoi, mais une modification peut survenir après cette vérification.
+6. **Scalabilité Entreprise :** la liste des sociétés et les agrégats ne sont pas paginés et aucun quota produit définitif (sociétés, sièges, stockage, API/automations) n'est appliqué.
+7. **Droits :** le propriétaire du groupe obtient des droits administrateur sur chaque filiale acceptée ; les rôles granulaires par société ne sont pas encore implémentés.
+8. **Comptabilité multi-devise/OHADA :** l'agrégation reste séparée par devise ; aucune conversion de change, consolidation légale ou certification fiscale nationale n'est effectuée.
+9. **Abonnements mensuels renouvelables :** ils ne sont pas activés. Le backend bloque la souscription par HTTP 503 tant qu'un mandat de débit récurrent, le prix mensuel, le consentement, les notifications, les retries, la grâce, la résiliation et les scénarios d'impayé ne sont pas validés. Les montants actuels du backend sont des paiements ponctuels ; les prix du plan d'entreprise restent des hypothèses commerciales.
+10. **Recette navigateur/conformité :** la recette responsive vérifie Chromium ; Firefox, Safari et une certification WCAG complète ne sont pas couverts.
+11. **Protection GitHub :** les protections de `main` n'ont pas pu être confirmées par l'intégration disponible ; la fusion ne doit pas être effectuée sur la base de ce seul audit.
 
 ## Décision
 
-Aucune fusion dans `main`. La branche reste à soumettre à une revue humaine indépendante et aux règles de protection GitHub. Les abonnements payants et les prélèvements récurrents ne sont pas activés par ces corrections.
+Aucune fusion dans `main`. La PR #60 reste un brouillon en attente d'une revue humaine indépendante et de la vérification des protections de branche. Aucun prélèvement mensuel automatique ni aucune disponibilité commerciale internationale générale ne doivent être annoncés avant validation des critères produit, fournisseur, réglementaires et opérationnels.
