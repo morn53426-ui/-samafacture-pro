@@ -1016,6 +1016,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     await page.waitForFunction(() =>
       getComputedStyle(document.getElementById('invoice-template-preview-modal')).display !== 'none'
     );
+    await page.waitForFunction(() =>
+      document.activeElement?.id === 'invoice-template-preview-close'
+    );
     await page.keyboard.down('Shift');
     await page.keyboard.press('Tab');
     await page.keyboard.up('Shift');
