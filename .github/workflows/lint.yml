@@ -1,0 +1,53 @@
+name: ESLint — JavaScript modifié
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'eslint.config.mjs'
+      - 'public/js/sidebar.js'
+      - 'public/js/workspace-modals.js'
+      - 'server/tests/visual/recette-visuelle.js'
+      - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/workspace-modal-accessibility.test.js'
+      - '.github/workflows/lint.yml'
+  push:
+    branches:
+      - feat/enterprise-workspace-ux-20261117
+    paths:
+      - 'eslint.config.mjs'
+      - 'public/js/sidebar.js'
+      - 'public/js/workspace-modals.js'
+      - 'server/tests/visual/recette-visuelle.js'
+      - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/workspace-modal-accessibility.test.js'
+      - '.github/workflows/lint.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  eslint:
+    name: ESLint — fichiers JavaScript ciblés
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: Exécuter ESLint (version maintenue et figée)
+        run: >-
+          npx --yes --package=eslint@10.15.0 eslint
+          eslint.config.mjs
+          public/js/sidebar.js
+          public/js/workspace-modals.js
+          server/tests/visual/recette-visuelle.js
+          server/tests/workspace-navigation.test.js
+          server/tests/workspace-modal-accessibility.test.js

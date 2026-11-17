@@ -1,0 +1,126 @@
+/* Navigation, hiérarchie et ergonomie des espaces Entreprise et professionnel. */
+.workspace-skip-link{
+  position:fixed;z-index:1200;top:10px;left:10px;transform:translateY(-160%);
+  padding:10px 14px;border-radius:10px;background:var(--paper);color:var(--ink);
+  border:2px solid var(--emerald);box-shadow:var(--shadow-md);font-weight:700;text-decoration:none
+}
+.workspace-skip-link:focus{transform:translateY(0);outline:0}
+
+.group-section-nav{
+  display:flex;align-items:center;gap:6px;min-width:0;margin:-5px 0 20px;padding:7px;
+  overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+  border:1px solid var(--line);border-radius:13px;background:var(--paper);
+  box-shadow:var(--shadow-xs);scrollbar-width:thin
+}
+.group-section-nav[hidden]{display:none}
+.group-section-nav a{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-height:40px;
+  padding:8px 13px;border-radius:9px;color:var(--ink-soft);font-size:.82rem;font-weight:700;
+  text-decoration:none;white-space:nowrap;transition:background var(--dur-fast),color var(--dur-fast)
+}
+.group-section-nav a:hover,.group-section-nav a:focus-visible{
+  background:var(--emerald-light);color:var(--emerald)
+}
+.group-section-nav a:focus-visible{outline:2px solid var(--emerald);outline-offset:2px}
+.group-panel[id]{scroll-margin-top:22px}
+.group-overview-heading,.group-panel-heading{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-width:0
+}
+.group-overview-heading>div,.group-panel-heading>div{min-width:0;flex:1}
+.group-overview-heading h2{margin:0 0 5px;font-size:clamp(1.2rem,1.65vw,1.55rem)}
+.group-overview-heading p,.group-panel-heading p{margin:0;max-width:76ch}
+.group-section-eyebrow{
+  margin-bottom:6px;color:var(--emerald);font-size:.68rem;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase
+}
+.group-status-chip{
+  display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;padding:7px 11px;
+  border:1px solid color-mix(in srgb,var(--emerald) 26%,var(--line));border-radius:999px;
+  background:var(--emerald-light);color:var(--emerald);font-size:.75rem;font-weight:750
+}
+.group-overview-kpis{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin:18px 0 6px
+}
+.group-overview-kpi{
+  display:flex;flex-direction:column;gap:4px;min-width:0;padding:14px 15px;
+  border:1px solid var(--line);border-radius:12px;background:var(--surface,rgba(15,27,51,.035))
+}
+.group-overview-kpi span{color:var(--ink-soft);font-size:.76rem;font-weight:700;line-height:1.4}
+.group-overview-kpi strong{color:var(--ink);font:750 1.55rem var(--font-display);font-variant-numeric:tabular-nums;line-height:1.15}
+.group-overview-kpi small{color:var(--ink-soft);font-size:.7rem;line-height:1.4}
+.group-panel-heading{align-items:center}
+.group-panel-heading h2{margin:0 0 4px}
+.group-panel-heading p{margin:0}
+.group-section-count{
+  display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;
+  border:1px solid var(--line);border-radius:10px;background:var(--surface,rgba(15,27,51,.035));
+  color:var(--ink);font-size:.82rem;font-weight:800;font-variant-numeric:tabular-nums
+}
+.group-metric-section-label{
+  margin:0 0 8px;color:var(--ink-soft);font-size:.7rem;font-weight:800;
+  letter-spacing:.07em;text-transform:uppercase
+}
+.group-metric-grid-primary{grid-template-columns:repeat(4,minmax(0,1fr))}
+.group-metric-grid-secondary{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:12px}
+.group-secondary-details{
+  margin-top:12px;border-top:1px solid var(--line);padding-top:10px
+}
+.group-secondary-details summary{
+  display:flex;align-items:center;gap:8px;min-height:38px;cursor:pointer;
+  color:var(--workspace-blue,var(--emerald));font-size:.78rem;font-weight:750;list-style:none
+}
+.group-secondary-details summary::-webkit-details-marker{display:none}
+.group-secondary-details summary::after{content:'+';margin-left:auto;font-size:1.1rem}
+.group-secondary-details[open] summary::after{content:'−'}
+.group-secondary-details summary:focus-visible{outline:2px solid var(--emerald);outline-offset:3px;border-radius:6px}
+.group-currency-card{min-width:0}
+.group-currency-card .group-metric{min-width:0}
+.group-currency-card .group-metric strong{overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.group-performance-currency,.group-company,.group-invite,.group-alert{min-width:0}
+.group-actions .btn{min-height:39px}
+.group-form .btn{align-self:end;min-height:45px}
+.group-empty{line-height:1.55}
+
+.pro-workspace-guide{scroll-margin-top:20px}
+.pro-workspace-guide-group{display:flex;flex-direction:column;min-width:0}
+.pro-workspace-guide-group-head{min-width:0}
+.pro-workspace-guide-links{margin-top:auto}
+.pro-workspace-guide-links a{min-height:39px}
+.pro-workspace-guide-links a:focus-visible{outline-offset:1px}
+.pro-module-grid{align-items:stretch;gap:20px}
+.pro-module{height:100%;scroll-margin-top:20px}
+.pro-module-heading{min-width:0}
+.pro-module-heading>div{min-width:0}
+.pro-module-heading h2,.pro-module-heading p{overflow-wrap:anywhere}
+.pro-company-bar{min-width:0}
+.pro-company-bar>div{min-width:0}
+.pro-company-bar select{max-width:100%}
+
+@media(max-width:1100px){
+  .group-overview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .group-metric-grid-primary,.group-metric-grid-secondary{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .group-section-nav{margin:0 0 16px;padding:6px}
+  .group-section-nav a{min-height:42px;padding:8px 11px;font-size:.78rem}
+  .group-overview-heading,.group-panel-heading{align-items:flex-start}
+  .group-status-chip{font-size:.7rem}
+  .group-overview-kpi{padding:12px}
+  .group-overview-kpi strong{font-size:1.35rem}
+  .group-currency-card{padding:13px}
+}
+@media(max-width:560px){
+  .group-overview-heading{flex-direction:column;gap:10px}
+  .group-overview-kpis{gap:8px}
+  .group-overview-kpi{padding:10px}
+  .group-overview-kpi span{font-size:.7rem}
+  .group-overview-kpi small{font-size:.66rem}
+  .group-metric-grid-primary,.group-metric-grid-secondary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .group-metric{padding:10px}
+  .group-metric small{font-size:.72rem}
+  .group-metric strong{font-size:.95rem}
+  .group-performance-row{grid-template-columns:50px minmax(0,1fr);gap:7px}
+  .group-performance-row strong{grid-column:2;justify-self:start;overflow-wrap:anywhere}
+  .group-panel-heading{gap:8px}
+  .group-section-count{flex-basis:30px;width:30px;height:30px}
+}

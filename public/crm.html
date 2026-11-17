@@ -2,7 +2,8 @@
 <html lang="fr"><head>
 <script src="js/theme.js"></script><script src="js/icons.js"></script><script src="js/tooltip.js"></script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>CRM & suivi client — SamaFacture Pro</title><meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0F1B33">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/workspace-polish.css"><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0F1B33">
 <style>
 .crm-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.72fr);gap:18px}
 .crm-stat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
@@ -12,7 +13,8 @@
 @media(max-width:850px){.crm-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.crm-stat{grid-template-columns:1fr}}
 </style></head><body>
-<div class="app-shell"><div id="sidebar-root"></div><main class="main-content workspace-page page-crm">
+<a class="workspace-skip-link" href="#main-content">Aller au contenu principal</a>
+<div class="app-shell"><div id="sidebar-root"></div><main class="main-content workspace-page page-crm" id="main-content" tabindex="-1">
 <div class="page-header workspace-page-header"><div><div class="pro-eyebrow">RELATION CLIENT & ACTIVITÉS</div><h1>CRM & suivi client</h1><p>Consignez les échanges, planifiez les rappels et partagez un espace sécurisé avec vos clients.</p></div><button class="btn btn-outline" id="refresh-crm">Actualiser</button></div>
 <section class="crm-stat">
   <article class="card stat-card"><div class="stat-label">Activités enregistrées</div><div class="stat-value" id="stat-activities">—</div></article>
