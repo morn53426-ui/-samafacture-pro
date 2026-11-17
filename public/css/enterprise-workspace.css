@@ -950,8 +950,29 @@ body.enterprise-console-shell .group-disclaimer {
   body.enterprise-console-shell #app-sidebar.sidebar.open {
     transform: translateX(0);
   }
-  body.enterprise-console-shell #app-sidebar .sidebar-brand { display: none; }
-  body.enterprise-console-shell #app-sidebar .mobile-toggle { display: none; }
+  body.enterprise-console-shell #app-sidebar .sidebar-brand {
+    display: flex;
+    min-height: 70px;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 11px;
+    padding: 9px 14px;
+    border-bottom: 1px solid #edf0f4;
+    background: #fff;
+  }
+  body.enterprise-console-shell #app-sidebar .sidebar-brand .mark {
+    width: 52px !important;
+    height: 52px !important;
+    flex: 0 0 52px;
+  }
+  body.enterprise-console-shell #app-sidebar .sidebar-brand-copy {
+    display: block;
+    min-width: 0;
+  }
+  body.enterprise-console-shell #app-sidebar .sidebar-brand .name { color: #203a55; }
+  body.enterprise-console-shell #app-sidebar .sidebar-brand .sub { color: #6c7b8e; }
+  body.enterprise-console-shell #app-sidebar .sidebar-collapse-toggle,
+  body.enterprise-console-shell #app-sidebar .mobile-toggle { display: none !important; }
   body.enterprise-console-shell #app-sidebar .sidebar-nav {
     display: block;
     max-height: calc(100dvh - 130px);
