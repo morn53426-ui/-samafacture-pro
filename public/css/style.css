@@ -6489,3 +6489,50 @@ a.btn .icon {
   .pro-workspace-guide-group { padding: 12px; }
   .pro-workspace-guide-links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Page Abonnement — choix de moyens encore en validation fournisseur */
+.subscription-payment-methods {
+  max-width: 1040px;
+  margin: 25px 0 18px;
+}
+.subscription-payment-method-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+  max-width: 1040px;
+  margin: 16px 0 25px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface-muted);
+}
+.subscription-payment-method-grid > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.subscription-payment-method-grid > div > .ic {
+  display: grid;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--paper);
+  color: var(--emerald);
+  font-size: 1rem;
+}
+.subscription-payment-method-grid strong,
+.subscription-payment-method-grid small { display: block; }
+.subscription-payment-method-grid strong { font-size: 0.74rem; }
+.subscription-payment-method-grid small {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+@media (max-width: 900px) {
+  .subscription-payment-method-grid { grid-template-columns: 1fr; }
+}
