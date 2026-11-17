@@ -59,6 +59,7 @@
 </style>
 </head>
 <body>
+<a class="workspace-skip-link" href="#main-content">Aller au contenu principal</a>
 <div class="app-shell">
   <div id="sidebar-root"></div>
   <main class="main-content workspace-page" id="main-content" tabindex="-1">
@@ -96,7 +97,7 @@ function setGroupNavigation(visible){
   if(navigation)navigation.hidden=!visible;
 }
 function message(text,kind='info'){
-  statusRoot.innerHTML='<div role="status" class="'+(kind==='error'?'error-box':'group-note')+'">'+escapeHtml(text)+'</div>';
+  statusRoot.innerHTML='<div class="'+(kind==='error'?'error-box':'group-note')+'">'+escapeHtml(text)+'</div>';
 }
 function money(value,currency){
   return formatMontant(Number(value||0),currency||'FCFA');
@@ -335,6 +336,7 @@ function renderGroup(data,dashboard){
       ${invitations.length?`<h3 style="margin:20px 0 0">Invitations en attente</h3><div class="group-invite-list">${invitations.map(item=>`
         <div class="group-invite"><div><strong>${escapeHtml(item.invited_email)}</strong><small class="group-muted">Expire le ${escapeHtml(formatDate(item.expire_at))}</small><small class="group-muted">${escapeHtml(emailStatusLabel(item))}</small></div><div class="group-actions"><button class="btn btn-outline" type="button" data-copy-invitation="${Number(item.id)}">Copier le lien</button>${item.email_statut==='failed'?'<button class="btn btn-outline" type="button" data-retry-email="'+Number(item.id)+'">Relancer l’email</button>':''}<button class="btn btn-outline group-danger" type="button" data-revoke="${Number(item.id)}">Révoquer</button></div></div>`).join('')}</div>`:''}
     </section>`;
+  if(typeof window.hydrateIcons==='function')window.hydrateIcons(root);
 
   document.getElementById('invite-company-form').addEventListener('submit',async event=>{
     event.preventDefault();
