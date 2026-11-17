@@ -24,6 +24,8 @@ let subsidiaryToken;
 let outsiderToken;
 let starterToken;
 let subsidiaryClientId;
+let teamRecipientId;
+let teamConcurrentRecipientId;
 
 function getVerificationTokens(verificationUrl) {
   const url = new URL(verificationUrl);
@@ -97,10 +99,11 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v13 sans perdre les données existantes', async () => {
+test('une base v8 reçoit les migrations v9 à v14 sans perdre les données existantes', async () => {
   // Simule strictement l'état de main : schéma v8 sans colonne/index v9-v10,
-  // ni tables multi-sociétés v11, outbox v12 et preuve email v13.
+  // ni tables multi-sociétés v11, outbox v12, preuve groupe v13 et preuve équipe v14.
   await pool.query('DROP TABLE IF EXISTS email_outbox');
+  await pool.query('DROP TABLE IF EXISTS pro_team_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitations');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_companies');
@@ -132,10 +135,10 @@ test('une base v8 reçoit les migrations v9 à v13 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v13 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v14 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 13, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12 → v13');
+  assert.equal(Number(meta.version), 14, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12 → v13 → v14');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -158,14 +161,192 @@ test('une base v8 reçoit les migrations v9 à v13 sans perdre les données exis
   assert.equal(dueIndexes.length, 1, 'l’index d’échéances actives de la migration v10 doit être créé');
 
   const [tables] = await pool.query(
-    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?, ?)',
-    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations', 'email_outbox', 'pro_company_group_invitation_verifications']
+    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?, ?, ?)',
+    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations', 'email_outbox', 'pro_company_group_invitation_verifications', 'pro_team_invitation_verifications']
   );
   assert.deepEqual(
     tables.map(row => row.TABLE_NAME).sort(),
-    ['email_outbox', 'pro_company_group_companies', 'pro_company_group_invitation_verifications', 'pro_company_group_invitations', 'pro_company_groups'],
-    'les tables de groupes v11, de l’outbox v12 et de preuve email v13 doivent être créées'
+    ['email_outbox', 'pro_company_group_companies', 'pro_company_group_invitation_verifications', 'pro_company_group_invitations', 'pro_company_groups', 'pro_team_invitation_verifications'],
+    'les tables de groupes v11, de l’outbox v12 et de preuves email v13-v14 doivent être créées'
   );
+});
+
+
+test('les invitations classiques exigent une preuve email, un envoi outbox et une acceptation atomique', async () => {
+  const teamRecipient = await register('team-recipient', 'Compte invité équipe');
+  teamRecipientId = teamRecipient.user.id;
+  const teamRecipientEmail = teamRecipient.user.email;
+
+  const invitation = await request(app)
+    .post('/api/pro/team/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: teamRecipientEmail, role: 'employe' });
+  assert.equal(invitation.status, 201, invitation.text);
+  assert.equal(invitation.body.email_en_file, true);
+  assert.equal(invitation.body.invitation_url, undefined, 'le lien brut ne doit pas être renvoyé au propriétaire');
+  assert.equal(invitation.body.email_envoye, undefined, 'la mise en file ne doit pas être présentée comme une livraison SMTP');
+
+  const [[inviteRow]] = await pool.query('SELECT id, token_hash FROM pro_team_invitations WHERE id = ?', [invitation.body.id]);
+  const [[inviteOutbox]] = await pool.query(
+    "SELECT statut, payload_enc FROM email_outbox WHERE entity_type = 'team_invitation' AND entity_id = ?",
+    [inviteRow.id]
+  );
+  assert.equal(inviteOutbox.statut, 'queued');
+  const inviteMessage = decryptEmailPayload(inviteOutbox.payload_enc);
+  assert.equal(inviteMessage.to, teamRecipientEmail);
+  const token = getVerificationTokens(inviteMessage.invitation_url).token;
+  assert.match(token || '', /^[a-f0-9]{64}$/i);
+  assert.equal(inviteRow.token_hash, crypto.createHash('sha256').update(token).digest('hex'));
+  assert.doesNotMatch(inviteOutbox.payload_enc, new RegExp(token));
+
+  const sentInvitationMessages = [];
+  const invitationDelivery = await dispatchPendingEmails({
+    sender: async message => { sentInvitationMessages.push(message); return { sent: true }; },
+    batchSize: 10
+  });
+  assert.equal(invitationDelivery.sent, 1);
+  assert.equal(sentInvitationMessages.length, 1);
+  assert.equal(sentInvitationMessages[0].to, teamRecipientEmail);
+
+  const wrongAccount = await request(app)
+    .post('/api/pro/team/invitations/accept')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token });
+  assert.equal(wrongAccount.status, 403);
+
+  const challenge = await request(app)
+    .post('/api/pro/team/invitations/accept')
+    .set('Authorization', 'Bearer ' + teamRecipient.token)
+    .send({ token });
+  assert.equal(challenge.status, 202, challenge.text);
+  assert.equal(challenge.body.verification_required, true);
+  assert.match(challenge.headers['cache-control'] || '', /no-store/i);
+
+  const cooldown = await request(app)
+    .post('/api/pro/team/invitations/accept')
+    .set('Authorization', 'Bearer ' + teamRecipient.token)
+    .send({ token });
+  assert.equal(cooldown.status, 202);
+  const [[proofCount]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = (SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ?)",
+    [inviteRow.id]
+  );
+  assert.equal(Number(proofCount.total), 1);
+
+  const [[proofRow]] = await pool.query(
+    'SELECT id, token_hash, used_at FROM pro_team_invitation_verifications WHERE invitation_id = ?',
+    [inviteRow.id]
+  );
+  assert.ok(proofRow);
+  assert.equal(proofRow.used_at, null);
+  const [[proofOutbox]] = await pool.query(
+    "SELECT statut, payload_enc FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = ?",
+    [proofRow.id]
+  );
+  assert.equal(proofOutbox.statut, 'queued');
+  const proofMessage = decryptEmailPayload(proofOutbox.payload_enc);
+  assert.equal(proofMessage.to, teamRecipientEmail);
+  const proofTokens = getVerificationTokens(proofMessage.verification_url);
+  assert.equal(proofTokens.token, token);
+  const verificationToken = proofTokens.verificationToken;
+  assert.match(verificationToken || '', /^[a-f0-9]{64}$/i);
+  assert.equal(proofRow.token_hash, crypto.createHash('sha256').update(verificationToken).digest('hex'));
+  assert.doesNotMatch(proofOutbox.payload_enc, new RegExp(verificationToken));
+
+  const [[membershipBeforeProof]] = await pool.query(
+    'SELECT id FROM pro_team_members WHERE owner_user_id = ? AND member_user_id = ? AND active = 1',
+    [groupOwnerId, teamRecipientId]
+  );
+  assert.equal(membershipBeforeProof, undefined);
+
+  const wrongProof = await request(app)
+    .post('/api/pro/team/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + teamRecipient.token)
+    .send({ token, verification_token: '0'.repeat(64) });
+  assert.equal(wrongProof.status, 404);
+
+  const sentProofMessages = [];
+  const proofDelivery = await dispatchPendingEmails({
+    sender: async message => { sentProofMessages.push(message); return { sent: true }; },
+    batchSize: 10
+  });
+  assert.equal(proofDelivery.sent, 1);
+  assert.equal(sentProofMessages.length, 1);
+  assert.equal(sentProofMessages[0].to, teamRecipientEmail);
+
+  const accepted = await request(app)
+    .post('/api/pro/team/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + teamRecipient.token)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(accepted.status, 200, accepted.text);
+  assert.equal(accepted.body.success, true);
+  assert.match(accepted.headers['cache-control'] || '', /no-store/i);
+
+  const replay = await request(app)
+    .post('/api/pro/team/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + teamRecipient.token)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(replay.status, 404);
+
+  const [[membershipAfterProof]] = await pool.query(
+    'SELECT id, role, active FROM pro_team_members WHERE owner_user_id = ? AND member_user_id = ?',
+    [groupOwnerId, teamRecipientId]
+  );
+  assert.ok(membershipAfterProof);
+  assert.equal(membershipAfterProof.role, 'employe');
+  assert.equal(Number(membershipAfterProof.active), 1);
+  const [[acceptedInvite]] = await pool.query(
+    'SELECT statut, accepted_user_id, accepted_at FROM pro_team_invitations WHERE id = ?', [inviteRow.id]
+  );
+  assert.equal(acceptedInvite.statut, 'acceptee');
+  assert.equal(Number(acceptedInvite.accepted_user_id), teamRecipientId);
+  assert.ok(acceptedInvite.accepted_at);
+  const [[usedProof]] = await pool.query('SELECT used_at FROM pro_team_invitation_verifications WHERE id = ?', [proofRow.id]);
+  assert.ok(usedProof.used_at);
+
+  const concurrentRecipient = await register('team-concurrent', 'Compte invité concurrent');
+  teamConcurrentRecipientId = concurrentRecipient.user.id;
+  const secondInvitation = await request(app)
+    .post('/api/pro/team/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: concurrentRecipient.user.email, role: 'comptable' });
+  assert.equal(secondInvitation.status, 201, secondInvitation.text);
+  const [[secondInviteOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation' AND entity_id = ?",
+    [secondInvitation.body.id]
+  );
+  const secondToken = getVerificationTokens(decryptEmailPayload(secondInviteOutbox.payload_enc).invitation_url).token;
+  const secondChallenge = await request(app)
+    .post('/api/pro/team/invitations/accept')
+    .set('Authorization', 'Bearer ' + concurrentRecipient.token)
+    .send({ token: secondToken });
+  assert.equal(secondChallenge.status, 202, secondChallenge.text);
+  const [[secondProof]] = await pool.query(
+    'SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ?', [secondInvitation.body.id]
+  );
+  const [[secondProofOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = ?",
+    [secondProof.id]
+  );
+  const secondVerificationToken = getVerificationTokens(decryptEmailPayload(secondProofOutbox.payload_enc).verification_url).verificationToken;
+  const concurrentAcceptances = await Promise.all([
+    request(app).post('/api/pro/team/invitations/accept/verify').set('Authorization', 'Bearer ' + concurrentRecipient.token)
+      .send({ token: secondToken, verification_token: secondVerificationToken }),
+    request(app).post('/api/pro/team/invitations/accept/verify').set('Authorization', 'Bearer ' + concurrentRecipient.token)
+      .send({ token: secondToken, verification_token: secondVerificationToken })
+  ]);
+  assert.deepEqual(concurrentAcceptances.map(result => result.status).sort((a, b) => a - b), [200, 404]);
+  const [[secondMembership]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_team_members WHERE owner_user_id = ? AND member_user_id = ? AND active = 1',
+    [groupOwnerId, teamConcurrentRecipientId]
+  );
+  assert.equal(Number(secondMembership.total), 1);
+  const [cancelledEmails] = await pool.query(
+    "SELECT entity_type, statut FROM email_outbox WHERE (entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)",
+    [secondInvitation.body.id, secondProof.id]
+  );
+  assert.equal(cancelledEmails.length, 2);
+  assert.ok(cancelledEmails.every(row => row.statut === 'cancelled'));
 });
 
 test('le plan Entreprise permet de créer un groupe, inviter une société et lui déléguer un accès explicite', async () => {
@@ -887,6 +1068,8 @@ after(async () => {
     await nettoyerUtilisateur(subsidiaryOwnerId);
     await nettoyerUtilisateur(outsiderId);
     await nettoyerUtilisateur(starterId);
+    await nettoyerUtilisateur(teamRecipientId);
+    await nettoyerUtilisateur(teamConcurrentRecipientId);
   } finally {
     await teardownTestEnvironment();
   }

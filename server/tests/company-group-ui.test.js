@@ -13,6 +13,10 @@ const invitationPage = fs.readFileSync(
   path.join(__dirname, '..', '..', 'public', 'invitation.html'),
   'utf8'
 );
+const professionalPage = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'public', 'professionnel.html'),
+  'utf8'
+);
 
 describe('Retour visuel des invitations Entreprise', () => {
   test('ne termine pas le rattachement d’un groupe avant la preuve email indépendante', () => {
@@ -32,6 +36,21 @@ describe('Retour visuel des invitations Entreprise', () => {
   test('ne laisse pas les jetons de vérification dans le referer ou la barre d’adresse après lecture', () => {
     assert.match(invitationPage, /name="referrer" content="no-referrer"/);
     assert.match(invitationPage, /history\.replaceState/);
+  });
+
+
+  test('protège aussi les invitations classiques avec des jetons de fragment et une reprise après connexion', () => {
+    assert.ok(invitationPage.includes("teamResumeUrl='invitation.html?type=team&resume=1'"));
+    assert.ok(invitationPage.includes("sessionStorage.setItem(teamInvitationStorageKey,token)"));
+    assert.ok(invitationPage.includes("sessionStorage.setItem(teamVerificationStorageKey,verificationToken)"));
+    assert.ok(invitationPage.includes("'/pro/team/invitations/accept/verify'"));
+    assert.ok(invitationPage.includes("'/pro/team/invitations/accept'"));
+  });
+
+  test('ne révèle plus le jeton d’invitation dans l’écran de gestion d’équipe', () => {
+    assert.doesNotMatch(professionalPage, /result\.invitation_url/);
+    assert.doesNotMatch(professionalPage, /Ouvrir le lien d’invitation/);
+    assert.match(professionalPage, /result\.message \|\| 'Le lien a été placé dans la file d’envoi sécurisée\.'/);
   });
 
   test('affiche un état email confirmé uniquement lorsque le serveur le confirme', () => {

@@ -612,7 +612,7 @@ el('invite-form').addEventListener('submit', async e => {
     if (customRole) payload.permissions = customRole.permissions || [];
     const result = await Api.post('/pro/team/invitations', payload);
     el('invite-result').hidden = false;
-    el('invite-result').innerHTML = '<strong>Invitation créée</strong><p>' + (result.email_envoye ? 'Email envoyé. ' : 'SMTP non configuré : email non envoyé. ') + '</p><p><a href="' + escapeHtml(result.invitation_url) + '" target="_blank" rel="noopener">Ouvrir le lien d’invitation</a></p>';
+    el('invite-result').innerHTML = '<strong>Invitation créée</strong><p>' + escapeHtml(result.message || 'Le lien a été placé dans la file d’envoi sécurisée.') + '</p>';
     e.target.reset(); await loadWorkspace();
   } catch (err) { alert(err.message); }
 });
