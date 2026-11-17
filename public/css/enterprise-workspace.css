@@ -301,16 +301,16 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
     top: 54px;
     bottom: 0;
     left: 0;
-    width: 76px !important;
+    width: var(--sidebar-collapsed-w) !important;
     border-right: 1px solid #e1e6ed;
     background: #fff;
     color: #526174;
     box-shadow: 1px 0 5px rgba(20,38,60,.035);
   }
   body.enterprise-console-shell .main-content.enterprise-console-main {
-    width: calc(100% - 76px);
+    width: calc(100% - var(--sidebar-collapsed-w));
     max-width: none;
-    margin-left: 76px !important;
+    margin-left: var(--sidebar-collapsed-w) !important;
     padding: 78px clamp(24px,2.35vw,34px) 52px !important;
     background: #f5f7fa;
   }
@@ -364,7 +364,7 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
   }
   body.enterprise-console-shell #app-sidebar .nav-item {
     display: flex;
-    width: 64px;
+    width: calc(var(--sidebar-collapsed-w) - 12px);
     min-height: 57px;
     flex-direction: column;
     align-items: center;
@@ -397,7 +397,7 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
   }
   body.enterprise-console-shell #app-sidebar .nav-label {
     display: block !important;
-    max-width: 60px;
+    max-width: calc(var(--sidebar-collapsed-w) - 16px);
     overflow-wrap: anywhere;
     color: inherit;
     font-size: .57rem;
