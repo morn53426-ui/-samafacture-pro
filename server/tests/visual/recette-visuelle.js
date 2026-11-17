@@ -803,10 +803,11 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   if (!pageDefinition.public && viewport.width >= 901) {
     assert.equal(navigationGeometry.sidebarCollapsed, true,
       pageDefinition.name + ' : le menu de bureau doit démarrer compact.');
-    assert.equal(navigationGeometry.sidebarWidth, 76,
-      pageDefinition.name + ' : la largeur réelle du rail desktop doit rester à 76 px : ' + JSON.stringify(navigationGeometry));
-    assert.ok(navigationGeometry.mainMargin >= 76 && navigationGeometry.mainMargin <= 92,
-      pageDefinition.name + ' : la marge CSS du contenu doit réserver la largeur du rail compact sans espace excessif : ' + JSON.stringify(navigationGeometry));
+    const compactWidth = Number.parseFloat(navigationGeometry.expectedCompactWidth);
+    assert.equal(navigationGeometry.sidebarWidth, compactWidth,
+      pageDefinition.name + ' : le rail desktop doit respecter sa largeur responsive : ' + JSON.stringify(navigationGeometry));
+    assert.equal(navigationGeometry.mainMargin, compactWidth,
+      pageDefinition.name + ' : la marge du contenu doit suivre exactement la largeur du rail : ' + JSON.stringify(navigationGeometry));
     assert.ok(navigationGeometry.mainLeft >= navigationGeometry.sidebarWidth &&
       navigationGeometry.mainLeft <= navigationGeometry.sidebarWidth + 16,
       pageDefinition.name + ' : le conteneur principal ne doit pas chevaucher le rail : ' + JSON.stringify(navigationGeometry));
@@ -1659,7 +1660,8 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
     mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
     bodyState: document.body.classList.contains('sidebar-collapsed'),
-    labelsHidden: [...document.querySelectorAll('.nav-label')].every(element => getComputedStyle(element).display === 'none'),
+    labelsVisible: [...document.querySelectorAll('.nav-label')].length > 0 &&
+      [...document.querySelectorAll('.nav-label')].every(element => getComputedStyle(element).display !== 'none'),
     promoRemoved: !document.querySelector('.sidebar-promo'),
     toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded'),
     headingFont: getComputedStyle(document.querySelector('.page-header h1') || document.querySelector('h1')).fontFamily,
@@ -1683,10 +1685,10 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
   }));
   assert.deepEqual(compact, {
     collapsed: true,
-    sidebarWidth: 76,
-    mainMargin: 76,
+    sidebarWidth: 96,
+    mainMargin: 96,
     bodyState: true,
-    labelsHidden: true,
+    labelsVisible: true,
     promoRemoved: true,
     toggleExpanded: 'false',
     headingFont: '"IBM Plex Sans", sans-serif',
