@@ -71,14 +71,21 @@ describe("Paiements d'abonnement", () => {
     assert.equal(res.status, 400);
   });
 
-  test('un fournisseur non configuré (pas de clés en .env de test) répond 503, pas une erreur 500 opaque', async () => {
-    const res = await request(app)
-      .post('/api/abonnement/payer')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ plan: 'starter', fournisseur: 'wave' });
-    // Selon que WAVE_API_KEY est défini dans l'environnement de test ou non, on accepte
-    // soit un rejet propre (503) soit un succès — mais jamais un crash serveur (500).
-    assert.ok([200, 503].includes(res.status), `statut inattendu : ${res.status}`);
+  test('un utilisateur ne peut pas s’attribuer directement un plan payant via /auth/plan', async () => {
+    await pool.query("UPDATE users SET plan = 'gratuit' WHERE id = ?", [userId]);
+
+    for (const plan of ['starter', 'pro', 'entreprise']) {
+      const res = await request(app)
+        .put('/api/auth/plan')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ plan });
+
+      assert.equal(res.status, 403, `le plan ${plan} doit exiger un paiement confirmé`);
+      assert.equal(res.body.code, 'PAIEMENT_REQUIS');
+    }
+
+    const [[user]] = await pool.query('SELECT plan FROM users WHERE id = ?', [userId]);
+    assert.equal(user.plan, 'gratuit', 'un appel direct ne doit jamais débloquer une formule payante');
   });
 
   test("le statut d'un paiement inexistant renvoie 404", async () => {
