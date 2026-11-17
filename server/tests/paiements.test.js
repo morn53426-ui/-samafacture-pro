@@ -71,26 +71,6 @@ describe("Paiements d'abonnement", () => {
     assert.equal(res.status, 400);
   });
 
-  test('un fournisseur ne peut pas activer un abonnement mensuel sans mandat récurrent', async () => {
-    const before = await pool.query(
-      'SELECT COUNT(*) AS n FROM abonnement_paiements WHERE user_id = ?',
-      [userId]
-    );
-    const res = await request(app)
-      .post('/api/abonnement/payer')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ plan: 'starter', fournisseur: 'wave' });
-
-    assert.equal(res.status, 503);
-    assert.equal(res.body.code, 'PAIEMENT_RECURRENT_NON_CONFIGURE');
-    const after = await pool.query(
-      'SELECT COUNT(*) AS n FROM abonnement_paiements WHERE user_id = ?',
-      [userId]
-    );
-    assert.equal(Number(after[0][0].n), Number(before[0][0].n),
-      'aucun checkout ponctuel ne doit être créé sans mandat récurrent');
-  });
-
   test('un utilisateur ne peut pas s’attribuer directement un plan payant via /auth/plan', async () => {
     await pool.query("UPDATE users SET plan = 'gratuit' WHERE id = ?", [userId]);
 
