@@ -35,6 +35,8 @@ const PAGES = [
   { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
   { name: 'automatisations', file: 'automatisations.html', ready: '#automation-form' },
   { name: 'abonnement', file: 'abonnement.html', ready: '#plan-cards .subscription-plan-card' },
+  { name: 'groupe-entreprise', file: 'groupe-entreprise.html', ready: '#invite-company-form', plan: 'entreprise' },
+  { name: 'invitation', file: 'invitation.html?type=company-group&token=' + 'a'.repeat(64), ready: '#accept-invite', public: true },
   { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true }
 ];
 
@@ -315,6 +317,25 @@ function fixtureFor(pathname, fixtures) {
       tva_collectee: DATASET === 'empty' ? 0 : (DATASET === 'normal' ? 36000 : 777777777777.77)
     };
   }
+  if (pathname === '/api/pro/company-group') return {
+    groupe: { id: 1, nom: 'Groupe de démonstration', actif: true },
+    societes: [
+      { id: 1, entreprise_nom: 'SamaFacture Société principale', contact_nom: 'Compte principal', is_primary: true, pays_code: 'SN', devise: 'FCFA', email: 'direction@principal.example', entreprise_ninea: 'SN-DKR-2026-A001' },
+      { id: 2, entreprise_nom: 'Filiale de démonstration', contact_nom: 'Compte filiale', is_primary: false, pays_code: 'SN', devise: 'FCFA', email: 'contact@filiale.example', entreprise_ninea: 'SN-DKR-2026-B002' }
+    ],
+    invitations: [
+      { id: 11, invited_email: 'direction@future-filiale.example', expire_at: '2026-11-24 12:00:00', email_statut: 'queued', tentatives_email: 0 }
+    ]
+  };
+  if (pathname === '/api/pro/company-group/dashboard') return {
+    factures_par_devise: [{ devise: 'FCFA', nombre_factures: 15, total_facture: 12500000, total_encaisse: 8300000 }],
+    depenses_par_devise: [{ devise: 'FCFA', nombre_depenses: 8, total_depenses: 2450000 }]
+  };
+  if (pathname === '/api/pro/company-group/membership') return { membre: false };
+  if (pathname === '/api/pro/company-group/invitations/accept') return {
+    verification_required: true,
+    message: 'Un lien de confirmation a été envoyé à l’adresse email du propriétaire. Il expire après 20 minutes.'
+  };
   if (pathname === '/api/abonnement/moyens-disponibles') return {
     wave: true,
     paydunya: true,
@@ -457,6 +478,13 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   page.on('pageerror', onPageError);
 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
+  if (pageDefinition.plan) {
+    await page.evaluate((plan) => {
+      const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+      user.plan = plan;
+      localStorage.setItem('sf_user', JSON.stringify(user));
+    }, pageDefinition.plan);
+  }
   await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
   try {
     await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
@@ -472,6 +500,34 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     throw new Error(pageDefinition.name + ' indisponible; diagnostic=' +
       JSON.stringify({ ...diagnostic, apiRequests: page.__visualApiRequests, pageErrors }) +
       '; cause=' + error.message);
+  }
+  if (pageDefinition.name === 'groupe-entreprise') {
+    const groupUi = await page.evaluate(() => ({
+      liveRegion: document.getElementById('group-status')?.getAttribute('aria-live') || null,
+      companyCount: document.querySelectorAll('.group-company').length,
+      invitationCount: document.querySelectorAll('.group-invite').length,
+      inviteForm: Boolean(document.querySelector('#invite-company-form'))
+    }));
+    assert.equal(groupUi.liveRegion, 'polite', 'La page Groupe doit annoncer les changements de statut aux lecteurs d’écran.');
+    assert.equal(groupUi.companyCount, 2, 'La recette doit afficher la société principale et une filiale.');
+    assert.equal(groupUi.invitationCount, 1, 'La recette doit afficher une invitation en attente.');
+    assert.equal(groupUi.inviteForm, true, 'Le formulaire d’invitation doit être visible.');
+  }
+  if (pageDefinition.name === 'invitation') {
+    const invitationUi = await page.evaluate(() => ({
+      title: document.querySelector('#invite-content h1')?.textContent.trim() || '',
+      liveRegion: document.getElementById('invite-content')?.getAttribute('aria-live') || null,
+      atomic: document.getElementById('invite-content')?.getAttribute('aria-atomic') || null,
+      acceptButton: Boolean(document.getElementById('accept-invite')),
+      tokenStored: Boolean(sessionStorage.getItem('sf_company_group_invitation_token')),
+      queryCleaned: !location.search.includes('token=')
+    }));
+    assert.equal(invitationUi.title, 'Rejoindre un groupe de sociétés', 'La page doit montrer le parcours de confirmation d’invitation.');
+    assert.equal(invitationUi.liveRegion, 'polite', 'Le contenu dynamique de l’invitation doit être annoncé.');
+    assert.equal(invitationUi.atomic, 'true', 'Le lecteur d’écran doit annoncer le message complet.');
+    assert.equal(invitationUi.acceptButton, true, 'Le destinataire doit pouvoir lancer la confirmation.');
+    assert.equal(invitationUi.tokenStored, true, 'Le jeton doit rester dans sessionStorage pendant le parcours.');
+    assert.equal(invitationUi.queryCleaned, true, 'Le jeton ne doit pas rester dans la barre d’adresse.');
   }
   if (pageDefinition.charts?.length) {
     await page.waitForFunction((chartIds) => chartIds.every((id) => {
@@ -1119,6 +1175,33 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     fullPage: true,
     captureBeyondViewport: true
   });
+  if (pageDefinition.name === 'invitation' && viewport.name === 'mobile-320') {
+    await page.focus('#accept-invite');
+    assert.equal(await page.evaluate(() => document.activeElement?.id || ''), 'accept-invite',
+      'Le bouton de confirmation doit être accessible au clavier.');
+    await page.click('#accept-invite');
+    await page.waitForFunction(() =>
+      document.getElementById('invite-content')?.textContent.includes('Vérifiez votre boîte email'),
+    { timeout: 15000 });
+    const confirmationState = await page.evaluate(() => ({
+      heading: document.querySelector('#invite-content h1')?.textContent.trim() || '',
+      liveRegion: document.getElementById('invite-content')?.getAttribute('aria-live') || null,
+      message: document.getElementById('invite-content')?.innerText || '',
+      invitationTokenCleared: !sessionStorage.getItem('sf_company_group_invitation_token')
+    }));
+    assert.equal(confirmationState.heading, 'Vérifiez votre boîte email',
+      'Après acceptation, la page doit annoncer l’étape de confirmation email.');
+    assert.equal(confirmationState.liveRegion, 'polite', 'Le changement d’étape doit être annoncé.');
+    assert.match(confirmationState.message, /expire après 20 minutes/i,
+      'Le destinataire doit être informé de la durée de validité du lien.');
+    assert.equal(confirmationState.invitationTokenCleared, true,
+      'Le jeton initial doit être supprimé après la demande de preuve email.');
+    await page.screenshot({
+      path: path.join(screenshots, 'invitation-confirmation-email-mobile-320-' + DATASET + '.png'),
+      fullPage: true,
+      captureBeyondViewport: true
+    });
+  }
   page.off('pageerror', onPageError);
   return { page: pageDefinition.name, viewport: viewport.name, width: viewport.width, horizontalOverflow: false };
 }

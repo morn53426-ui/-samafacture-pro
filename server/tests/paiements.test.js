@@ -28,14 +28,39 @@ describe("Paiements d'abonnement", () => {
       .set('Authorization', `Bearer ${token}`);
 
     assert.equal(res.status, 200);
-    assert.deepEqual(res.body.tarifs, { starter: 5000, pro: 15000, entreprise: 35000 });
+    assert.equal(res.body.wave, false, 'un checkout ponctuel ne doit pas être présenté comme un renouvellement automatique');
+    assert.equal(res.body.paydunya, false, 'le checkout ponctuel ne doit pas être présenté comme un renouvellement automatique');
+    assert.deepEqual(res.body.tarifs, {}, 'les anciens montants ponctuels ne sont pas des prix mensuels approuvés');
     assert.deepEqual(res.body.facturation, {
-      mode: 'paiement_unique',
-      renouvellement_automatique: false,
+      mode: 'mensuel_renouvellement_automatique_en_preparation',
+      renouvellement_automatique: true,
       expiration_automatique: false,
-      acces_jusqua_changement_manuel: true,
-      activation: 'apres_confirmation'
+      acces_jusqua_changement_manuel: false,
+      activation: 'apres_confirmation',
+      disponible: false
     });
+  });
+
+  test('un renouvellement mensuel non pris en charge est bloqué sans créer de paiement ponctuel', async () => {
+    for (const plan of ['starter', 'pro', 'entreprise']) {
+      const before = await pool.query(
+        'SELECT COUNT(*) AS n FROM abonnement_paiements WHERE user_id = ?',
+        [userId]
+      );
+      const res = await request(app)
+        .post('/api/abonnement/payer')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ plan, fournisseur: 'wave' });
+
+      assert.equal(res.status, 503);
+      assert.equal(res.body.code, 'PAIEMENT_RECURRENT_NON_CONFIGURE');
+      const after = await pool.query(
+        'SELECT COUNT(*) AS n FROM abonnement_paiements WHERE user_id = ?',
+        [userId]
+      );
+      assert.equal(Number(after[0][0].n), Number(before[0][0].n),
+        'aucune ligne de paiement ponctuel ne doit être créée tant que le mandat récurrent est indisponible');
+    }
   });
 
   test('un plan invalide est refusé avant toute création de session', async () => {
@@ -43,22 +68,6 @@ describe("Paiements d'abonnement", () => {
       .post('/api/abonnement/payer')
       .set('Authorization', `Bearer ${token}`)
       .send({ plan: 'plan-qui-nexiste-pas', fournisseur: 'wave' });
-    assert.equal(res.status, 400);
-  });
-
-  test('un canal PayDunya inconnu est refusé avant toute création de paiement', async () => {
-    const res = await request(app)
-      .post('/api/abonnement/payer')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ plan: 'starter', fournisseur: 'paydunya', moyen: 'paypal' });
-    assert.equal(res.status, 400);
-  });
-
-  test('un canal carte ne peut pas être envoyé au fournisseur Wave', async () => {
-    const res = await request(app)
-      .post('/api/abonnement/payer')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ plan: 'starter', fournisseur: 'wave', moyen: 'carte_bancaire' });
     assert.equal(res.status, 400);
   });
 

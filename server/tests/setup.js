@@ -82,24 +82,46 @@ async function nettoyerUtilisateur(userId) {
  * Le hook est enregistré par chaque test APRÈS ses propres hooks de nettoyage.
  */
 async function teardownTestEnvironment() {
-  // Ferme le navigateur Chromium partagé (utils/pdf.js) s'il a été lancé par ce fichier de
-  // test — sans ça, le process Chromium reste ouvert et empêche node --test de se terminer
-  // proprement, provoquant l'annulation en cascade des fichiers de test suivants.
-  await closeBrowser();
-  if (testHttpServer) {
-    await new Promise((resolve) => {
-      if (!testHttpServer.listening) return resolve();
-      testHttpServer.close(() => resolve());
-    });
-    testHttpServer = null;
-    testHttpServerPromise = null;
+  let cleanupError = null;
+
+  // Ferme le navigateur Chromium partagé (utils/pdf.js) s'il a été lancé par ce fichier.
+  // On conserve l'erreur éventuelle, mais on doit toujours fermer le serveur HTTP et MySQL.
+  try {
+    await closeBrowser();
+  } catch (err) {
+    cleanupError = err;
   }
+
+  const server = testHttpServer;
+  if (server) {
+    try {
+      if (server.listening) {
+        await new Promise((resolve, reject) => {
+          server.close(err => err ? reject(err) : resolve());
+          // server.close() attend les connexions existantes. En teardown, aucune requête
+          // ne doit survivre au fichier de test : ferme explicitement les sockets pour
+          // éviter qu'un keep-alive Supertest/Puppeteer bloque le worker node --test.
+          server.closeAllConnections?.();
+          server.closeIdleConnections?.();
+        });
+      }
+    } catch (err) {
+      cleanupError ||= err;
+    } finally {
+      testHttpServer = null;
+      testHttpServerPromise = null;
+    }
+  }
+
   try {
     await pool.end();
   } catch (err) {
-    if (!/closed|pool/i.test(String(err && err.message))) throw err;
+    if (!/closed|pool/i.test(String(err && err.message))) cleanupError ||= err;
+  } finally {
+    initialized = false;
   }
-  initialized = false;
+
+  if (cleanupError) throw cleanupError;
 }
 
 module.exports = { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, ensureTestHttpServer, teardownTestEnvironment };

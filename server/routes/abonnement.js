@@ -1,35 +1,13 @@
 const express = require('express');
-const crypto = require('crypto');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { captureException } = require('../config/monitoring');
 const {
-  waveConfigured, paydunyaConfigured,
-  creerSessionWave, verifierSignatureWave, consulterSessionWave,
-  creerFacturePaydunya, verifierHashPaydunya, confirmerFacturePaydunya
+  waveConfigured, verifierSignatureWave, consulterSessionWave,
+  verifierHashPaydunya, confirmerFacturePaydunya
 } = require('../config/payments');
 
 const router = express.Router();
-
-// Montants des achats ponctuels de plans payants (FCFA). Ils sont débités une seule fois
-// par commande ; aucun abonnement récurrent ni prélèvement automatique n'est créé.
-const TARIFS = {
-  starter: 5000,
-  pro: 15000,
-  entreprise: 35000
-};
-
-// Canaux PayDunya autorisés pour l'écran d'abonnement.
-// Les identifiants sont ceux de l'API officielle (invoice.channels).
-const CANAUX_PAYDUNYA = Object.freeze({
-  wave: 'wave-senegal',
-  orange_money: 'orange-money-senegal',
-  carte_bancaire: 'card'
-});
-
-function baseUrl(req) {
-  return (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-}
 
 // Indique au frontend quels moyens de paiement afficher (les boutons restent masqués
 // tant que les clés correspondantes ne sont pas renseignées dans .env).
@@ -37,7 +15,7 @@ function baseUrl(req) {
  * @openapi
  * /abonnement/moyens-disponibles:
  *   get:
- *     summary: Indique quels moyens de paiement sont configurés côté serveur, et les tarifs des plans
+ *     summary: Décrit la disponibilité du paiement mensuel des plans
  *     tags: [Abonnement]
  *     responses:
  *       200:
@@ -65,7 +43,7 @@ function baseUrl(req) {
  *                   properties:
  *                     mode:
  *                       type: string
- *                       enum: [paiement_unique]
+ *                       enum: [mensuel_renouvellement_automatique_en_preparation]
  *                     renouvellement_automatique:
  *                       type: boolean
  *                     expiration_automatique:
@@ -75,29 +53,34 @@ function baseUrl(req) {
  *                     activation:
  *                       type: string
  *                       enum: [apres_confirmation]
+ *                     disponible:
+ *                       type: boolean
  */
 router.get('/moyens-disponibles', requireAuth, (req, res) => {
   res.json({
-    wave: waveConfigured(),
-    paydunya: paydunyaConfigured(),
-    tarifs: TARIFS,
+    // Le checkout actuellement intégré par Wave/PayDunya est ponctuel : ne pas afficher
+    // ses boutons tant que le renouvellement mensuel autorisé n'est pas opérationnel.
+    wave: false,
+    paydunya: false,
+    tarifs: {},
     facturation: {
-      mode: 'paiement_unique',
-      renouvellement_automatique: false,
+      mode: 'mensuel_renouvellement_automatique_en_preparation',
+      renouvellement_automatique: true,
       expiration_automatique: false,
-      acces_jusqua_changement_manuel: true,
-      activation: 'apres_confirmation'
+      acces_jusqua_changement_manuel: false,
+      activation: 'apres_confirmation',
+      disponible: false
     }
   });
 });
 
-// Démarre un paiement d'abonnement : crée une session chez le fournisseur choisi et
-// renvoie l'URL de paiement vers laquelle rediriger l'utilisateur.
+// Prépare la demande de paiement mensuel. Aucun checkout ponctuel ne doit être utilisé
+// comme substitut d'un mandat récurrent autorisé par le prestataire.
 /**
  * @openapi
  * /abonnement/payer:
  *   post:
- *     summary: Démarre un paiement ponctuel via Wave ou un canal PayDunya choisi
+ *     summary: Refuse temporairement la souscription tant que le paiement récurrent n'est pas disponible
  *     tags: [Abonnement]
  *     requestBody:
  *       required: true
@@ -109,80 +92,23 @@ router.get('/moyens-disponibles', requireAuth, (req, res) => {
  *             properties:
  *               plan: { type: string, enum: [starter, pro, entreprise] }
  *               fournisseur: { type: string, enum: [wave, paydunya] }
- *               moyen: { type: string, enum: [wave, orange_money, carte_bancaire], description: 'Choix du client ; facultatif pour compatibilité avec les anciens appels.' }
  *     responses:
- *       200:
- *         description: URL de paiement à ouvrir.
- *         content:
- *           application/json:
- *             schema: { type: object, properties: { checkout_url: { type: string }, reference: { type: string } } }
- *       400: { description: "Plan invalide ou fournisseur non configuré.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       400: { description: "Plan ou moyen de paiement invalide.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       503: { description: "Le renouvellement automatique n'est pas encore disponible ; aucun paiement n'est lancé.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
-router.post('/payer', requireAuth, async (req, res, next) => {
-  try {
-    const { plan, fournisseur, moyen } = req.body;
-    if (!TARIFS[plan]) return res.status(400).json({ error: 'Plan invalide.' });
-    if (!['wave', 'paydunya'].includes(fournisseur)) return res.status(400).json({ error: 'Fournisseur de paiement invalide.' });
-    if (moyen !== undefined && typeof moyen !== 'string') return res.status(400).json({ error: 'Moyen de paiement invalide.' });
-    if (fournisseur === 'wave' && moyen !== undefined && moyen !== 'wave') {
-      return res.status(400).json({ error: 'Le moyen sélectionné ne correspond pas au fournisseur Wave.' });
-    }
-    if (fournisseur === 'paydunya' && moyen !== undefined && !Object.hasOwn(CANAUX_PAYDUNYA, moyen)) {
-      return res.status(400).json({ error: 'PayDunya ne prend pas en charge ce moyen pour ce paiement.' });
-    }
-    if (fournisseur === 'wave' && !waveConfigured()) return res.status(503).json({ error: "Le paiement Wave n'est pas configuré sur ce serveur." });
-    if (fournisseur === 'paydunya' && !paydunyaConfigured()) return res.status(503).json({ error: "Le paiement PayDunya n'est pas configuré sur ce serveur." });
+router.post('/payer', requireAuth, async (req, res) => {
+  const { plan, fournisseur } = req.body || {};
+  if (!['starter', 'pro', 'entreprise'].includes(plan)) {
+    return res.status(400).json({ error: 'Plan invalide.' });
+  }
+  if (!['wave', 'paydunya'].includes(fournisseur)) {
+    return res.status(400).json({ error: 'Moyen de paiement invalide.' });
+  }
 
-    const montant = TARIFS[plan];
-    const reference = crypto.randomBytes(16).toString('hex');
-
-    const [result] = await pool.query(
-      `INSERT INTO abonnement_paiements (user_id, plan, montant, devise, fournisseur, reference, internal_reference, statut)
-       VALUES (?, ?, ?, 'XOF', ?, ?, ?, 'en_attente')`,
-      [req.user.id, plan, montant, fournisseur, reference, reference]
-    );
-
-    const retourUrl = `${baseUrl(req)}/abonnement-retour.html?ref=${reference}`;
-
-    let checkoutUrl;
-    try {
-      if (fournisseur === 'wave') {
-        const session = await creerSessionWave({
-          amount: montant,
-          reference,
-          successUrl: retourUrl,
-          errorUrl: retourUrl
-        });
-        checkoutUrl = session.checkoutUrl;
-        // La référence Wave (session.id) remplace notre référence interne : c'est elle qui
-        // reviendra dans le webhook, il faut donc pouvoir retrouver la ligne grâce à elle.
-        await pool.query('UPDATE abonnement_paiements SET reference = ? WHERE id = ?', [session.sessionId || reference, result.insertId]);
-      } else {
-        const invoice = await creerFacturePaydunya({
-          amount: montant,
-          description: `Abonnement SamaFacture Pro — Plan ${plan}`,
-          reference,
-          storeName: req.user.nom,
-          returnUrl: retourUrl,
-          cancelUrl: retourUrl,
-          callbackUrl: `${baseUrl(req)}/api/abonnement/webhook/paydunya`,
-          // Un canal unique est envoyé lorsque le client l'a choisi dans SamaFacture.
-          // En l'absence de ce champ, le comportement historique reste inchangé.
-          channels: moyen ? [CANAUX_PAYDUNYA[moyen]] : undefined
-        });
-        checkoutUrl = invoice.checkoutUrl;
-        await pool.query('UPDATE abonnement_paiements SET reference = ? WHERE id = ?', [invoice.token, result.insertId]);
-      }
-    } catch (providerErr) {
-      // La session n'a pas pu être créée chez le fournisseur : on marque la tentative comme
-      // échouée plutôt que de laisser une ligne "en_attente" fantôme (qui ne recevra jamais
-      // de webhook, puisque aucune session réelle n'existe côté fournisseur).
-      await pool.query(`UPDATE abonnement_paiements SET statut = 'echouee' WHERE id = ?`, [result.insertId]);
-      throw providerErr;
-    }
-
-    res.json({ checkout_url: checkoutUrl, reference });
-  } catch (err) { next(err); }
+  return res.status(503).json({
+    error: 'Les formules payantes sont prévues au mois avec renouvellement automatique. Le prestataire ne confirme pas encore un mandat de débit récurrent utilisable par SamaFacture Pro ; aucun paiement ponctuel ne sera lancé.',
+    code: 'PAIEMENT_RECURRENT_NON_CONFIGURE'
+  });
 });
 
 // Statut d'un paiement (utilisé par la page de retour pour afficher la confirmation).

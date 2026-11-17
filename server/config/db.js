@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 10;
+const CURRENT_SCHEMA_VERSION = 13;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -161,8 +161,11 @@ async function initializeDatabaseOnce() {
  */
 async function runMigrations(conn) {
   // v8 : registre persistant du quota mensuel, rétrocompatible avec les bases v7.
-  // v9 : jour d'ancrage du calendrier des factures récurrentes (fin de mois stable).
-  // v10 : index de parcours des échéances actives pour le planificateur multi-fuseaux.
+  // v9 : jour d'ancrage des factures récurrentes (date mensuelle stable).
+  // v10 : index de parcours des échéances actives.
+  // v11 : groupes multi-sociétés (migration 006).
+  // v12 : outbox email chiffrée et durable (migration 007).
+  // v13 : preuve email à usage unique avant rattachement multi-sociétés (migration 008).
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -367,6 +370,49 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of phaseFiveToSevenStatements) {
+    await conn.query(statement);
+  }
+
+
+  // Groupes multi-sociétés : chaque filiale reste un compte/tenant indépendant.
+  const companyGroupsPath = path.join(__dirname, '..', 'database', 'migrations', '006_company_groups.sql');
+  const companyGroupsSql = fs.readFileSync(companyGroupsPath, 'utf8');
+  const companyGroupsStatements = companyGroupsSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of companyGroupsStatements) {
+    await conn.query(statement);
+  }
+
+  // Outbox email durable : contenu chiffré, idempotence et reprise après interruption.
+  const emailOutboxPath = path.join(__dirname, '..', 'database', 'migrations', '007_email_outbox.sql');
+  const emailOutboxSql = fs.readFileSync(emailOutboxPath, 'utf8');
+  const emailOutboxStatements = emailOutboxSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of emailOutboxStatements) {
+    await conn.query(statement);
+  }
+
+  // Vérification indépendante de l'adresse email avant l'acceptation d'une invitation de groupe.
+  const companyGroupVerificationPath = path.join(__dirname, '..', 'database', 'migrations', '008_company_group_email_proof.sql');
+  const companyGroupVerificationSql = fs.readFileSync(companyGroupVerificationPath, 'utf8');
+  const companyGroupVerificationStatements = companyGroupVerificationSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of companyGroupVerificationStatements) {
     await conn.query(statement);
   }
 

@@ -32,6 +32,7 @@
     package: '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
     'credit-card': '<rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M2.5 10h19"/><path d="M6 15h4"/>',
     building: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h1.2M13.8 7H15M9 11h1.2M13.8 11H15M9 15h1.2M13.8 15H15"/><path d="M10 21v-3.5h4V21"/>',
+    'building-2': '<rect x="3" y="3" width="9" height="18" rx="1"/><rect x="14" y="8" width="7" height="13" rx="1"/><path d="M6 7h3M6 11h3M6 15h3M16 12h3M16 16h3"/>',
     landmark: '<path d="M3 9.5 12 4l9 5.5"/><path d="M4.5 9.5h15V20h-15V9.5Z"/><path d="M7.5 12.5v5M12 12.5v5M16.5 12.5v5"/><path d="M3 20.5h18"/>',
     receipt: '<path d="M6 2.5h12v18.2l-2.2-1.4-2.2 1.4-2.1-1.4-2.1 1.4-2.2-1.4-1.2.8V2.5Z"/><path d="M9 8h6M9 11.5h6M9 15h4"/>',
     'check-circle': '<circle cx="12" cy="12" r="9.2"/><path d="M8 12.3l2.6 2.6L16.3 9"/>',

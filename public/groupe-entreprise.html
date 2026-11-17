@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Groupe de sociétés — SamaFacture Pro</title>
+<script src="js/theme.js"></script>
+<script src="js/icons.js"></script>
+<link rel="stylesheet" href="css/style.css" />
+<link rel="icon" type="image/png" href="images/icon-192.png" />
+<style>
+.group-layout{display:grid;gap:20px;max-width:1180px}
+.group-panel{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--shadow-sm)}
+.group-panel h2{margin:0 0 8px;font-size:1.08rem}
+.group-muted{color:var(--ink-soft);font-size:.9rem}
+.group-form{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.group-form .field{flex:1 1 240px;margin:0}
+.group-form input{width:100%}
+.group-company-list,.group-invite-list{display:grid;gap:12px;margin-top:16px}
+.group-company,.group-invite{border:1px solid var(--line);border-radius:12px;padding:15px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.group-company-main{min-width:220px;flex:1}
+.group-company-main strong{display:block;color:var(--ink)}
+.group-company-main small{display:block;color:var(--ink-soft);margin-top:4px}
+.group-actions{display:flex;gap:8px;flex-wrap:wrap}
+.group-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-top:16px}
+.group-stat{background:var(--surface,rgba(15,27,51,.035));border:1px solid var(--line);border-radius:12px;padding:16px}
+.group-stat strong{display:block;font-size:1.1rem;margin-top:7px}
+.group-stat small{color:var(--ink-soft)}
+.group-note{padding:12px 14px;border-radius:10px;background:var(--emerald-light);color:var(--ink);font-size:.88rem;line-height:1.5}
+.group-empty{padding:24px;border:1px dashed var(--line);border-radius:12px;color:var(--ink-soft);text-align:center}
+.group-danger{color:#a83232}
+.group-status{margin-bottom:16px}
+@media(max-width:640px){.group-panel{padding:16px}.group-company{align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-root"></div>
+  <main class="main-content workspace-page">
+    <div class="page-header workspace-page-header">
+      <div>
+        <div class="subscription-eyebrow">OFFRE ENTREPRISE</div>
+        <h1>Groupe & sociétés</h1>
+        <p class="group-muted">Gérez plusieurs sociétés distinctes depuis un espace de pilotage commun.</p>
+      </div>
+    </div>
+    <div id="group-status" class="group-status" aria-live="polite"></div>
+    <div id="group-content" class="group-layout"><div class="group-panel">Chargement du groupe…</div></div>
+  </main>
+</div>
+<script src="js/api.js"></script>
+<script src="js/sidebar.js"></script>
+<script>
+requireAuthPage();
+renderSidebar('groupe-entreprise');
+
+const root=document.getElementById('group-content');
+const statusRoot=document.getElementById('group-status');
+const currentUser=Api.currentUser()||{};
+
+function message(text,kind='info'){
+  statusRoot.innerHTML='<div class="'+(kind==='error'?'error-box':'group-note')+'">'+escapeHtml(text)+'</div>';
+}
+function money(value,currency){
+  return formatMontant(Number(value||0),currency||'FCFA');
+}
+function emailStatusLabel(item){
+  const status=item.email_statut;
+  if(status==='sent')return 'Email envoyé'+(item.email_envoye_le?' le '+formatDate(item.email_envoye_le):'');
+  if(status==='processing')return 'Envoi email en cours';
+  if(status==='retry')return 'Envoi temporairement bloqué — nouvelle tentative programmée';
+  if(status==='failed')return 'Échec après plusieurs tentatives ('+Number(item.tentatives_email||0)+')';
+  if(status==='cancelled')return 'Envoi annulé : invitation acceptée, révoquée ou expirée';
+  if(status==='queued')return 'Email placé dans la file d’envoi';
+  return 'État de l’email indisponible';
+}
+async function copyInvitationLink(invitationId,button){
+  button.disabled=true;
+  try{
+    const result=await Api.get('/pro/company-group/invitations/'+invitationId+'/link');
+    const link=String(result.invitation_url||'');
+    if(!link)throw new Error('Le lien sécurisé n’est plus disponible.');
+    if(navigator.clipboard?.writeText && window.isSecureContext){
+      await navigator.clipboard.writeText(link);
+    }else{
+      const field=document.createElement('textarea');
+      field.value=link;
+      field.setAttribute('readonly','');
+      field.style.position='fixed';
+      field.style.left='-9999px';
+      document.body.appendChild(field);
+      field.select();
+      const copied=document.execCommand('copy');
+      field.remove();
+      if(!copied)throw new Error('La copie automatique est indisponible sur ce navigateur.');
+    }
+    message('Lien sécurisé copié. Transmettez-le au propriétaire de la société invitée.');
+  }catch(err){
+    message(err.message||'Impossible de récupérer le lien sécurisé.','error');
+  }finally{
+    button.disabled=false;
+  }
+}
+
+function renderCreate(){
+  root.innerHTML=`
+    <section class="group-panel">
+      <h2>Créer votre groupe</h2>
+      <p class="group-muted">La société associée à votre compte sera la société principale. Vous pourrez ensuite inviter les propriétaires des autres sociétés.</p>
+      <form id="create-group-form" class="group-form">
+        <div class="field"><label for="group-name">Nom du groupe</label><input id="group-name" maxlength="190" required value="${escapeHtml(currentUser.entreprise_nom||'Groupe d’entreprises')}" /></div>
+        <button class="btn btn-primary" type="submit">Créer le groupe</button>
+      </form>
+    </section>`;
+  document.getElementById('create-group-form').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const button=event.currentTarget.querySelector('button');
+    button.disabled=true;
+    try{
+      await Api.post('/pro/company-group',{nom:document.getElementById('group-name').value.trim()});
+      await load();
+    }catch(err){message(err.message,'error');button.disabled=false;}
+  });
+}
+
+
+function renderMembership(membership){
+  const group=membership.groupe||{};
+  root.innerHTML=`
+    <section class="group-panel">
+      <h2>Votre société est rattachée à un groupe</h2>
+      <p class="group-muted">Groupe : <strong>${escapeHtml(group.nom||'Groupe')}</strong></p>
+      <div class="group-note">${group.actif
+        ? 'Le propriétaire du groupe dispose d’un accès administrateur à l’espace de votre société. Vos données restent dans votre compte séparé.'
+        : 'La formule Entreprise du propriétaire du groupe n’est plus active. L’accès au groupe est suspendu jusqu’à sa réactivation.'}</div>
+      ${membership.peut_quitter?'<button class="btn btn-outline group-danger" id="leave-group" type="button" style="margin-top:16px">Quitter ce groupe</button>':''}
+    </section>`;
+  document.getElementById('leave-group')?.addEventListener('click',async()=>{
+    if(!confirm('Quitter ce groupe ? Le propriétaire perdra son accès à votre société, mais toutes vos données resteront dans votre compte.'))return;
+    try{
+      const result=await Api.del('/pro/company-group/leave');
+      localStorage.removeItem('sf_company_group_member');
+      message(result.message||'Votre société a quitté le groupe.');
+      await load();
+    }catch(err){message(err.message,'error');}
+  });
+}
+
+function renderGroup(data,dashboard){
+  const group=data.groupe;
+  const companies=data.societes||[];
+  const invitations=data.invitations||[];
+  const invoiceTotals=(dashboard?.factures_par_devise||[]).map(row=>`
+    <div class="group-stat"><small>Factures émises · ${escapeHtml(row.devise)}</small><strong>${money(row.total_facture,row.devise)}</strong><small>${Number(row.nombre_factures||0)} facture(s), encaissé ${money(row.total_encaisse,row.devise)}</small></div>`).join('');
+  const expenseTotals=(dashboard?.depenses_par_devise||[]).map(row=>`
+    <div class="group-stat"><small>Dépenses · ${escapeHtml(row.devise)}</small><strong>${money(row.total_depenses,row.devise)}</strong><small>${Number(row.nombre_depenses||0)} dépense(s)</small></div>`).join('');
+  root.innerHTML=`
+    <section class="group-panel">
+      <h2>${escapeHtml(group.nom)}</h2>
+      <p class="group-muted">Les sociétés conservent leurs propres comptes, utilisateurs et données. Le groupe donne au propriétaire principal un accès administrateur aux sociétés qui ont accepté leur rattachement.</p>
+      <div class="group-note">Les chiffres consolidés sont présentés par devise. Aucune conversion de change ni consolidation comptable légale n'est effectuée automatiquement.</div>
+      <div class="group-stat-grid">${invoiceTotals||'<div class="group-empty">Aucune facture enregistrée dans les sociétés du groupe.</div>'}${expenseTotals}</div>
+    </section>
+    <section class="group-panel">
+      <h2>Sociétés du groupe</h2>
+      <p class="group-muted">${companies.length} société(s) rattachée(s), société principale incluse.</p>
+      <div class="group-company-list">
+      ${companies.map(company=>`
+        <article class="group-company">
+          <div class="group-company-main">
+            <strong>${escapeHtml(company.entreprise_nom||company.contact_nom||'Société')}</strong>
+            <small>${company.is_primary?'Société principale':'Société rattachée'} · ${escapeHtml(company.pays_code||'')} · ${escapeHtml(company.devise||'')}</small>
+            <small>${escapeHtml(company.email||'')} · NINEA/RCCM : ${escapeHtml(company.entreprise_ninea||company.entreprise_rccm||'Non renseigné')}</small>
+          </div>
+          <div class="group-actions">
+            ${company.is_primary?'':'<button class="btn btn-outline" type="button" data-open="'+Number(company.id)+'">Ouvrir</button><button class="btn btn-outline group-danger" type="button" data-remove="'+Number(company.id)+'">Retirer</button>'}
+          </div>
+        </article>`).join('')}
+      </div>
+    </section>
+    <section class="group-panel">
+      <h2>Inviter une société</h2>
+      <p class="group-muted">Le propriétaire de la société invitée doit accepter l'accès administrateur avant que ses données soient visibles par le groupe. L'invitation expire après 7 jours.</p>
+      <form id="invite-company-form" class="group-form">
+        <div class="field"><label for="company-email">Email du propriétaire de la société</label><input id="company-email" type="email" maxlength="190" required placeholder="direction@entreprise.com" /></div>
+        <button class="btn btn-primary" type="submit">Envoyer l’invitation</button>
+      </form>
+      <div id="latest-invitation" style="margin-top:14px"></div>
+      ${invitations.length?`<h3 style="margin:20px 0 0">Invitations en attente</h3><div class="group-invite-list">${invitations.map(item=>`
+        <div class="group-invite"><div><strong>${escapeHtml(item.invited_email)}</strong><small class="group-muted">Expire le ${escapeHtml(formatDate(item.expire_at))}</small><small class="group-muted">${escapeHtml(emailStatusLabel(item))}</small></div><div class="group-actions"><button class="btn btn-outline" type="button" data-copy-invitation="${Number(item.id)}">Copier le lien</button>${item.email_statut==='failed'?'<button class="btn btn-outline" type="button" data-retry-email="'+Number(item.id)+'">Relancer l’email</button>':''}<button class="btn btn-outline group-danger" type="button" data-revoke="${Number(item.id)}">Révoquer</button></div></div>`).join('')}</div>`:''}
+    </section>`;
+  document.getElementById('invite-company-form').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const button=event.currentTarget.querySelector('button');
+    button.disabled=true;
+    try{
+      const result=await Api.post('/pro/company-group/invitations',{email:document.getElementById('company-email').value.trim()});
+      const emailStatus=result.email_envoye
+        ? '<span>Email envoyé et confirmé.</span>'
+        : '<span>'+escapeHtml(result.avertissement||'Invitation créée. Son email sera traité par la file d’envoi sécurisée.')+'</span>';
+      await load();
+      // Le rechargement du groupe reconstruit le DOM : afficher le lien après ce
+      // re-rendu pour que le propriétaire puisse le copier avant de quitter la page.
+      const latestInvitation=document.getElementById('latest-invitation');
+      if(latestInvitation){
+        latestInvitation.innerHTML=
+          '<div class="group-note" role="status" aria-live="polite">Invitation créée pour '+
+          escapeHtml(result.email)+'. <a href="'+escapeHtml(result.invitation_url)+
+          '" target="_blank" rel="noopener">Ouvrir le lien sécurisé</a>'+
+          '<p class="group-invitation-mail-status">'+emailStatus+'</p></div>';
+      }
+    }catch(err){message(err.message,'error');}
+    finally{button.disabled=false;}
+  });
+  root.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',()=>{
+    localStorage.setItem('sf_company_owner',String(button.dataset.open));
+    location.href='dashboard.html';
+  }));
+  root.querySelectorAll('[data-remove]').forEach(button=>button.addEventListener('click',async()=>{
+    const id=button.dataset.remove;
+    if(!confirm('Retirer cette société du groupe ? Ses données resteront dans son compte indépendant.'))return;
+    button.disabled=true;
+    try{await Api.del('/pro/company-group/companies/'+id);await load();}
+    catch(err){message(err.message,'error');button.disabled=false;}
+  }));
+  root.querySelectorAll('[data-copy-invitation]').forEach(button=>button.addEventListener('click',async()=>{
+    await copyInvitationLink(button.dataset.copyInvitation,button);
+  }));
+  root.querySelectorAll('[data-retry-email]').forEach(button=>button.addEventListener('click',async()=>{
+    const id=button.dataset.retryEmail;
+    if(!confirm('Remettre cet email dans la file d’envoi ?'))return;
+    button.disabled=true;
+    try{
+      const result=await Api.post('/pro/company-group/invitations/'+id+'/retry-email',{});
+      message(result.message||'Email remis dans la file d’envoi sécurisée.');
+      await load();
+    }catch(err){
+      message(err.message||'Impossible de relancer cet email.','error');
+      button.disabled=false;
+    }
+  }));
+  root.querySelectorAll('[data-revoke]').forEach(button=>button.addEventListener('click',async()=>{
+    button.disabled=true;
+    try{await Api.del('/pro/company-group/invitations/'+button.dataset.revoke);await load();}
+    catch(err){message(err.message,'error');button.disabled=false;}
+  }));
+}
+
+async function load(){
+  try{
+    if(currentUser.plan==='entreprise'){
+      const data=await Api.get('/pro/company-group');
+      if(data.groupe){
+        const dashboard=await Api.get('/pro/company-group/dashboard');
+        renderGroup(data,dashboard);
+        return;
+      }
+    }
+    const membership=await Api.get('/pro/company-group/membership');
+    if(membership.membre){
+      localStorage.setItem('sf_company_group_member','true');
+      renderMembership(membership);
+      return;
+    }
+    localStorage.removeItem('sf_company_group_member');
+    if(currentUser.plan==='entreprise'){renderCreate();return;}
+    root.innerHTML='<section class="group-panel"><h2>Formule Entreprise requise</h2><p class="group-muted">La gestion des groupes et filiales est réservée à la formule Entreprise.</p><a class="btn btn-primary" href="abonnement.html">Voir les formules</a></section>';
+  }catch(err){message(err.message,'error');}
+}
+load();
+</script>
+</body>
+</html>
