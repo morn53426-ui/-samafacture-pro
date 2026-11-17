@@ -9,15 +9,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex" />
 <link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/workspace-polish.css" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0F1B33" />
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 </head>
 <body>
+<a class="workspace-skip-link" href="#main-content">Aller au contenu principal</a>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content workspace-page page-factures">
+  <main class="main-content workspace-page page-factures" id="main-content" tabindex="-1">
     <div class="page-header billing-page-header">
       <div>
         <div class="billing-eyebrow"><i class="ic" data-icon="receipt"></i> GESTION COMMERCIALE</div>
@@ -53,40 +55,40 @@
     </section>
 </div>
 
-<div id="pay-modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
-  <div class="card" style="width:380px; max-width:92vw;">
-    <div class="payment-modal-heading"><span class="payment-modal-icon"><i class="ic" data-icon="hand-coins"></i></span><div><span class="billing-overline">ENCAISSEMENT</span><h3>Enregistrer un règlement</h3><p>Ajoutez un paiement total ou partiel à cette facture.</p></div></div>
+<div id="pay-modal" data-workspace-modal role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="pay-modal-title" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card workspace-modal-panel" tabindex="-1" style="width:380px; max-width:92vw;">
+    <div class="payment-modal-heading"><span class="payment-modal-icon"><i class="ic" data-icon="hand-coins"></i></span><div><span class="billing-overline">ENCAISSEMENT</span><h3 id="pay-modal-title">Enregistrer un règlement</h3><p>Ajoutez un paiement total ou partiel à cette facture.</p></div></div>
     <div id="pay-context" class="payment-modal-context"></div>
-    <div id="pay-error"></div>
+    <div id="pay-error" role="alert" aria-live="assertive"></div>
     <form id="pay-form">
       <input type="hidden" id="pay-facture-id" />
       <div class="field"><label for="pay-montant">Montant du règlement *</label><div class="payment-amount-input"><input type="number" id="pay-montant" min="0.01" step="0.01" required /><span>FCFA</span></div><small class="field-hint" id="pay-remaining-hint"></small></div>
       <div class="field">
-        <label>Méthode *</label>
+        <label for="pay-methode">Méthode *</label>
         <select id="pay-methode" required>
           <option>Espèces</option><option>Wave</option><option>Orange Money</option>
           <option>PayDunya</option><option>Virement bancaire</option><option>Chèque</option><option>Carte bancaire</option>
         </select>
       </div>
-      <div class="field"><label>Référence</label><input type="text" id="pay-reference" /></div>
-      <div style="display:flex; gap:10px; justify-content:flex-end;">
-        <button type="button" class="btn btn-outline" onclick="closePayModal()">Annuler</button>
+      <div class="field"><label for="pay-reference">Référence</label><input type="text" id="pay-reference" /></div>
+      <div class="workspace-modal-actions" style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" data-modal-close onclick="closePayModal()">Annuler</button>
         <button type="submit" class="btn btn-primary"><i class="ic" data-icon="check"></i> Enregistrer le règlement</button>
       </div>
     </form>
   </div>
 </div>
 
-<div id="send-modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
-  <div class="card" style="width:400px; max-width:92vw;">
+<div id="send-modal" data-workspace-modal role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="send-modal-title" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card workspace-modal-panel" tabindex="-1" style="width:400px; max-width:92vw;">
     <h3 id="send-modal-title">Envoyer par email</h3>
-    <div id="send-error"></div>
+    <div id="send-error" role="alert" aria-live="assertive"></div>
     <form id="send-form">
       <input type="hidden" id="send-facture-id" />
       <input type="hidden" id="send-action" />
-      <div class="field"><label>Adresse email du client *</label><input type="email" id="send-email" required /></div>
-      <div style="display:flex; gap:10px; justify-content:flex-end;">
-        <button type="button" class="btn btn-outline" onclick="closeSendModal()">Annuler</button>
+      <div class="field"><label for="send-email">Adresse email du client *</label><input type="email" id="send-email" required /></div>
+      <div class="workspace-modal-actions" style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" data-modal-close onclick="closeSendModal()">Annuler</button>
         <button type="submit" class="btn btn-primary">Envoyer</button>
       </div>
     </form>
@@ -98,6 +100,7 @@
 <script src="js/pwa.js"></script>
 <script src="js/sidebar.js"></script>
 <script src="js/billing-ui.js"></script>
+<script src="js/workspace-modals.js"></script>
 <script>
   requireAuthPage();
   renderSidebar('factures');

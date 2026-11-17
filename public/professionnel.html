@@ -9,15 +9,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
 <link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/enterprise-workspace.css" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0F1B33" />
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 </head>
 <body>
+<a class="workspace-skip-link" href="#main-content">Aller au contenu principal</a>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content workspace-page pro-workspace">
+  <main class="main-content workspace-page pro-workspace" id="main-content" tabindex="-1">
     <div class="page-header">
       <div>
         <div class="pro-eyebrow"><i class="ic" data-icon="briefcase-business"></i> OUTILS DE GESTION AVANCÉS</div>
@@ -32,18 +34,18 @@
       <select id="company-select" aria-label="Choisir une entreprise"><option value="">Mon espace personnel</option></select>
     </div>
 
-    <section class="pro-kpis" id="pro-kpis">
+    <section class="pro-kpis" id="pro-kpis" aria-label="Indicateurs de l’espace professionnel">
       <article class="pro-kpi"><span>Commandes</span><strong id="kpi-orders">—</strong></article>
       <article class="pro-kpi"><span>Bons de livraison</span><strong id="kpi-deliveries">—</strong></article>
       <article class="pro-kpi"><span>Demandes de remboursement</span><strong id="kpi-refunds">—</strong></article>
       <article class="pro-kpi"><span>Documents archivés</span><strong id="kpi-documents">—</strong></article>
     </section>
 
-    <nav class="pro-workspace-guide" aria-label="Navigation par activité dans l'espace professionnel">
+    <nav class="pro-workspace-guide" id="pro-sections" aria-label="Accès direct aux outils par activité">
       <div class="pro-workspace-guide-head">
         <div>
           <h2>Accès rapide par activité</h2>
-          <p>Choisissez une rubrique pour accéder directement à l’outil correspondant.</p>
+          <p id="pro-workspace-guide-description">Choisissez une famille, puis ouvrez directement l’outil correspondant.</p>
         </div>
         <span class="pro-status">9 outils · 4 rubriques</span>
       </div>
@@ -92,7 +94,7 @@
       </div>
     </nav>
 
-    <div class="pro-module-grid">
+    <div class="pro-module-grid" id="pro-modules" role="region" aria-label="Modules de l’espace professionnel">
       <section class="card pro-module" id="pro-sales">
         <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="clipboard-list"></i></span><div><h2>Ventes et documents commerciaux</h2><p>Commandes clients, bons de livraison et avoirs.</p></div></div>
         <form id="order-form" class="pro-form">

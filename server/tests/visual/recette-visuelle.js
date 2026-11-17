@@ -502,16 +502,51 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       '; cause=' + error.message);
   }
   if (pageDefinition.name === 'groupe-entreprise') {
-    const groupUi = await page.evaluate(() => ({
-      liveRegion: document.getElementById('group-status')?.getAttribute('aria-live') || null,
-      companyCount: document.querySelectorAll('.group-company').length,
-      invitationCount: document.querySelectorAll('.group-invite').length,
-      inviteForm: Boolean(document.querySelector('#invite-company-form'))
-    }));
+    const groupUi = await page.evaluate(() => {
+      const links = [...document.querySelectorAll('#group-section-nav a[href^="#"]')];
+      return {
+        liveRegion: document.getElementById('group-status')?.getAttribute('aria-live') || null,
+        companyCount: document.querySelectorAll('.group-company').length,
+        invitationCount: document.querySelectorAll('.group-invite').length,
+        inviteForm: Boolean(document.querySelector('#invite-company-form')),
+        navigationVisible: document.getElementById('group-section-nav')?.hidden === false,
+        navigationTargets: links.map(link => Boolean(document.querySelector(link.getAttribute('href')))),
+        overviewKpis: document.querySelectorAll('.group-overview-kpi').length,
+        primaryCurrencyCards: document.querySelectorAll('.group-metric-grid-primary').length,
+        secondaryMetricDisclosure: document.querySelectorAll('.group-secondary-details').length,
+        skipLink: Boolean(document.querySelector('.workspace-skip-link[href="#main-content"]')),
+        mainLandmark: Boolean(document.querySelector('main#main-content'))
+      };
+    });
     assert.equal(groupUi.liveRegion, 'polite', 'La page Groupe doit annoncer les changements de statut aux lecteurs d’écran.');
     assert.equal(groupUi.companyCount, 2, 'La recette doit afficher la société principale et une filiale.');
     assert.equal(groupUi.invitationCount, 1, 'La recette doit afficher une invitation en attente.');
     assert.equal(groupUi.inviteForm, true, 'Le formulaire d’invitation doit être visible.');
+    assert.equal(groupUi.navigationVisible, true, 'La navigation du centre de pilotage doit être visible.');
+    assert.equal(groupUi.navigationTargets.length, 5, 'Les cinq sections du centre de pilotage doivent être accessibles.');
+    assert.ok(groupUi.navigationTargets.every(Boolean), 'Chaque entrée de navigation doit pointer vers une section existante.');
+    assert.equal(groupUi.overviewKpis, 4, 'La synthèse du groupe doit afficher quatre indicateurs de premier niveau.');
+    assert.ok(groupUi.primaryCurrencyCards > 0, 'Les indicateurs principaux par devise doivent être visibles.');
+    assert.equal(groupUi.secondaryMetricDisclosure, groupUi.primaryCurrencyCards, 'Les indicateurs secondaires doivent être regroupés dans des sections dépliables.');
+    assert.equal(groupUi.skipLink, true, 'Un lien de saut vers le contenu principal doit être disponible.');
+    assert.equal(groupUi.mainLandmark, true, 'La page doit exposer un repère de contenu principal.');
+  }
+  if (pageDefinition.name === 'professionnel') {
+    const workspaceUi = await page.evaluate(() => {
+      const links = [...document.querySelectorAll('#pro-sections a[href^="#"]')];
+      return {
+        linkCount: links.length,
+        targets: links.map(link => Boolean(document.querySelector(link.getAttribute('href')))),
+        mainLandmark: Boolean(document.querySelector('main#main-content')),
+        skipLink: Boolean(document.querySelector('.workspace-skip-link[href="#main-content"]')),
+        moduleRegion: Boolean(document.querySelector('#pro-modules[role="region"][aria-label]'))
+      };
+    });
+    assert.equal(workspaceUi.linkCount, 9, 'Les neuf outils professionnels doivent être accessibles depuis la navigation rapide.');
+    assert.ok(workspaceUi.targets.every(Boolean), 'Chaque accès rapide doit pointer vers un module existant.');
+    assert.equal(workspaceUi.mainLandmark, true, 'L’espace professionnel doit exposer un repère de contenu principal.');
+    assert.equal(workspaceUi.skipLink, true, 'L’espace professionnel doit proposer un lien de saut au contenu.');
+    assert.equal(workspaceUi.moduleRegion, true, 'Les modules doivent être regroupés dans une région nommée.');
   }
   if (pageDefinition.name === 'invitation') {
     const invitationUi = await page.evaluate(() => ({
