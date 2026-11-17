@@ -1,0 +1,54 @@
+/* Socle commun des pages de gestion : navigation de section, lisibilité et responsive. */
+.workspace-skip-link{
+  position:fixed;z-index:1200;top:10px;left:10px;transform:translateY(-160%);
+  padding:10px 14px;border:2px solid var(--emerald);border-radius:10px;
+  background:var(--paper);color:var(--ink);box-shadow:var(--shadow-md);
+  font-weight:700;text-decoration:none
+}
+.workspace-skip-link:focus{transform:translateY(0);outline:0}
+.workspace-section-nav{
+  display:flex;align-items:center;gap:6px;min-width:0;margin:-5px 0 20px;padding:7px;
+  overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+  border:1px solid var(--line);border-radius:13px;background:var(--paper);
+  box-shadow:var(--shadow-xs);scrollbar-width:thin
+}
+.workspace-section-nav a{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-height:40px;
+  padding:8px 13px;border-radius:9px;color:var(--ink-soft);
+  font-size:.82rem;font-weight:700;text-decoration:none;white-space:nowrap;
+  transition:background var(--dur-fast),color var(--dur-fast)
+}
+.workspace-section-nav a:hover,.workspace-section-nav a:focus-visible{
+  background:var(--emerald-light);color:var(--emerald)
+}
+.workspace-section-nav a:focus-visible{
+  outline:2px solid var(--emerald);outline-offset:2px
+}
+.workspace-section-nav .ic{margin-right:6px}
+.workspace-page main[id],.workspace-page section[id]{scroll-margin-top:22px}
+.workspace-page>section.card,.workspace-page>div.card{
+  min-width:0
+}
+.workspace-page .data-table,.workspace-page .table-stack{
+  font-variant-numeric:tabular-nums
+}
+.workspace-page .card h2:first-child{line-height:1.35}
+.workspace-page .pro-form,.workspace-page form.grid{min-width:0}
+.workspace-page .field{min-width:0}
+.workspace-page input,.workspace-page select,.workspace-page textarea{max-width:100%}
+.workspace-page .table-scroll,.workspace-page .workspace-data-card{
+  min-width:0;overscroll-behavior-x:contain
+}
+@media(max-width:760px){
+  .workspace-section-nav{margin:0 0 16px;padding:6px}
+  .workspace-section-nav a{min-height:42px;padding:8px 11px;font-size:.78rem}
+  .workspace-page>section.card{padding:16px}
+  .workspace-page .page-header{align-items:flex-start}
+}
+@media(max-width:560px){
+  .workspace-section-nav{gap:4px}
+  .workspace-section-nav a{padding:8px 10px}
+  .workspace-page .page-header>.btn,.workspace-page .page-header>a{
+    min-height:42px;white-space:normal
+  }
+}
