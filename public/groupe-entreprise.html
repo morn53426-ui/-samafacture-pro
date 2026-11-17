@@ -8,6 +8,7 @@
 <script src="js/theme.js"></script>
 <script src="js/icons.js"></script>
 <link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/enterprise-workspace.css" />
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <style>
 .group-layout{display:grid;gap:20px;max-width:1180px}
@@ -60,16 +61,24 @@
 <body>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content workspace-page">
-    <div class="page-header workspace-page-header">
+  <main class="main-content workspace-page" id="main-content" tabindex="-1">
+    <header class="page-header workspace-page-header">
       <div>
-        <div class="subscription-eyebrow">OFFRE ENTREPRISE</div>
+        <div class="subscription-eyebrow">ESPACE ENTREPRISE · PILOTAGE MULTI-SOCIÉTÉS</div>
         <h1>Groupe & sociétés</h1>
-        <p class="group-muted">Gérez plusieurs sociétés distinctes depuis un espace de pilotage commun.</p>
+        <p class="group-muted">Une vue claire de vos filiales, de leurs indicateurs et des actions à suivre.</p>
       </div>
-    </div>
-    <div id="group-status" class="group-status" aria-live="polite"></div>
-    <div id="group-content" class="group-layout"><div class="group-panel">Chargement du groupe…</div></div>
+      <button class="btn btn-outline" type="button" onclick="load()"><i class="ic" data-icon="refresh-cw"></i> Actualiser</button>
+    </header>
+    <div id="group-status" class="group-status" role="status" aria-live="polite"></div>
+    <nav class="group-section-nav" id="group-section-nav" aria-label="Sections du centre de pilotage" hidden>
+      <a href="#group-overview">Vue d’ensemble</a>
+      <a href="#group-alerts">Alertes</a>
+      <a href="#group-performance">Performance</a>
+      <a href="#group-companies">Sociétés</a>
+      <a href="#group-invitations">Invitations</a>
+    </nav>
+    <div id="group-content" class="group-layout" aria-busy="true"><div class="group-panel">Chargement du groupe…</div></div>
   </main>
 </div>
 <script src="js/api.js"></script>
@@ -82,8 +91,12 @@ const root=document.getElementById('group-content');
 const statusRoot=document.getElementById('group-status');
 const currentUser=Api.currentUser()||{};
 
+function setGroupNavigation(visible){
+  const navigation=document.getElementById('group-section-nav');
+  if(navigation)navigation.hidden=!visible;
+}
 function message(text,kind='info'){
-  statusRoot.innerHTML='<div class="'+(kind==='error'?'error-box':'group-note')+'">'+escapeHtml(text)+'</div>';
+  statusRoot.innerHTML='<div role="status" class="'+(kind==='error'?'error-box':'group-note')+'">'+escapeHtml(text)+'</div>';
 }
 function money(value,currency){
   return formatMontant(Number(value||0),currency||'FCFA');
@@ -127,6 +140,7 @@ async function copyInvitationLink(invitationId,button){
 }
 
 function renderCreate(){
+  setGroupNavigation(false);
   root.innerHTML=`
     <section class="group-panel">
       <h2>Créer votre groupe</h2>
@@ -149,6 +163,7 @@ function renderCreate(){
 
 
 function renderMembership(membership){
+  setGroupNavigation(false);
   const group=membership.groupe||{};
   root.innerHTML=`
     <section class="group-panel">
@@ -171,10 +186,12 @@ function renderMembership(membership){
 }
 
 function renderGroup(data,dashboard){
+  setGroupNavigation(true);
   const group=data.groupe;
   const companies=data.societes||[];
   const metricsByCompany=new Map((dashboard?.societes||[]).map(company=>[Number(company.id),company]));
   const invitations=data.invitations||[];
+  const alertes=dashboard?.alertes||[];
   const invoiceCurrencies=dashboard?.factures_par_devise||[];
   const expenseCurrencies=dashboard?.depenses_par_devise||[];
   const stockCurrencies=dashboard?.stocks_par_devise||[];
@@ -196,18 +213,24 @@ function renderGroup(data,dashboard){
     const overdueCount=Number(invoice.nombre_en_retard||0);
     const stockAlerts=Number(stock.ruptures_stock||0)+Number(stock.stocks_faibles||0);
     return `
-      <section class="group-currency-card">
+      <section class="group-currency-card" aria-label="Indicateurs en ${escapeHtml(currency)}">
         <h3>${escapeHtml(currency)}</h3>
-        <div class="group-metric-grid">
+        <div class="group-metric-section-label">Indicateurs principaux</div>
+        <div class="group-metric-grid group-metric-grid-primary">
           <div class="group-metric"><small>Chiffre d’affaires facturé</small><strong>${money(invoice.total_facture,currency)}</strong><em>${invoiceCount} facture(s)</em></div>
-          <div class="group-metric"><small>Montant encaissé</small><strong>${money(invoice.total_encaisse,currency)}</strong><em>Montant actuellement enregistré sur les factures</em></div>
+          <div class="group-metric"><small>Montant encaissé</small><strong>${money(invoice.total_encaisse,currency)}</strong><em>Somme enregistrée sur les factures</em></div>
           <div class="group-metric"><small>Factures impayées</small><strong>${money(invoice.total_impaye,currency)}</strong><em>${unpaidCount} facture(s) avec solde restant</em></div>
           <div class="group-metric"><small>Factures en retard</small><strong>${money(invoice.total_en_retard,currency)}</strong><em>${overdueCount} facture(s) échue(s)</em></div>
-          <div class="group-metric"><small>Dépenses enregistrées</small><strong>${money(expense.total_depenses,currency)}</strong><em>${Number(expense.nombre_depenses||0)} dépense(s)</em></div>
-          <div class="group-metric"><small>Solde des caisses actives</small><strong>${money(cash.solde_total,currency)}</strong><em>${Number(cash.nombre_caisses||0)} caisse(s) suivie(s)</em></div>
-          <div class="group-metric"><small>Valeur estimée du stock</small><strong>${money(stock.valeur_stock_estimee,currency)}</strong><em>${Number(stock.nombre_produits||0)} produit(s) au catalogue</em></div>
-          <div class="group-metric"><small>Alertes de stock</small><strong>${stockAlerts}</strong><em>${Number(stock.ruptures_stock||0)} rupture(s) · ${Number(stock.stocks_faibles||0)} stock(s) faible(s)</em></div>
         </div>
+        <details class="group-secondary-details">
+          <summary>Voir les indicateurs de dépenses, caisses et stocks</summary>
+          <div class="group-metric-grid group-metric-grid-secondary">
+            <div class="group-metric"><small>Dépenses enregistrées</small><strong>${money(expense.total_depenses,currency)}</strong><em>${Number(expense.nombre_depenses||0)} dépense(s)</em></div>
+            <div class="group-metric"><small>Solde des caisses actives</small><strong>${money(cash.solde_total,currency)}</strong><em>${Number(cash.nombre_caisses||0)} caisse(s) suivie(s)</em></div>
+            <div class="group-metric"><small>Valeur estimée du stock</small><strong>${money(stock.valeur_stock_estimee,currency)}</strong><em>${Number(stock.nombre_produits||0)} produit(s) au catalogue</em></div>
+            <div class="group-metric"><small>Alertes de stock</small><strong>${stockAlerts}</strong><em>${Number(stock.ruptures_stock||0)} rupture(s) · ${Number(stock.stocks_faibles||0)} stock(s) faible(s)</em></div>
+          </div>
+        </details>
       </section>`;
   }).join('');
 
@@ -233,7 +256,6 @@ function renderGroup(data,dashboard){
     return `<div class="group-performance-currency"><h3>${escapeHtml(currency)}</h3>${bars}</div>`;
   }).join('');
 
-  const alertes=dashboard?.alertes||[];
   const alertHtml=alertes.map(item=>{
     const isInvoice=item.type==='factures_en_retard';
     const title=isInvoice?'Factures en retard':'Stock à surveiller';
@@ -273,30 +295,38 @@ function renderGroup(data,dashboard){
   }).join('');
 
   root.innerHTML=`
-    <section class="group-panel">
-      <h2>${escapeHtml(group.nom)}</h2>
-      <p class="group-muted">Centre de pilotage de ${companies.length} société(s). Les comptes, utilisateurs et données restent séparés ; la direction consulte uniquement les sociétés ayant accepté le rattachement.</p>
+    <section class="group-panel group-overview" id="group-overview" aria-labelledby="group-overview-title">
+      <div class="group-overview-heading">
+        <div>
+          <div class="group-section-eyebrow">Vue d’ensemble</div>
+          <h2 id="group-overview-title">${escapeHtml(group.nom)}</h2>
+          <p class="group-muted">Centre de pilotage de ${companies.length} société(s). Les comptes et les données restent séparés ; seules les sociétés ayant accepté le rattachement sont visibles ici.</p>
+        </div>
+        <span class="group-status-chip"><i class="ic" data-icon="check-circle" aria-hidden="true"></i> Groupe actif</span>
+      </div>
+      <div class="group-overview-kpis" aria-label="Résumé du groupe">
+        <article class="group-overview-kpi"><span>Sociétés rattachées</span><strong>${companies.length}</strong><small>Société principale incluse</small></article>
+        <article class="group-overview-kpi"><span>Invitations en cours</span><strong>${invitations.length}</strong><small>Accès en attente de confirmation</small></article>
+        <article class="group-overview-kpi"><span>Alertes à examiner</span><strong>${alertes.length}</strong><small>Factures ou stocks à surveiller</small></article>
+        <article class="group-overview-kpi"><span>Devises suivies</span><strong>${currencies.length}</strong><small>Indicateurs gardés séparés par devise</small></article>
+      </div>
       <div class="group-dashboard-grid">${currencyCards||'<div class="group-empty">Les indicateurs financiers apparaîtront dès que les sociétés auront enregistré des opérations.</div>'}</div>
       <p class="group-disclaimer">${escapeHtml(dashboard?.note||'Les montants sont présentés séparément par devise.')}</p>
     </section>
-    <section class="group-panel">
-      <h2>Alertes du groupe</h2>
-      <p class="group-muted">Factures échues et niveaux de stock nécessitant une vérification.</p>
+    <section class="group-panel" id="group-alerts" aria-labelledby="group-alerts-title">
+      <div class="group-panel-heading"><div><h2 id="group-alerts-title">Alertes du groupe</h2><p class="group-muted">Les points qui nécessitent une vérification ou une action.</p></div><span class="group-section-count">${alertes.length}</span></div>
       <div class="group-alert-list">${alertHtml||'<div class="group-empty">Aucune alerte de facture échue ou de stock critique détectée.</div>'}</div>
     </section>
-    <section class="group-panel">
-      <h2>Performance sur les six derniers mois</h2>
-      <p class="group-muted">Montant des factures émises par mois, regroupé par devise. Les factures annulées sont exclues.</p>
+    <section class="group-panel" id="group-performance" aria-labelledby="group-performance-title">
+      <div class="group-panel-heading"><div><h2 id="group-performance-title">Performance sur les six derniers mois</h2><p class="group-muted">Montant des factures émises par mois, regroupé par devise. Les factures annulées sont exclues.</p></div></div>
       <div class="group-performance">${trendHtml||'<div class="group-empty">Aucune facture émise sur la période disponible.</div>'}</div>
     </section>
-    <section class="group-panel">
-      <h2>Sociétés du groupe</h2>
-      <p class="group-muted">${companies.length} société(s) rattachée(s), société principale incluse.</p>
+    <section class="group-panel" id="group-companies" aria-labelledby="group-companies-title">
+      <div class="group-panel-heading"><div><h2 id="group-companies-title">Sociétés du groupe</h2><p class="group-muted">${companies.length} société(s) rattachée(s), société principale incluse.</p></div></div>
       <div class="group-company-list">${companyHtml}</div>
     </section>
-    <section class="group-panel">
-      <h2>Inviter une société</h2>
-      <p class="group-muted">Le propriétaire de la société invitée doit accepter l’accès administrateur avant que ses données soient visibles par le groupe. L’invitation expire après 7 jours.</p>
+    <section class="group-panel" id="group-invitations" aria-labelledby="group-invitations-title">
+      <div class="group-panel-heading"><div><h2 id="group-invitations-title">Inviter une société</h2><p class="group-muted">Le propriétaire de la société invitée doit accepter l’accès administrateur avant que ses données soient visibles par le groupe. L’invitation expire après 7 jours.</p></div></div>
       <form id="invite-company-form" class="group-form">
         <div class="field"><label for="company-email">Email du propriétaire de la société</label><input id="company-email" type="email" maxlength="190" required placeholder="direction@entreprise.com" /></div>
         <button class="btn btn-primary" type="submit">Envoyer l’invitation</button>
@@ -361,6 +391,8 @@ function renderGroup(data,dashboard){
   }));
 }
 async function load(){
+  setGroupNavigation(false);
+  root.setAttribute('aria-busy','true');
   try{
     if(currentUser.plan==='entreprise'){
       const data=await Api.get('/pro/company-group');
@@ -380,6 +412,7 @@ async function load(){
     if(currentUser.plan==='entreprise'){renderCreate();return;}
     root.innerHTML='<section class="group-panel"><h2>Formule Entreprise requise</h2><p class="group-muted">La gestion des groupes et filiales est réservée à la formule Entreprise.</p><a class="btn btn-primary" href="abonnement.html">Voir les formules</a></section>';
   }catch(err){message(err.message,'error');}
+  finally{root.setAttribute('aria-busy','false');}
 }
 load();
 </script>
