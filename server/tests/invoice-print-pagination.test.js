@@ -72,7 +72,7 @@ function makeDocumentHtml() {
     frais_livraison: 0,
     commentaires: ''
   };
-  const lignes = Array.from({ length: 26 }, (_, index) => ({
+  const lignes = Array.from({ length: 48 }, (_, index) => ({
     designation: 'Prestation professionnelle ' + (index + 1) +
       ' — analyse, préparation, coordination, exécution et contrôle qualité',
     quantite: 1,
@@ -136,7 +136,7 @@ test('un devis long garde chaque bloc complémentaire ensemble sans bloquer la p
     });
     const pageCount = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
     assert.ok(pageCount >= 2,
-      'le jeu de données volumineux doit produire un PDF multi-pages');
+      'le jeu de données volumineux doit produire un PDF multi-pages (pages détectées : ' + pageCount + ')');
   } finally {
     await browser.close().catch(() => {});
   }
