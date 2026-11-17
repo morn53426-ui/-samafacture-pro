@@ -211,6 +211,8 @@ function renderMembership(membership){
 function renderGroup(data,dashboard){
   setGroupNavigation(true);
   const group=data.groupe;
+  const activeViewName=document.querySelector('.enterprise-console-view small');
+  if(activeViewName)activeViewName.textContent=group?.nom||currentUser.entreprise_nom||'Groupe multi-sociétés';
   const companies=data.societes||[];
   const companyPagination=data.pagination||dashboard?.pagination||null;
   const totalCompanies=Number(companyPagination?.total??companies.length);
