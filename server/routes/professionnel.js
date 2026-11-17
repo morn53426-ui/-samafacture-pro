@@ -1391,9 +1391,10 @@ router.get('/company-group/dashboard', async (req, res, next) => {
       [actor(req)]
     );
     if (!group) return res.status(404).json({ error: 'Groupe de sociétés introuvable.' });
+
     const [companies] = await pool.query(
       `SELECT gc.company_owner_id AS id, gc.is_primary, u.entreprise_nom, u.nom AS contact_nom,
-              u.pays_code, u.devise
+              u.pays_code, u.devise, u.fuseau_horaire
        FROM pro_company_group_companies gc
        JOIN users u ON u.id = gc.company_owner_id
        WHERE gc.group_id = ?
@@ -1401,17 +1402,40 @@ router.get('/company-group/dashboard', async (req, res, next) => {
       [group.id]
     );
     const ids = companies.map(company => Number(company.id));
-    if (!ids.length) return res.json({ groupe: group, societes: [], factures_par_devise: [], depenses_par_devise: [] });
+    if (!ids.length) {
+      return res.json({
+        groupe: group, societes: [], factures_par_devise: [], depenses_par_devise: [],
+        stocks_par_devise: [], caisses_par_devise: [], performance_mensuelle: [], alertes: []
+      });
+    }
+
     const slots = ids.map(() => '?').join(', ');
+    const dateCase = 'CASE f.user_id ' + companies.map(() => 'WHEN ? THEN ?').join(' ') + " ELSE '9999-12-31' END";
+    const dateCaseParams = companies.flatMap(company => [
+      Number(company.id),
+      localDateString(company.fuseau_horaire || 'Africa/Dakar')
+    ]);
+
     const [invoiceRows] = await pool.query(
-      `SELECT user_id, devise, COUNT(*) AS nombre_factures,
-              COALESCE(SUM(total),0) AS total_facture,
-              COALESCE(SUM(montant_paye),0) AS total_encaisse
-       FROM factures
-       WHERE user_id IN (${slots}) AND type = 'facture' AND statut <> 'annulee'
-       GROUP BY user_id, devise`,
-      ids
+      `SELECT f.user_id, f.devise, COUNT(*) AS nombre_factures,
+              COALESCE(SUM(f.total),0) AS total_facture,
+              COALESCE(SUM(f.montant_paye),0) AS total_encaisse,
+              COALESCE(SUM(GREATEST(f.total - f.montant_paye,0)),0) AS total_impaye,
+              SUM(CASE WHEN GREATEST(f.total - f.montant_paye,0) > 0.01 THEN 1 ELSE 0 END) AS nombre_impayees,
+              COALESCE(SUM(CASE
+                WHEN GREATEST(f.total - f.montant_paye,0) > 0.01
+                 AND (f.statut = 'en_retard' OR (f.date_echeance IS NOT NULL AND f.date_echeance < ${dateCase}))
+                THEN GREATEST(f.total - f.montant_paye,0) ELSE 0 END),0) AS total_en_retard,
+              SUM(CASE
+                WHEN GREATEST(f.total - f.montant_paye,0) > 0.01
+                 AND (f.statut = 'en_retard' OR (f.date_echeance IS NOT NULL AND f.date_echeance < ${dateCase}))
+                THEN 1 ELSE 0 END) AS nombre_en_retard
+       FROM factures f
+       WHERE f.user_id IN (${slots}) AND f.type = 'facture' AND f.statut <> 'annulee'
+       GROUP BY f.user_id, f.devise`,
+      [...dateCaseParams, ...dateCaseParams, ...ids]
     );
+
     const [expenseRows] = await pool.query(
       `SELECT d.user_id, u.devise, COUNT(*) AS nombre_depenses,
               COALESCE(SUM(d.montant),0) AS total_depenses
@@ -1421,38 +1445,181 @@ router.get('/company-group/dashboard', async (req, res, next) => {
        GROUP BY d.user_id, u.devise`,
       ids
     );
-    const companiesWithTotals = companies.map(company => ({
-      ...company,
-      factures: invoiceRows.filter(row => Number(row.user_id) === Number(company.id)).map(row => ({
-        devise: row.devise, nombre: Number(row.nombre_factures), total: Number(row.total_facture), encaisse: Number(row.total_encaisse)
-      })),
-      depenses: expenseRows.filter(row => Number(row.user_id) === Number(company.id)).map(row => ({
-        devise: row.devise, nombre: Number(row.nombre_depenses), total: Number(row.total_depenses)
-      }))
-    }));
+
+    const [stockRows] = await pool.query(
+      `SELECT p.user_id, u.devise, COUNT(*) AS nombre_produits,
+              SUM(CASE WHEN COALESCE(s.quantite,p.stock,0) <= 0 THEN 1 ELSE 0 END) AS ruptures_stock,
+              SUM(CASE WHEN COALESCE(s.quantite,p.stock,0) > 0
+                         AND COALESCE(s.quantite,p.stock,0) <= COALESCE(p.stock_minimum,0)
+                       THEN 1 ELSE 0 END) AS stocks_faibles,
+              COALESCE(SUM(CASE WHEN p.prix_achat > 0
+                THEN COALESCE(s.quantite,p.stock,0) * p.prix_achat ELSE 0 END),0) AS valeur_stock_estimee,
+              SUM(CASE WHEN COALESCE(s.quantite,p.stock,0) > 0 AND COALESCE(p.prix_achat,0) <= 0
+                       THEN 1 ELSE 0 END) AS produits_sans_cout
+       FROM produits p
+       JOIN users u ON u.id = p.user_id
+       LEFT JOIN (
+         SELECT user_id, produit_id, SUM(quantite) AS quantite
+         FROM pro_stocks_entrepots
+         WHERE user_id IN (${slots})
+         GROUP BY user_id, produit_id
+       ) s ON s.user_id = p.user_id AND s.produit_id = p.id
+       WHERE p.user_id IN (${slots})
+       GROUP BY p.user_id, u.devise`,
+      [...ids, ...ids]
+    );
+
+    const [cashRows] = await pool.query(
+      `SELECT c.user_id, c.devise, COUNT(*) AS nombre_caisses,
+              COALESCE(SUM(c.solde_initial + COALESCE(o.solde_operations,0)),0) AS solde_total
+       FROM pro_caisses c
+       LEFT JOIN (
+         SELECT user_id, caisse_id,
+                SUM(CASE WHEN type = 'entree' THEN montant WHEN type = 'sortie' THEN -montant ELSE 0 END) AS solde_operations
+         FROM pro_caisse_operations
+         WHERE user_id IN (${slots})
+         GROUP BY user_id, caisse_id
+       ) o ON o.user_id = c.user_id AND o.caisse_id = c.id
+       WHERE c.user_id IN (${slots}) AND c.active = 1
+       GROUP BY c.user_id, c.devise`,
+      [...ids, ...ids]
+    );
+
+    const [performanceRows] = await pool.query(
+      `SELECT user_id, devise, DATE_FORMAT(date_emission,'%Y-%m') AS mois,
+              COUNT(*) AS nombre_factures, COALESCE(SUM(total),0) AS total_facture
+       FROM factures
+       WHERE user_id IN (${slots}) AND type = 'facture' AND statut <> 'annulee'
+         AND date_emission >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+       GROUP BY user_id, devise, mois
+       ORDER BY mois ASC`,
+      ids
+    );
+
+    const addCurrency = (map, row, factory, apply) => {
+      const currency = row.devise || 'INCONNUE';
+      const item = map.get(currency) || factory(currency);
+      apply(item, row);
+      map.set(currency, item);
+    };
+
     const invoiceCurrencies = new Map();
     for (const row of invoiceRows) {
-      const key = row.devise || 'INCONNUE';
-      const item = invoiceCurrencies.get(key) || { devise: key, nombre_factures: 0, total_facture: 0, total_encaisse: 0 };
-      item.nombre_factures += Number(row.nombre_factures || 0);
-      item.total_facture += Number(row.total_facture || 0);
-      item.total_encaisse += Number(row.total_encaisse || 0);
-      invoiceCurrencies.set(key, item);
+      addCurrency(invoiceCurrencies, row,
+        devise => ({ devise, nombre_factures: 0, total_facture: 0, total_encaisse: 0, total_impaye: 0, nombre_impayees: 0, total_en_retard: 0, nombre_en_retard: 0 }),
+        (item, value) => {
+          for (const field of ['nombre_factures','total_facture','total_encaisse','total_impaye','nombre_impayees','total_en_retard','nombre_en_retard']) {
+            item[field] += Number(value[field] || 0);
+          }
+        }
+      );
     }
+
     const expenseCurrencies = new Map();
     for (const row of expenseRows) {
-      const key = row.devise || 'INCONNUE';
-      const item = expenseCurrencies.get(key) || { devise: key, nombre_depenses: 0, total_depenses: 0 };
-      item.nombre_depenses += Number(row.nombre_depenses || 0);
-      item.total_depenses += Number(row.total_depenses || 0);
-      expenseCurrencies.set(key, item);
+      addCurrency(expenseCurrencies, row,
+        devise => ({ devise, nombre_depenses: 0, total_depenses: 0 }),
+        (item, value) => {
+          item.nombre_depenses += Number(value.nombre_depenses || 0);
+          item.total_depenses += Number(value.total_depenses || 0);
+        }
+      );
     }
+
+    const stockCurrencies = new Map();
+    for (const row of stockRows) {
+      addCurrency(stockCurrencies, row,
+        devise => ({ devise, nombre_produits: 0, ruptures_stock: 0, stocks_faibles: 0, valeur_stock_estimee: 0, produits_sans_cout: 0 }),
+        (item, value) => {
+          for (const field of ['nombre_produits','ruptures_stock','stocks_faibles','valeur_stock_estimee','produits_sans_cout']) {
+            item[field] += Number(value[field] || 0);
+          }
+        }
+      );
+    }
+
+    const cashCurrencies = new Map();
+    for (const row of cashRows) {
+      addCurrency(cashCurrencies, row,
+        devise => ({ devise, nombre_caisses: 0, solde_total: 0 }),
+        (item, value) => {
+          item.nombre_caisses += Number(value.nombre_caisses || 0);
+          item.solde_total += Number(value.solde_total || 0);
+        }
+      );
+    }
+
+    const companyById = new Map(companies.map(company => [Number(company.id), company]));
+    const companiesWithTotals = companies.map(company => {
+      const companyId = Number(company.id);
+      return {
+        ...company,
+        factures: invoiceRows.filter(row => Number(row.user_id) === companyId).map(row => ({
+          devise: row.devise, nombre: Number(row.nombre_factures), total: Number(row.total_facture),
+          encaisse: Number(row.total_encaisse), impaye: Number(row.total_impaye),
+          nombre_impayees: Number(row.nombre_impayees), en_retard: Number(row.total_en_retard),
+          nombre_en_retard: Number(row.nombre_en_retard)
+        })),
+        depenses: expenseRows.filter(row => Number(row.user_id) === companyId).map(row => ({
+          devise: row.devise, nombre: Number(row.nombre_depenses), total: Number(row.total_depenses)
+        })),
+        stock: stockRows.filter(row => Number(row.user_id) === companyId).map(row => ({
+          devise: row.devise, nombre_produits: Number(row.nombre_produits),
+          ruptures: Number(row.ruptures_stock), stocks_faibles: Number(row.stocks_faibles),
+          valeur_estimee: Number(row.valeur_stock_estimee), produits_sans_cout: Number(row.produits_sans_cout)
+        })),
+        caisses: cashRows.filter(row => Number(row.user_id) === companyId).map(row => ({
+          devise: row.devise, nombre: Number(row.nombre_caisses), solde: Number(row.solde_total)
+        })),
+        performance: performanceRows.filter(row => Number(row.user_id) === companyId).map(row => ({
+          devise: row.devise, mois: row.mois, nombre_factures: Number(row.nombre_factures),
+          total_facture: Number(row.total_facture)
+        }))
+      };
+    });
+
+    const alertes = [];
+    for (const row of invoiceRows) {
+      if (Number(row.nombre_en_retard || 0) > 0) {
+        const company = companyById.get(Number(row.user_id));
+        alertes.push({
+          type: 'factures_en_retard',
+          societe_id: Number(row.user_id),
+          societe: company?.entreprise_nom || company?.contact_nom || 'Société',
+          devise: row.devise || company?.devise || 'INCONNUE',
+          nombre: Number(row.nombre_en_retard),
+          montant: Number(row.total_en_retard)
+        });
+      }
+    }
+    for (const row of stockRows) {
+      const lowStock = Number(row.ruptures_stock || 0) + Number(row.stocks_faibles || 0);
+      if (lowStock > 0) {
+        const company = companyById.get(Number(row.user_id));
+        alertes.push({
+          type: 'stocks_a_surveiller',
+          societe_id: Number(row.user_id),
+          societe: company?.entreprise_nom || company?.contact_nom || 'Société',
+          devise: row.devise || company?.devise || 'INCONNUE',
+          ruptures: Number(row.ruptures_stock || 0),
+          stocks_faibles: Number(row.stocks_faibles || 0)
+        });
+      }
+    }
+
     res.json({
       groupe: group,
       societes: companiesWithTotals,
       factures_par_devise: [...invoiceCurrencies.values()],
       depenses_par_devise: [...expenseCurrencies.values()],
-      note: 'Les montants sont regroupés par devise ; aucune conversion de change ou consolidation comptable n’est réalisée.'
+      stocks_par_devise: [...stockCurrencies.values()],
+      caisses_par_devise: [...cashCurrencies.values()],
+      performance_mensuelle: performanceRows.map(row => ({
+        devise: row.devise || 'INCONNUE', mois: row.mois,
+        nombre_factures: Number(row.nombre_factures), total_facture: Number(row.total_facture)
+      })),
+      alertes,
+      note: 'Les montants sont regroupés par devise ; les soldes affichés concernent uniquement les caisses actives enregistrées dans SamaFacture. La valorisation du stock utilise les prix d’achat renseignés. Aucune conversion de change ou consolidation comptable OHADA n’est réalisée.'
     });
   } catch (err) { next(err); }
 });
