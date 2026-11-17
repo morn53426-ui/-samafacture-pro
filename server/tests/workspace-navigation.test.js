@@ -51,6 +51,8 @@ describe('Navigation et structure des pages métier', () => {
     assert.match(sidebarScript, /class="nav-label"/);
     assert.match(sidebarScript, /aria-current="page"/);
     assert.match(sidebarStyles, /--sidebar-collapsed-w:\s*96px/);
+    assert.match(sidebarStyles, /\.sidebar-brand \.mark\s*\{[\s\S]*?width:\s*52px/);
+    assert.match(sidebarStyles, /\.nav-item \.ic \.icon\s*\{[\s\S]*?width:\s*24px/);
     assert.match(sidebarStyles, /\.sidebar\.is-collapsed \.nav-item\s*\{[\s\S]*?flex-direction:\s*column/);
     assert.match(sidebarStyles, /\.sidebar\.is-collapsed \.nav-item \.nav-label\s*\{[\s\S]*?display:\s*block !important/);
     assert.match(sidebarStyles, /\.sidebar\.is-collapsed \.nav-item\.active \.ic\s*\{[\s\S]*?background:\s*#172a4b/);
