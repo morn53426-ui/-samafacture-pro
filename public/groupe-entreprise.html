@@ -86,7 +86,7 @@
       <div class="enterprise-create-actions-list">
         <a href="nouvelle-facture.html"><i class="ic" data-icon="file-plus"></i> Nouvelle facture</a>
         <a href="devis.html"><i class="ic" data-icon="file-check"></i> Créer un devis</a>
-        <a href="#group-invitations"><i class="ic" data-icon="user-round-plus"></i> Inviter une société</a>
+        <a href="#group-invitations"><i class="ic" data-icon="user-round"></i> Inviter une société</a>
         <a href="depenses.html"><i class="ic" data-icon="plus-circle"></i> Ajouter une dépense</a>
         <a href="achats.html"><i class="ic" data-icon="truck"></i> Enregistrer un achat</a>
       </div>
@@ -281,7 +281,7 @@ function renderGroup(data,dashboard){
         <div><h3>${title}</h3><p>${description}</p></div>
       </header>
       <div class="enterprise-dashboard-card-body">${content}</div>
-      ${action?'<a class="enterprise-dashboard-card-link" href="'+action.href+'">'+action.label+' <span aria-hidden="true">→</span></a>':''}
+      ${action?'<a class="enterprise-dashboard-card-link" href="'+action+'">Voir le module <span aria-hidden="true">→</span></a>':''}
     </article>`;
   const collectionsHtml=invoiceCurrencies.length?invoiceCurrencies.map(row=>{
     const total=Number(row.total_facture||0);
