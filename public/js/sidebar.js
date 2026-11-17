@@ -58,9 +58,11 @@ function renderSidebar(activePage) {
   }
 
   const planLabels = { gratuit: 'Plan Gratuit', starter: 'Plan Starter', pro: 'Plan Pro', entreprise: 'Plan Entreprise' };
-  // Sur ordinateur, la navigation démarre en mode compact pour laisser la priorité
-  // à la zone de travail. La préférence utilisateur est conservée entre les pages.
-  const sidebarCollapsed = window.matchMedia('(min-width: 901px)').matches && (() => {
+  const isEnterpriseConsole = location.pathname.endsWith('/groupe-entreprise.html');
+  document.body.classList.toggle('enterprise-console-shell', isEnterpriseConsole);
+  // Le centre de pilotage possède son propre rail vertical, avec libellés sous les icônes.
+  // La préférence de repli générale n'est donc pas modifiée pour les autres pages.
+  const sidebarCollapsed = !isEnterpriseConsole && window.matchMedia('(min-width: 901px)').matches && (() => {
     try { return localStorage.getItem('sf-sidebar-collapsed') !== 'false'; }
     catch { return true; }
   })();
@@ -168,16 +170,32 @@ function renderTopbar(title, subtitle) {
     : 'Espace de travail';
   const avatar = typeof initials === 'function' ? initials(displayName) : 'SF';
   const isLocalizationPage = location.pathname.endsWith('/internationalisation.html');
+  const isEnterpriseConsole = location.pathname.endsWith('/groupe-entreprise.html');
 
   el.outerHTML = `
-    <header class="app-topbar" aria-label="Barre d'outils">
-      <form class="app-topbar-search" role="search" onsubmit="return submitWorkspaceSearch(event)">
-        <span class="ic" aria-hidden="true">${Icon('search')}</span>
-        <input id="workspace-search" type="search"
-          placeholder="Rechercher un client (nom, email, téléphone)..."
-          aria-label="Rechercher un client par nom, email ou téléphone" />
-        <button type="submit" aria-label="Lancer la recherche">${Icon('arrow-up-right')}</button>
-      </form>
+    <header class="app-topbar${isEnterpriseConsole ? ' enterprise-console-topbar' : ''}" aria-label="Barre d'outils">
+      ${isEnterpriseConsole ? `
+        <button type="button" class="enterprise-console-menu-toggle" onclick="toggleSidebar()" aria-label="Ouvrir la navigation" aria-controls="app-navigation" aria-expanded="false">
+          ${Icon('menu')}
+        </button>
+        <a class="enterprise-console-brand" href="dashboard.html" aria-label="SamaFacture Pro, tableau de bord">
+          <span class="enterprise-console-brand-mark"><img src="images/icon-192.png" alt="" /></span>
+          <span><strong>SamaFacture <em>Pro</em></strong><small>Gestion d’entreprise</small></span>
+        </a>
+        <div class="enterprise-console-view">
+          <span>Vue consolidée</span>
+          <small>${escapeHtml(user.entreprise_nom || 'Groupe multi-sociétés')}</small>
+          ${Icon('chevron-down')}
+        </div>
+      ` : `
+        <form class="app-topbar-search" role="search" onsubmit="return submitWorkspaceSearch(event)">
+          <span class="ic" aria-hidden="true">${Icon('search')}</span>
+          <input id="workspace-search" type="search"
+            placeholder="Rechercher un client (nom, email, téléphone)..."
+            aria-label="Rechercher un client par nom, email ou téléphone" />
+          <button type="submit" aria-label="Lancer la recherche">${Icon('arrow-up-right')}</button>
+        </form>
+      `}
       <div class="app-topbar-account">
         <div class="app-topbar-avatar" aria-hidden="true">${escapeHtml(avatar)}</div>
         <div>
