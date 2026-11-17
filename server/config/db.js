@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 14;
+const CURRENT_SCHEMA_VERSION = 15;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -167,6 +167,8 @@ async function runMigrations(conn) {
   // v12 : outbox email chiffrée et durable (migration 007).
   // v13 : preuve email à usage unique avant rattachement multi-sociétés (migration 008).
   // v14 : preuve email à usage unique pour les invitations classiques d’équipe (migration 009).
+  // v15 : fondation des abonnements SaaS (prix versionnés, consentements, mandats,
+  // périodes, tentatives, inbox webhook et audit) ; aucune donnée ni paiement créé.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -428,6 +430,21 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of teamInvitationVerificationStatements) {
+    await conn.query(statement);
+  }
+
+  // Fondation du moteur d'abonnements SaaS : migration additive et idempotente.
+  // Elle ne publie aucun tarif, ne crée aucun mandat et ne déclenche aucun paiement.
+  const saasSubscriptionsPath = path.join(__dirname, '..', 'database', 'migrations', '010_saas_subscriptions_simulation.sql');
+  const saasSubscriptionsSql = fs.readFileSync(saasSubscriptionsPath, 'utf8');
+  const saasSubscriptionsStatements = saasSubscriptionsSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of saasSubscriptionsStatements) {
     await conn.query(statement);
   }
 
