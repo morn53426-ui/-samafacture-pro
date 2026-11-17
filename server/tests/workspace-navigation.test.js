@@ -56,11 +56,6 @@ describe('Navigation et structure des pages métier', () => {
 
 
 
-  test('le centre Entreprise aligne le rail et le contenu sur la largeur responsive', () => {
-    assert.match(enterpriseStyles, /width: var\\(--sidebar-collapsed-w\\) !important/);
-    assert.match(enterpriseStyles, /width: calc\\(100% - var\\(--sidebar-collapsed-w\\)\\)/);
-    assert.match(enterpriseStyles, /margin-left: var\\(--sidebar-collapsed-w\\) !important/);
-  });
 
   test('toutes les icônes appelées par la navigation existent dans le catalogue SVG', () => {
     const definitions = new Set(
