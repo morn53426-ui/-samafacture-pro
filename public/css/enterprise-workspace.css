@@ -1200,3 +1200,31 @@ body.enterprise-console-shell .enterprise-currency-breakdown .group-currency-car
 @media (max-width: 640px) {
   .enterprise-currency-breakdown { margin-top: 17px; padding-top: 14px; }
 }
+
+
+/* Le rail du centre Entreprise reste clair, même lorsque l'espace général
+   utilise le thème sombre ; le bandeau supérieur conserve son bleu nuit. */
+body.enterprise-console-shell #app-sidebar.sidebar {
+  background: #fff !important;
+  color: #526174 !important;
+  border-right: 1px solid #e1e6ed !important;
+}
+body.enterprise-console-shell #app-sidebar .sidebar-brand,
+body.enterprise-console-shell #app-sidebar .sidebar-nav,
+body.enterprise-console-shell #app-sidebar .sidebar-foot {
+  background: #fff !important;
+  color: #526174 !important;
+}
+body.enterprise-console-shell #app-sidebar .nav-item {
+  color: #697789 !important;
+}
+body.enterprise-console-shell #app-sidebar .nav-item .ic {
+  color: #526579 !important;
+}
+body.enterprise-console-shell #app-sidebar .nav-item.active {
+  background: #eaf2fb !important;
+  color: #123d67 !important;
+}
+body.enterprise-console-shell #app-sidebar .nav-item.active .ic {
+  color: #1468a8 !important;
+}
