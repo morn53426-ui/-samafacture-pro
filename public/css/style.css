@@ -6536,3 +6536,18 @@ a.btn .icon {
 @media (max-width: 900px) {
   .subscription-payment-method-grid { grid-template-columns: 1fr; }
 }
+
+/* Impression A4 : le conteneur des compléments doit se fragmenter entre ses blocs.
+   Chaque panneau (conditions, coordonnées, acceptation et mentions) reste indivisible,
+   sans forcer l'ensemble des compléments à commencer sur une nouvelle page. */
+@media print {
+  .invoice-doc .sf-doc-extras {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+  .invoice-doc .sf-doc-extras > .sf-extra-panel,
+  .invoice-doc .sf-doc-extras > .sf-doc-legal {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
