@@ -41,13 +41,18 @@ function renderSidebar(activePage) {
   ];
 
   if (user?.plan === 'entreprise' || localStorage.getItem('sf_company_group_member') === 'true') {
-    const accountSection = nav.find(section => section.group === 'Compte');
-    if (accountSection) {
-      accountSection.items.unshift({
-        id: 'groupe-entreprise',
-        icon: 'building-2',
-        label: 'Groupe & sociétés',
-        href: 'groupe-entreprise.html'
+    // La gestion multi-sociétés est une destination métier : elle dispose de sa
+    // propre rubrique, distincte des réglages du compte et de l'abonnement.
+    const accountIndex = nav.findIndex(section => section.group === 'Compte');
+    if (accountIndex >= 0) {
+      nav.splice(accountIndex, 0, {
+        group: 'Entreprise',
+        items: [{
+          id: 'groupe-entreprise',
+          icon: 'building-2',
+          label: 'Groupe & sociétés',
+          href: 'groupe-entreprise.html'
+        }]
       });
     }
   }
@@ -65,7 +70,7 @@ function renderSidebar(activePage) {
   document.body.classList.toggle('sidebar-collapsed', sidebarCollapsed);
 
   const navHtml = nav.map(section => `
-    ${section.group ? `<div class="nav-group-label">${section.group}</div>` : ''}
+    ${section.group ? `<div class="nav-group-label" role="heading" aria-level="2">${section.group}</div>` : ''}
     ${section.items.map(item => `
       <a href="${item.href}" class="nav-item ${(activePage === item.id || (activePage === 'nouvelle-facture' && item.id === 'factures')) ? 'active' : ''}" title="${item.label}" aria-label="${item.label}" ${(activePage === item.id || (activePage === 'nouvelle-facture' && item.id === 'factures')) ? 'aria-current="page"' : ''} onclick="closeSidebar()">
         <span class="ic" aria-hidden="true">${Icon(item.icon)}</span><span class="nav-label">${item.label}</span>
