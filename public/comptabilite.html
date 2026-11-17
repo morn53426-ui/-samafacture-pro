@@ -10,12 +10,18 @@
 <body>
 <a class="workspace-skip-link" href="#main-content">Aller au contenu principal</a><div class="app-shell"><div id="sidebar-root"></div><main class="main-content workspace-page page-comptabilite" id="main-content" tabindex="-1">
   <div class="page-header workspace-page-header"><div><div class="pro-eyebrow">PILOTAGE FINANCIER</div><h1>Comptabilité OHADA</h1><p>Journaux, écritures en partie double, balance générale et grand livre.</p></div></div>
+  <nav class="workspace-section-nav" aria-label="Accès rapides à la comptabilité">
+    <a href="#accounting-entry">Saisir une écriture</a>
+    <a href="#accounting-guided">Comptabilisation guidée</a>
+    <a href="#accounting-balance">Balance générale</a>
+    <a href="#accounting-ledger">Grand livre</a>
+  </nav>
   <div class="grid grid-3" style="margin-bottom:18px">
     <article class="card stat-card"><div class="stat-label">Total débit</div><div class="stat-value mono" id="kpi-debit">—</div></article>
     <article class="card stat-card"><div class="stat-label">Total crédit</div><div class="stat-value mono" id="kpi-credit">—</div></article>
     <article class="card stat-card"><div class="stat-label">Équilibre de la balance</div><div class="stat-value" id="kpi-balance">—</div></article>
   </div>
-  <section class="card" style="margin-bottom:20px">
+  <section class="card" style="margin-bottom:20px" id="accounting-entry">
     <h2 style="margin-top:0">Saisir une écriture</h2>
     <p class="pro-note">Chaque écriture est enregistrée comme validée et devient non modifiable. Vérifiez les montants avant validation. Toute correction doit être passée par une écriture de contrepassation.</p>
     <form id="entry-form">
@@ -33,7 +39,7 @@
       </div>
     </form>
   </section>
-  <section class="card" style="margin-bottom:20px">
+  <section class="card" style="margin-bottom:20px" id="accounting-guided">
     <h2 style="margin-top:0">Comptabilisation guidée</h2>
     <p class="pro-note">Ces actions génèrent une écriture équilibrée à partir des montants déjà présents. Elles sont idempotentes : une même facture, un même paiement ou une même dépense ne peut pas être comptabilisé deux fois.</p>
     <div class="grid grid-3">
@@ -42,11 +48,11 @@
       <div class="field"><label for="post-expense">Dépense enregistrée</label><select id="post-expense"></select><button class="btn btn-outline" id="post-expense-btn" type="button">Comptabiliser la dépense</button></div>
     </div>
   </section>
-  <section class="card" style="margin-bottom:20px">
+  <section class="card" style="margin-bottom:20px" id="accounting-balance">
     <div class="page-header" style="margin-bottom:12px"><div><h2 style="margin:0">Balance générale</h2><p class="pro-note">Soldes cumulés des écritures validées.</p></div><button class="btn btn-outline" type="button" id="refresh-accounting">Actualiser</button></div>
     <div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:650px"><thead><tr><th>Compte</th><th>Libellé</th><th>Débit</th><th>Crédit</th><th>Solde D/C</th></tr></thead><tbody id="trial-balance"><tr><td colspan="5">Chargement…</td></tr></tbody></table></div>
   </section>
-  <section class="card">
+  <section class="card" id="accounting-ledger">
     <h2 style="margin-top:0">Grand livre</h2>
     <div class="grid grid-2"><div class="field"><label for="ledger-account">Compte</label><select id="ledger-account"></select></div><div class="field" style="align-self:end"><button class="btn btn-outline" type="button" id="load-ledger">Afficher le grand livre</button></div></div>
     <div id="ledger-result" class="pro-list"><p class="pro-muted">Sélectionnez un compte.</p></div>
