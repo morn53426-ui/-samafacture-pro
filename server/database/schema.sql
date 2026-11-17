@@ -208,6 +208,7 @@ CREATE TABLE IF NOT EXISTS factures_recurrentes (
   libelle VARCHAR(190) NOT NULL,
   frequence VARCHAR(20) NOT NULL DEFAULT 'mensuelle', -- hebdomadaire | mensuelle | annuelle
   prochaine_date DATE NOT NULL,
+  jour_ancre TINYINT UNSIGNED NULL,
   remise DECIMAL(14,2) NOT NULL DEFAULT 0,
   frais_livraison DECIMAL(14,2) NOT NULL DEFAULT 0,
   mode_paiement VARCHAR(50),
@@ -222,6 +223,7 @@ CREATE TABLE IF NOT EXISTS factures_recurrentes (
   factures_generees INT UNSIGNED NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_factures_recurrentes_user (user_id),
+  KEY idx_factures_recurrentes_active_due (actif, prochaine_date),
   KEY idx_factures_recurrentes_client (client_id),
   CONSTRAINT fk_factures_recurrentes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_factures_recurrentes_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE

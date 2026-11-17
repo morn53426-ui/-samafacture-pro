@@ -48,6 +48,8 @@ BACKUP_ENCRYPTION_KEY=64-caracteres-hexadecimaux
 
 Générer cette clé avec `openssl rand -hex 32`, la conserver dans un gestionnaire de secrets et stocker une copie hors du VPS. Sans une clé valide, l'application refuse de démarrer en production afin de ne pas produire de sauvegardes en clair.
 
+**Deux fichiers d'environnement sont utilisés :** `--env-file .env` à la racine sert à l'interpolation des variables Compose ; `env_file: ./server/.env` injecte les paramètres applicatifs dans `app` et `pdf-worker`. Ne remplacez pas le premier par `server/.env`. Pour une préproduction isolée, utilisez également un nom de projet Docker distinct et suivez [RECETTE_PREPRODUCTION.md](RECETTE_PREPRODUCTION.md).
+
 5. Vérifier la configuration, puis démarrer :
 
 ```bash

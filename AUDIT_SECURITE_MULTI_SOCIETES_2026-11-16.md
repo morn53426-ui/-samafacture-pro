@@ -3,6 +3,9 @@ Date : 16 novembre 2026
 Branche d'audit : `audit/security-multisocietes-review-20261116-run3`
 Base vérifiée : `main` — `70750be430c83c4bf3ff369ad453c7b1fd1af511`
 
+> **Portée historique :** les constats, références et états de Pull Requests ci-dessous décrivent l’audit du 16 novembre 2026 sur le commit `70750be430c83c4bf3ff369ad453c7b1fd1af511`. Pour éviter toute confusion avec le statut actuel du dépôt, consulter l’addendum daté du 17 novembre à la fin de ce rapport.
+
+
 ## Décision
 Aucun correctif applicatif n'est appliqué dans cette exécution. Une anomalie d'identité affectant l'acceptation des invitations multi-sociétés exige une décision d'architecture et une validation humaine : la corriger proprement nécessite une preuve de contrôle de l'adresse email et un parcours de vérification, pas un simple changement de condition. Les autres changements proposés dans les PR existantes ne sont pas fusionnés.
 
@@ -71,3 +74,29 @@ Le ruleset GitHub `protect main` (#27410527) a été lu et est actif sur `refs/h
 - Ajout de ce rapport d'audit.
 - Aucun code métier, aucune donnée, aucun paramètre, aucune migration SQL et aucun test existant n'ont été modifiés ou supprimés.
 - Aucun test local n'a été exécuté depuis cette interface ; les résultats CI indiqués sont ceux renvoyés par GitHub Actions pour les commits cités.
+
+
+## Addendum — état vérifié le 17 novembre 2026
+
+### Branche principale
+- `main` : `71e0a06812f5cd63d20f3800768431371a89b1d6`, après intégration des PR #56, #57, #59 et #67.
+- Les PR #56 (file PDF durable, factures récurrentes et exactitude des mentions de paiement), #57 (libellés accessibles des paramètres), #59 (procédure Docker/HTTPS de préproduction) et #67 (documentation SMTP et test de non-journalisation des secrets) sont fusionnées.
+- Le contrôle CI de ce nouveau commit `main` était encore en cours au moment de la rédaction de cet addendum ; consulter Actions avant toute nouvelle fusion.
+
+### Protection de main
+- Le ruleset `protect main` (#27410527) reste actif sur `refs/heads/main`.
+- Le nombre d'approbations obligatoires est désormais **0** ; la résolution des conversations reste exigée.
+- Les deux contrôles obligatoires restent `Tests Node.js et MySQL` et `Build complete source archive`.
+- La suppression de la branche et les mises à jour non fast-forward restent bloquées ; aucun acteur de contournement n'est configuré.
+
+### État des travaux multi-sociétés
+- **PR #60** — socle multi-sociétés : toujours en brouillon. GitHub signale un état de fusion `dirty` avec la tête actuelle de `main` ; la branche est basée sur un ancien commit. Ne pas fusionner avant une intégration explicite de `main`, la résolution des conflits et une nouvelle CI complète.
+- **PR #69** — preuve email à usage unique avant rattachement : toujours en brouillon et empilée sur la branche de la PR #60. Ses deux contrôles CI étaient verts sur sa tête `4347d572f4e78fe057fc3595d677619abe74e745`, mais le correctif n'est pas intégré à `main`. Le constat P1 décrit plus haut reste donc un blocage de sécurité de la version principale jusqu'à intégration contrôlée.
+- **PR #63** — accès temps réel aux filiales : dépend des tables et règles de rattachement créées par la PR #60. Ne pas la fusionner indépendamment de ce socle ; sa branche doit être actualisée et ses contrôles rejoués après intégration de la fondation.
+- **PR #64** — ce rapport d'audit : la présente branche est actualisée avec le commit `main` ci-dessus ; cette mise à jour documentaire ne corrige pas à elle seule le risque P1.
+
+### Paiement et renouvellement mensuel
+- Dans `main`, les paiements de plans livrés restent des paiements ponctuels. Aucun prélèvement récurrent ni renouvellement automatique n'est activé.
+- Le consentement explicite, le mandat récurrent compatible avec le compte marchand, les règles de renouvellement, les échecs, les résiliations et les tests sandbox restent des prérequis avant activation.
+
+**Règle de décision :** aucun changement multi-sociétés ne doit être fusionné dans `main` avant résolution des conflits, validation de l'isolation des tenants et réussite des deux contrôles obligatoires sur la tête exacte qui sera fusionnée.
