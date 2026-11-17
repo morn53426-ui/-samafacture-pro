@@ -81,8 +81,7 @@ export default [
       'server/routes/professionnel.js',
       'server/tests/company-group-ui.test.js',
       'server/tests/company-groups.test.js',
-      'server/tests/invoice-quota-migration-v8.test.js',
-      'server/tests/facture-pdf.test.js'
+      'server/tests/invoice-quota-migration-v8.test.js'
     ],
     languageOptions: {
       ecmaVersion: 'latest',
@@ -99,6 +98,14 @@ export default [
       }
     },
     rules: correctnessRules
+  },
+  {
+    files: ['server/tests/facture-pdf.test.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'commonjs',
+      globals: { ...nodeGlobals, ...browserGlobals }
+    },
+    rules: correctnessRules
   }
-
 ];
