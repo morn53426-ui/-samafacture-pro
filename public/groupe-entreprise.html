@@ -309,17 +309,17 @@ function renderGroup(data,dashboard){
       <strong>${escapeHtml(item.currency)}</strong>
       <div><span>Valeur estimée du stock</span><b>${escapeHtml(money(item.stock.valeur_stock_estimee,item.currency))}</b></div>
       <div><span>Solde des caisses actives</span><b>${escapeHtml(money(item.cash.solde_total,item.currency))}</b></div>
-      <small>${Number(item.stock.nombre_produits||0)} produit(s) · ${stockAlerts} alerte(s) de stock · ${Number(item.cash.nombre_caisses||0)} caisse(s)</small>
+      <small>${Number(item.stock.nombre_produits||0)} produit(s) · ${stockAlerts} alerte(s) · Alertes de stock · ${Number(item.cash.nombre_caisses||0)} caisse(s)</small>
     </div>`;
   }).join(''):'<div class="group-empty enterprise-dashboard-empty">Aucune donnée de stock ou de caisse.</div>';
   const dashboardCards=[
-    renderDashboardCard('Facturation émise','Factures non annulées, par devise.','file-text',
+    renderDashboardCard('Chiffre d’affaires facturé','Factures non annulées, par devise.','file-text',
       renderMetricRows(invoiceCurrencies,'total_facture',row=>Number(row.nombre_factures||0)+' facture(s)')),
     renderDashboardCard('Encaissements','Sommes enregistrées sur les factures.','hand-coins',collectionsHtml),
     renderDashboardCard('Dépenses enregistrées','Dépenses saisies, par devise.','receipt',
       renderMetricRows(expenseCurrencies,'total_depenses',row=>Number(row.nombre_depenses||0)+' dépense(s)'),'depenses.html'),
-    renderDashboardCard('Reste à recouvrer','Montants impayés et retards identifiés.','wallet',receivablesHtml,'rapports.html'),
-    renderDashboardCard('Évolution des ventes','Montant des factures émises sur six mois, par devise.','trending-up',
+    renderDashboardCard('Factures impayées & retards','Reste à recouvrer, par devise.','wallet',receivablesHtml,'rapports.html'),
+    renderDashboardCard('Évolution des ventes','Performance sur les six derniers mois, par devise.','trending-up',
       trendHtml||'<div class="group-empty enterprise-dashboard-empty">Aucune facture émise sur la période.</div>','rapports.html'),
     renderDashboardCard('Stocks & trésorerie','Valorisation estimée et soldes des caisses actives.','package',stockCashHtml,'achats.html')
   ].join('');
