@@ -27,6 +27,7 @@ const pages = [
 
 const sidebarScript = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'sidebar.js'), 'utf8');
 const sidebarStyles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'style.css'), 'utf8');
+const iconCatalogue = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'icons.js'), 'utf8');
 
 function readPage(file) {
   return fs.readFileSync(path.join(PUBLIC_DIR, file), 'utf8');
@@ -54,6 +55,21 @@ describe('Navigation et structure des pages métier', () => {
     assert.match(sidebarStyles, /\.sidebar\.is-collapsed \.nav-item \.nav-label\s*\{[\s\S]*?display:\s*block !important/);
     assert.match(sidebarStyles, /\.sidebar\.is-collapsed \.nav-item\.active \.ic\s*\{[\s\S]*?background:\s*#172a4b/);
     assert.match(sidebarStyles, /@media \(max-width:\s*900px\)/);
+  });
+
+
+  test('toutes les icônes appelées par la navigation existent dans le catalogue SVG', () => {
+    const definitions = new Set(
+      [...iconCatalogue.matchAll(/^\\s*(?:['"]([^'"]+)['"]|([A-Za-z][\\w-]*))\\s*:/gm)]
+        .map(match => match[1] || match[2])
+    );
+    const used = new Set(
+      [...sidebarScript.matchAll(/\\bIcon\\(([^)]*)\\)/g)]
+        .flatMap(([, args]) => [...args.matchAll(/['"]([^'"]+)['"]/g)].map(match => match[1]))
+    );
+    for (const name of used) {
+      assert.ok(definitions.has(name), 'Icône manquante dans icons.js : ' + name);
+    }
   });
 
   test('la navigation ne plante pas quand le stockage local ou le point de montage manque', () => {
