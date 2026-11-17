@@ -95,7 +95,7 @@ function paydunyaHeaders(credentials = process.env) {
 }
 
 /** Crée une facture de paiement PayDunya et renvoie l'URL de paiement hébergée. */
-async function creerFacturePaydunya({ amount, description, reference, storeName, returnUrl, cancelUrl, callbackUrl, credentials = process.env }) {
+async function creerFacturePaydunya({ amount, description, reference, storeName, returnUrl, cancelUrl, callbackUrl, channels, credentials = process.env }) {
   const res = await fetch(`${paydunyaBaseUrl(credentials)}/checkout-invoice/create`, {
     method: 'POST',
     headers: paydunyaHeaders(credentials),
@@ -103,7 +103,8 @@ async function creerFacturePaydunya({ amount, description, reference, storeName,
     body: JSON.stringify({
       invoice: {
         total_amount: Math.round(amount),
-        description
+        description,
+        ...(Array.isArray(channels) && channels.length ? { channels } : {})
       },
       store: { name: storeName || 'SamaFacture Pro' },
       custom_data: { reference },
