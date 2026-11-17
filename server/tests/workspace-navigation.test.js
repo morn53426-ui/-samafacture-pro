@@ -63,10 +63,11 @@ describe('Navigation et structure des pages métier', () => {
       [...iconCatalogue.matchAll(/^\\s*(?:['"]([^'"]+)['"]|([A-Za-z][\\w-]*))\\s*:/gm)]
         .map(match => match[1] || match[2])
     );
-    const used = new Set(
-      [...sidebarScript.matchAll(/\\bIcon\\(([^)]*)\\)/g)]
-        .flatMap(([, args]) => [...args.matchAll(/['"]([^'"]+)['"]/g)].map(match => match[1]))
-    );
+    const used = new Set([
+      ...[...sidebarScript.matchAll(/\\bIcon\\(([^)]*)\\)/g)]
+        .flatMap(([, args]) => [...args.matchAll(/['"]([^'"]+)['"]/g)].map(match => match[1])),
+      ...[...sidebarScript.matchAll(/\\bicon:\\s*['"]([^'"]+)['"]/g)].map(match => match[1])
+    ]);
     for (const name of used) {
       assert.ok(definitions.has(name), 'Icône manquante dans icons.js : ' + name);
     }
