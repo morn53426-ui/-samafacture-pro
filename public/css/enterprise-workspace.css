@@ -1128,3 +1128,46 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-account {
   .enterprise-console-utility-links { gap: 1px; }
   .enterprise-console-utility-links a { width: 28px; }
 }
+
+
+body.enterprise-console-shell .enterprise-console-search {
+  width: min(230px,21vw);
+  min-height: 36px;
+  flex: 0 1 230px;
+  padding: 0 8px 0 10px;
+  border-color: rgba(219,235,248,.24);
+  border-radius: 9px;
+  background: rgba(255,255,255,.075);
+  color: #dce9f5;
+}
+body.enterprise-console-shell .enterprise-console-search .ic {
+  color: #d0e0ef;
+  font-size: 1rem;
+}
+body.enterprise-console-shell .enterprise-console-search input {
+  min-width: 0;
+  padding: 6px 2px;
+  color: #fff;
+  font-size: .73rem;
+}
+body.enterprise-console-shell .enterprise-console-search input::placeholder {
+  color: #bdcddd;
+}
+body.enterprise-console-shell .enterprise-console-search button {
+  width: 27px;
+  height: 27px;
+  border-radius: 7px;
+  background: #1c6498;
+  color: #fff;
+}
+body.enterprise-console-shell .enterprise-console-search button .icon {
+  width: 15px;
+  height: 15px;
+}
+@media (max-width: 1100px) and (min-width: 901px) {
+  body.enterprise-console-shell .enterprise-console-search { width: 170px; flex-basis: 170px; }
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-account > div:nth-child(2) { display: none; }
+}
+@media (max-width: 900px) {
+  body.enterprise-console-shell .enterprise-console-search { display: none; }
+}
