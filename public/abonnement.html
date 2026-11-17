@@ -58,7 +58,7 @@
 
     <section class="subscription-trust">
       <div><span class="ic" aria-hidden="true"><i data-icon="lock"></i></span><span><strong>Paiement sécurisé</strong><small>Redirection vers le fournisseur configuré.</small></span></div>
-      <div><span class="ic" aria-hidden="true"><i data-icon="smartphone"></i></span><span><strong>Paiements locaux</strong><small>Wave et PayDunya selon la configuration du serveur.</small></span></div>
+      <div><span class="ic" aria-hidden="true"><i data-icon="smartphone"></i></span><span><strong>Paiements locaux</strong><small>Wave, Orange Money et carte bancaire selon la configuration du serveur.</small></span></div>
       <div><span class="ic" aria-hidden="true"><i data-icon="help-circle"></i></span><span><strong>Accompagnement</strong><small>Un espace de facturation pensé pour les professionnels.</small></span></div>
     </section>
 
@@ -213,10 +213,13 @@
     } else {
       const providers = [];
       if (moyens.wave) {
-        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'wave\', this)">' + Icon('smartphone') + ' Payer avec Wave</button>');
+        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'wave\', \'wave\')">' + Icon('smartphone') + ' Payer avec Wave</button>');
+      } else if (moyens.paydunya) {
+        providers.push('<button type="button" class="btn btn-primary plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', \'wave\')">' + Icon('smartphone') + ' Payer avec Wave</button>');
       }
       if (moyens.paydunya) {
-        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', this)">' + Icon('credit-card') + ' Payer avec PayDunya</button>');
+        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', \'orange_money\')">' + Icon('smartphone') + ' Payer avec Orange Money</button>');
+        providers.push('<button type="button" class="btn btn-outline plan-action" onclick="preparerPaiement(\'' + plan.id + '\', \'paydunya\', \'carte_bancaire\')">' + Icon('credit-card') + ' Payer par carte bancaire</button>');
       }
       actions = providers.length
         ? '<div class="plan-payment-actions">' + providers.join('') + '</div>'
@@ -277,7 +280,7 @@
     document.getElementById('plan-fallback').style.display = aucunMoyenConfigure ? 'block' : 'none';
   }
 
-  function preparerPaiement(plan, fournisseur) {
+  function preparerPaiement(plan, fournisseur, moyen) {
     const montant = Number(window.SF_TARIFS_ABONNEMENT?.[plan]);
     const facturation = window.SF_FACTURATION_ABONNEMENT;
     if (!facturation ||
@@ -296,11 +299,16 @@
       return;
     }
 
-    intentionPaiement = { plan, fournisseur, montant };
+    intentionPaiement = { plan, fournisseur, moyen, montant };
     document.getElementById('checkout-plan').textContent = PLAN_LABELS[plan] || plan;
     document.getElementById('checkout-amount').textContent = formatMontant(montant, 'FCFA');
+    const libellesMoyens = {
+      wave: 'Wave',
+      orange_money: 'Orange Money',
+      carte_bancaire: 'Carte bancaire'
+    };
     document.getElementById('checkout-provider').textContent =
-      fournisseur === 'wave' ? 'Wave' : 'PayDunya';
+      libellesMoyens[moyen] || (fournisseur === 'wave' ? 'Wave' : 'Paiement PayDunya');
     document.getElementById('checkout-disclosure-copy').textContent =
       'Le paiement est ponctuel, sans prélèvement ultérieur. Le plan reste associé au compte jusqu’à un changement manuel ; aucune date d’expiration automatique n’est gérée actuellement.';
     document.getElementById('checkout-activation-copy').textContent =
@@ -330,7 +338,8 @@
     try {
       const { checkout_url } = await Api.post('/abonnement/payer', {
         plan: intentionPaiement.plan,
-        fournisseur: intentionPaiement.fournisseur
+        fournisseur: intentionPaiement.fournisseur,
+        moyen: intentionPaiement.moyen
       });
       if (!checkout_url) throw new Error('Le fournisseur n’a pas retourné de lien de paiement.');
       location.href = checkout_url;
