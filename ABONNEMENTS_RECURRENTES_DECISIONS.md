@@ -1,6 +1,6 @@
 # Facturation récurrente — décisions requises avant développement
 
-**État fonctionnel du dépôt audité le 16 novembre 2026 :** les plans Starter, Pro et Entreprise sont activés après confirmation d'un paiement ponctuel. Le backend indique `mode: paiement_unique`, `renouvellement_automatique: false` et `expiration_automatique: false`. Aucun débit périodique ni mécanisme de renouvellement n'est actuellement revendiqué.
+**État fonctionnel du dépôt audité le 17 novembre 2026 :** le code de `server/routes/abonnement.js` expose les formules mensuelles comme « en préparation ». `GET /api/abonnement/moyens-disponibles` renvoie Wave/PayDunya désactivés, aucun tarif mensuel validé et `disponible: false`. `POST /api/abonnement/payer` renvoie HTTP 503 (`PAIEMENT_RECURRENT_NON_CONFIGURE`) sans créer de paiement. `PUT /api/auth/plan` n'autorise que le plan Gratuit ; toute attribution directe de Starter, Pro ou Entreprise renvoie HTTP 403 (`PAIEMENT_REQUIS`). Les anciens montants et les anciens parcours de checkout ponctuel ne constituent pas une facturation mensuelle.
 
 ## Documentation fournisseur consultée
 
