@@ -21,10 +21,10 @@ describe('Accessibilité des fenêtres de gestion', () => {
   for (const page of pages) {
     it(page.file + ' charge le comportement commun des fenêtres', () => {
       const html = readPublic(page.file);
-      assert.match(html, /js\/workspace-modals\.js/,
+      assert.match(html, /js\\/workspace-modals\\.js/,
         'Le script de gestion clavier doit être chargé.');
       for (const id of page.ids) {
-        const modal = html.match(new RegExp('<div id="' + id + '"[^>]*data-workspace-modal'));
+        const modal = html.match(new RegExp('<div id="' + id + '"[^>]*data-workspace-modal[^>]*>'));
         assert.ok(modal, 'La fenêtre #' + id + ' doit être identifiée comme une boîte de dialogue.');
         assert.match(modal[0], /role="dialog"/);
         assert.match(modal[0], /aria-modal="true"/);
@@ -34,7 +34,7 @@ describe('Accessibilité des fenêtres de gestion', () => {
         assert.match(html, new RegExp('<label for="' + id + '">'),
           'Le champ #' + id + ' doit avoir un libellé associé.');
       }
-      assert.match(html, /role="alert" aria-live="assertive"/',
+      assert.match(html, /role="alert" aria-live="assertive"/,
         'Les erreurs doivent être annoncées par les lecteurs d’écran.');
     });
   }
@@ -42,15 +42,15 @@ describe('Accessibilité des fenêtres de gestion', () => {
   it('le gestionnaire enferme le focus et prend en charge Échap', () => {
     const script = readPublic('js/workspace-modals.js');
     assert.match(script, /new MutationObserver/);
-    assert.match(script, /event\.key === 'Escape'/);
-    assert.match(script, /event\.key !== 'Tab'/);
+    assert.match(script, /event\\.key === 'Escape'/);
+    assert.match(script, /event\\.key !== 'Tab'/);
     assert.match(script, /returnFocus/);
     assert.match(script, /focusInside/);
   });
 
   it('les fenêtres peuvent défiler sans déborder sur mobile', () => {
     const css = readPublic('css/workspace-polish.css');
-    assert.match(css, /max-height:calc\(100dvh - 20px\)/);
+    assert.match(css, /max-height:calc\\(100dvh - 20px\\)/);
     assert.match(css, /overflow-y:auto/);
     assert.match(css, /workspace-modal-actions/);
   });
