@@ -6,21 +6,34 @@ const path = require('node:path');
 const root = path.join(__dirname, '..', '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('la page publique distingue les règlements saisis du checkout des plans', () => {
+test('la page publique distingue les règlements de factures des abonnements indisponibles', () => {
   const home = read('public/index.html');
-  assert.match(home, /Modes de règlement que vous pouvez enregistrer/);
-  assert.match(home, /paiements en ligne des plans, Wave ou PayDunya/);
+  assert.match(home, /Modes de règlement que vous pouvez enregistrer pour vos factures/);
+  assert.match(home, /formules payantes mensuelles sont en préparation/i);
+  assert.match(home, /aucun checkout d'abonnement ni prélèvement automatique n'est activé/i);
+  assert.doesNotMatch(home, /paiement en ligne (?:des plans|des formules|des abonnements)/i);
+  assert.doesNotMatch(home, /paiements en ligne des plans, Wave ou PayDunya/i);
   assert.doesNotMatch(home, /Compatible avec Wave.*Stripe/);
 });
 
-test('le README décrit les plans comme des paiements uniques sans promesse mensuelle', () => {
+test("le README décrit l'état indisponible des abonnements et le renouvellement sur consentement", () => {
   const readme = read('README.md');
-  assert.match(readme, /paiements uniques en XOF/);
-  assert.match(readme, /ne renouvelle pas automatiquement/);
-  assert.doesNotMatch(readme, /FCFA par mois pour Starter/);
+  assert.match(readme, /## Souscriptions aux plans \(en préparation\)/);
+  assert.match(readme, /aucune souscription mensuelle, aucun mandat récurrent et aucun débit automatique ne sont activés/i);
+  assert.match(readme, /HTTP .503.*PAIEMENT_RECURRENT_NON_CONFIGURE/);
+  assert.match(readme, /renouvellement automatique sera facultatif.*désactivé par défaut.*consentement explicite/i);
+  assert.ok(readme.includes('PUT /api/auth/plan'));
+  assert.ok(readme.includes('HTTP `403` (`PAIEMENT_REQUIS`)'));
+  assert.doesNotMatch(readme, /paiements uniques en XOF/i);
+  assert.doesNotMatch(readme, /intégrations d'abonnement Wave et PayDunya déjà présentes/i);
+  assert.match(readme, /PayDunya présente aussi \[Collect\]\(https:\/\/paydunya\.com\/collect\)/);
+  assert.match(readme, /les payeurs reçoivent un SMS avec un lien pour effectuer le paiement/i);
+  assert.match(readme, /Une demande de paiement envoyée automatiquement ne signifie pas que le client est prélevé automatiquement/i);
+  assert.match(readme, /WhatsApp d'assistance intégration \*\*\+221 77 190 26 41\*\*/);
+  assert.match(readme, /le blocage HTTP 503 reste obligatoire/i);
 });
 
-test('la page présente distinctement les trois moyens prévus sans activer le paiement récurrent', () => {
+test('la page abonnement garde les fournisseurs en attente et le renouvellement désactivé par défaut', () => {
   const subscription = read('public/abonnement.html');
   const billingRoute = read('server/routes/abonnement.js');
   assert.match(subscription, /Moyens de paiement prévus/i);
@@ -36,7 +49,7 @@ test('la page présente distinctement les trois moyens prévus sans activer le p
   assert.ok(billingRoute.includes('PAIEMENT_RECURRENT_NON_CONFIGURE'));
 });
 
-test('la politique indique les prestataires réellement utilisés et conserve la mention de validation juridique', () => {
+test('la politique de confidentialité garde ses mentions de prestataire et de validation', () => {
   const privacy = read('public/confidentialite.html');
   assert.match(privacy, /prestataire effectivement choisi et configuré \(Wave ou PayDunya\)/);
   assert.match(privacy, /aucun checkout Stripe n'est intégré/);
