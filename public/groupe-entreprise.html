@@ -62,15 +62,35 @@
 <a class="workspace-skip-link" href="#main-content">Aller au contenu principal</a>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content workspace-page" id="main-content" tabindex="-1">
-    <header class="page-header workspace-page-header">
+  <main class="main-content workspace-page enterprise-console-main" id="main-content" tabindex="-1">
+    <header class="enterprise-dashboard-heading">
       <div>
         <div class="subscription-eyebrow">ESPACE ENTREPRISE · PILOTAGE MULTI-SOCIÉTÉS</div>
-        <h1>Groupe & sociétés</h1>
-        <p class="group-muted">Une vue claire de vos filiales, de leurs indicateurs et des actions à suivre.</p>
+        <h1>Centre de pilotage</h1>
+        <p class="group-muted">Suivez l’activité, les finances et les sociétés de votre groupe depuis une vue consolidée.</p>
       </div>
-      <button class="btn btn-outline" type="button" onclick="load()"><i class="ic" data-icon="refresh-cw"></i> Actualiser</button>
+      <button class="btn btn-outline" type="button" onclick="load(companyPage)"><i class="ic" data-icon="refresh-cw"></i> Actualiser</button>
     </header>
+    <nav class="enterprise-module-strip" aria-label="Modules de gestion">
+      <a class="enterprise-module-chip" href="comptabilite.html"><span><i class="ic" data-icon="landmark"></i></span>Comptabilité OHADA</a>
+      <a class="enterprise-module-chip" href="depenses.html"><span><i class="ic" data-icon="receipt"></i></span>Dépenses</a>
+      <a class="enterprise-module-chip" href="factures.html"><span><i class="ic" data-icon="file-text"></i></span>Factures & devis</a>
+      <a class="enterprise-module-chip" href="clients.html"><span><i class="ic" data-icon="users"></i></span>Clients & CRM</a>
+      <a class="enterprise-module-chip" href="achats.html"><span><i class="ic" data-icon="package"></i></span>Achats & stocks</a>
+      <a class="enterprise-module-chip" href="professionnel.html"><span><i class="ic" data-icon="users"></i></span>Équipe</a>
+      <a class="enterprise-module-chip" href="rapports.html"><span><i class="ic" data-icon="bar-chart"></i></span>Rapports</a>
+      <a class="enterprise-module-chip" href="automatisations.html"><span><i class="ic" data-icon="workflow"></i></span>Automatisations</a>
+    </nav>
+    <section class="enterprise-create-actions" aria-label="Actions de création rapides">
+      <strong>Créer une action</strong>
+      <div class="enterprise-create-actions-list">
+        <a href="nouvelle-facture.html"><i class="ic" data-icon="file-plus"></i> Nouvelle facture</a>
+        <a href="devis.html"><i class="ic" data-icon="file-check"></i> Créer un devis</a>
+        <a href="#group-invitations"><i class="ic" data-icon="user-round-plus"></i> Inviter une société</a>
+        <a href="depenses.html"><i class="ic" data-icon="plus-circle"></i> Ajouter une dépense</a>
+        <a href="achats.html"><i class="ic" data-icon="truck"></i> Enregistrer un achat</a>
+      </div>
+    </section>
     <div id="group-status" class="group-status" role="status" aria-live="polite"></div>
     <nav class="group-section-nav" id="group-section-nav" aria-label="Sections du centre de pilotage" hidden>
       <a href="#group-overview">Vue d’ensemble</a>
@@ -210,36 +230,15 @@ function renderGroup(data,dashboard){
     ...cashCurrencies.map(row=>row.devise)
   ].filter(Boolean))].sort();
 
-  const currencyCards=currencies.map(currency=>{
+  const currencySummaries=currencies.map(currency=>{
     const invoice=invoiceCurrencies.find(row=>row.devise===currency)||{};
     const expense=expenseCurrencies.find(row=>row.devise===currency)||{};
     const stock=stockCurrencies.find(row=>row.devise===currency)||{};
     const cash=cashCurrencies.find(row=>row.devise===currency)||{};
-    const invoiceCount=Number(invoice.nombre_factures||0);
-    const unpaidCount=Number(invoice.nombre_impayees||0);
-    const overdueCount=Number(invoice.nombre_en_retard||0);
-    const stockAlerts=Number(stock.ruptures_stock||0)+Number(stock.stocks_faibles||0);
-    return `
-      <section class="group-currency-card" aria-label="Indicateurs en ${escapeHtml(currency)}">
-        <h3>${escapeHtml(currency)}</h3>
-        <div class="group-metric-section-label">Indicateurs principaux</div>
-        <div class="group-metric-grid group-metric-grid-primary">
-          <div class="group-metric"><small>Chiffre d’affaires facturé</small><strong>${money(invoice.total_facture,currency)}</strong><em>${invoiceCount} facture(s)</em></div>
-          <div class="group-metric"><small>Montant encaissé</small><strong>${money(invoice.total_encaisse,currency)}</strong><em>Somme enregistrée sur les factures</em></div>
-          <div class="group-metric"><small>Factures impayées</small><strong>${money(invoice.total_impaye,currency)}</strong><em>${unpaidCount} facture(s) avec solde restant</em></div>
-          <div class="group-metric"><small>Factures en retard</small><strong>${money(invoice.total_en_retard,currency)}</strong><em>${overdueCount} facture(s) échue(s)</em></div>
-        </div>
-        <details class="group-secondary-details">
-          <summary>Voir les indicateurs de dépenses, caisses et stocks</summary>
-          <div class="group-metric-grid group-metric-grid-secondary">
-            <div class="group-metric"><small>Dépenses enregistrées</small><strong>${money(expense.total_depenses,currency)}</strong><em>${Number(expense.nombre_depenses||0)} dépense(s)</em></div>
-            <div class="group-metric"><small>Solde des caisses actives</small><strong>${money(cash.solde_total,currency)}</strong><em>${Number(cash.nombre_caisses||0)} caisse(s) suivie(s)</em></div>
-            <div class="group-metric"><small>Valeur estimée du stock</small><strong>${money(stock.valeur_stock_estimee,currency)}</strong><em>${Number(stock.nombre_produits||0)} produit(s) au catalogue</em></div>
-            <div class="group-metric"><small>Alertes de stock</small><strong>${stockAlerts}</strong><em>${Number(stock.ruptures_stock||0)} rupture(s) · ${Number(stock.stocks_faibles||0)} stock(s) faible(s)</em></div>
-          </div>
-        </details>
-      </section>`;
-  }).join('');
+    return {currency,invoice,expense,stock,cash};
+  });
+
+
 
   const trendByCurrency=new Map();
   for(const row of dashboard?.performance_mensuelle||[]){
@@ -262,6 +261,68 @@ function renderGroup(data,dashboard){
     }).join('');
     return `<div class="group-performance-currency"><h3>${escapeHtml(currency)}</h3>${bars}</div>`;
   }).join('');
+
+  const renderMetricRows=(rows,valueKey,noteBuilder)=>{
+    const maxValue=Math.max(1,...rows.map(row=>Number(row[valueKey]||0)));
+    return rows.length?rows.map(row=>{
+      const value=Number(row[valueKey]||0);
+      const width=value>0?Math.max(2,Math.min(100,Math.round(value/maxValue*100))):0;
+      return `<div class="enterprise-dashboard-metric-row">
+        <div class="enterprise-dashboard-metric-heading"><span>${escapeHtml(row.devise||'INCONNUE')}</span><strong>${escapeHtml(money(value,row.devise))}</strong></div>
+        <div class="enterprise-dashboard-track" aria-hidden="true"><span style="width:${width}%"></span></div>
+        <small>${escapeHtml(noteBuilder(row))}</small>
+      </div>`;
+    }).join(''):'<div class="group-empty enterprise-dashboard-empty">Aucune donnée disponible pour le moment.</div>';
+  };
+  const renderDashboardCard=(title,description,icon,content,action='')=>`
+    <article class="enterprise-dashboard-card">
+      <header class="enterprise-dashboard-card-heading">
+        <span class="enterprise-dashboard-card-icon"><i class="ic" data-icon="${icon}"></i></span>
+        <div><h3>${title}</h3><p>${description}</p></div>
+      </header>
+      <div class="enterprise-dashboard-card-body">${content}</div>
+      ${action?'<a class="enterprise-dashboard-card-link" href="'+action.href+'">'+action.label+' <span aria-hidden="true">→</span></a>':''}
+    </article>`;
+  const collectionsHtml=invoiceCurrencies.length?invoiceCurrencies.map(row=>{
+    const total=Number(row.total_facture||0);
+    const paid=Number(row.total_encaisse||0);
+    const outstanding=Number(row.total_impaye||0);
+    const ratio=total>0?Math.max(0,Math.min(100,Math.round(paid/total*100))):0;
+    return `<div class="enterprise-collection-row">
+      <div class="enterprise-collection-donut" style="--ratio:${ratio}%" role="img" aria-label="${ratio}% encaissé en ${escapeHtml(row.devise||'INCONNUE')}"><span>${ratio}%</span></div>
+      <div class="enterprise-collection-copy"><div><strong>${escapeHtml(row.devise||'INCONNUE')}</strong><b>${escapeHtml(money(paid,row.devise))}</b></div><small>Encaissé · ${escapeHtml(money(outstanding,row.devise))} restant</small></div>
+    </div>`;
+  }).join(''):'<div class="group-empty enterprise-dashboard-empty">Aucun encaissement enregistré.</div>';
+  const receivablesHtml=invoiceCurrencies.length?invoiceCurrencies.map(row=>{
+    const outstanding=Number(row.total_impaye||0);
+    const overdue=Number(row.total_en_retard||0);
+    const ratio=outstanding>0?Math.max(0,Math.min(100,Math.round(overdue/outstanding*100))):0;
+    return `<div class="enterprise-receivable-row">
+      <div><span>${escapeHtml(row.devise||'INCONNUE')}</span><strong>${escapeHtml(money(outstanding,row.devise))}</strong></div>
+      <div class="enterprise-dashboard-track enterprise-dashboard-track-warning" aria-hidden="true"><span style="width:${ratio}%"></span></div>
+      <small>${Number(row.nombre_impayees||0)} facture(s) impayée(s) · ${escapeHtml(money(overdue,row.devise))} en retard</small>
+    </div>`;
+  }).join(''):'<div class="group-empty enterprise-dashboard-empty">Aucune facture impayée.</div>';
+  const stockCashHtml=currencySummaries.length?currencySummaries.map(item=>{
+    const stockAlerts=Number(item.stock.ruptures_stock||0)+Number(item.stock.stocks_faibles||0);
+    return `<div class="enterprise-stock-cash-row">
+      <strong>${escapeHtml(item.currency)}</strong>
+      <div><span>Valeur estimée du stock</span><b>${escapeHtml(money(item.stock.valeur_stock_estimee,item.currency))}</b></div>
+      <div><span>Solde des caisses actives</span><b>${escapeHtml(money(item.cash.solde_total,item.currency))}</b></div>
+      <small>${Number(item.stock.nombre_produits||0)} produit(s) · ${stockAlerts} alerte(s) de stock · ${Number(item.cash.nombre_caisses||0)} caisse(s)</small>
+    </div>`;
+  }).join(''):'<div class="group-empty enterprise-dashboard-empty">Aucune donnée de stock ou de caisse.</div>';
+  const dashboardCards=[
+    renderDashboardCard('Facturation émise','Factures non annulées, par devise.','file-text',
+      renderMetricRows(invoiceCurrencies,'total_facture',row=>Number(row.nombre_factures||0)+' facture(s)')),
+    renderDashboardCard('Encaissements','Sommes enregistrées sur les factures.','hand-coins',collectionsHtml),
+    renderDashboardCard('Dépenses enregistrées','Dépenses saisies, par devise.','receipt',
+      renderMetricRows(expenseCurrencies,'total_depenses',row=>Number(row.nombre_depenses||0)+' dépense(s)'),'depenses.html'),
+    renderDashboardCard('Reste à recouvrer','Montants impayés et retards identifiés.','wallet',receivablesHtml,'rapports.html'),
+    renderDashboardCard('Évolution des ventes','Montant des factures émises sur six mois, par devise.','trending-up',
+      trendHtml||'<div class="group-empty enterprise-dashboard-empty">Aucune facture émise sur la période.</div>','rapports.html'),
+    renderDashboardCard('Stocks & trésorerie','Valorisation estimée et soldes des caisses actives.','package',stockCashHtml,'achats.html')
+  ].join('');
 
   const alertHtml=alertes.map(item=>{
     const isInvoice=item.type==='factures_en_retard';
@@ -301,12 +362,12 @@ function renderGroup(data,dashboard){
   }).join('');
 
   root.innerHTML=`
-    <section class="group-panel group-overview" id="group-overview" aria-labelledby="group-overview-title">
+    <section class="group-panel group-overview enterprise-overview" id="group-overview" aria-labelledby="group-overview-title">
       <div class="group-overview-heading">
         <div>
-          <div class="group-section-eyebrow">Vue d’ensemble</div>
+          <div class="group-section-eyebrow">Vue consolidée</div>
           <h2 id="group-overview-title">${escapeHtml(group.nom)}</h2>
-          <p class="group-muted">Centre de pilotage de ${totalCompanies} société(s). Les comptes, utilisateurs et données restent séparés ; seules les sociétés ayant accepté le rattachement sont visibles ici.</p>
+          <p class="group-muted">Vue financière des ${totalCompanies} société(s) rattachée(s). Les comptes restent séparés et les montants ne sont jamais additionnés entre devises.</p>
         </div>
         <span class="group-status-chip"><i class="ic" data-icon="check-circle" aria-hidden="true"></i> Groupe actif</span>
       </div>
@@ -316,7 +377,7 @@ function renderGroup(data,dashboard){
         <article class="group-overview-kpi"><span>Alertes à examiner</span><strong>${alertes.length}</strong><small>Factures ou stocks à surveiller</small></article>
         <article class="group-overview-kpi"><span>Devises suivies</span><strong>${currencies.length}</strong><small>Indicateurs gardés séparés par devise</small></article>
       </div>
-      <div class="group-dashboard-grid">${currencyCards||'<div class="group-empty">Les indicateurs financiers apparaîtront dès que les sociétés auront enregistré des opérations.</div>'}</div>
+      <div class="enterprise-dashboard-grid">${dashboardCards}</div>
       <p class="group-disclaimer">${escapeHtml(dashboard?.note||'Les montants sont présentés séparément par devise.')}</p>
     </section>
     <section class="group-panel" id="group-alerts" aria-labelledby="group-alerts-title">
