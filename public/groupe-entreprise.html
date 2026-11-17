@@ -240,7 +240,34 @@ function renderGroup(data,dashboard){
     return {currency,invoice,expense,stock,cash};
   });
 
-
+  // Détail financier par devise : les chiffres restent distincts, même si
+  // le tableau de bord principal présente six cartes de synthèse.
+  const currencyCards=currencySummaries.map(({currency,invoice,expense,stock,cash})=>{
+    const invoiceCount=Number(invoice.nombre_factures||0);
+    const unpaidCount=Number(invoice.nombre_impayees||0);
+    const overdueCount=Number(invoice.nombre_en_retard||0);
+    const stockAlerts=Number(stock.ruptures_stock||0)+Number(stock.stocks_faibles||0);
+    return `
+      <section class="group-currency-card" aria-label="Indicateurs en ${escapeHtml(currency)}">
+        <h3>${escapeHtml(currency)}</h3>
+        <div class="group-metric-section-label">Indicateurs principaux</div>
+        <div class="group-metric-grid group-metric-grid-primary">
+          <div class="group-metric"><small>Chiffre d’affaires facturé</small><strong>${money(invoice.total_facture,currency)}</strong><em>${invoiceCount} facture(s)</em></div>
+          <div class="group-metric"><small>Montant encaissé</small><strong>${money(invoice.total_encaisse,currency)}</strong><em>Somme enregistrée sur les factures</em></div>
+          <div class="group-metric"><small>Factures impayées</small><strong>${money(invoice.total_impaye,currency)}</strong><em>${unpaidCount} facture(s) avec solde restant</em></div>
+          <div class="group-metric"><small>Factures en retard</small><strong>${money(invoice.total_en_retard,currency)}</strong><em>${overdueCount} facture(s) échue(s)</em></div>
+        </div>
+        <details class="group-secondary-details">
+          <summary>Voir les indicateurs de dépenses, caisses et stocks</summary>
+          <div class="group-metric-grid group-metric-grid-secondary">
+            <div class="group-metric"><small>Dépenses enregistrées</small><strong>${money(expense.total_depenses,currency)}</strong><em>${Number(expense.nombre_depenses||0)} dépense(s)</em></div>
+            <div class="group-metric"><small>Solde des caisses actives</small><strong>${money(cash.solde_total,currency)}</strong><em>${Number(cash.nombre_caisses||0)} caisse(s) suivie(s)</em></div>
+            <div class="group-metric"><small>Valeur estimée du stock</small><strong>${money(stock.valeur_stock_estimee,currency)}</strong><em>${Number(stock.nombre_produits||0)} produit(s) au catalogue</em></div>
+            <div class="group-metric"><small>Alertes de stock</small><strong>${stockAlerts}</strong><em>${Number(stock.ruptures_stock||0)} rupture(s) · ${Number(stock.stocks_faibles||0)} stock(s) faible(s)</em></div>
+          </div>
+        </details>
+      </section>`;
+  }).join('');
 
   const trendByCurrency=new Map();
   for(const row of dashboard?.performance_mensuelle||[]){
@@ -380,6 +407,12 @@ function renderGroup(data,dashboard){
         <article class="group-overview-kpi"><span>Devises suivies</span><strong>${currencies.length}</strong><small>Indicateurs gardés séparés par devise</small></article>
       </div>
       <div class="enterprise-dashboard-grid">${dashboardCards}</div>
+      <section class="enterprise-currency-breakdown" aria-labelledby="enterprise-currency-breakdown-title">
+        <div class="enterprise-currency-breakdown-heading">
+          <div><h3 id="enterprise-currency-breakdown-title">Indicateurs détaillés par devise</h3><p>Les montants ne sont jamais additionnés entre devises.</p></div>
+        </div>
+        <div class="group-dashboard-grid">${currencyCards||'<div class="group-empty">Les indicateurs par devise apparaîtront dès que les sociétés auront enregistré des opérations.</div>'}</div>
+      </section>
       <p class="group-disclaimer">${escapeHtml(dashboard?.note||'Les montants sont présentés séparément par devise.')}</p>
     </section>
     <section class="group-panel" id="group-alerts" aria-labelledby="group-alerts-title">
