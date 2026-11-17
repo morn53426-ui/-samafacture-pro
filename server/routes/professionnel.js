@@ -8,6 +8,8 @@ const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { encryptSecret, decryptSecret } = require('../utils/pro-webhooks');
 const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydunya } = require('../config/payments');
 const net = require('net');
+const { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, SUPPORTED_TIMEZONES } = require('../config/localization');
+const { localDateString } = require('../utils/local-date');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -20,7 +22,15 @@ const money = (value) => {
   if (!Number.isFinite(amount) || amount <= 0 || amount > 999999999999) return null;
   return Math.round((amount + Number.EPSILON) * 100) / 100;
 };
-const safeDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? value : new Date().toISOString().slice(0, 10);
+async function safeDateForUser(value, userId) {
+  const valid = optionalIsoDate(value);
+  if (valid) return valid;
+  const [accounts] = await pool.query(
+    'SELECT fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+    [userId]
+  );
+  return localDateString(accounts?.[0]?.fuseau_horaire || 'Africa/Dakar');
+}
 function optionalText(value, maxLength) {
   if (value === undefined || value === null) return null;
   return String(value).trim().slice(0, maxLength) || null;
@@ -95,7 +105,7 @@ router.post('/orders', async (req, res, next) => {
     const orderNumber = randomRef('CMD');
     const [result] = await pool.query(
       'INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, date_livraison_prevue, devise, total, lignes_json, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, clientId, orderNumber, 'confirmee', safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, String(req.body.devise || 'FCFA').slice(0, 10), total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
+      [uid, clientId, orderNumber, 'confirmee', await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, String(req.body.devise || 'FCFA').slice(0, 10), total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
     );
     await audit(req, 'commande.creee', 'commande', result.insertId, { numero: orderNumber });
     res.status(201).json({ id: result.insertId, total, lignes: normalized });
@@ -123,7 +133,7 @@ router.post('/orders/:id/delivery-note', async (req, res, next) => {
     const numero = randomRef('BL');
     const [result] = await pool.query(
       'INSERT INTO pro_bons_livraison (user_id, commande_id, numero, date_livraison, destinataire, adresse_livraison, lignes_json, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, order.id, numero, safeDate(req.body.date_livraison), clientRows[0]?.nom || null, req.body.adresse_livraison || clientRows[0]?.adresse || null, order.lignes_json, String(req.body.notes || '').slice(0, 2000) || null]
+      [uid, order.id, numero, await safeDateForUser(req.body.date_livraison, uid), clientRows[0]?.nom || null, req.body.adresse_livraison || clientRows[0]?.adresse || null, order.lignes_json, String(req.body.notes || '').slice(0, 2000) || null]
     );
     await pool.query('UPDATE pro_commandes SET statut = ? WHERE id = ? AND user_id = ?', ['preparee', order.id, uid]);
     await audit(req, 'bon_livraison.cree', 'bon_livraison', result.insertId, { commande_id: order.id, numero });
@@ -162,7 +172,7 @@ router.post('/credit-notes', async (req, res, next) => {
       return res.status(400).json({ error: 'Le montant de cet avoir dépasse le montant encore disponible sur la facture.' });
     }
     const numero = randomRef('AVR');
-    const [result] = await conn.query('INSERT INTO pro_avoirs (user_id, facture_id, numero, date_emission, montant, motif) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, numero, safeDate(req.body.date_emission), amount, motif]);
+    const [result] = await conn.query('INSERT INTO pro_avoirs (user_id, facture_id, numero, date_emission, montant, motif) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, numero, await safeDateForUser(req.body.date_emission, uid), amount, motif]);
     await conn.commit();
     await audit(req, 'avoir.cree', 'avoir', result.insertId, { facture_id: invoiceId, montant: amount, numero });
     res.status(201).json({ id: result.insertId, numero, statut: 'brouillon', montant: amount });
@@ -222,7 +232,7 @@ router.post('/deposits', async (req, res, next) => {
     const numero = randomRef('ACP');
     const [result] = await conn.query(
       'INSERT INTO pro_acomptes (user_id, facture_id, numero, date_emission, montant) VALUES (?, ?, ?, ?, ?)',
-      [uid, invoiceId, numero, safeDate(req.body.date_emission), amount]
+      [uid, invoiceId, numero, await safeDateForUser(req.body.date_emission, uid), amount]
     );
     await conn.commit();
     await audit(req, 'acompte.cree', 'acompte', result.insertId, { facture_id: invoiceId, montant: amount });
@@ -402,7 +412,11 @@ router.put('/refunds/:id/status', async (req, res, next) => {
         return res.status(409).json({ error: 'Le montant remboursé dépasse les encaissements encore comptabilisés sur la facture.' });
       }
       const remainingPaid = Math.max(0, Number(invoice.montant_paye) - Number(refund.montant));
-      const today = new Date().toISOString().slice(0, 10);
+      const [accountRows] = await conn.query(
+        'SELECT fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+        [owner(req)]
+      );
+      const today = localDateString(accountRows?.[0]?.fuseau_horaire || 'Africa/Dakar');
       const newInvoiceStatus = invoice.statut === 'annulee'
         ? 'annulee'
         : (remainingPaid + 0.001 >= Number(invoice.total)
@@ -700,12 +714,24 @@ router.get('/reports/margins', async (req, res, next) => {
 
 router.get('/reports/forecast', async (req, res, next) => {
   try {
+    const userId = owner(req);
+    const [accounts] = await pool.query(
+      'SELECT fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    const localToday = localDateString(accounts?.[0]?.fuseau_horaire || 'Africa/Dakar');
     const [rows] = await pool.query(
-      "SELECT DATE_FORMAT(p.date_paiement, '%Y-%m') AS mois, SUM(p.montant) AS encaissements, COUNT(*) AS nb_paiements FROM paiements p JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id WHERE p.user_id = ? AND f.type = 'facture' AND f.statut != 'annulee' AND p.date_paiement >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH) GROUP BY mois ORDER BY mois",
-      [owner(req)]
+      "SELECT DATE_FORMAT(p.date_paiement, '%Y-%m') AS mois, SUM(p.montant) AS encaissements, COUNT(*) AS nb_paiements FROM paiements p JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id WHERE p.user_id = ? AND f.type = 'facture' AND f.statut != 'annulee' AND p.date_paiement >= DATE_SUB(?, INTERVAL 6 MONTH) GROUP BY mois ORDER BY mois",
+      [userId, localToday]
     );
     const monthlyAverage = rows.length ? rows.reduce((s, r) => s + Number(r.encaissements || 0), 0) / 6 : 0;
-    const forecast = [1,2,3].map(i => ({ mois: new Date(new Date().getFullYear(), new Date().getMonth() + i, 1).toISOString().slice(0, 7), encaissements_estimes: Math.round(monthlyAverage * 100) / 100 }));
+    const [yearPart, monthPart] = localToday.slice(0, 7).split('-').map(Number);
+    const forecast = [1, 2, 3].map(i => {
+      const monthIndex = yearPart * 12 + monthPart - 1 + i;
+      const year = Math.floor(monthIndex / 12);
+      const month = String(monthIndex % 12 + 1).padStart(2, '0');
+      return { mois: year + '-' + month, encaissements_estimes: Math.round(monthlyAverage * 100) / 100 };
+    });
     res.json({ historique: rows, moyenne_mensuelle_6_mois: monthlyAverage, previsions: forecast, methode: 'Moyenne simple des encaissements des six derniers mois, sans saisonnalité ni correction statistique.' });
   } catch (err) { next(err); }
 });
@@ -1125,8 +1151,7 @@ router.post('/purchase-orders', async (req, res, next) => {
     const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [uid]);
     const companyCurrency = String(company?.devise || 'FCFA').toUpperCase();
     const orderCurrency = String(req.body.devise || companyCurrency).toUpperCase();
-    const supportedCurrencies = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
-    if (!supportedCurrencies.includes(orderCurrency)) return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
+    if (!SUPPORTED_CURRENCIES.includes(orderCurrency)) return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
     if (orderCurrency !== companyCurrency) return res.status(409).json({ error: 'La devise de la commande doit correspondre à la devise de base de l’entreprise. Les conversions ne sont pas encore activées.' });
     if (!idOk(supplierId) || !lines.length || lines.length > 100) return res.status(400).json({ error: 'Fournisseur et 1 à 100 lignes obligatoires.' });
     const [[supplier]] = await pool.query('SELECT id FROM pro_fournisseurs WHERE id = ? AND user_id = ? AND actif = 1', [supplierId, uid]);
@@ -1157,7 +1182,7 @@ router.post('/purchase-orders', async (req, res, next) => {
     await conn.beginTransaction();
     const [created] = await conn.query(
       "INSERT INTO pro_commandes_fournisseurs (user_id, fournisseur_id, numero, statut, date_commande, date_livraison_prevue, devise, total_ht, total_tva, total_ttc, notes) VALUES (?, ?, ?, 'confirmee', ?, ?, ?, ?, ?, ?, ?)",
-      [uid, supplierId, numero, safeDate(req.body.date_commande), req.body.date_livraison_prevue || null, orderCurrency, totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
+      [uid, supplierId, numero, await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, orderCurrency, totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
     );
     for (const line of normalized) {
       await conn.query(
@@ -1192,7 +1217,7 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
     const reference = randomRef('REC');
     const [receipt] = await conn.query(
       'INSERT INTO pro_receptions_achats (user_id, commande_id, entrepot_id, reference, date_reception, acteur_user_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [uid, order.id, warehouseId, reference, safeDate(req.body.date_reception), actor(req)]
+      [uid, order.id, warehouseId, reference, await safeDateForUser(req.body.date_reception, uid), actor(req)]
     );
     const [orderLines] = await conn.query('SELECT * FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? FOR UPDATE', [order.id, uid]);
     for (const received of lines) {
@@ -1769,15 +1794,6 @@ router.put('/crm/activities/:id', async (req, res, next) => {
 });
 
 /* ---------------------- PARAMÈTRES INTERNATIONAUX ---------------------- */
-const SUPPORTED_CURRENCIES = ['FCFA','XOF','XAF','GNF','EUR','USD','GBP','CAD','MAD'];
-const SUPPORTED_COUNTRIES = ['SN','CI','ML','BF','BJ','TG','NE','GN','CM','GA','TD','CG','CD','FR','BE','CH','US','GB','CA','MA'];
-const SUPPORTED_TIMEZONES = [
-  'Africa/Dakar','Africa/Abidjan','Africa/Bamako','Africa/Ouagadougou','Africa/Porto-Novo',
-  'Africa/Lome','Africa/Niamey','Africa/Conakry','Africa/Douala','Africa/Libreville',
-  'Africa/Ndjamena','Africa/Brazzaville','Africa/Kinshasa','Europe/Paris','Europe/Brussels',
-  'Europe/Zurich','Europe/London','America/New_York','America/Toronto','UTC'
-];
-
 router.get('/localization', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
