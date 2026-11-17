@@ -227,8 +227,8 @@ async function runMigrations(conn) {
     }
   }
 
-  // Les échéances existantes conservent leur prochain jour comme ancre mensuelle.
-  // Une valeur déjà définie n'est jamais recalculée lors des redémarrages.
+  // Le jour d'ancrage est initialisé depuis la prochaine échéance des modèles
+  // déjà existants. Une fois renseigné, il n'est jamais recalculé par la migration.
   await conn.query(
     'UPDATE factures_recurrentes SET jour_ancre = DAY(prochaine_date) WHERE jour_ancre IS NULL'
   );

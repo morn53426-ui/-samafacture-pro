@@ -572,19 +572,19 @@
             </div>
           </div>
         </div>
-        <div class="field"><label>Nom de l'entreprise</label><input type="text" id="entreprise_nom" /></div>
-        <div class="field"><label>Adresse</label><input type="text" id="entreprise_adresse" /></div>
-        <div class="field"><label>Téléphone</label><input type="tel" id="entreprise_telephone" /></div>
-        <div class="field"><label>Email</label><input type="email" id="entreprise_email" /></div>
-        <div class="field"><label>NINEA</label><input type="text" id="entreprise_ninea" maxlength="60" /></div>
-        <div class="field"><label>RCCM</label><input type="text" id="entreprise_rccm" maxlength="80" placeholder="Numéro du registre de commerce" /></div>
-        <div class="field"><label>Site web</label><input type="url" id="entreprise_site_web" maxlength="190" placeholder="https://www.votre-entreprise.com" /></div>
-        <div class="field"><label>Banque de règlement</label><input type="text" id="entreprise_banque" maxlength="120" placeholder="Nom de la banque" /></div>
-        <div class="field"><label>RIB / IBAN / compte de règlement</label><input type="text" id="entreprise_rib" maxlength="100" /></div>
-        <div class="field"><label>Conditions de règlement par défaut</label><textarea id="entreprise_conditions_reglement" rows="3" maxlength="5000" placeholder="Ex. Paiement à 30 jours. Acompte de 50 % à la commande."></textarea><div class="helper">Ces conditions apparaissent sur les factures et devis, sauf si vous les remplacez sur un document.</div></div>
-        <div class="field"><label>Mentions légales / pied de page</label><textarea id="entreprise_mentions_legales" rows="3" maxlength="2000" placeholder="Informations légales ou commerciales à afficher en bas des documents."></textarea></div>
+        <div class="field"><label for="entreprise_nom">Nom de l'entreprise</label><input type="text" id="entreprise_nom" /></div>
+        <div class="field"><label for="entreprise_adresse">Adresse</label><input type="text" id="entreprise_adresse" /></div>
+        <div class="field"><label for="entreprise_telephone">Téléphone</label><input type="tel" id="entreprise_telephone" /></div>
+        <div class="field"><label for="entreprise_email">Email</label><input type="email" id="entreprise_email" /></div>
+        <div class="field"><label for="entreprise_ninea">NINEA</label><input type="text" id="entreprise_ninea" maxlength="60" /></div>
+        <div class="field"><label for="entreprise_rccm">RCCM</label><input type="text" id="entreprise_rccm" maxlength="80" placeholder="Numéro du registre de commerce" /></div>
+        <div class="field"><label for="entreprise_site_web">Site web</label><input type="url" id="entreprise_site_web" maxlength="190" placeholder="https://www.votre-entreprise.com" /></div>
+        <div class="field"><label for="entreprise_banque">Banque de règlement</label><input type="text" id="entreprise_banque" maxlength="120" placeholder="Nom de la banque" /></div>
+        <div class="field"><label for="entreprise_rib">RIB / IBAN / compte de règlement</label><input type="text" id="entreprise_rib" maxlength="100" /></div>
+        <div class="field"><label for="entreprise_conditions_reglement">Conditions de règlement par défaut</label><textarea id="entreprise_conditions_reglement" rows="3" maxlength="5000" placeholder="Ex. Paiement à 30 jours. Acompte de 50 % à la commande."></textarea><div class="helper">Ces conditions apparaissent sur les factures et devis, sauf si vous les remplacez sur un document.</div></div>
+        <div class="field"><label for="entreprise_mentions_legales">Mentions légales / pied de page</label><textarea id="entreprise_mentions_legales" rows="3" maxlength="2000" placeholder="Informations légales ou commerciales à afficher en bas des documents."></textarea></div>
         <div class="field">
-          <label>Devise</label>
+          <label for="devise">Devise</label>
           <select id="devise">
             <option value="FCFA">FCFA</option>
             <option value="EUR">EUR</option>
@@ -640,7 +640,7 @@
                 Couleur principale (filet des totaux)
               </label>
               <div class="perso-color-row">
-                <input type="color" id="perso_couleur_principale" value="#0F1B33" disabled onchange="updatePersoColorValue('couleur_principale')" />
+                <input type="color" id="perso_couleur_principale" aria-label="Couleur principale du document" value="#0F1B33" disabled onchange="updatePersoColorValue('couleur_principale')" />
                 <span class="perso-color-value" id="perso_couleur_principale_value">Par défaut</span>
               </div>
             </div>
@@ -650,7 +650,7 @@
                 Couleur secondaire (tampon de statut)
               </label>
               <div class="perso-color-row">
-                <input type="color" id="perso_couleur_secondaire" value="#0F1B33" disabled onchange="updatePersoColorValue('couleur_secondaire')" />
+                <input type="color" id="perso_couleur_secondaire" aria-label="Couleur secondaire du document" value="#0F1B33" disabled onchange="updatePersoColorValue('couleur_secondaire')" />
                 <span class="perso-color-value" id="perso_couleur_secondaire_value">Par défaut</span>
               </div>
             </div>
@@ -660,12 +660,12 @@
                 Couleur du texte
               </label>
               <div class="perso-color-row">
-                <input type="color" id="perso_couleur_texte" value="#1A1A1A" disabled onchange="updatePersoColorValue('couleur_texte')" />
+                <input type="color" id="perso_couleur_texte" aria-label="Couleur du texte du document" value="#1A1A1A" disabled onchange="updatePersoColorValue('couleur_texte')" />
                 <span class="perso-color-value" id="perso_couleur_texte_value">Par défaut</span>
               </div>
             </div>
             <div class="field" style="margin:0;">
-              <label>Taille du logo</label>
+              <label for="perso_logo_taille">Taille du logo</label>
               <select id="perso_logo_taille">
                 <option value="">Taille du modèle (par défaut)</option>
                 <option value="petit">Petit</option>
@@ -674,7 +674,7 @@
               </select>
             </div>
             <div class="field" style="margin:0;">
-              <label>Police</label>
+              <label for="perso_police">Police</label>
               <select id="perso_police">
                 <option value="">Police du modèle (par défaut)</option>
                 <option value="sans">Sans-serif (Arial)</option>
@@ -683,7 +683,7 @@
               </select>
             </div>
             <div class="field" style="margin:0;">
-              <label>Taille du texte</label>
+              <label for="perso_taille_texte">Taille du texte</label>
               <select id="perso_taille_texte">
                 <option value="">Normale (par défaut)</option>
                 <option value="petit">Plus petite</option>
@@ -691,7 +691,7 @@
               </select>
             </div>
             <div class="field" style="margin:0;">
-              <label>Épaisseur du texte</label>
+              <label for="perso_epaisseur_texte">Épaisseur du texte</label>
               <select id="perso_epaisseur_texte">
                 <option value="">Normale (par défaut)</option>
                 <option value="moyen">Moyenne</option>

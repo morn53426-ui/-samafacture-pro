@@ -37,11 +37,11 @@
         <div class="invoice-section-heading"><span class="ic"><i class="ic" data-icon="building"></i></span><div><h3>Informations générales</h3><p>Les informations principales de votre document.</p></div></div>
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px;">
           <div class="field">
-            <label>Client *</label>
+            <label for="client_id">Client *</label>
             <select id="client_id" required></select>
           </div>
           <div class="field">
-            <label>Mode de paiement</label>
+            <label for="mode_paiement">Mode de paiement</label>
             <select id="mode_paiement">
               <option value="">—</option>
               <option>Espèces</option>
@@ -54,11 +54,11 @@
             </select>
           </div>
           <div class="field">
-            <label>Date d'émission</label>
+            <label for="date_emission">Date d’émission</label>
             <input type="date" id="date_emission" />
           </div>
           <div class="field" id="invoice-due-field">
-            <label>Date d'échéance</label>
+            <label for="date_echeance">Date d’échéance</label>
             <input type="date" id="date_echeance" />
           </div>
           <div class="field" id="quote-validity-field" hidden>
@@ -67,10 +67,10 @@
           </div>
         </div>
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:12px;">
-          <div class="field"><label>Objet / prestation</label><input type="text" id="objet" maxlength="190" placeholder="Ex. Fourniture de matériel informatique" /></div>
-          <div class="field"><label>Référence client / bon de commande</label><input type="text" id="reference_externe" maxlength="100" placeholder="Ex. BC-2026-014" /></div>
+          <div class="field"><label for="objet">Objet / prestation</label><input type="text" id="objet" maxlength="190" placeholder="Ex. Fourniture de matériel informatique" /></div>
+          <div class="field"><label for="reference_externe">Référence client / bon de commande</label><input type="text" id="reference_externe" maxlength="100" placeholder="Ex. BC-2026-014" /></div>
         </div>
-        <div class="field"><label>Conditions de règlement / validité</label><textarea id="conditions_reglement" rows="3" maxlength="5000" placeholder="Conditions particulières de paiement ou de validité du devis."></textarea></div>
+        <div class="field"><label for="conditions_reglement">Conditions de règlement / validité</label><textarea id="conditions_reglement" rows="3" maxlength="5000" placeholder="Conditions particulières de paiement ou de validité du devis."></textarea></div>
 
         <div class="invoice-section-heading invoice-lines-heading"><span class="ic"><i class="ic" data-icon="file-stack"></i></span><div><h3>Articles</h3><p>Ajoutez les prestations ou produits facturés.</p></div></div>
         <div class="invoice-lines-container" role="region" aria-label="Articles du document">
@@ -82,10 +82,10 @@
         <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addLigne()">+ Ajouter une ligne</button>
 
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:20px;">
-          <div class="field"><label>Remise (montant)</label><input type="number" id="remise" value="0" /></div>
-          <div class="field"><label>Frais de livraison</label><input type="number" id="frais_livraison" value="0" /></div>
+          <div class="field"><label for="remise">Remise (montant)</label><input type="number" id="remise" value="0" /></div>
+          <div class="field"><label for="frais_livraison">Frais de livraison</label><input type="number" id="frais_livraison" value="0" /></div>
         </div>
-        <div class="field"><label>Commentaires</label><textarea id="commentaires" placeholder="Merci pour votre confiance."></textarea></div>
+        <div class="field"><label for="commentaires">Commentaires</label><textarea id="commentaires" placeholder="Merci pour votre confiance."></textarea></div>
       </div>
 
       <div class="card invoice-summary-card" style="align-self:start;">
@@ -122,7 +122,7 @@
   let produits = [];
   let ligneCount = 0;
 
-  document.getElementById('date_emission').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('date_emission').value = dateCivileAujourdhui();
 
   async function init() {
     const [{ clients: c }, { produits: p }] = await Promise.all([Api.get('/clients'), Api.get('/produits')]);
