@@ -6105,13 +6105,22 @@ a.btn .icon {
     print-color-adjust: exact !important;
   }
   .invoice-doc .sf-doc-footer,
-  .invoice-doc .sf-doc-extras,
   .invoice-doc .sf-acceptance-grid,
   .invoice-doc .sf-doc-tax,
   .invoice-doc .sf-extra-panel,
   .invoice-doc .stamp {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+  /* Fragmenter entre les panneaux complémentaires au lieu de déplacer le bloc entier.
+     Chaque .sf-extra-panel reste indivisible pour conserver les signatures et libellés. */
+  .invoice-doc .sf-doc-extras {
+    display: block !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+  .invoice-doc .sf-doc-extras > * + * {
+    margin-top: 10px !important;
   }
   .invoice-doc .sf-document-table thead {
     display: table-header-group !important;

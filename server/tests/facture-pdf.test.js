@@ -184,6 +184,50 @@ describe('Génération PDF de facture', () => {
     assert.equal(res.status, 404);
   });
 
+  test('un devis volumineux ne repousse pas conditions et acceptation sur une page isolée', async () => {
+    const client = await request(app)
+      .post('/api/clients')
+      .set('Authorization', 'Bearer ' + tokenA)
+      .send({ nom: 'Client Devis Pagination' });
+    const lignes = Array.from({ length: 28 }, (_, index) => ({
+      designation: 'Lot de prestation et fournitures prévu au devis — ' +
+        String(index + 1).padStart(2, '0') +
+        ' — Départements et services régionaux de gestion commerciale',
+      quantite: index % 5 === 0 ? 2 : 1,
+      prix_unitaire: 10000 + index * 250,
+      tva: index % 4 === 0 ? 0 : 18
+    }));
+    const devis = await request(app)
+      .post('/api/factures')
+      .set('Authorization', 'Bearer ' + tokenA)
+      .send({
+        client_id: client.body.client.id,
+        type: 'devis',
+        objet: 'Proposition commerciale détaillée et conditions de réalisation',
+        date_validite: '2026-12-17',
+        conditions_reglement: 'Offre valable 30 jours. Exécution après accord du client et validation du calendrier.',
+        lignes
+      });
+    assert.equal(devis.status, 201, devis.text);
+
+    const res = await request(app)
+      .get('/api/factures/' + devis.body.facture.id + '/pdf')
+      .set('Authorization', 'Bearer ' + tokenA)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks = [];
+        response.on('data', chunk => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.slice(0, 5).toString('latin1'), '%PDF-');
+    const pageCount = (res.body.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
+    assert.ok(pageCount > 0, 'le PDF doit contenir au moins une page');
+    assert.ok(pageCount <= 3,
+      'les conditions et l’acceptation doivent suivre les totaux sans créer une quatrième page isolée (pages=' + pageCount + ')');
+  });
+
   test("un devis (pas une facture) télécharge un PDF nommé 'devis-...'", async () => {
     const client = await request(app)
       .post('/api/clients')
