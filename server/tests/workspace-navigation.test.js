@@ -27,6 +27,7 @@ const pages = [
 
 const sidebarScript = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'sidebar.js'), 'utf8');
 const sidebarStyles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'style.css'), 'utf8');
+const enterpriseStyles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'enterprise-workspace.css'), 'utf8');
 const iconCatalogue = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'icons.js'), 'utf8');
 
 function readPage(file) {
@@ -61,6 +62,13 @@ describe('Navigation et structure des pages métier', () => {
     assert.match(sidebarStyles, /@media \(max-width:\s*900px\)/);
   });
 
+
+
+  test('le centre Entreprise aligne le rail et le contenu sur la largeur responsive', () => {
+    assert.match(enterpriseStyles, /width: var\\(--sidebar-collapsed-w\\) !important/);
+    assert.match(enterpriseStyles, /width: calc\\(100% - var\\(--sidebar-collapsed-w\\)\\)/);
+    assert.match(enterpriseStyles, /margin-left: var\\(--sidebar-collapsed-w\\) !important/);
+  });
 
   test('toutes les icônes appelées par la navigation existent dans le catalogue SVG', () => {
     const definitions = new Set(
