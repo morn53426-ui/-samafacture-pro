@@ -311,7 +311,7 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
     width: calc(100% - 76px);
     max-width: none;
     margin-left: 76px !important;
-    padding: 78px clamp(20px,2.35vw,34px) 52px !important;
+    padding: 78px clamp(24px,2.35vw,34px) 52px !important;
     background: #f5f7fa;
   }
   body.enterprise-console-shell #app-sidebar .sidebar-brand {
