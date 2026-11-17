@@ -104,16 +104,16 @@ test('un devis long garde chaque bloc complémentaire ensemble sans bloquer la p
     await page.emulateMediaType('print');
 
     const printRules = await page.evaluate(() => {
-      const extras = document.querySelector('.sf-doc-extras');
+      const extras = globalThis.document.querySelector('.sf-doc-extras');
       const panels = Array.from(extras.children).filter(element =>
         element.classList.contains('sf-extra-panel') ||
         element.classList.contains('sf-doc-legal')
       );
       const acceptance = extras.querySelector('.sf-acceptance-panel');
       return {
-        container: getComputedStyle(extras).breakInside,
-        panels: panels.map(element => getComputedStyle(element).breakInside),
-        acceptance: acceptance ? getComputedStyle(acceptance).breakInside : null,
+        container: globalThis.getComputedStyle(extras).breakInside,
+        panels: panels.map(element => globalThis.getComputedStyle(element).breakInside),
+        acceptance: acceptance ? globalThis.getComputedStyle(acceptance).breakInside : null,
         acceptancePresent: Boolean(acceptance)
       };
     });
