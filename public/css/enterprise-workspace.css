@@ -1228,3 +1228,148 @@ body.enterprise-console-shell #app-sidebar .nav-item.active {
 body.enterprise-console-shell #app-sidebar .nav-item.active .ic {
   color: #1468a8 !important;
 }
+
+
+/* Bandeau Entreprise sur écrans intermédiaires : garder une seule rangée.
+   La règle générique des pages métier empile la recherche à 901–1100 px ;
+   elle ne doit pas s'appliquer au bandeau compact du centre Entreprise. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  body.enterprise-console-shell .enterprise-console-topbar {
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    height: 54px;
+    min-height: 54px;
+    padding: 0 10px;
+    overflow: hidden;
+  }
+
+  body.enterprise-console-shell .enterprise-console-brand {
+    flex: 0 0 auto;
+    gap: 6px;
+    padding-right: 8px;
+  }
+
+  body.enterprise-console-shell .enterprise-console-brand-mark {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+
+  body.enterprise-console-shell .enterprise-console-brand strong {
+    font-size: .72rem;
+  }
+
+  body.enterprise-console-shell .enterprise-console-brand small {
+    display: none;
+  }
+
+  body.enterprise-console-shell .enterprise-console-view {
+    flex: 0 1 132px;
+    gap: 4px;
+    min-width: 104px;
+    overflow: hidden;
+    font-size: .68rem;
+  }
+
+  body.enterprise-console-shell .enterprise-console-view span {
+    flex: 0 0 auto;
+    font-size: .68rem;
+  }
+
+  body.enterprise-console-shell .enterprise-console-view small {
+    min-width: 0;
+    max-width: 64px;
+    font-size: .61rem;
+  }
+
+  body.enterprise-console-shell .enterprise-console-search {
+    flex: 1 1 145px;
+    width: auto;
+    min-width: 118px;
+    max-width: 190px;
+    min-height: 34px;
+  }
+
+  body.enterprise-console-shell .enterprise-console-utility-links {
+    flex: 0 0 auto;
+    gap: 2px;
+  }
+
+  body.enterprise-console-shell .enterprise-console-utility-links a {
+    width: 29px;
+    height: 30px;
+  }
+
+  body.enterprise-console-shell .enterprise-console-utility-links .icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-account {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    width: auto;
+    min-width: 0;
+    margin-left: auto;
+  }
+
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-account > div:nth-child(2) {
+    display: none !important;
+  }
+
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-avatar {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    font-size: .68rem;
+  }
+
+  body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle {
+    display: grid;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    place-items: center;
+    padding: 0;
+  }
+
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-quick-actions {
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 0;
+  }
+
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-quick-actions .theme-toggle-btn,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization {
+    flex: 0 0 32px;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+  }
+
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout {
+    display: inline-flex;
+    flex: 0 0 32px;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    height: 32px;
+    gap: 0;
+    padding: 0;
+    font-size: 0;
+  }
+
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout span {
+    display: none;
+  }
+}
