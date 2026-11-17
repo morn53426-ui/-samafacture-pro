@@ -20,9 +20,12 @@ test('le README décrit les plans comme des paiements uniques sans promesse mens
   assert.doesNotMatch(readme, /FCFA par mois pour Starter/);
 });
 
-test('le checkout PayDunya ne prétend pas sélectionner Orange Money ou la carte bancaire', () => {
+test('le checkout affiche les trois moyens de paiement distincts et conserve le paiement unique', () => {
   const subscription = read('public/abonnement.html');
-  assert.match(subscription, /Payer avec PayDunya/);
+  assert.match(subscription, /Payer avec Wave/);
+  assert.match(subscription, /Payer avec Orange Money/);
+  assert.match(subscription, /Payer par carte bancaire/);
+  assert.match(subscription, /moyen: intentionPaiement\.moyen/);
   assert.doesNotMatch(subscription, /Orange Money \/ Carte/);
   assert.match(subscription, /Type de paiement/);
   assert.match(subscription, /Paiement unique/);
