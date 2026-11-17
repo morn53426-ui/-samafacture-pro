@@ -1248,6 +1248,132 @@ function createFactureTemplates(helpers) {
     ].join('');
   }
 
+  // Générateur de variantes premium : chaque thème conserve une composition propre, tout en
+  // réutilisant les helpers échappés, les calculs, les lignes, les totaux et le pied de page
+  // communs. Aucun calcul métier n'est effectué dans les modèles de présentation.
+  function makePremiumRenderer(config) {
+    return function renderPremium(user, facture, lignes, isDevis, qrCode, personnalisation) {
+      const companyName = escapeHtml(user.entreprise_nom || user.nom);
+      const companyAddress = escapeHtml(user.entreprise_adresse || '');
+      const companyContact = [
+        user.entreprise_telephone ? escapeHtml(user.entreprise_telephone) : '',
+        user.entreprise_email ? escapeHtml(user.entreprise_email) : ''
+      ].filter(Boolean).join(' · ');
+      const logo = logoHtml(user, config.logoSize || 58, personnalisation);
+      const documentName = isDevis ? 'DEVIS' : 'FACTURE';
+      const documentRef = escapeHtml(facture.numero || '');
+      const identity = '<div style="display:flex;align-items:center;gap:13px;min-width:0;">' + logo +
+        '<div style="min-width:0;"><div style="font-size:' + (config.companySize || '1.08rem') +
+        ';font-weight:800;letter-spacing:' + (config.letterSpacing || '-.02em') + ';">' + companyName +
+        '</div><div style="margin-top:5px;font-size:.74rem;line-height:1.65;opacity:.82;">' +
+        companyAddress + (companyContact ? '<br/>' + companyContact : '') + '</div></div></div>';
+      const documentLabel = '<div style="text-align:right;min-width:118px;"><div style="font-size:.62rem;font-weight:800;letter-spacing:.18em;">' +
+        documentName + '</div><div style="margin-top:7px;font-size:' + (config.referenceSize || '.95rem') +
+        ';font-weight:750;letter-spacing:.02em;">' + documentRef + '</div></div>';
+      let header = '';
+      if (config.layout === 'bar') {
+        header = '<div style="margin:-40px -40px 25px;padding:25px 40px 24px;background:' + config.primary +
+          ';color:#fff;border-bottom:5px solid ' + config.accent +
+          ';display:flex;justify-content:space-between;align-items:center;gap:18px;">' + identity + documentLabel + '</div>';
+      } else if (config.layout === 'split') {
+        header = '<div style="margin:-40px -40px 25px;padding:23px 40px 22px;border-top:5px solid ' + config.accent +
+          ';border-bottom:1px solid ' + config.line +
+          ';display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;"><div>' + identity +
+          '</div><div style="padding:13px 16px;background:' + config.pale + ';border-left:3px solid ' + config.accent +
+          ';color:' + config.primary + ';">' + documentLabel + '</div></div>';
+      } else if (config.layout === 'rail') {
+        header = '<div style="margin:-40px -40px 25px;padding:24px 40px 23px;border-left:9px solid ' + config.accent +
+          ';background:' + config.pale + ';display:flex;justify-content:space-between;align-items:center;gap:18px;"><div style="color:' +
+          config.primary + ';">' + identity + '</div><div style="color:' + config.primary + ';">' + documentLabel + '</div></div>';
+      } else if (config.layout === 'frame') {
+        header = '<div style="margin:-40px -40px 25px;padding:21px 40px 22px;background:' + config.primary +
+          ';color:#fff;border:1px solid ' + config.accent + ';outline:1px solid ' + config.accent +
+          ';outline-offset:-7px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:18px;">' +
+          identity + documentLabel + '</div></div>';
+      } else if (config.layout === 'tiles') {
+        header = '<div style="margin:-40px -40px 25px;padding:22px 40px 21px;background:' + config.pale +
+          ';border-top:7px solid ' + config.primary +
+          ';display:flex;justify-content:space-between;align-items:center;gap:18px;"><div style="color:' +
+          config.primary + ';">' + identity + '</div><div style="padding:14px 17px;background:' + config.primary +
+          ';color:#fff;border-radius:4px;">' + documentLabel + '</div></div>';
+      } else if (config.layout === 'grid') {
+        header = '<div style="margin:-40px -40px 25px;padding:22px 40px 22px;background:' + config.pale +
+          ';border:1px solid ' + config.line +
+          ';display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;"><div style="padding-left:13px;border-left:4px solid ' +
+          config.accent + ';color:' + config.primary + ';">' + identity + '</div><div style="padding:16px 19px;background:' +
+          config.primary + ';color:#fff;min-width:150px;">' + documentLabel + '</div></div>';
+      } else {
+        header = '<div style="margin:-40px -40px 25px;padding:23px 40px 22px;text-align:center;border-top:3px double ' +
+          config.accent + ';border-bottom:3px double ' + config.accent + ';color:' + config.primary +
+          ';"><div style="display:flex;justify-content:center;margin-bottom:9px;">' + logo +
+          '</div><div style="font-size:1.12rem;font-weight:800;letter-spacing:.08em;">' + companyName +
+          '</div><div style="margin-top:5px;font-size:.73rem;line-height:1.6;">' + companyAddress +
+          (companyContact ? ' · ' + companyContact : '') + '</div><div style="margin-top:13px;font-size:.65rem;font-weight:800;letter-spacing:.22em;">' +
+          documentName + ' · ' + documentRef + '</div></div>';
+      }
+      const metaCards = '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:0 0 21px;">' +
+        '<div style="padding:11px 12px;background:' + config.pale + ';border:1px solid ' + config.line +
+        ';"><div style="color:' + config.accent + ';font-size:.58rem;font-weight:800;letter-spacing:.1em;">DATE D’ÉMISSION</div>' +
+        '<strong style="display:block;margin-top:6px;color:' + config.primary + ';font-size:.78rem;">' +
+        formatDate(facture.date_emission) + '</strong></div>' +
+        '<div style="padding:11px 12px;background:' + config.pale + ';border:1px solid ' + config.line +
+        ';"><div style="color:' + config.accent + ';font-size:.58rem;font-weight:800;letter-spacing:.1em;">' +
+        (isDevis ? 'VALIDITÉ DU DEVIS' : 'ÉCHÉANCE') + '</div><strong style="display:block;margin-top:6px;color:' +
+        config.primary + ';font-size:.78rem;">' + formatDate(facture.date_echeance) + '</strong></div>' +
+        '<div style="padding:11px 12px;background:' + config.pale + ';border:1px solid ' + config.line +
+        ';"><div style="color:' + config.accent + ';font-size:.58rem;font-weight:800;letter-spacing:.1em;">STATUT</div>' +
+        '<div style="margin-top:5px;">' + statutBadge(facture.statut) + '</div></div></div>';
+      const client = '<div style="margin-bottom:21px;padding:14px 16px;background:' +
+        (config.clientBackground || config.pale) + ';border:1px solid ' + config.line + ';border-left:4px solid ' +
+        config.accent + ';"><div style="margin-bottom:7px;color:' + config.accent +
+        ';font-size:.62rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;">' +
+        (config.clientLabel || 'FACTURÉ À') + '</div>' + clientBlockHtml(facture) + '</div>';
+      const table = '<table><thead><tr><th style="background:' + config.primary +
+        ';color:#fff;">Désignation</th><th style="background:' + config.primary +
+        ';color:#fff;">Qté</th><th style="background:' + config.primary +
+        ';color:#fff;">Prix U.</th><th style="background:' + config.primary +
+        ';color:#fff;">TVA</th><th style="background:' + config.primary +
+        ';color:#fff;text-align:right;">Total</th></tr></thead><tbody>' + lignesRowsHtml(lignes) + '</tbody></table>';
+      const totals = '<div style="display:flex;justify-content:flex-end;margin-top:19px;"><div style="width:300px;padding:15px 17px;background:' +
+        config.pale + ';border:1px solid ' + config.line + ';border-top:4px solid ' +
+        config.accent + ';">' + totalsRowsHtml(facture, config.accent, personnalisation) + '</div></div>';
+      return header + metaCards + client + table + totals +
+        footerHtml(user, facture, isDevis, paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay', qrCode, personnalisation);
+    };
+  }
+
+  // Trois créations Pro supplémentaires : sobres, modernes et immédiatement lisibles.
+  const renderEclipse = makePremiumRenderer({
+    layout:'rail', primary:'#173B32', accent:'#2E8066', pale:'#EEF6F2', line:'#D5E7DE',
+    companySize:'1.16rem', logoSize:62, referenceSize:'1rem', clientLabel:'CLIENT'
+  });
+  const renderSaphir = makePremiumRenderer({
+    layout:'bar', primary:'#173A70', accent:'#4A86D8', pale:'#EEF4FC', line:'#D7E4F4',
+    companySize:'1.12rem', logoSize:58, referenceSize:'1rem', clientLabel:'INFORMATIONS CLIENT'
+  });
+  const renderConseil = makePremiumRenderer({
+    layout:'split', primary:'#344255', accent:'#A27B4E', pale:'#F5F3EE', line:'#E4DED2',
+    companySize:'1.02rem', logoSize:54, referenceSize:'.9rem', clientLabel:'DESTINATAIRE'
+  });
+
+  // Quatre créations exclusives Entreprise, pensées pour les dossiers B2B et les organisations.
+  const renderImperial = makePremiumRenderer({
+    layout:'frame', primary:'#25242A', accent:'#C4A46A', pale:'#F7F4ED', line:'#E7DDC8',
+    companySize:'1.14rem', logoSize:60, referenceSize:'1rem', clientLabel:'COMPTE CLIENT'
+  });
+  const renderPanorama = makePremiumRenderer({
+    layout:'tiles', primary:'#145B62', accent:'#35A6A0', pale:'#EAF5F4', line:'#D1E8E6',
+    companySize:'1.12rem', logoSize:60, referenceSize:'1rem', clientLabel:'FACTURÉ À'
+  });
+  const renderGroupe = makePremiumRenderer({
+    layout:'grid', primary:'#24364B', accent:'#7894AC', pale:'#F0F3F6', line:'#DCE3EA',
+    companySize:'1.08rem', logoSize:58, referenceSize:'.95rem', clientLabel:'ENTITÉ / CLIENT'
+  });
+  const renderMajeste = makePremiumRenderer({
+    layout:'center', primary:'#633F43', accent:'#B58B67', pale:'#F8F2EE', line:'#E9DCD5',
+    companySize:'1.08rem', logoSize:62, referenceSize:'.95rem', clientLabel:'CLIENT'
+  });
+
   const RENDERERS = {
     classique: renderClassique, moderne: renderModerne, minimaliste: renderMinimaliste,
     elegant: renderElegant, corporate: renderCorporate, creatif: renderCreatif,
@@ -1255,7 +1381,9 @@ function createFactureTemplates(helpers) {
     epure: renderEpure, azur: renderAzur, circuit: renderCircuit,
     platine: renderPlatine, atelier: renderAtelier, saveurs: renderSaveurs,
     executive: renderExecutive, institution: renderInstitution, signature: renderSignature, consolide: renderConsolide,
-    nova: renderNova, nordique: renderNordique, luxe: renderLuxe, tech: renderTech, horizon: renderHorizon
+    nova: renderNova, nordique: renderNordique, luxe: renderLuxe, tech: renderTech, horizon: renderHorizon,
+    eclipse: renderEclipse, saphir: renderSaphir, conseil: renderConseil,
+    imperial: renderImperial, panorama: renderPanorama, groupe: renderGroupe, majeste: renderMajeste
   };
 
   function renderInvoiceHtml({ user, facture, lignes, isDevis, qrCode, template, personnalisation }) {
