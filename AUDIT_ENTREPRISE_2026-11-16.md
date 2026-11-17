@@ -96,3 +96,33 @@ Exécutions :
 - `main` est protégée par le ruleset actif `protect main` ; les contrôles CI et l'approbation indépendante doivent rester satisfaits. Aucune fusion ni approbation n'a été effectuée.
 
 Aucun prélèvement mensuel automatique ni aucune disponibilité commerciale internationale générale ne doivent être annoncés avant validation des critères produit, fournisseur, réglementaires et opérationnels.
+
+## Addendum — 17 novembre 2026 : invitations classiques d’équipe
+
+La correction des invitations d’équipe classiques est portée par la branche fix/team-invitation-email-proof-20261117 et la PR brouillon [#72](https://github.com/morn53426-ui/-samafacture-pro/pull/72). Elle complète la preuve email du parcours multi-sociétés ; elle ne la remplace pas.
+
+### Correctifs apportés
+
+- La création de l’invitation, l’écriture dans l’outbox chiffrée et l’audit sont transactionnels. Le lien brut n’est plus renvoyé à l’administrateur et l’interface n’affiche plus un faux état « email envoyé » avant livraison.
+- Le destinataire doit se connecter avec le compte correspondant à l’adresse invitée, puis ouvrir un second lien envoyé à cette même adresse. Le jeton de preuve est aléatoire, stocké sous forme SHA-256, valable 20 minutes et consommable une seule fois.
+- Un délai anti-renvoi évite les envois répétés immédiats. Le worker vérifie que l’invitation et la preuve sont encore valides avant livraison ; les messages en attente sont annulés après acceptation.
+- L’acceptation et la création du membre sont effectuées dans une transaction. Les requêtes concurrentes ne peuvent pas consommer deux fois le même jeton.
+- Les nouveaux liens transportent leurs jetons dans le fragment URL, sont retirés de la barre d’adresse dès lecture et sont conservés en sessionStorage pendant le parcours de connexion. Les requêtes d’acceptation partent du compte personnel, sans l’en-tête d’un ancien espace sélectionné.
+- La migration 009 ajoute pro_team_invitation_verifications et porte le schéma à la version 14.
+
+### Validation CI du code
+
+Sur le commit applicatif 024ab145c9564f472b8fca8871d2803f5a11c238, le workflow [Tests automatisés #44037122142](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/44037122142) est terminé avec succès :
+
+- 414 tests exécutés : 413 réussis, 0 échec, 1 ignoré ;
+- npm audit : 0 vulnérabilité signalée ;
+- construction Docker et vérification du script de recette staging réussies ;
+- smoke test cluster réussi : 2 workers, MySQL prêt et Redis opérationnel ;
+- recette visuelle réussie : 133 captures, 7 largeurs, jeu de données extrême ;
+- archive complète des sources générée avec succès.
+
+Le parcours email est testé avec un expéditeur simulé dans la suite d’intégration ; une recette supplémentaire avec une vraie boîte mail de test et le fournisseur SMTP de production reste à réaliser. Le workflow ne contient pas d’étape indépendante de lint ou de typage statique : ces contrôles ne sont donc pas déclarés comme exécutés.
+
+### Décision d’intégration
+
+La PR #72 reste en brouillon et non fusionnée. main n’a reçu aucun de ces changements. La protection de main, les contrôles obligatoires et l’approbation indépendante restent requis avant toute intégration.

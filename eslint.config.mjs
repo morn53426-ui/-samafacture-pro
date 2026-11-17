@@ -72,5 +72,32 @@ export default [
       globals: { ...nodeGlobals, ...browserGlobals }
     },
     rules: correctnessRules
+  },
+
+  {
+    files: [
+      'server/config/db.js',
+      'server/email-outbox.js',
+      'server/routes/professionnel.js',
+      'server/tests/company-group-ui.test.js',
+      'server/tests/company-groups.test.js',
+      'server/tests/invoice-quota-migration-v8.test.js'
+    ],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'commonjs',
+      globals: {
+        ...nodeGlobals,
+        AbortController: 'readonly',
+        TextDecoder: 'readonly',
+        TextEncoder: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        fetch: 'readonly',
+        structuredClone: 'readonly'
+      }
+    },
+    rules: correctnessRules
   }
+
 ];

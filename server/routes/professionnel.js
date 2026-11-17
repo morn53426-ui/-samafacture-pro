@@ -5,7 +5,7 @@ const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission, ROLE_PERMISSIONS } = require('../middleware/tenant');
 const { sendMail, isSmtpConfigured } = require('../config/mailer');
-const { encryptSecret, decryptSecret } = require('../utils/pro-webhooks');
+const { encryptSecret, decryptSecret, queueWebhookEvent } = require('../utils/pro-webhooks');
 const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydunya } = require('../config/payments');
 const net = require('net');
 const { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, SUPPORTED_TIMEZONES } = require('../config/localization');
@@ -606,6 +606,7 @@ router.post('/team/roles', async (req, res, next) => {
   }
 });
 router.post('/team/invitations', async (req, res, next) => {
+  let conn;
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
     const role = String(req.body.role || 'employe').trim();
@@ -613,36 +614,290 @@ router.post('/team/invitations', async (req, res, next) => {
     const allowedPermissions = ['dashboard.read','clients.read','clients.write','products.read','products.write','invoices.read','invoices.write','payments.read','payments.write','expenses.read','expenses.write','reports.read','documents.read','documents.write','sales.read','sales.write','cash.read','cash.write','team.read','team.manage','integrations.read','integrations.manage','automations.read','automations.manage','purchasing.read','purchasing.write','inventory.read','inventory.write','accounting.read','accounting.write','crm.read','crm.write','localization.read','localization.write','audit.read'];
     let permissions = ROLE_PERMISSIONS[role];
     if (role === 'personnalise') permissions = Array.isArray(req.body.permissions) ? [...new Set(req.body.permissions.filter(p => allowedPermissions.includes(p)))] : [];
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (!allowedRoles.includes(role) && role !== 'personnalise')) return res.status(400).json({ error: 'Adresse email ou rôle invalide.' });
-    if (!Array.isArray(permissions) || !permissions.length || permissions.length > 30) return res.status(400).json({ error: 'Les permissions du rôle sont invalides.' });
-    const [already] = await pool.query('SELECT id FROM pro_team_members WHERE owner_user_id = ? AND active = 1 AND member_user_id IN (SELECT id FROM users WHERE email = ?)', [owner(req), email]);
-    if (already.length) return res.status(409).json({ error: 'Cet utilisateur est déjà membre de votre équipe.' });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || (!allowedRoles.includes(role) && role !== 'personnalise')) {
+      return res.status(400).json({ error: 'Adresse email ou rôle invalide.' });
+    }
+    if (!Array.isArray(permissions) || !permissions.length || permissions.length > 30) {
+      return res.status(400).json({ error: 'Les permissions du rôle sont invalides.' });
+    }
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [[ownerAccount]] = await conn.query('SELECT id, email FROM users WHERE id = ? LIMIT 1 FOR UPDATE', [owner(req)]);
+    if (!ownerAccount) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Compte propriétaire introuvable.' });
+    }
+    if (String(ownerAccount.email || '').toLowerCase() === email) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Vous ne pouvez pas vous inviter vous-même.' });
+    }
+    const [already] = await conn.query(
+      'SELECT id FROM pro_team_members WHERE owner_user_id = ? AND active = 1 AND member_user_id IN (SELECT id FROM users WHERE LOWER(email) = LOWER(?)) LIMIT 1',
+      [owner(req), email]
+    );
+    if (already.length) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Cet utilisateur est déjà membre de votre équipe.' });
+    }
+    const [pending] = await conn.query(
+      "SELECT id FROM pro_team_invitations WHERE user_id = ? AND LOWER(email) = LOWER(?) AND statut = 'envoyee' AND expire_at > NOW() LIMIT 1 FOR UPDATE",
+      [owner(req), email]
+    );
+    if (pending.length) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Une invitation active existe déjà pour cette adresse email.' });
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
     const hash = crypto.createHash('sha256').update(token).digest('hex');
     const expires = new Date(Date.now() + 7 * 86400000);
-    const [result] = await pool.query('INSERT INTO pro_team_invitations (user_id, email, role, permissions_json, token_hash, expire_at) VALUES (?, ?, ?, ?, ?, ?)', [owner(req), email, role, JSON.stringify(permissions), hash, expires]);
+    const [result] = await conn.query(
+      'INSERT INTO pro_team_invitations (user_id, email, role, permissions_json, token_hash, expire_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [owner(req), email, role, JSON.stringify(permissions), hash, expires]
+    );
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
-    const inviteUrl = base + '/invitation.html?token=' + token;
-    const mailResult = await sendMail({ to: email, subject: 'Invitation à rejoindre SamaFacture Pro', text: 'Vous êtes invité à rejoindre un espace SamaFacture Pro. Créez un compte avec cette adresse email puis acceptez l’invitation : ' + inviteUrl });
-    await audit(req, 'equipe.invitation_creee', 'invitation', result.insertId, { email, role });
-    res.status(201).json({ id: result.insertId, email, role, invitation_url: inviteUrl, email_envoye: mailResult.sent });
-  } catch (err) { next(err); }
+    const inviteUrl = base + '/invitation.html?type=team#token=' + encodeURIComponent(token);
+    const subject = 'Invitation à rejoindre SamaFacture Pro';
+    const text = 'Vous êtes invité à rejoindre un espace SamaFacture Pro. Connectez-vous ou créez un compte avec cette adresse email, puis ouvrez ce lien pour commencer la vérification : ' +
+      inviteUrl + '\n\nLe rattachement à l’équipe ne sera effectué qu’après une confirmation supplémentaire envoyée à cette même adresse email. Ce lien expire dans 7 jours.';
+    const payloadEnc = encryptEmailPayload({ to: email, subject, text, invitation_url: inviteUrl });
+    const idempotencyKey = crypto.createHash('sha256').update('team-invitation:' + result.insertId).digest('hex');
+    await conn.query(
+      "INSERT INTO email_outbox (owner_user_id, entity_type, entity_id, idempotency_key, payload_enc, statut, tentatives, prochaine_tentative) " +
+      "VALUES (?, 'team_invitation', ?, ?, ?, 'queued', 0, NOW())",
+      [owner(req), result.insertId, idempotencyKey, payloadEnc]
+    );
+    await conn.query(
+      'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [owner(req), actor(req), 'equipe.invitation_creee', 'invitation', String(result.insertId), JSON.stringify({ email, role, email_queued: true }), req.ip || null]
+    );
+    await conn.commit();
+    res.status(201).json({
+      id: result.insertId, email, role, email_en_file: true, email_statut: 'queued',
+      message: 'Invitation créée. Le lien a été placé dans la file d’envoi sécurisée.'
+    });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Une invitation ou un membre existe déjà pour cette adresse email.' });
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
+
 router.post('/team/invitations/accept', async (req, res, next) => {
+  let conn;
   try {
     const token = String(req.body.token || '');
     if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(400).json({ error: 'Jeton d’invitation invalide.' });
-    const hash = crypto.createHash('sha256').update(token).digest('hex');
-    const [rows] = await pool.query("SELECT * FROM pro_team_invitations WHERE token_hash = ? AND statut = 'envoyee' AND expire_at > NOW() LIMIT 1", [hash]);
-    const invite = rows[0];
-    if (!invite) return res.status(404).json({ error: 'Invitation expirée ou déjà utilisée.' });
-    if (String(invite.email).toLowerCase() !== String(req.user.email).toLowerCase()) return res.status(403).json({ error: 'Connectez-vous avec l’adresse email ayant reçu l’invitation.' });
-    await pool.query('INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), permissions_json = VALUES(permissions_json), active = 1', [invite.user_id, actor(req), invite.role, invite.permissions_json]);
-    await pool.query("UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ?", [actor(req), invite.id]);
-    await pool.query('INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)', [invite.user_id, actor(req), 'equipe.invitation_acceptee', 'invitation', String(invite.id), JSON.stringify({ owner_user_id: invite.user_id }), req.ip || null]);
-    res.json({ success: true, entreprise_id: invite.user_id, message: 'Invitation acceptée. Reconnectez-vous pour ouvrir l’espace de cette entreprise.' });
-  } catch (err) { next(err); }
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [[currentAccount]] = await conn.query(
+      'SELECT id, email FROM users WHERE id = ? LIMIT 1 FOR UPDATE', [actor(req)]
+    );
+    if (!currentAccount?.email) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
+    }
+    const [invites] = await conn.query(
+      "SELECT * FROM pro_team_invitations WHERE token_hash = ? AND statut = 'envoyee' AND expire_at > NOW() LIMIT 1 FOR UPDATE",
+      [tokenHash]
+    );
+    const invite = invites[0];
+    if (!invite) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Invitation expirée, révoquée ou déjà utilisée.' });
+    }
+    if (Number(invite.user_id) === actor(req)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le propriétaire ne peut pas accepter sa propre invitation.' });
+    }
+    if (String(invite.email).toLowerCase() !== String(currentAccount.email).toLowerCase()) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Connectez-vous avec l’adresse email qui a reçu cette invitation.' });
+    }
+    const [[alreadyMember]] = await conn.query(
+      'SELECT id FROM pro_team_members WHERE owner_user_id = ? AND member_user_id = ? AND active = 1 LIMIT 1 FOR UPDATE',
+      [invite.user_id, actor(req)]
+    );
+    if (alreadyMember) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Vous êtes déjà membre de cette équipe.' });
+    }
+    const [[existingProof]] = await conn.query(
+      "SELECT id, used_at, (expires_at > NOW()) AS is_active, (sent_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)) AS recently_sent " +
+      "FROM pro_team_invitation_verifications WHERE invitation_id = ? LIMIT 1 FOR UPDATE",
+      [invite.id]
+    );
+    if (existingProof && !existingProof.used_at && Number(existingProof.is_active) === 1 &&
+        Number(existingProof.recently_sent) === 1) {
+      const [[outbox]] = await conn.query(
+        "SELECT statut FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = ? LIMIT 1",
+        [existingProof.id]
+      );
+      await conn.commit();
+      res.set('Cache-Control', 'no-store, private');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      return res.status(202).json({
+        verification_required: true, email_en_file: true, email_statut: outbox?.statut || 'queued',
+        message: 'Un lien de confirmation a déjà été demandé récemment. Consultez la boîte de réception de cette adresse avant de demander un nouvel envoi.'
+      });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    const expires = new Date(Date.now() + 20 * 60 * 1000);
+    await conn.query(
+      "INSERT INTO pro_team_invitation_verifications (invitation_id, member_user_id, token_hash, expires_at, sent_at, used_at) " +
+      "VALUES (?, ?, ?, ?, NOW(), NULL) ON DUPLICATE KEY UPDATE member_user_id = VALUES(member_user_id), " +
+      "token_hash = VALUES(token_hash), expires_at = VALUES(expires_at), sent_at = NOW(), used_at = NULL",
+      [invite.id, actor(req), verificationHash, expires]
+    );
+    const [[proof]] = await conn.query(
+      'SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ? LIMIT 1', [invite.id]
+    );
+    const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
+    const verificationUrl = base + '/invitation.html?type=team#token=' +
+      encodeURIComponent(token) + '&verification_token=' + encodeURIComponent(verificationToken);
+    const subject = 'Confirmez votre adresse email pour rejoindre SamaFacture Pro';
+    const text = 'Une demande a été faite pour rejoindre une équipe SamaFacture Pro. Pour confirmer que vous contrôlez cette adresse email et autoriser le rattachement, ouvrez ce lien valable 20 minutes : ' +
+      verificationUrl + '\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message. Aucun accès à l’équipe ne sera accordé sans cette confirmation.';
+    const payloadEnc = encryptEmailPayload({ to: invite.email, subject, text, verification_url: verificationUrl });
+    const idempotencyKey = crypto.createHash('sha256').update('team-invitation-verification:' + proof.id).digest('hex');
+    await conn.query(
+      "INSERT INTO email_outbox (owner_user_id, entity_type, entity_id, idempotency_key, payload_enc, statut, tentatives, prochaine_tentative) " +
+      "VALUES (?, 'team_invitation_verification', ?, ?, ?, 'queued', 0, NOW()) " +
+      "ON DUPLICATE KEY UPDATE payload_enc = VALUES(payload_enc), statut = 'queued', tentatives = 0, " +
+      "prochaine_tentative = NOW(), verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = NULL, envoye_le = NULL, updated_at = NOW()",
+      [invite.user_id, proof.id, idempotencyKey, payloadEnc]
+    );
+    await conn.query(
+      'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [invite.user_id, actor(req), 'equipe.invitation_verification_demandee', 'invitation', String(invite.id), JSON.stringify({ email_verified: false }), req.ip || null]
+    );
+    await conn.commit();
+    res.set('Cache-Control', 'no-store, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    return res.status(202).json({
+      verification_required: true, email_en_file: true, email_statut: 'queued',
+      message: 'Un lien de confirmation a été placé dans la file d’envoi sécurisée. L’accès à l’équipe ne sera accordé qu’après ouverture de ce lien depuis la boîte email invitée.'
+    });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Cette invitation ne peut plus être acceptée.' });
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
+
+router.post('/team/invitations/accept/verify', async (req, res, next) => {
+  let conn;
+  try {
+    const token = String(req.body.token || '');
+    const verificationToken = String(req.body.verification_token || '');
+    if (!/^[a-f0-9]{64}$/i.test(token) || !/^[a-f0-9]{64}$/i.test(verificationToken)) {
+      return res.status(400).json({ error: 'Lien de vérification invalide.' });
+    }
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const verificationHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [[currentAccount]] = await conn.query(
+      'SELECT id, email FROM users WHERE id = ? LIMIT 1 FOR UPDATE', [actor(req)]
+    );
+    if (!currentAccount?.email) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
+    }
+    const [invites] = await conn.query(
+      "SELECT * FROM pro_team_invitations WHERE token_hash = ? AND statut = 'envoyee' AND expire_at > NOW() LIMIT 1 FOR UPDATE",
+      [tokenHash]
+    );
+    const invite = invites[0];
+    if (!invite) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Invitation expirée, révoquée ou déjà utilisée.' });
+    }
+    if (Number(invite.user_id) === actor(req)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le propriétaire ne peut pas accepter sa propre invitation.' });
+    }
+    if (String(invite.email).toLowerCase() !== String(currentAccount.email).toLowerCase()) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Connectez-vous avec le compte associé à l’adresse email invitée.' });
+    }
+    const [[alreadyMember]] = await conn.query(
+      'SELECT id FROM pro_team_members WHERE owner_user_id = ? AND member_user_id = ? AND active = 1 LIMIT 1 FOR UPDATE',
+      [invite.user_id, actor(req)]
+    );
+    if (alreadyMember) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Vous êtes déjà membre de cette équipe.' });
+    }
+    const [proofs] = await conn.query(
+      "SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ? AND member_user_id = ? AND token_hash = ? AND used_at IS NULL AND expires_at > NOW() LIMIT 1 FOR UPDATE",
+      [invite.id, actor(req), verificationHash]
+    );
+    const proof = proofs[0];
+    if (!proof) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Le lien de confirmation est expiré, invalide ou déjà utilisé. Recommencez depuis votre invitation.' });
+    }
+    const [used] = await conn.query(
+      "UPDATE pro_team_invitation_verifications SET used_at = NOW() WHERE id = ? AND member_user_id = ? AND token_hash = ? AND used_at IS NULL AND expires_at > NOW()",
+      [proof.id, actor(req), verificationHash]
+    );
+    if (used.affectedRows !== 1) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Ce lien de confirmation a déjà été utilisé.' });
+    }
+    const permissionsJson = typeof invite.permissions_json === 'string'
+      ? invite.permissions_json
+      : JSON.stringify(invite.permissions_json || []);
+    await conn.query(
+      'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), permissions_json = VALUES(permissions_json), active = 1',
+      [invite.user_id, actor(req), invite.role, permissionsJson]
+    );
+    const [accepted] = await conn.query(
+      "UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ? AND statut = 'envoyee'",
+      [actor(req), invite.id]
+    );
+    if (accepted.affectedRows !== 1) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Cette invitation a déjà été acceptée.' });
+    }
+    await conn.query(
+      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_accepted', updated_at = NOW() " +
+      "WHERE ((entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
+      [invite.id, proof.id]
+    );
+    await conn.query(
+      'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [invite.user_id, actor(req), 'equipe.invitation_acceptee', 'invitation', String(invite.id), JSON.stringify({ owner_user_id: invite.user_id, email_verified: true }), req.ip || null]
+    );
+    await conn.commit();
+    res.set('Cache-Control', 'no-store, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.json({
+      success: true,
+      entreprise_id: invite.user_id,
+      message: 'Adresse email confirmée. Invitation acceptée. Reconnectez-vous pour ouvrir l’espace de cette entreprise.'
+    });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Vous êtes déjà membre de cette équipe.' });
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
 router.delete('/team/:memberId', async (req, res, next) => {
   try {
     if (!idOk(req.params.memberId)) return res.status(400).json({ error: 'Identifiant de membre invalide.' });

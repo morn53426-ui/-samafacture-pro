@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 13;
+const CURRENT_SCHEMA_VERSION = 14;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -166,6 +166,7 @@ async function runMigrations(conn) {
   // v11 : groupes multi-sociétés (migration 006).
   // v12 : outbox email chiffrée et durable (migration 007).
   // v13 : preuve email à usage unique avant rattachement multi-sociétés (migration 008).
+  // v14 : preuve email à usage unique pour les invitations classiques d’équipe (migration 009).
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -413,6 +414,20 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of companyGroupVerificationStatements) {
+    await conn.query(statement);
+  }
+
+  // Preuve email à usage unique pour les invitations classiques d'équipe.
+  const teamInvitationVerificationPath = path.join(__dirname, '..', 'database', 'migrations', '009_team_invitation_email_proof.sql');
+  const teamInvitationVerificationSql = fs.readFileSync(teamInvitationVerificationPath, 'utf8');
+  const teamInvitationVerificationStatements = teamInvitationVerificationSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of teamInvitationVerificationStatements) {
     await conn.query(statement);
   }
 

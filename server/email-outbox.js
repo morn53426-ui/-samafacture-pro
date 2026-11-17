@@ -74,6 +74,30 @@ function extractEmailVerificationToken(verificationUrl) {
 }
 
 async function isEmailJobDeliverable(job, message) {
+  if (job.entity_type === 'team_invitation') {
+    const [[invitation]] = await pool.query(
+      "SELECT id FROM pro_team_invitations WHERE id = ? AND statut = 'envoyee' AND expire_at > NOW() LIMIT 1",
+      [job.entity_id]
+    );
+    return Boolean(invitation);
+  }
+
+  if (job.entity_type === 'team_invitation_verification') {
+    const proofToken = extractEmailVerificationToken(message?.verification_url);
+    if (!/^[a-f0-9]{64}$/i.test(proofToken)) return false;
+    const proofHash = crypto.createHash('sha256').update(proofToken).digest('hex');
+    const [[verification]] = await pool.query(
+      "SELECT v.id FROM pro_team_invitation_verifications v " +
+      "JOIN pro_team_invitations i ON i.id = v.invitation_id " +
+      "JOIN users account ON account.id = v.member_user_id " +
+      "WHERE v.id = ? AND v.token_hash = ? AND v.used_at IS NULL AND v.expires_at > NOW() " +
+      "AND i.statut = 'envoyee' AND i.expire_at > NOW() " +
+      "AND LOWER(account.email) = LOWER(i.email) LIMIT 1",
+      [job.entity_id, proofHash]
+    );
+    return Boolean(verification);
+  }
+
   if (job.entity_type === 'company_group_invitation') {
     const [[invitation]] = await pool.query(
       `SELECT id
@@ -172,9 +196,11 @@ async function dispatchPendingEmails({ sender = sendMail, batchSize = DEFAULT_BA
     try {
       // Déchiffre d'abord les preuves afin de lier la tâche à la version courante du jeton.
       // Un ancien email repris après une demande de renvoi ne doit pas livrer un lien déjà remplacé.
-      const message = job.entity_type === 'company_group_invitation_verification'
-        ? decryptEmailPayload(job.payload_enc)
-        : null;
+      const needsVerificationPayload = [
+        'company_group_invitation_verification',
+        'team_invitation_verification'
+      ].includes(job.entity_type);
+      const message = needsVerificationPayload ? decryptEmailPayload(job.payload_enc) : null;
       if (!await isEmailJobDeliverable(job, message)) {
         await markEmailCancelled(job);
         summary.cancelled += 1;
