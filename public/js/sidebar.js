@@ -40,7 +40,12 @@ function renderSidebar(activePage) {
     ]}
   ];
 
-  if (user?.plan === 'entreprise' || localStorage.getItem('sf_company_group_member') === 'true') {
+  const hasCompanyGroupAccess = user?.plan === 'entreprise' || (() => {
+    try { return localStorage.getItem('sf_company_group_member') === 'true'; }
+    catch { return false; }
+  })();
+
+  if (hasCompanyGroupAccess) {
     // La gestion multi-sociétés est une destination métier : elle dispose de sa
     // propre rubrique, distincte des réglages du compte et de l'abonnement.
     const accountIndex = nav.findIndex(section => section.group === 'Compte');
@@ -105,7 +110,8 @@ function renderSidebar(activePage) {
     </aside>
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
   `;
-  document.getElementById('sidebar-root').outerHTML = html;
+  const sidebarRoot = document.getElementById('sidebar-root');
+  if (sidebarRoot) sidebarRoot.outerHTML = html;
   ensureWorkspaceTopbar();
   initRealtime();
   requestAnimationFrame(() => requestAnimationFrame(() => {
