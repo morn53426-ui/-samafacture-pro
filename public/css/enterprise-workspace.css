@@ -1171,3 +1171,32 @@ body.enterprise-console-shell .enterprise-console-search button .icon {
 @media (max-width: 900px) {
   body.enterprise-console-shell .enterprise-console-search { display: none; }
 }
+
+.enterprise-currency-breakdown {
+  margin-top: 21px;
+  padding-top: 17px;
+  border-top: 1px solid #e4e9ef;
+}
+.enterprise-currency-breakdown-heading { margin-bottom: 10px; }
+.enterprise-currency-breakdown-heading h3 {
+  margin: 0;
+  color: #203a55;
+  font-size: .86rem;
+  font-weight: 800;
+}
+.enterprise-currency-breakdown-heading p {
+  margin: 3px 0 0;
+  color: #788596;
+  font-size: .68rem;
+}
+body.enterprise-console-shell .enterprise-currency-breakdown .group-dashboard-grid {
+  margin-top: 12px;
+}
+body.enterprise-console-shell .enterprise-currency-breakdown .group-currency-card {
+  border-color: #e3e9ef;
+  border-radius: 11px;
+  background: #fff;
+}
+@media (max-width: 640px) {
+  .enterprise-currency-breakdown { margin-top: 17px; padding-top: 14px; }
+}
