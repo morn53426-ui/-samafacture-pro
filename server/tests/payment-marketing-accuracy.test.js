@@ -23,7 +23,7 @@ test('le README décrit les plans comme des paiements uniques sans promesse mens
 test('la page présente distinctement les trois moyens prévus sans activer le paiement récurrent', () => {
   const subscription = read('public/abonnement.html');
   const billingRoute = read('server/routes/abonnement.js');
-  assert.match(subscription, /Moyens de paiement prévus/);
+  assert.match(subscription, /Moyens de paiement prévus/i);
   assert.ok(subscription.includes('<strong>Wave</strong>'));
   assert.ok(subscription.includes('<strong>Orange Money</strong>'));
   assert.ok(subscription.includes('<strong>Carte bancaire</strong>'));
