@@ -65,8 +65,8 @@ function renderSidebar(activePage) {
   const planLabels = { gratuit: 'Plan Gratuit', starter: 'Plan Starter', pro: 'Plan Pro', entreprise: 'Plan Entreprise' };
   const isEnterpriseConsole = location.pathname.endsWith('/groupe-entreprise.html');
   document.body.classList.toggle('enterprise-console-shell', isEnterpriseConsole);
-  // Le centre de pilotage possède son propre rail vertical, avec libellés sous les icônes.
-  // La préférence de repli générale n'est donc pas modifiée pour les autres pages.
+  // Le centre Entreprise démarre en rail compact ; les autres pages respectent la préférence
+  // enregistrée. Le rail compact garde les libellés visibles sous les icônes sur ordinateur.
   const sidebarCollapsed = window.matchMedia('(min-width: 901px)').matches && (
     isEnterpriseConsole || (() => {
       try { return localStorage.getItem('sf-sidebar-collapsed') !== 'false'; }
