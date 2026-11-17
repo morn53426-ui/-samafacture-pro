@@ -16,7 +16,7 @@ test('la page publique distingue les règlements de factures des abonnements ind
   assert.doesNotMatch(home, /Compatible avec Wave.*Stripe/);
 });
 
-test('le README décrit l'état indisponible des abonnements et le renouvellement sur consentement', () => {
+test("le README décrit l'état indisponible des abonnements et le renouvellement sur consentement", () => {
   const readme = read('README.md');
   assert.match(readme, /## Souscriptions aux plans \(en préparation\)/);
   assert.match(readme, /aucune souscription mensuelle, aucun mandat récurrent et aucun débit automatique ne sont activés/i);
