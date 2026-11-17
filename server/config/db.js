@@ -438,9 +438,9 @@ async function runMigrations(conn) {
   const saasSubscriptionsPath = path.join(__dirname, '..', 'database', 'migrations', '010_saas_subscriptions_simulation.sql');
   const saasSubscriptionsSql = fs.readFileSync(saasSubscriptionsPath, 'utf8');
   const saasSubscriptionsStatements = saasSubscriptionsSql
-    .split(/\\r?\\n/)
+    .split(/\r?\n/)
     .filter(line => !line.trim().startsWith('--'))
-    .join('\\n')
+    .join('\n')
     .split(';')
     .map(statement => statement.trim())
     .filter(Boolean);
