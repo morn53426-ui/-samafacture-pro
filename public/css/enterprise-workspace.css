@@ -18,8 +18,13 @@
   padding:8px 13px;border-radius:9px;color:var(--ink-soft);font-size:.82rem;font-weight:700;
   text-decoration:none;white-space:nowrap;transition:background var(--dur-fast),color var(--dur-fast)
 }
-.group-section-nav a:hover,.group-section-nav a:focus-visible{
+.group-section-nav a:focus-visible{
   background:var(--emerald-light);color:var(--emerald)
+}
+@media (hover: hover) and (pointer: fine) {
+  .group-section-nav a:hover{
+    background:var(--emerald-light);color:var(--emerald)
+  }
 }
 .group-section-nav a:focus-visible{outline:2px solid var(--emerald);outline-offset:2px}
 .group-panel[id]{scroll-margin-top:22px}
@@ -281,16 +286,20 @@ body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggl
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout {
   color: #e8f1fb;
 }
-body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle:hover,
-body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout:hover {
-  background: rgba(255,255,255,.12);
-  color: #fff;
+@media (hover: hover) and (pointer: fine) {
+  body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle:hover,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout:hover {
+    background: rgba(255,255,255,.12);
+    color: #fff;
+  }
 }
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization {
   color: #e8f1fb;
 }
-body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization:hover {
-  background: rgba(255,255,255,.12);
+@media (hover: hover) and (pointer: fine) {
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization:hover {
+    background: rgba(255,255,255,.12);
+  }
 }
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization .icon {
   color: #e8f1fb;
@@ -404,10 +413,12 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
     line-height: 1.12;
     text-align: center;
   }
-  body.enterprise-console-shell #app-sidebar .nav-item:hover {
-    border-color: #e5ebf2;
-    background: #f5f8fc;
-    color: #183b61;
+  @media (hover: hover) and (pointer: fine) {
+    body.enterprise-console-shell #app-sidebar .nav-item:hover {
+      border-color: #e5ebf2;
+      background: #f5f8fc;
+      color: #183b61;
+    }
   }
   body.enterprise-console-shell #app-sidebar .nav-item.active {
     border-color: #dce8f6;
@@ -440,9 +451,11 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
     height: 22px;
     place-items: center;
   }
-  body.enterprise-console-shell #app-sidebar .sidebar-logout:hover {
-    background: #f5f8fc;
-    color: #183b61;
+  @media (hover: hover) and (pointer: fine) {
+    body.enterprise-console-shell #app-sidebar .sidebar-logout:hover {
+      background: #f5f8fc;
+      color: #183b61;
+    }
   }
   body.enterprise-console-shell #app-navigation a.nav-item:not([href="dashboard.html"]):not([href="factures.html"]):not([href="clients.html"]):not([href="comptabilite.html"]):not([href="depenses.html"]):not([href="rapports.html"]):not([href="achats.html"]):not([href="groupe-entreprise.html"]):not([href="parametres.html"]) {
     display: none;
@@ -521,10 +534,12 @@ body.enterprise-console-shell .enterprise-dashboard-heading {
   color: #e7f5ff;
 }
 .enterprise-module-chip .icon { width: 17px; height: 17px; stroke-width: 2; }
-.enterprise-module-chip:hover {
-  border-color: #a9c5de;
-  box-shadow: 0 4px 11px rgba(16,52,87,.09);
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .enterprise-module-chip:hover {
+    border-color: #a9c5de;
+    box-shadow: 0 4px 11px rgba(16,52,87,.09);
+    transform: translateY(-1px);
+  }
 }
 .enterprise-module-chip:focus-visible {
   outline: 2px solid #2789b8;
@@ -570,9 +585,11 @@ body.enterprise-console-shell .enterprise-dashboard-heading {
   white-space: nowrap;
 }
 .enterprise-create-actions-list a .icon { width: 15px; height: 15px; }
-.enterprise-create-actions-list a:hover {
-  border-color: #a6c5dc;
-  background: #f4f9fd;
+@media (hover: hover) and (pointer: fine) {
+  .enterprise-create-actions-list a:hover {
+    border-color: #a6c5dc;
+    background: #f4f9fd;
+  }
 }
 .enterprise-create-actions-list a:focus-visible {
   outline: 2px solid #2789b8;
@@ -596,10 +613,15 @@ body.enterprise-console-shell .group-section-nav a {
   font-size: .74rem;
   font-weight: 750;
 }
-body.enterprise-console-shell .group-section-nav a:hover,
 body.enterprise-console-shell .group-section-nav a:focus-visible {
   background: #eaf2fb;
   color: #145c91;
+}
+@media (hover: hover) and (pointer: fine) {
+  body.enterprise-console-shell .group-section-nav a:hover {
+    background: #eaf2fb;
+    color: #145c91;
+  }
 }
 
 body.enterprise-console-shell .group-layout { gap: 21px; max-width: none; }
@@ -868,7 +890,9 @@ body.enterprise-console-shell .group-overview-kpi small { color: #798596; }
   font-size: .69rem;
   font-weight: 800;
 }
-.enterprise-dashboard-card-link:hover { color: #0d4e76; }
+@media (hover: hover) and (pointer: fine) {
+  .enterprise-dashboard-card-link:hover { color: #0d4e76; }
+}
 .enterprise-dashboard-card-link:focus-visible {
   outline: 2px solid #2789b8;
   outline-offset: 3px;
@@ -1108,10 +1132,12 @@ body.enterprise-console-shell .group-disclaimer {
   height: 18px;
   stroke-width: 1.9;
 }
-.enterprise-console-utility-links a:hover {
-  border-color: rgba(255,255,255,.14);
-  background: rgba(255,255,255,.1);
-  color: #fff;
+@media (hover: hover) and (pointer: fine) {
+  .enterprise-console-utility-links a:hover {
+    border-color: rgba(255,255,255,.14);
+    background: rgba(255,255,255,.1);
+    color: #fff;
+  }
 }
 .enterprise-console-utility-links a:focus-visible {
   outline: 2px solid #9bd3ff;
