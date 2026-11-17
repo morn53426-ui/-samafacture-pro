@@ -856,9 +856,12 @@ router.post('/team/invitations/accept/verify', async (req, res, next) => {
       await conn.rollback();
       return res.status(409).json({ error: 'Ce lien de confirmation a déjà été utilisé.' });
     }
+    const permissionsJson = typeof invite.permissions_json === 'string'
+      ? invite.permissions_json
+      : JSON.stringify(invite.permissions_json || []);
     await conn.query(
       'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role), permissions_json = VALUES(permissions_json), active = 1',
-      [invite.user_id, actor(req), invite.role, invite.permissions_json]
+      [invite.user_id, actor(req), invite.role, permissionsJson]
     );
     const [accepted] = await conn.query(
       "UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ? AND statut = 'envoyee'",

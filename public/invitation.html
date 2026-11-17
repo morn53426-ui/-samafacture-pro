@@ -40,19 +40,28 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
  let verificationToken='';
 
  if(isCompanyGroup || isTeam){
-   const invitationKey=isTeam?teamInvitationStorageKey:invitationStorageKey;
-   const verificationKey=isTeam?teamVerificationStorageKey:verificationStorageKey;
-   const resume=isTeam?resumeTeam:resumeCompanyGroup;
-   if(resume){
-     token=sessionStorage.getItem(invitationKey)||'';
-     verificationToken=sessionStorage.getItem(verificationKey)||'';
+   if(resumeTeam || resumeCompanyGroup){
+     if(isTeam){
+       token=sessionStorage.getItem(teamInvitationStorageKey)||'';
+       verificationToken=sessionStorage.getItem(teamVerificationStorageKey)||'';
+     }else{
+       token=sessionStorage.getItem(invitationStorageKey)||'';
+       verificationToken=sessionStorage.getItem(verificationStorageKey)||'';
+     }
    }else{
      token=params.get('token')||fragmentParams.get('token')||'';
      verificationToken=params.get('verification_token')||fragmentParams.get('verification_token')||'';
-     if(validToken(token)) sessionStorage.setItem(invitationKey,token);
-     else sessionStorage.removeItem(invitationKey);
-     if(validToken(verificationToken)) sessionStorage.setItem(verificationKey,verificationToken);
-     else sessionStorage.removeItem(verificationKey);
+     if(isTeam){
+       if(validToken(token)) sessionStorage.setItem(teamInvitationStorageKey,token);
+       else sessionStorage.removeItem(teamInvitationStorageKey);
+       if(validToken(verificationToken)) sessionStorage.setItem(teamVerificationStorageKey,verificationToken);
+       else sessionStorage.removeItem(teamVerificationStorageKey);
+     }else{
+       if(validToken(token)) sessionStorage.setItem(invitationStorageKey,token);
+       else sessionStorage.removeItem(invitationStorageKey);
+       if(validToken(verificationToken)) sessionStorage.setItem(verificationStorageKey,verificationToken);
+       else sessionStorage.removeItem(verificationStorageKey);
+     }
    }
  }else{
    token=params.get('token')||'';
@@ -104,7 +113,7 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
  }
 
  if(!Api.token()){
-   root.innerHTML='<h1>Vous avez été invité</h1><p>Connectez-vous avec l’adresse email qui a reçu l’invitation. Une confirmation supplémentaire sera envoyée à cette adresse avant tout rattachement.</p><a class="btn btn-primary" style="width:100%" href="login.html?next='+encodeURIComponent(next)+'">Se connecter pour accepter</a><a style="display:block;text-align:center;margin-top:14px;color:var(--emerald)" href="register.html?next='+encodeURIComponent(next)+'">Créer un compte</a>';
+   root.innerHTML='<h1>Vous avez été invité</h1><p>Connectez-vous avec l’adresse email qui a reçu l’invitation. Pour un groupe de sociétés, une confirmation sera envoyée à cette adresse avant tout rattachement. Les invitations classiques d’équipe nécessitent également une confirmation indépendante.</p><a class="btn btn-primary" style="width:100%" href="login.html?next='+encodeURIComponent(next)+'">Se connecter pour accepter</a><a style="display:block;text-align:center;margin-top:14px;color:var(--emerald)" href="register.html?next='+encodeURIComponent(next)+'">Créer un compte</a>';
    return;
  }
 
