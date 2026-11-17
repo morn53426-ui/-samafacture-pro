@@ -17,6 +17,7 @@ on:
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
       - 'server/tests/facture-pdf.test.js'
+      - 'server/tests/paiements.test.js'
       - '.github/workflows/lint.yml'
   push:
     branches:
@@ -65,3 +66,4 @@ jobs:
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
           server/tests/facture-pdf.test.js
+          server/tests/paiements.test.js
