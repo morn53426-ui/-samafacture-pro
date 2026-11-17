@@ -339,6 +339,8 @@ Les fonctions fournisseurs actuellement présentes sont des parcours de transact
 
 Ces parcours ne sont pas utilisés comme mandat de débit récurrent. Renseigner `WAVE_API_KEY`, `WAVE_SIGNING_SECRET` ou les clés PayDunya dans `.env` ne rend donc pas les abonnements mensuels disponibles et ne doit pas être considéré comme une autorisation de renouvellement automatique. Ne réactivez pas les boutons et ne remplacez pas le blocage HTTP 503 par un checkout ponctuel.
 
+PayDunya présente aussi [Collect](https://paydunya.com/collect) comme une solution de collecte de paiements récurrents ou de masse avec automatisation des demandes de paiement, via une interface Web ou mobile. Cette piste doit être confirmée auprès de son équipe technique : la page publique ne démontre pas qu'une API tierce permet de créer un mandat réutilisable ou de débiter automatiquement chaque client tous les mois. Une demande de paiement envoyée automatiquement ne signifie pas que le client est prélevé automatiquement. Tant que cette distinction, l'autorisation du compte marchand et le consentement révocable ne sont pas confirmés par écrit, le blocage HTTP 503 reste obligatoire.
+
 Les paiements reçus manuellement pour une facture (espèces, virement, paiement mobile ou carte) restent des écritures de suivi comptable ; ils ne constituent pas une souscription SaaS ni un mandat de prélèvement.
 
 ### Conditions avant activation
