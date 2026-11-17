@@ -318,19 +318,35 @@ L'application pousse des notifications instantanées au navigateur, sans recharg
 
 **Pour être bien référencé**, pensez à renseigner `APP_URL` avec votre vrai nom de domaine une fois en ligne (pas `localhost`), et à soumettre `sitemap.xml` à [Google Search Console](https://search.google.com/search-console).
 
-## Paiement des plans (Wave et PayDunya)
+## Souscriptions aux plans (en préparation)
 
-Wave for Business et PayDunya sont les fournisseurs envisagés pour les paiements, mais **aucun moyen de paiement d'abonnement mensuel n'est actuellement ouvert** dans l'application. La présence de leurs identifiants dans `.env` ne vaut ni autorisation de prélèvement récurrent ni validation d'un mandat.
+Les formules payantes Starter, Pro et Entreprise sont prévues **au mois**. Le renouvellement automatique sera facultatif, présenté séparément et désactivé par défaut ; il ne pourra être activé qu'après consentement explicite du client et validation du mandat par le prestataire. Cette cible produit n'est pas encore disponible : **aucune souscription mensuelle, aucun mandat récurrent et aucun débit automatique ne sont activés**.
 
-Les paiements actuellement disponibles pour les factures clients et les abonnements doivent être distingués. Pour les abonnements Starter, Pro et Entreprise, l'API **n'ouvre aucun checkout** : `GET /api/abonnement/moyens-disponibles` renvoie `wave: false`, `paydunya: false`, aucun tarif mensuel approuvé et `disponible: false`. `POST /api/abonnement/payer` renvoie HTTP 503 avec le code `PAIEMENT_RECURRENT_NON_CONFIGURE`.
+### État réel de l'application
 
-Les formules ciblées sont mensuelles et le renouvellement automatique est la cible produit confirmée, mais aucun mandat de prélèvement récurrent utilisable n'est actuellement validé dans le dépôt. Les identifiants Wave/PayDunya configurés dans `.env` ne rendent donc pas la souscription mensuelle disponible. Ne pas réutiliser un checkout ponctuel comme abonnement et ne jamais activer un plan payant sans confirmation serveur d'un paiement autorisé.
+- `GET /api/abonnement/moyens-disponibles` renvoie actuellement `wave: false`, `paydunya: false`, `tarifs: {}` et `facturation.disponible: false`.
+- `POST /api/abonnement/payer` refuse les demandes de souscription payante avec HTTP `503` et le code `PAIEMENT_RECURRENT_NON_CONFIGURE`. Il ne crée pas de paiement ponctuel de remplacement.
+- `PUT /api/auth/plan` n'autorise que le plan Gratuit ; toute demande directe d'un plan Starter, Pro ou Entreprise renvoie HTTP `403` (`PAIEMENT_REQUIS`).
+- La page Abonnement laisse les formules payantes en préparation et n'ouvre aucun checkout.
+- Le champ `renouvellement_automatique: true` retourné dans l'objet de facturation décrit la cible mensuelle souhaitée ; il ne prouve ni l'existence d'un mandat ni l'activation d'un débit.
+- Aucun tarif mensuel n'est actuellement publié par l'API. Les anciens montants associés aux paiements ponctuels ne doivent pas être présentés comme des prix mensuels approuvés.
 
-Le endpoint `PUT /api/auth/plan` n'autorise que le retour au plan Gratuit ; les plans payants renvoient HTTP 403 (`PAIEMENT_REQUIS`). Cette règle est appliquée côté serveur, pas seulement par l'interface.
+### Pourquoi les clés de paiement existantes ne suffisent pas
 
-Les décisions encore requises avant mise en service (contrat et confirmation fournisseur, mandat et preuve de consentement, dates et règles de renouvellement, résiliation, impayés, prorata, remboursement et fiscalité) sont suivies dans [ABONNEMENTS_RECURRENTES_DECISIONS.md](ABONNEMENTS_RECURRENTES_DECISIONS.md). En développement local, aucun débit réel ne doit être exécuté.
+Les fonctions fournisseurs actuellement présentes sont des parcours de transaction ponctuelle :
+- [Wave Checkout API](https://docs.wave.com/checkout) crée et suit une session de checkout individuelle.
+- [PayDunya HTTP/JSON](https://developers.paydunya.com/doc/FR/http_json) crée une facture de paiement avec un token permettant de vérifier cette transaction.
 
+Ces parcours ne sont pas utilisés comme mandat de débit récurrent. Renseigner `WAVE_API_KEY`, `WAVE_SIGNING_SECRET` ou les clés PayDunya dans `.env` ne rend donc pas les abonnements mensuels disponibles et ne doit pas être considéré comme une autorisation de renouvellement automatique. Ne réactivez pas les boutons et ne remplacez pas le blocage HTTP 503 par un checkout ponctuel.
 
+Les paiements reçus manuellement pour une facture (espèces, virement, paiement mobile ou carte) restent des écritures de suivi comptable ; ils ne constituent pas une souscription SaaS ni un mandat de prélèvement.
+
+### Conditions avant activation
+
+Avant toute mise en service, il faut obtenir une confirmation écrite du fournisseur pour le compte marchand concerné, intégrer le parcours de mandat récurrent autorisé, recueillir et conserver le consentement explicite et révocable du client, puis tester les renouvellements, échecs, notifications, résiliations, remboursements et rapprochements. Les décisions et critères de sortie sont suivis dans [ABONNEMENTS_RECURRENTES_DECISIONS.md](ABONNEMENTS_RECURRENTES_DECISIONS.md).
+
+**En développement local, aucun débit réel ne doit être lancé.** Tant que ces contrôles ne sont pas terminés, la page et l'API doivent continuer à annoncer « en préparation » et à bloquer la souscription.
+  
 ## Authentification : Google et mot de passe oublié
 
 ### Connexion avec Google (facultatif)
@@ -359,7 +375,7 @@ SMTP_PASSWORD=un-mot-de-passe-d-application-google
 
 ## Feuille de route (non inclus dans cette version)
 
-- Extension des moyens de paiement internationaux (Stripe, PayPal et autres prestataires), au-delà des intégrations d'abonnement Wave et PayDunya déjà présentes.
+- Extension des moyens de paiement internationaux (Stripe, PayPal et autres prestataires), après validation des parcours réellement autorisés ; aucune intégration d'abonnement récurrent Wave ou PayDunya n'est actuellement activée.
 - Application mobile native (React Native / Flutter) avec scan QR/code-barres et mode hors ligne.
 - Génération de facture par IA à partir d'un texte libre.
 - Signature électronique interactive (dessin/upload de signature).
