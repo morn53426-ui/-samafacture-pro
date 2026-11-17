@@ -6563,8 +6563,8 @@ a.btn .icon {
   border-bottom-color: rgba(255,255,255,.09);
 }
 .sidebar-brand .mark {
-  width: 38px;
-  height: 38px;
+  width: 52px;
+  height: 52px;
   border-radius: 11px;
   background: #f7f6f1;
   box-shadow: 0 2px 8px rgba(0,0,0,.2);
@@ -6611,8 +6611,8 @@ a.btn .icon {
 }
 .nav-item .ic .icon {
   display: block;
-  width: 21px;
-  height: 21px;
+  width: 24px;
+  height: 24px;
   stroke-width: 1.85;
 }
 .nav-item:hover {
@@ -6674,8 +6674,8 @@ a.btn .icon {
     padding: 16px 8px 13px;
   }
   .sidebar.is-collapsed .sidebar-brand .mark {
-    width: 42px;
-    height: 42px;
+    width: 52px;
+    height: 52px;
     padding: 4px;
     border: 1px solid rgba(255,255,255,.2);
     border-radius: 13px;
@@ -6724,8 +6724,8 @@ a.btn .icon {
     font-size: 1.18rem;
   }
   .sidebar.is-collapsed .nav-item .ic .icon {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     stroke-width: 1.9;
   }
   .sidebar.is-collapsed .nav-item:hover {
@@ -6762,7 +6762,7 @@ a.btn .icon {
 }
 @media (max-width: 900px) {
   .sidebar-brand { padding: 13px 16px; }
-  .sidebar-brand .mark { width: 36px; height: 36px; }
+  .sidebar-brand .mark { width: 52px; height: 52px; }
   .sidebar-nav { padding: 8px 12px 12px; }
   .nav-group-label { margin-top: 14px; }
   .nav-item { min-height: 46px; }
