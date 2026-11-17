@@ -6,7 +6,7 @@ function renderSidebar(activePage) {
     ]},
     { group: 'Ventes', items: [
       { id: 'factures', icon: 'file-text', label: 'Factures', href: 'factures.html' },
-      { id: 'devis', icon: 'file-stack', label: 'Devis', href: 'devis.html' },
+      { id: 'devis', icon: 'file-check', label: 'Devis', href: 'devis.html' },
       { id: 'clients', icon: 'users', label: 'Clients', href: 'clients.html' },
       { id: 'crm', icon: 'contact-round', label: 'CRM & suivi client', href: 'crm.html' }
     ]},
@@ -14,29 +14,29 @@ function renderSidebar(activePage) {
       { id: 'produits', icon: 'package', label: 'Produits & services', href: 'produits.html' }
     ]},
     { group: 'Comptabilité', items: [
-      { id: 'finances', icon: 'credit-card', label: 'Paiements', href: 'finances.html' },
-      { id: 'paiements-pro', icon: 'wallet-cards', label: 'Paiements en ligne', href: 'paiements-professionnels.html' },
-      { id: 'comptabilite', icon: 'calculator', label: 'Comptabilité OHADA', href: 'comptabilite.html' },
-      { id: 'depenses', icon: 'banknote', label: 'Dépenses', href: 'depenses.html' },
+      { id: 'finances', icon: 'hand-coins', label: 'Paiements', href: 'finances.html' },
+      { id: 'paiements-pro', icon: 'credit-card', label: 'Paiements en ligne', href: 'paiements-professionnels.html' },
+      { id: 'comptabilite', icon: 'landmark', label: 'Comptabilité OHADA', href: 'comptabilite.html' },
+      { id: 'depenses', icon: 'receipt', label: 'Dépenses', href: 'depenses.html' },
       { id: 'rapports', icon: 'bar-chart', label: 'Rapports', href: 'rapports.html' }
     ]},
     { group: 'Outils professionnels', items: [
       { id: 'factures-recurrentes', icon: 'repeat', label: 'Factures récurrentes', href: 'factures-recurrentes.html' },
-      { id: 'professionnel', icon: 'building', label: 'Espace professionnel', href: 'professionnel.html' },
+      { id: 'professionnel', icon: 'briefcase-business', label: 'Espace professionnel', href: 'professionnel.html' },
       { id: 'achats', icon: 'truck', label: 'Achats & stocks', href: 'achats.html' },
-      { id: 'assistant-ia', icon: 'message-circle', label: 'Assistant IA', href: 'assistant-ia.html' },
+      { id: 'assistant-ia', icon: 'sparkles', label: 'Assistant IA', href: 'assistant-ia.html' },
       { id: 'automatisations', icon: 'workflow', label: 'Automatisations', href: 'automatisations.html' },
       { id: 'facture-ia', icon: 'wand', label: 'Facture par IA', href: 'facture-ia.html' }
     ]},
     { group: 'Compte', items: [
-      { id: 'abonnement', icon: 'wallet-cards', label: 'Abonnement', href: 'abonnement.html' },
+      { id: 'abonnement', icon: 'gem', label: 'Abonnement', href: 'abonnement.html' },
       { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' }
     ]},
     { group: 'Aide et ressources', items: [
       { id: 'aide', icon: 'help-circle', label: 'Centre d’aide', href: 'aide.html' },
-      { id: 'support', icon: 'phone', label: 'Support technique', href: 'support.html' },
-      { id: 'confidentialite', icon: 'lock', label: 'Confidentialité', href: 'confidentialite.html' },
-      { id: 'conditions', icon: 'file-stack', label: "Conditions d'utilisation", href: 'conditions.html' }
+      { id: 'support', icon: 'message-square', label: 'Support technique', href: 'support.html' },
+      { id: 'confidentialite', icon: 'shield-check', label: 'Confidentialité', href: 'confidentialite.html' },
+      { id: 'conditions', icon: 'file-text', label: "Conditions d'utilisation", href: 'conditions.html' }
     ]}
   ];
 
