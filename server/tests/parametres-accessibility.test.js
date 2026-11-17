@@ -1,0 +1,57 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const html = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'public', 'parametres.html'),
+  'utf8'
+);
+
+const labelledControlIds = [
+  'entreprise_nom',
+  'entreprise_adresse',
+  'entreprise_telephone',
+  'entreprise_email',
+  'entreprise_ninea',
+  'entreprise_rccm',
+  'entreprise_site_web',
+  'entreprise_banque',
+  'entreprise_rib',
+  'entreprise_conditions_reglement',
+  'entreprise_mentions_legales',
+  'devise',
+  'perso_logo_taille',
+  'perso_police',
+  'perso_taille_texte',
+  'perso_epaisseur_texte'
+];
+
+const ariaLabelledControlIds = [
+  'perso_couleur_principale',
+  'perso_couleur_secondaire',
+  'perso_couleur_texte'
+];
+
+test('les champs de paramètres ont un label HTML explicitement associé', () => {
+  for (const id of labelledControlIds) {
+    const labelStart = html.indexOf('<label for="' + id + '">');
+    assert.notEqual(labelStart, -1, 'Le champ #' + id + ' doit avoir un label associé.');
+    const labelEnd = html.indexOf('</label>', labelStart);
+    assert.ok(labelEnd > labelStart, 'Le label du champ #' + id + ' doit être fermé.');
+    assert.ok(html.slice(labelStart, labelEnd).replace(/<[^>]*>/g, '').trim(),
+      'Le label du champ #' + id + ' doit contenir un nom non vide.');
+    assert.ok(html.includes('id="' + id + '"'), 'Le contrôle #' + id + ' doit exister.');
+  }
+});
+
+test('les sélecteurs de couleur ont chacun un nom accessible', () => {
+  for (const id of ariaLabelledControlIds) {
+    const inputStart = html.indexOf('<input type="color" id="' + id + '"');
+    assert.notEqual(inputStart, -1, 'Le sélecteur de couleur #' + id + ' doit exister.');
+    const inputEnd = html.indexOf('>', inputStart);
+    const inputTag = html.slice(inputStart, inputEnd + 1);
+    assert.match(inputTag, /aria-label="[^"]+"/,
+      'Le sélecteur de couleur #' + id + ' doit avoir un aria-label non vide.');
+  }
+});
