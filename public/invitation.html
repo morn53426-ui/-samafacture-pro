@@ -84,6 +84,17 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
    clearCompanyGroupTokens();
    clearTeamTokens();
  }
+
+ async function postInvitationAsOwnAccount(endpoint,payload){
+   const selectedCompany=localStorage.getItem('sf_company_owner');
+   localStorage.removeItem('sf_company_owner');
+   try{
+     return await Api.post(endpoint,payload);
+   }finally{
+     if(selectedCompany!==null) localStorage.setItem('sf_company_owner',selectedCompany);
+   }
+ }
+
  function showSuccess(result){
    clearSecureInvitationTokens();
    if(!isCompanyGroup) localStorage.setItem('sf_company_owner',String(result.entreprise_id));
@@ -100,7 +111,7 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
  if((isCompanyGroup || isTeam) && validToken(verificationToken)){
    root.innerHTML='<h1>Confirmation de votre adresse email</h1><p>Vérification du lien sécurisé et rattachement…</p><div id="invite-error" style="margin-top:14px"></div>';
    const endpoint=isCompanyGroup?'/pro/company-group/invitations/accept/verify':'/pro/team/invitations/accept/verify';
-   Api.post(endpoint,{token,verification_token:verificationToken})
+   postInvitationAsOwnAccount(endpoint,{token,verification_token:verificationToken})
      .then(showSuccess)
      .catch(err=>{
        document.getElementById('invite-error').innerHTML='<div class="error-box">'+escapeHtml(err.message)+'</div><p>Rechargez cette page pour réessayer ou demandez un nouveau lien si celui-ci a expiré.</p>';
@@ -120,8 +131,8 @@ body{min-height:100vh;background:var(--cream);display:grid;place-items:center;pa
    button.textContent=(isCompanyGroup||isTeam)?'Envoi de la confirmation…':'Acceptation…';
    try{
      const result=isCompanyGroup
-       ? await Api.post('/pro/company-group/invitations/accept',{token})
-       : await Api.post('/pro/team/invitations/accept',{token});
+       ? await postInvitationAsOwnAccount('/pro/company-group/invitations/accept',{token})
+       : await postInvitationAsOwnAccount('/pro/team/invitations/accept',{token});
      if((isCompanyGroup||isTeam) && result.verification_required){
        clearSecureInvitationTokens();
        root.innerHTML='<h1>Vérifiez votre boîte email</h1><p>'+escapeHtml(result.message)+'</p><p>Le rattachement ne sera effectué qu’après ouverture du lien de confirmation reçu à cette adresse. Ce lien expire après 20 minutes.</p>';

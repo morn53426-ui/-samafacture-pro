@@ -39,6 +39,13 @@ describe('Retour visuel des invitations Entreprise', () => {
   });
 
 
+
+  test('envoie l’acceptation depuis le compte personnel sans le sélecteur de société précédent', () => {
+    assert.match(invitationPage, /const selectedCompany=localStorage\.getItem\('sf_company_owner'\)/);
+    assert.match(invitationPage, /localStorage\.removeItem\('sf_company_owner'\)/);
+    assert.match(invitationPage, /postInvitationAsOwnAccount\(endpoint/);
+  });
+
   test('protège aussi les invitations classiques avec des jetons de fragment et une reprise après connexion', () => {
     assert.ok(invitationPage.includes("teamResumeUrl='invitation.html?type=team&resume=1'"));
     assert.ok(invitationPage.includes("sessionStorage.setItem(teamInvitationStorageKey,token)"));
