@@ -71,14 +71,41 @@ describe("Paiements d'abonnement", () => {
     assert.equal(res.status, 400);
   });
 
-  test('un fournisseur non configuré (pas de clés en .env de test) répond 503, pas une erreur 500 opaque', async () => {
+  test('un fournisseur ne peut pas activer un abonnement mensuel sans mandat récurrent', async () => {
+    const before = await pool.query(
+      'SELECT COUNT(*) AS n FROM abonnement_paiements WHERE user_id = ?',
+      [userId]
+    );
     const res = await request(app)
       .post('/api/abonnement/payer')
       .set('Authorization', `Bearer ${token}`)
       .send({ plan: 'starter', fournisseur: 'wave' });
-    // Selon que WAVE_API_KEY est défini dans l'environnement de test ou non, on accepte
-    // soit un rejet propre (503) soit un succès — mais jamais un crash serveur (500).
-    assert.ok([200, 503].includes(res.status), `statut inattendu : ${res.status}`);
+
+    assert.equal(res.status, 503);
+    assert.equal(res.body.code, 'PAIEMENT_RECURRENT_NON_CONFIGURE');
+    const after = await pool.query(
+      'SELECT COUNT(*) AS n FROM abonnement_paiements WHERE user_id = ?',
+      [userId]
+    );
+    assert.equal(Number(after[0][0].n), Number(before[0][0].n),
+      'aucun checkout ponctuel ne doit être créé sans mandat récurrent');
+  });
+
+  test('un utilisateur ne peut pas s’attribuer directement un plan payant via /auth/plan', async () => {
+    await pool.query("UPDATE users SET plan = 'gratuit' WHERE id = ?", [userId]);
+
+    for (const plan of ['starter', 'pro', 'entreprise']) {
+      const res = await request(app)
+        .put('/api/auth/plan')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ plan });
+
+      assert.equal(res.status, 403, `le plan ${plan} doit exiger un paiement confirmé`);
+      assert.equal(res.body.code, 'PAIEMENT_REQUIS');
+    }
+
+    const [[user]] = await pool.query('SELECT plan FROM users WHERE id = ?', [userId]);
+    assert.equal(user.plan, 'gratuit', 'un appel direct ne doit jamais débloquer une formule payante');
   });
 
   test("le statut d'un paiement inexistant renvoie 404", async () => {
