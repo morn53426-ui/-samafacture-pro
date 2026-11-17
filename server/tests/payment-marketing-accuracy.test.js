@@ -20,15 +20,20 @@ test('le README décrit les plans comme des paiements uniques sans promesse mens
   assert.doesNotMatch(readme, /FCFA par mois pour Starter/);
 });
 
-test('le checkout affiche les trois moyens de paiement distincts et conserve le paiement unique', () => {
+test('la page présente distinctement les trois moyens prévus sans activer le paiement récurrent', () => {
   const subscription = read('public/abonnement.html');
-  assert.match(subscription, /Payer avec Wave/);
-  assert.match(subscription, /Payer avec Orange Money/);
-  assert.match(subscription, /Payer par carte bancaire/);
-  assert.match(subscription, /moyen: intentionPaiement\.moyen/);
-  assert.doesNotMatch(subscription, /Orange Money \/ Carte/);
-  assert.match(subscription, /Type de paiement/);
-  assert.match(subscription, /Paiement unique/);
+  const billingRoute = read('server/routes/abonnement.js');
+  assert.match(subscription, /Moyens de paiement prévus/);
+  assert.ok(subscription.includes('<strong>Wave</strong>'));
+  assert.ok(subscription.includes('<strong>Orange Money</strong>'));
+  assert.ok(subscription.includes('<strong>Carte bancaire</strong>'));
+  assert.match(subscription, /Aucun paiement ni débit automatique ne sera lancé/i);
+  assert.match(subscription, /renouvellement automatique facultatif après consentement explicite/i);
+  assert.match(subscription, /comingSoon: true/);
+  assert.ok(subscription.includes('Abonnement mensuel (en préparation)'));
+  assert.doesNotMatch(subscription, /Payer avec Orange Money|Payer par carte bancaire/);
+  assert.ok(billingRoute.includes('return res.status(503)'));
+  assert.ok(billingRoute.includes('PAIEMENT_RECURRENT_NON_CONFIGURE'));
 });
 
 test('la politique indique les prestataires réellement utilisés et conserve la mention de validation juridique', () => {

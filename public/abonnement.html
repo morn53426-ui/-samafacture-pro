@@ -47,7 +47,7 @@
         <div>
           <span class="subscription-overline">NOS FORMULES</span>
           <h2 id="offers-title">Comparez les offres</h2>
-          <p>Les formules payantes sont prévues au mois, avec renouvellement automatique après consentement. Le parcours de paiement récurrent est encore en préparation.</p>
+          <p>Les formules payantes seront mensuelles. Le renouvellement automatique restera facultatif, décoché par défaut et activé uniquement après consentement explicite et validation du mandat par le prestataire. Les souscriptions restent en préparation.</p>
         </div>
         <div class="subscription-billing-note"><span class="ic" aria-hidden="true"><i data-icon="repeat"></i></span> Abonnement mensuel</div>
       </div>
@@ -56,9 +56,23 @@
       </div>
     </section>
 
+    <section class="subscription-payment-methods" aria-labelledby="payment-methods-title">
+      <div class="subscription-section-heading">
+        <div>
+          <span class="subscription-overline">MOYENS DE PAIEMENT PRÉVUS</span>
+          <h2 id="payment-methods-title">Trois moyens distincts</h2>
+          <p>Wave, Orange Money et carte bancaire sont prévus séparément. Ils restent indisponibles pour les abonnements mensuels tant que les mandats récurrents ne sont pas validés auprès des prestataires. Aucun paiement ni débit automatique ne sera lancé pendant cette étape.</p>
+        </div>
+      </div>
+      <div class="subscription-trust">
+        <div><span class="ic" aria-hidden="true"><i data-icon="smartphone"></i></span><span><strong>Wave</strong><small>En attente de validation du mandat récurrent.</small></span></div>
+        <div><span class="ic" aria-hidden="true"><i data-icon="smartphone"></i></span><span><strong>Orange Money</strong><small>En attente de validation du mandat récurrent.</small></span></div>
+        <div><span class="ic" aria-hidden="true"><i data-icon="credit-card"></i></span><span><strong>Carte bancaire</strong><small>En attente de validation du mandat récurrent.</small></span></div>
+      </div>
+    </section>
+
     <section class="subscription-trust">
-      <div><span class="ic" aria-hidden="true"><i data-icon="lock"></i></span><span><strong>Paiement sécurisé</strong><small>Redirection vers le fournisseur configuré.</small></span></div>
-      <div><span class="ic" aria-hidden="true"><i data-icon="smartphone"></i></span><span><strong>Paiements locaux</strong><small>Wave et PayDunya selon la configuration du serveur.</small></span></div>
+      <div><span class="ic" aria-hidden="true"><i data-icon="lock"></i></span><span><strong>Paiement sécurisé</strong><small>Aucun paiement ne sera activé avant validation du parcours.</small></span></div>
       <div><span class="ic" aria-hidden="true"><i data-icon="help-circle"></i></span><span><strong>Accompagnement</strong><small>Un espace de facturation pensé pour les professionnels.</small></span></div>
     </section>
 
@@ -67,12 +81,12 @@
         <button type="button" class="subscription-checkout-close" aria-label="Fermer la fenêtre" onclick="fermerPaiement()"><span class="ic" aria-hidden="true"><i data-icon="x"></i></span></button>
         <span class="subscription-overline">RÉCAPITULATIF AVANT PAIEMENT</span>
         <h2 id="checkout-title">Vérifiez votre commande</h2>
-        <p id="checkout-description">Contrôlez le montant et le moyen de paiement avant de continuer.</p>
+        <p id="checkout-description">Le parcours de souscription mensuelle est en préparation. Aucun paiement ne pourra être lancé avant validation des mandats récurrents.</p>
         <dl class="subscription-checkout-summary">
           <div><dt>Formule</dt><dd id="checkout-plan">—</dd></div>
           <div><dt>Montant à payer</dt><dd id="checkout-amount">—</dd></div>
           <div><dt>Moyen de paiement</dt><dd id="checkout-provider">—</dd></div>
-          <div><dt>Type de paiement</dt><dd>Paiement unique</dd></div>
+          <div><dt>Type de facturation</dt><dd>Abonnement mensuel (en préparation)</dd></div>
         </dl>
         <div class="subscription-checkout-disclosure">
           <strong>À savoir avant de payer</strong>
@@ -81,7 +95,7 @@
         </div>
         <label class="subscription-checkout-consent" for="checkout-agreement">
           <input type="checkbox" id="checkout-agreement" onchange="actualiserConfirmationPaiement()" />
-          <span>J’autorise le renouvellement mensuel automatique après consultation du prix, des conditions et des modalités de résiliation.</span>
+          <span>Je pourrai choisir séparément d’activer le renouvellement automatique après affichage du prix, de la périodicité, de la date du prochain débit et des modalités de résiliation. Cette option restera décochée par défaut.</span>
         </label>
         <div id="checkout-message" aria-live="polite"></div>
         <div class="subscription-checkout-actions">
@@ -157,7 +171,7 @@
         'Factures illimitées',
         'Devis illimités',
         'Gestion des clients et produits',
-        'Abonnement mensuel avec renouvellement automatique'
+        'Renouvellement automatique facultatif après consentement explicite'
       ]
     },
     {
@@ -172,7 +186,7 @@
         'Signature électronique',
         '3 modèles premium de facture',
         'Export Excel',
-        'Abonnement mensuel avec renouvellement automatique'
+        'Renouvellement automatique facultatif après consentement explicite'
       ]
     },
     {
@@ -187,7 +201,7 @@
         'Gestion multi-sociétés',
         'Tableau de bord consolidé',
         'Droits et accès par société',
-        'Abonnement mensuel avec renouvellement automatique'
+        'Renouvellement automatique facultatif après consentement explicite'
       ]
     }
   ];
