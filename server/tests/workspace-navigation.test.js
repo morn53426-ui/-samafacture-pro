@@ -25,6 +25,9 @@ const pages = [
   'finances.html'
 ];
 
+const sidebarScript = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'sidebar.js'), 'utf8');
+const sidebarStyles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'style.css'), 'utf8');
+
 function readPage(file) {
   return fs.readFileSync(path.join(PUBLIC_DIR, file), 'utf8');
 }
@@ -41,6 +44,22 @@ describe('Navigation et structure des pages métier', () => {
         'Le contenu principal doit être un repère focusable.');
     });
   }
+
+
+  test('le rail desktop affiche les icônes et les libellés avec un état actif contrasté', () => {
+    assert.match(sidebarScript, /class="nav-label"/);
+    assert.match(sidebarScript, /aria-current="page"/);
+    assert.match(sidebarStyles, /--sidebar-collapsed-w:\s*96px/);
+    assert.match(sidebarStyles, /\.sidebar\.is-collapsed \.nav-item\s*\{[\s\S]*?flex-direction:\s*column/);
+    assert.match(sidebarStyles, /\.sidebar\.is-collapsed \.nav-item \.nav-label\s*\{[\s\S]*?display:\s*block !important/);
+    assert.match(sidebarStyles, /\.sidebar\.is-collapsed \.nav-item\.active \.ic\s*\{[\s\S]*?background:\s*#172a4b/);
+    assert.match(sidebarStyles, /@media \(max-width:\s*900px\)/);
+  });
+
+  test('la navigation ne plante pas quand le stockage local ou le point de montage manque', () => {
+    assert.match(sidebarScript, /try\s*\{\s*return localStorage\.getItem\('sf_company_group_member'\) === 'true';\s*\}\s*catch\s*\{\s*return false;/);
+    assert.match(sidebarScript, /const sidebarRoot = document\.getElementById\('sidebar-root'\);\s*if \(sidebarRoot\) sidebarRoot\.outerHTML = html;/);
+  });
 
   test('Achats & stocks permet de rejoindre directement chacune des opérations', () => {
     const html = readPage('achats.html');
