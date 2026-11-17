@@ -81,7 +81,8 @@ export default [
       'server/routes/professionnel.js',
       'server/tests/company-group-ui.test.js',
       'server/tests/company-groups.test.js',
-      'server/tests/invoice-quota-migration-v8.test.js'
+      'server/tests/invoice-quota-migration-v8.test.js',
+      'server/tests/invoice-print-pagination.test.js'
     ],
     languageOptions: {
       ecmaVersion: 'latest',
