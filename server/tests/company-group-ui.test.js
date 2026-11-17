@@ -173,6 +173,8 @@ describe('Retour visuel des invitations Entreprise', () => {
     assert.match(enterpriseStylesheet, /sidebar-brand \.mark\s*\{[\s\S]*?height: 52px !important;/);
     assert.match(enterpriseStylesheet, /nav-item \.ic \.icon\s*\{[\s\S]*?width: 24px;[\s\S]*?height: 24px;/);
     assert.match(enterpriseStylesheet, /enterprise-console-topbar/);
+    assert.match(enterpriseStylesheet, /sidebar-brand-copy\s*\{\s*display: block;/,
+      'le logo et son nom restent présents dans le tiroir de navigation mobile');
   });
 
   test('conserve les limites de consolidation comptable et l’accès séparé aux filiales', () => {
