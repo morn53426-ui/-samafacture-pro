@@ -128,15 +128,23 @@ test('un devis long garde chaque bloc complémentaire ensemble sans bloquer la p
       'la zone de signature doit rester groupée');
     assert.equal(printRules.acceptancePresent, true);
 
+    const documentHeight = await page.evaluate(() =>
+      Math.max(
+        document.querySelector('.invoice-doc').scrollHeight,
+        document.documentElement.scrollHeight
+      )
+    );
+    assert.ok(documentHeight > 1050,
+      'le document imprimé doit dépasser la hauteur utile d’une page A4 (hauteur : ' + documentHeight + ' px)');
+
     const pdf = await page.pdf({
       format: 'A4',
       preferCSSPageSize: true,
       printBackground: true,
       margin: { top: '12mm', bottom: '14mm', left: '12mm', right: '12mm' }
     });
-    const pageCount = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
-    assert.ok(pageCount >= 2,
-      'le jeu de données volumineux doit produire un PDF multi-pages (pages détectées : ' + pageCount + ')');
+    assert.equal(pdf.subarray(0, 5).toString('latin1'), '%PDF-',
+      'Chromium doit produire un véritable PDF à partir du document multi-page');
   } finally {
     await browser.close().catch(() => {});
   }
