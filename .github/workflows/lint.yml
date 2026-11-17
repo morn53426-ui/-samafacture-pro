@@ -10,6 +10,12 @@ on:
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/workspace-navigation.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
+      - 'server/config/db.js'
+      - 'server/email-outbox.js'
+      - 'server/routes/professionnel.js'
+      - 'server/tests/company-group-ui.test.js'
+      - 'server/tests/company-groups.test.js'
+      - 'server/tests/invoice-quota-migration-v8.test.js'
       - '.github/workflows/lint.yml'
   push:
     branches:
@@ -51,3 +57,9 @@ jobs:
           server/tests/visual/recette-visuelle.js
           server/tests/workspace-navigation.test.js
           server/tests/workspace-modal-accessibility.test.js
+          server/config/db.js
+          server/email-outbox.js
+          server/routes/professionnel.js
+          server/tests/company-group-ui.test.js
+          server/tests/company-groups.test.js
+          server/tests/invoice-quota-migration-v8.test.js
