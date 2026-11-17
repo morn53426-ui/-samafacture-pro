@@ -11,6 +11,15 @@
 <a class="workspace-skip-link" href="#main-content">Aller au contenu principal</a>
 <div class="app-shell"><div id="sidebar-root"></div><main class="main-content workspace-page page-achats" id="main-content" tabindex="-1">
   <div class="page-header workspace-page-header"><div><div class="pro-eyebrow">APPROVISIONNEMENT & INVENTAIRE</div><h1>Achats & stocks</h1><p>Fournisseurs, commandes d’achat, réceptions partielles, entrepôts et mouvements de stock.</p></div><button class="btn btn-outline" id="refresh-buying">Actualiser</button></div>
+  <nav class="workspace-section-nav" aria-label="Accès rapides aux opérations de stock">
+    <a href="#buying-suppliers">Fournisseurs</a>
+    <a href="#buying-orders">Commandes</a>
+    <a href="#buying-receipts">Réceptions</a>
+    <a href="#buying-warehouses">Entrepôts</a>
+    <a href="#buying-adjustments">Mouvements</a>
+    <a href="#buying-inventory">État du stock</a>
+    <a href="#buying-movements">Historique</a>
+  </nav>
 
   <div class="grid grid-3" style="margin-bottom:18px">
     <article class="card stat-card"><div class="stat-label">Fournisseurs actifs</div><div class="stat-value" id="kpi-suppliers">—</div></article>
@@ -18,7 +27,7 @@
     <article class="card stat-card"><div class="stat-label">Valeur du stock au coût d’achat</div><div class="stat-value mono" id="kpi-stock-value">—</div></article>
   </div>
 
-  <section class="card" style="margin-bottom:20px">
+  <section class="card" style="margin-bottom:20px" id="buying-suppliers">
     <h2 style="margin-top:0">1. Fournisseurs</h2>
     <form id="supplier-form" class="grid grid-3">
       <div class="field"><label for="supplier-name">Nom du fournisseur *</label><input id="supplier-name" required maxlength="190"></div>
@@ -32,7 +41,7 @@
     <div id="suppliers-list" class="pro-list" style="margin-top:14px"></div>
   </section>
 
-  <section class="card" style="margin-bottom:20px">
+  <section class="card" style="margin-bottom:20px" id="buying-orders">
     <h2 style="margin-top:0">2. Commande fournisseur</h2>
     <form id="purchase-form">
       <div class="grid grid-3">
@@ -50,7 +59,7 @@
     </form>
   </section>
 
-  <section class="card" style="margin-bottom:20px">
+  <section class="card" style="margin-bottom:20px" id="buying-receipts">
     <h2 style="margin-top:0">3. Réception des marchandises</h2>
     <div class="grid grid-3">
       <div class="field"><label for="receipt-order">Commande fournisseur</label><select id="receipt-order"></select></div>
@@ -62,7 +71,7 @@
     <button class="btn btn-primary" id="submit-receipt" type="button" style="margin-top:12px" hidden>Valider cette réception</button>
   </section>
 
-  <section class="card" style="margin-bottom:20px">
+  <section class="card" style="margin-bottom:20px" id="buying-warehouses">
     <h2 style="margin-top:0">4. Entrepôts</h2>
     <form id="warehouse-form" class="grid grid-3">
       <div class="field"><label for="warehouse-code">Code *</label><input id="warehouse-code" required maxlength="30" placeholder="DAKAR-01"></div>
@@ -73,7 +82,7 @@
     <div id="warehouses-list" class="pro-list" style="margin-top:12px"></div>
   </section>
 
-  <section class="card" style="margin-bottom:20px">
+  <section class="card" style="margin-bottom:20px" id="buying-adjustments">
     <h2 style="margin-top:0">5. Ajustement ou transfert de stock</h2>
     <div class="grid grid-2">
       <form id="adjustment-form" class="pro-form">
@@ -95,12 +104,12 @@
     </div>
   </section>
 
-  <section class="card" style="margin-bottom:20px">
+  <section class="card" style="margin-bottom:20px" id="buying-inventory">
     <h2 style="margin-top:0">6. État du stock par produit</h2>
     <div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:680px"><thead><tr><th>Produit</th><th>Référence</th><th>Entrepôts</th><th>Quantité totale</th><th>Coût unitaire</th><th>Valeur au coût</th></tr></thead><tbody id="stock-list"><tr><td colspan="6">Chargement…</td></tr></tbody></table></div>
   </section>
 
-  <section class="card">
+  <section class="card" id="buying-movements">
     <h2 style="margin-top:0">7. Derniers mouvements de stock</h2>
     <div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:680px"><thead><tr><th>Date</th><th>Produit</th><th>Entrepôt</th><th>Type</th><th>Variation</th><th>Motif / référence</th></tr></thead><tbody id="movement-list"></tbody></table></div>
     <div id="purchase-orders" class="pro-list" style="margin-top:18px"></div>
