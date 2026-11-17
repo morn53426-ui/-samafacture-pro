@@ -693,21 +693,21 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
 
   // Une facture annulée ne doit pas gonfler les totaux consolidés du groupe.
   await pool.query(
-    \`INSERT INTO factures
+    `INSERT INTO factures
       (user_id, client_id, numero, type, date_emission, date_echeance, statut, total, montant_paye)
      VALUES
       (?, ?, ?, 'facture', CURDATE(), DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'en_attente', 1000, 250),
-      (?, ?, ?, 'facture', CURDATE(), NULL, 'annulee', 9000, 9000)\`,
+      (?, ?, ?, 'facture', CURDATE(), NULL, 'annulee', 9000, 9000)`,
     [subsidiaryOwnerId, subsidiaryClientId, 'TEST-GROUPE-ACTIVE', subsidiaryOwnerId, subsidiaryClientId, 'TEST-GROUPE-ANNULEE']
   );
 
   // Trois produits couvrent le stock faible, la rupture et le coût d’achat manquant.
   await pool.query(
-    \`INSERT INTO produits (user_id, nom, prix_ht, prix_achat, tva, stock, stock_minimum)
+    `INSERT INTO produits (user_id, nom, prix_ht, prix_achat, tva, stock, stock_minimum)
      VALUES
        (?, 'TEST-GROUPE-STOCK-FAIBLE', 500, 200, 18, 2, 5),
        (?, 'TEST-GROUPE-RUPTURE', 500, 100, 18, 0, 0),
-       (?, 'TEST-GROUPE-COUT-MANQUANT', 500, 0, 18, 4, 0)\`,
+       (?, 'TEST-GROUPE-COUT-MANQUANT', 500, 0, 18, 4, 0)`,
     [subsidiaryOwnerId, subsidiaryOwnerId, subsidiaryOwnerId]
   );
   const [stockProducts] = await pool.query(
@@ -745,6 +745,11 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     [subsidiaryOwnerId, cashRegister.insertId, 'entree', 1500, 'Entrée test',
      subsidiaryOwnerId, cashRegister.insertId, 'sortie', 2000, 'Sortie test']
   );
+
+  await pool.query(
+    'INSERT INTO pro_caisses (user_id, nom, devise, solde_initial, active) VALUES (?, ?, ?, ?, 0)',
+    [subsidiaryOwnerId, 'Caisse inactive filiale', 'FCFA', 50000]
+  );
   await pool.query(
     'INSERT INTO depenses (user_id, libelle, montant, categorie, date_depense) VALUES (?, ?, ?, ?, CURDATE())',
     [subsidiaryOwnerId, 'Dépense test filiale', 3000, 'test']
@@ -752,18 +757,18 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
 
   // Des montants élevés dans une société extérieure ne doivent jamais être consolidés.
   await pool.query(
-    \`INSERT INTO depenses (user_id, libelle, montant, categorie, date_depense)
-     VALUES (?, 'Dépense extérieure', 99999, 'test', CURDATE())\`,
+    `INSERT INTO depenses (user_id, libelle, montant, categorie, date_depense)
+     VALUES (?, 'Dépense extérieure', 99999, 'test', CURDATE())`,
     [outsiderId]
   );
   await pool.query(
-    \`INSERT INTO pro_caisses (user_id, nom, devise, solde_initial)
-     VALUES (?, 'Caisse extérieure', 'FCFA', 99999)\`,
+    `INSERT INTO pro_caisses (user_id, nom, devise, solde_initial)
+     VALUES (?, 'Caisse extérieure', 'FCFA', 99999)`,
     [outsiderId]
   );
   await pool.query(
-    \`INSERT INTO produits (user_id, nom, prix_ht, prix_achat, tva, stock, stock_minimum)
-     VALUES (?, 'Produit extérieur', 500, 100, 18, 99, 1)\`,
+    `INSERT INTO produits (user_id, nom, prix_ht, prix_achat, tva, stock, stock_minimum)
+     VALUES (?, 'Produit extérieur', 500, 100, 18, 99, 1)`,
     [outsiderId]
   );
 
