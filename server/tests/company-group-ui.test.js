@@ -81,4 +81,36 @@ describe('Retour visuel des invitations Entreprise', () => {
     assert.match(page, /escapeHtml\(result\.invitation_url\)/);
     assert.match(page, /target="_blank" rel="noopener"/);
   });
+
+  test('présente les indicateurs consolidés sans mélanger les devises', () => {
+    assert.match(page, /factures_par_devise/);
+    assert.match(page, /depenses_par_devise/);
+    assert.match(page, /currencies=\[\.\.\.new Set/);
+    assert.match(page, /Chiffre d’affaires facturé/);
+    assert.match(page, /Factures impayées/);
+    assert.match(page, /Factures en retard/);
+  });
+
+  test('affiche les soldes des caisses et la valorisation estimative des stocks', () => {
+    assert.match(page, /caisses_par_devise/);
+    assert.match(page, /Solde des caisses actives/);
+    assert.match(page, /stocks_par_devise/);
+    assert.match(page, /Valeur estimée du stock/);
+    assert.match(page, /Alertes de stock/);
+    assert.match(page, /stock\.valeur_stock_estimee/);
+    assert.match(page, /row\.valeur_estimee/);
+  });
+
+  test('affiche les alertes par filiale et la tendance mensuelle', () => {
+    assert.match(page, /Alertes du groupe/);
+    assert.match(page, /performance_mensuelle/);
+    assert.match(page, /Performance sur les six derniers mois/);
+    assert.match(page, /Factures échues et niveaux de stock/);
+  });
+
+  test('conserve les limites de consolidation comptable et l’accès séparé aux filiales', () => {
+    assert.match(page, /dashboard\?\.note/);
+    assert.match(page, /Les comptes, utilisateurs et données restent séparés/);
+    assert.match(page, /data-open=/);
+  });
 });

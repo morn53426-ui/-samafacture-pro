@@ -694,11 +694,82 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   // Une facture annulée ne doit pas gonfler les totaux consolidés du groupe.
   await pool.query(
     `INSERT INTO factures
-      (user_id, client_id, numero, type, date_emission, statut, total, montant_paye)
+      (user_id, client_id, numero, type, date_emission, date_echeance, statut, total, montant_paye)
      VALUES
-      (?, ?, ?, 'facture', '2026-11-16', 'en_attente', 1000, 250),
-      (?, ?, ?, 'facture', '2026-11-16', 'annulee', 9000, 9000)`,
+      (?, ?, ?, 'facture', CURDATE(), DATE_SUB(CURDATE(), INTERVAL 2 DAY), 'en_attente', 1000, 250),
+      (?, ?, ?, 'facture', CURDATE(), NULL, 'annulee', 9000, 9000)`,
     [subsidiaryOwnerId, subsidiaryClientId, 'TEST-GROUPE-ACTIVE', subsidiaryOwnerId, subsidiaryClientId, 'TEST-GROUPE-ANNULEE']
+  );
+
+  // Trois produits couvrent le stock faible, la rupture et le coût d’achat manquant.
+  await pool.query(
+    `INSERT INTO produits (user_id, nom, prix_ht, prix_achat, tva, stock, stock_minimum)
+     VALUES
+       (?, 'TEST-GROUPE-STOCK-FAIBLE', 500, 200, 18, 2, 5),
+       (?, 'TEST-GROUPE-RUPTURE', 500, 100, 18, 0, 0),
+       (?, 'TEST-GROUPE-COUT-MANQUANT', 500, 0, 18, 4, 0)`,
+    [subsidiaryOwnerId, subsidiaryOwnerId, subsidiaryOwnerId]
+  );
+  const [stockProducts] = await pool.query(
+    'SELECT id, nom FROM produits WHERE user_id = ? AND nom LIKE ? ORDER BY nom',
+    [subsidiaryOwnerId, 'TEST-GROUPE-%']
+  );
+  const lowProduct = stockProducts.find(row => row.nom === 'TEST-GROUPE-STOCK-FAIBLE');
+  const missingCostProduct = stockProducts.find(row => row.nom === 'TEST-GROUPE-COUT-MANQUANT');
+  assert.equal(stockProducts.length, 3);
+
+  const [warehouseA] = await pool.query(
+    'INSERT INTO pro_entrepots (user_id, code, nom, par_defaut) VALUES (?, ?, ?, 1)',
+    [subsidiaryOwnerId, 'TEST-A', 'Entrepôt test A']
+  );
+  const [warehouseB] = await pool.query(
+    'INSERT INTO pro_entrepots (user_id, code, nom) VALUES (?, ?, ?)',
+    [subsidiaryOwnerId, 'TEST-B', 'Entrepôt test B']
+  );
+  await pool.query(
+    'INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 1), (?, ?, ?, 1), (?, ?, ?, 4)',
+    [
+      subsidiaryOwnerId, warehouseA.insertId, lowProduct.id,
+      subsidiaryOwnerId, warehouseB.insertId, lowProduct.id,
+      subsidiaryOwnerId, warehouseA.insertId, missingCostProduct.id
+    ]
+  );
+
+  // Les soldes de caisse incluent les entrées et sorties, mais pas les caisses inactives.
+  const [cashRegister] = await pool.query(
+    'INSERT INTO pro_caisses (user_id, nom, devise, solde_initial) VALUES (?, ?, ?, ?)',
+    [subsidiaryOwnerId, 'Caisse test filiale', 'FCFA', 10000]
+  );
+  await pool.query(
+    'INSERT INTO pro_caisse_operations (user_id, caisse_id, type, montant, motif) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)',
+    [subsidiaryOwnerId, cashRegister.insertId, 'entree', 1500, 'Entrée test',
+     subsidiaryOwnerId, cashRegister.insertId, 'sortie', 2000, 'Sortie test']
+  );
+
+  await pool.query(
+    'INSERT INTO pro_caisses (user_id, nom, devise, solde_initial, active) VALUES (?, ?, ?, ?, 0)',
+    [subsidiaryOwnerId, 'Caisse inactive filiale', 'FCFA', 50000]
+  );
+  await pool.query(
+    'INSERT INTO depenses (user_id, libelle, montant, categorie, date_depense) VALUES (?, ?, ?, ?, CURDATE())',
+    [subsidiaryOwnerId, 'Dépense test filiale', 3000, 'test']
+  );
+
+  // Des montants élevés dans une société extérieure ne doivent jamais être consolidés.
+  await pool.query(
+    `INSERT INTO depenses (user_id, libelle, montant, categorie, date_depense)
+     VALUES (?, 'Dépense extérieure', 99999, 'test', CURDATE())`,
+    [outsiderId]
+  );
+  await pool.query(
+    `INSERT INTO pro_caisses (user_id, nom, devise, solde_initial)
+     VALUES (?, 'Caisse extérieure', 'FCFA', 99999)`,
+    [outsiderId]
+  );
+  await pool.query(
+    `INSERT INTO produits (user_id, nom, prix_ht, prix_achat, tva, stock, stock_minimum)
+     VALUES (?, 'Produit extérieur', 500, 100, 18, 99, 1)`,
+    [outsiderId]
   );
 
   const dashboard = await request(app)
@@ -710,11 +781,29 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   const subsidiary = dashboard.body.societes.find(company => Number(company.id) === Number(subsidiaryOwnerId));
   assert.ok(subsidiary, 'la filiale doit être présente dans le tableau de bord');
   assert.deepEqual(subsidiary.factures, [
-    { devise: 'FCFA', nombre: 1, total: 1000, encaisse: 250 }
-  ], 'la facture annulée doit être exclue du nombre, du total et des encaissements');
+    { devise: 'FCFA', nombre: 1, total: 1000, encaisse: 250, impaye: 750, nombre_impayees: 1, en_retard: 750, nombre_en_retard: 1 }
+  ], 'la facture annulée est exclue ; le restant dû et le retard sont calculés');
   assert.deepEqual(dashboard.body.factures_par_devise, [
-    { devise: 'FCFA', nombre_factures: 1, total_facture: 1000, total_encaisse: 250 }
+    { devise: 'FCFA', nombre_factures: 1, total_facture: 1000, total_encaisse: 250, total_impaye: 750, nombre_impayees: 1, total_en_retard: 750, nombre_en_retard: 1 }
   ]);
+  assert.deepEqual(dashboard.body.depenses_par_devise, [
+    { devise: 'FCFA', nombre_depenses: 1, total_depenses: 3000 }
+  ], 'les dépenses d’une société extérieure ne sont pas consolidées');
+  assert.deepEqual(subsidiary.caisses, [
+    { devise: 'FCFA', nombre: 1, solde: 9500 }
+  ], 'le solde est calculé avec les entrées et sorties de la caisse rattachée');
+  assert.deepEqual(dashboard.body.caisses_par_devise, [
+    { devise: 'FCFA', nombre_caisses: 1, solde_total: 9500 }
+  ], 'la caisse extérieure ne doit pas être visible dans les totaux du groupe');
+  assert.deepEqual(subsidiary.stock, [
+    { devise: 'FCFA', nombre_produits: 3, ruptures: 1, stocks_faibles: 1, valeur_estimee: 400, produits_sans_cout: 1 }
+  ], 'les stocks de plusieurs entrepôts sont agrégés et les coûts manquants sont signalés');
+  assert.deepEqual(dashboard.body.stocks_par_devise, [
+    { devise: 'FCFA', nombre_produits: 3, ruptures_stock: 1, stocks_faibles: 1, valeur_stock_estimee: 400, produits_sans_cout: 1 }
+  ], 'le produit d’une société extérieure est exclu');
+  assert.ok(dashboard.body.performance_mensuelle.some(row => row.devise === 'FCFA' && row.total_facture === 1000), 'la tendance inclut la facture de la période');
+  assert.ok(dashboard.body.alertes.some(row => row.type === 'factures_en_retard' && Number(row.societe_id) === Number(subsidiaryOwnerId)), 'une facture échue doit produire une alerte');
+  assert.ok(dashboard.body.alertes.some(row => row.type === 'stocks_a_surveiller' && Number(row.societe_id) === Number(subsidiaryOwnerId)), 'un stock faible ou en rupture doit produire une alerte');
   assert.match(dashboard.body.note, /aucune conversion de change/i);
 
   // Un jeton expiré doit être rejeté par l'API et par le worker email.
