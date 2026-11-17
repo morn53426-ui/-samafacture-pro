@@ -301,7 +301,7 @@ function renderGroup(data,dashboard){
         <div>
           <div class="group-section-eyebrow">Vue d’ensemble</div>
           <h2 id="group-overview-title">${escapeHtml(group.nom)}</h2>
-          <p class="group-muted">Centre de pilotage de ${companies.length} société(s). Les comptes et les données restent séparés ; seules les sociétés ayant accepté le rattachement sont visibles ici.</p>
+          <p class="group-muted">Centre de pilotage de ${companies.length} société(s). Les comptes, utilisateurs et données restent séparés ; seules les sociétés ayant accepté le rattachement sont visibles ici.</p>
         </div>
         <span class="group-status-chip"><i class="ic" data-icon="check-circle" aria-hidden="true"></i> Groupe actif</span>
       </div>
@@ -315,7 +315,7 @@ function renderGroup(data,dashboard){
       <p class="group-disclaimer">${escapeHtml(dashboard?.note||'Les montants sont présentés séparément par devise.')}</p>
     </section>
     <section class="group-panel" id="group-alerts" aria-labelledby="group-alerts-title">
-      <div class="group-panel-heading"><div><h2 id="group-alerts-title">Alertes du groupe</h2><p class="group-muted">Les points qui nécessitent une vérification ou une action.</p></div><span class="group-section-count">${alertes.length}</span></div>
+      <div class="group-panel-heading"><div><h2 id="group-alerts-title">Alertes du groupe</h2><p class="group-muted">Factures échues et niveaux de stock nécessitant une vérification.</p></div><span class="group-section-count">${alertes.length}</span></div>
       <div class="group-alert-list">${alertHtml||'<div class="group-empty">Aucune alerte de facture échue ou de stock critique détectée.</div>'}</div>
     </section>
     <section class="group-panel" id="group-performance" aria-labelledby="group-performance-title">
