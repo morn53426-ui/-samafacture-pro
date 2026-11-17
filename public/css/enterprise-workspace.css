@@ -124,3 +124,33 @@
   .group-panel-heading{gap:8px}
   .group-section-count{flex-basis:30px;width:30px;height:30px}
 }
+
+
+/* Pagination du groupe Entreprise : boutons compacts, accessibles et adaptatifs. */
+.group-company-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+.group-company-pagination span {
+  min-width: 112px;
+  color: var(--ink-soft);
+  font-size: .8rem;
+  font-weight: 650;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.group-company-pagination .btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+@media (max-width: 480px) {
+  .group-company-pagination { gap: 8px; }
+  .group-company-pagination .btn { flex: 1 1 112px; }
+  .group-company-pagination span { order: -1; flex: 1 0 100%; }
+}
