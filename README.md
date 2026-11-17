@@ -318,36 +318,34 @@ L'application pousse des notifications instantanées au navigateur, sans recharg
 
 **Pour être bien référencé**, pensez à renseigner `APP_URL` avec votre vrai nom de domaine une fois en ligne (pas `localhost`), et à soumettre `sitemap.xml` à [Google Search Console](https://search.google.com/search-console).
 
-## Paiement des plans (Wave et PayDunya)
+## Souscriptions aux plans (en préparation)
 
-Le paiement en ligne des plans payants (Starter, Pro, Entreprise) est actuellement proposé par :
-- **Wave for Business** — paiement direct ;
-- **PayDunya** — agrégateur pouvant proposer Orange Money et carte bancaire selon le compte marchand et sa configuration.
+Les formules payantes Starter, Pro et Entreprise sont prévues **au mois**, avec un renouvellement automatique jusqu'à résiliation par le client. Cette cible produit n'est pas encore disponible : **aucune souscription mensuelle, aucun mandat récurrent et aucun débit automatique ne sont activés**.
 
-Ces flux sont des **paiements uniques en XOF**. Le backend ne met pas en place de prélèvement ultérieur, ne renouvelle pas automatiquement les formules et n'applique pas d'expiration automatique aux plans payés. Les moyens réellement exposés par l'API pour le checkout des plans sont Wave et PayDunya lorsque les identifiants correspondants sont configurés.
+### État réel de l'application
 
-Les décisions, vérifications fournisseur et exigences préalables à la facturation récurrente sont consignées dans [ABONNEMENTS_RECURRENTES_DECISIONS.md](ABONNEMENTS_RECURRENTES_DECISIONS.md). Aucune facturation récurrente n'est actuellement activée.
+- `GET /api/abonnement/moyens-disponibles` renvoie actuellement `wave: false`, `paydunya: false`, `tarifs: {}` et `facturation.disponible: false`.
+- `POST /api/abonnement/payer` refuse les demandes de souscription payante avec HTTP `503` et le code `PAIEMENT_RECURRENT_NON_CONFIGURE`. Il ne crée pas de paiement ponctuel de remplacement.
+- La page Abonnement laisse les formules payantes en préparation et n'ouvre aucun checkout.
+- Le champ `renouvellement_automatique: true` retourné dans l'objet de facturation décrit la cible mensuelle souhaitée ; il ne prouve ni l'existence d'un mandat ni l'activation d'un débit.
+- Aucun tarif mensuel n'est actuellement publié par l'API. Les anciens montants associés aux paiements ponctuels ne doivent pas être présentés comme des prix mensuels approuvés.
 
-Les moyens inscrits manuellement lors de l'enregistrement d'un règlement de facture (par exemple espèces, virement, paiement mobile ou carte) sont des informations de suivi comptable ; ils ne prouvent pas l'existence d'un checkout en ligne ou d'une connexion directe à chaque fournisseur.
+### Pourquoi les clés de paiement existantes ne suffisent pas
 
-Les plans payants ne peuvent être activés que par un paiement confirmé côté serveur. Tant qu'aucun fournisseur n'est configuré dans `server/.env`, les boutons de paiement restent masqués ; le compte peut seulement revenir au plan Gratuit. Une requête API directe ne permet pas de s'attribuer Starter, Pro ou Entreprise.
+Les fonctions fournisseurs actuellement présentes sont des parcours de transaction ponctuelle :
+- [Wave Checkout API](https://docs.wave.com/checkout) crée et suit une session de checkout individuelle.
+- [PayDunya HTTP/JSON](https://developers.paydunya.com/doc/FR/http_json) crée une facture de paiement avec un token permettant de vérifier cette transaction.
 
-### Configurer Wave
-1. Créez un compte sur [business.wave.com](https://business.wave.com) et vérifiez les conditions d'accès au checkout marchand.
-2. Récupérez la clé API et le secret de signature de webhook.
-3. Renseignez `WAVE_API_KEY` et `WAVE_SIGNING_SECRET` dans `.env`.
-4. Configurez l'URL de webhook dans le tableau de bord Wave : `https://votredomaine.com/api/abonnement/webhook/wave`.
+Ces parcours ne sont pas utilisés comme mandat de débit récurrent. Renseigner `WAVE_API_KEY`, `WAVE_SIGNING_SECRET` ou les clés PayDunya dans `.env` ne rend donc pas les abonnements mensuels disponibles et ne doit pas être considéré comme une autorisation de renouvellement automatique. Ne réactivez pas les boutons et ne remplacez pas le blocage HTTP 503 par un checkout ponctuel.
 
-### Configurer PayDunya
-1. Créez un compte sur [paydunya.com](https://paydunya.com).
-2. Créez une application dans le tableau de bord et récupérez les clés requises.
-3. Renseignez les identifiants PayDunya dans `.env`.
-4. Conservez `PAYDUNYA_MODE=test` tant que le compte marchand n'est pas validé pour les paiements réels.
+Les paiements reçus manuellement pour une facture (espèces, virement, paiement mobile ou carte) restent des écritures de suivi comptable ; ils ne constituent pas une souscription SaaS ni un mandat de prélèvement.
 
-**Important :** vérifiez les versions actuelles des API, les moyens effectivement activés sur le compte marchand, les frais, les remboursements et les webhooks avant la mise en production.
+### Conditions avant activation
 
-Les tarifs Starter / Pro / Entreprise (5 000 / 15 000 / 35 000 FCFA) sont définis dans `server/routes/abonnement.js`. Ils correspondent actuellement à des paiements uniques, et non à des prix mensuels récurrents.
+Avant toute mise en service, il faut obtenir une confirmation écrite du fournisseur pour le compte marchand concerné, intégrer le parcours de mandat récurrent autorisé, recueillir et conserver le consentement explicite et révocable du client, puis tester les renouvellements, échecs, notifications, résiliations, remboursements et rapprochements. Les décisions et critères de sortie sont suivis dans [ABONNEMENTS_RECURRENTES_DECISIONS.md](ABONNEMENTS_RECURRENTES_DECISIONS.md).
 
+**En développement local, aucun débit réel ne doit être lancé.** Tant que ces contrôles ne sont pas terminés, la page et l'API doivent continuer à annoncer « en préparation » et à bloquer la souscription.
+  
 ## Authentification : Google et mot de passe oublié
 
 ### Connexion avec Google (facultatif)
