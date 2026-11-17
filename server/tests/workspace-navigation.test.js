@@ -50,7 +50,7 @@ describe('Navigation et structure des pages métier', () => {
   test('le rail desktop affiche les icônes et les libellés avec un état actif contrasté', () => {
     assert.match(sidebarScript, /class="nav-label"/);
     assert.match(sidebarScript, /aria-current="page"/);
-    assert.match(sidebarStyles, /--sidebar-collapsed-w:\s*96px/);
+    assert.match(sidebarStyles, /--sidebar-collapsed-w:\s*76px/);
     assert.match(sidebarStyles, /\.sidebar-brand \.mark\s*\{[\s\S]*?width:\s*52px/);
     assert.match(sidebarStyles, /\.nav-item \.ic \.icon\s*\{[\s\S]*?width:\s*24px/);
     assert.match(sidebarStyles, /\.sidebar\.is-collapsed \.nav-item\s*\{[\s\S]*?flex-direction:\s*column/);
