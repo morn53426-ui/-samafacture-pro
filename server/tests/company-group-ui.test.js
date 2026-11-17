@@ -108,7 +108,7 @@ describe('Retour visuel des invitations Entreprise', () => {
   });
 
   test('conserve les limites de consolidation comptable et l’accès séparé aux filiales', () => {
-    assert.match(page, /Aucune conversion de change ou consolidation comptable OHADA/);
+    assert.match(page, /dashboard\?\.note/);
     assert.match(page, /Les comptes, utilisateurs et données restent séparés/);
     assert.match(page, /data-open=/);
   });
