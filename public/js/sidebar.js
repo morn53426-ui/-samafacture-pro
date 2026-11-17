@@ -211,6 +211,12 @@ function renderTopbar(title, subtitle) {
         </form>
       `}
       ${isEnterpriseConsole ? `
+        <form class="app-topbar-search enterprise-console-search" role="search" onsubmit="return submitWorkspaceSearch(event)">
+          <span class="ic" aria-hidden="true">${Icon('search')}</span>
+          <input id="workspace-search" type="search"
+            placeholder="Rechercher dans SamaFacture..." aria-label="Rechercher dans SamaFacture" />
+          <button type="submit" aria-label="Lancer la recherche">${Icon('arrow-up-right')}</button>
+        </form>
         <nav class="enterprise-console-utility-links" aria-label="Aide et paramètres">
           <a href="parametres.html" aria-label="Paramètres" title="Paramètres">${Icon('settings')}</a>
           <a href="aide.html" aria-label="Centre d’aide" title="Centre d’aide">${Icon('help-circle')}</a>
