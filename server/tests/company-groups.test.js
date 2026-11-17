@@ -99,15 +99,23 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v14 sans perdre les données existantes', async () => {
+test('une base v8 reçoit les migrations v9 à v15 sans perdre les données existantes', async () => {
   // Simule strictement l'état de main : schéma v8 sans colonne/index v9-v10,
-  // ni tables multi-sociétés v11, outbox v12, preuve groupe v13 et preuve équipe v14.
+  // ni tables multi-sociétés v11, outbox v12, preuves v13-v14 et abonnements v15.
   await pool.query('DROP TABLE IF EXISTS email_outbox');
   await pool.query('DROP TABLE IF EXISTS pro_team_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitations');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_companies');
   await pool.query('DROP TABLE IF EXISTS pro_company_groups');
+  await pool.query('DROP TABLE IF EXISTS saas_subscription_audit_events');
+  await pool.query('DROP TABLE IF EXISTS saas_subscription_webhook_events');
+  await pool.query('DROP TABLE IF EXISTS saas_subscription_payment_attempts');
+  await pool.query('DROP TABLE IF EXISTS saas_subscription_periods');
+  await pool.query('DROP TABLE IF EXISTS saas_subscription_mandates');
+  await pool.query('DROP TABLE IF EXISTS saas_subscription_consents');
+  await pool.query('DROP TABLE IF EXISTS saas_subscriptions');
+  await pool.query('DROP TABLE IF EXISTS saas_subscription_price_versions');
 
   const [existingDueIndex] = await pool.query(
     `SELECT INDEX_NAME FROM information_schema.STATISTICS
@@ -135,10 +143,10 @@ test('une base v8 reçoit les migrations v9 à v14 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v14 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v15 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 14, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12 → v13 → v14');
+  assert.equal(Number(meta.version), 15, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -161,13 +169,25 @@ test('une base v8 reçoit les migrations v9 à v14 sans perdre les données exis
   assert.equal(dueIndexes.length, 1, 'l’index d’échéances actives de la migration v10 doit être créé');
 
   const [tables] = await pool.query(
-    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?, ?, ?)',
-    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations', 'email_outbox', 'pro_company_group_invitation_verifications', 'pro_team_invitation_verifications']
+    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      'pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations',
+      'email_outbox', 'pro_company_group_invitation_verifications', 'pro_team_invitation_verifications',
+      'saas_subscription_price_versions', 'saas_subscriptions', 'saas_subscription_consents',
+      'saas_subscription_mandates', 'saas_subscription_periods', 'saas_subscription_payment_attempts',
+      'saas_subscription_webhook_events', 'saas_subscription_audit_events'
+    ]
   );
   assert.deepEqual(
     tables.map(row => row.TABLE_NAME).sort(),
-    ['email_outbox', 'pro_company_group_companies', 'pro_company_group_invitation_verifications', 'pro_company_group_invitations', 'pro_company_groups', 'pro_team_invitation_verifications'],
-    'les tables de groupes v11, de l’outbox v12 et de preuves email v13-v14 doivent être créées'
+    [
+      'email_outbox', 'pro_company_group_companies', 'pro_company_group_invitation_verifications',
+      'pro_company_group_invitations', 'pro_company_groups', 'pro_team_invitation_verifications',
+      'saas_subscription_audit_events', 'saas_subscription_consents', 'saas_subscription_mandates',
+      'saas_subscription_payment_attempts', 'saas_subscription_periods', 'saas_subscription_price_versions',
+      'saas_subscription_webhook_events', 'saas_subscriptions'
+    ].sort(),
+    'les tables v11-v15, dont les huit tables du moteur SaaS, doivent être créées'
   );
 });
 
