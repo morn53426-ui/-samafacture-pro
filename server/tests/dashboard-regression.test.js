@@ -45,6 +45,15 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.match(dbSource, /column: 'facture_personnalisation', definition: 'TEXT'/);
   });
 
+  test('les statuts et tendances utilisent la date civile du fuseau de l’entreprise', () => {
+    assert.match(source, /localDateString\(accountRows\?\.\[0\]\?\.fuseau_horaire \|\| 'Africa\/Dakar'\)/);
+    assert.match(source, /date_echeance >= \?/);
+    assert.match(source, /date_echeance < \?/);
+    assert.match(source, /date_emission >= DATE_SUB\(\?, INTERVAL 6 MONTH\)/);
+    assert.doesNotMatch(source, /date_echeance .*CURDATE\(\)/);
+    assert.doesNotMatch(source, /date_emission >= DATE_SUB\(CURDATE\(\)/);
+  });
+
   test('un compte sans facture évite les agrégations inutiles', () => {
     assert.match(source, /invoice_count/);
     assert.match(source, /invoice_count.*=== 0/s);

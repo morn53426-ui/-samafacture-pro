@@ -8,6 +8,8 @@ Pour l'API publique versionnée, ses permissions, ses exemples de requêtes et l
 
 Pour configurer et utiliser les modèles complets de factures et devis, consultez [GUIDE_MODELES_FACTURES_DEVIS.md](GUIDE_MODELES_FACTURES_DEVIS.md).
 
+Pour consulter la stratégie commerciale, les offres envisagées, le plan d'acquisition des 100 premiers clients et la feuille de route d'internationalisation, consultez [PLAN_ENTREPRISE_SAMAFACTURE_PRO.md](PLAN_ENTREPRISE_SAMAFACTURE_PRO.md). Pour exécuter le premier test de marché au Sénégal, utilisez le [guide opérationnel du pilote commercial](PLAN_PILOTE_COMMERCIAL_SENEGAL.md).
+
 ## Ce qui est inclus
 
 - **Backend** : Node.js + Express + **MySQL** (`mysql2`), authentification JWT + bcrypt, API REST complète.
@@ -20,14 +22,17 @@ Pour configurer et utiliser les modèles complets de factures et devis, consulte
   - Factures et devis : création avec lignes multiples, calcul automatique (sous-total, TVA, remise, livraison, total)
   - Transformation d'un devis en facture en un clic
   - Documents enrichis : objet, référence de commande, validité du devis, détail de TVA par taux, suivi du payé/reste à payer, conditions et zone « Bon pour accord »
-  - Enregistrement de paiements (Wave, Orange Money, PayDunya, Stripe, espèces, etc.) avec mise à jour automatique du statut
+  - Enregistrement manuel des règlements reçus (par exemple Wave, Orange Money, PayDunya, virement ou espèces) avec mise à jour du statut de facture ; cette saisie n'implique pas qu'un checkout automatisé soit intégré pour chaque moyen de règlement
   - Vue facture imprimable → export PDF via l'impression du navigateur (Ctrl/Cmd+P → "Enregistrer en PDF")
   - Dépenses (CRUD) pour suivre les sorties d'argent
   - Rapports : ventes par jour/semaine/mois/année/client/produit, export CSV, résumé comptable (recettes, dépenses, bénéfice net, TVA collectée)
   - Paramètres entreprise : identité, coordonnées légales, banque/RIB, conditions de règlement, logo et personnalisation visuelle ; **19 modèles de facture/devis** partagés entre aperçu, impression et PDF
+  - **Base d’internationalisation** : paramètres pays, devise, fuseau IANA, langue préférée et formats de date ; échéances et plusieurs rapports utilisent la date civile de l’entreprise. Périmètre et limites (traduction complète, conversions de devises, fiscalité par pays) : [INTERNATIONALISATION_SCOPE.md](INTERNATIONALISATION_SCOPE.md).
   - Centre d'aide (FAQ), Support technique (formulaire de contact) et Politique de confidentialité
+  - Checklist de préparation conformité (à compléter et faire valider) : [CONFORMITE_DONNEES_CHECKLIST.md](CONFORMITE_DONNEES_CHECKLIST.md)
   - Interface responsive : menu latéral escamotable sur mobile/tablette, tableaux et grilles adaptatifs
-  - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature électronique, factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle)
+  - **Fonctionnalités Pro** : dupliquer une facture/devis, envoyer par email au client (avec lien de consultation en ligne sans compte), relance automatique par email pour les factures en attente/retard, QR code de vérification d'authenticité sur chaque document imprimé, signature électronique, factures récurrentes (génération automatique hebdomadaire/mensuelle/annuelle) — les échéances mensuelles/annuelles conservent le jour d'ancrage, et une génération manuelle anticipée ne décale pas la prochaine échéance planifiée.
+  - **Email automatique des factures récurrentes (opt-in)** : case à cocher par modèle, désactivée par défaut. Nécessite un SMTP opérationnel et l'adresse email du client ; si l'envoi échoue, la facture demeure créée mais l'email n'est pas remis en file ni retenté automatiquement à ce stade.
   - **Partage WhatsApp manuel** des factures et devis depuis les listes et le détail : message prérempli et lien sécurisé de consultation ; l'utilisateur vérifie puis confirme l'envoi dans WhatsApp
 
 ## Installation avec WAMPserver
@@ -162,6 +167,8 @@ distincte.
 
 ## Sécurité et fiabilité
 
+La configuration des règles de protection de `main` et des contrôles requis avant fusion est documentée dans [GITHUB_MAIN_PROTECTION_RUNBOOK.md](GITHUB_MAIN_PROTECTION_RUNBOOK.md) ; elle doit être activée et vérifiée par un administrateur du dépôt.
+
 Les points suivants ont été audités et corrigés :
 - **Protection XSS** : toutes les données saisies par les utilisateurs (noms, notes, commentaires...) sont échappées avant affichage.
 - **Clé JWT** : générée automatiquement et sauvegardée dans `.env` en développement ; en production, un `JWT_SECRET` explicite d'au moins 32 caractères est obligatoire et le serveur refuse de démarrer avec la valeur de démonstration.
@@ -221,6 +228,8 @@ Les sauvegardes automatiques restent **sur le même disque dur** que la base de 
 - pour une vraie mise en production, un stockage cloud (S3, Backblaze...) avec une tâche planifiée est recommandé
 
 Une sauvegarde qui reste uniquement sur le serveur qui peut tomber en panne n'est qu'une protection partielle.
+
+Pour organiser une copie chiffrée vers un stockage indépendant et tester une restauration hors serveur, consultez [BACKUP_OFFSITE_RUNBOOK.md](BACKUP_OFFSITE_RUNBOOK.md). Cette copie distante n'est pas activée automatiquement par défaut.
 
 ## Tests automatisés
 
@@ -287,6 +296,10 @@ La facture "imprimable" (`facture-detail.html`) peut être exportée en vrai fic
 - Sur un hébergement Linux très limité en ressources (petit mutualisé), cette fonctionnalité peut nécessiter un plan supérieur ou un service séparé dédié à la génération de PDF. Sur Windows (WAMPserver local, développement) et sur la plupart des VPS/hébergements dédiés, elle fonctionne sans configuration supplémentaire.
 - `APP_URL` doit être correctement renseigné dans `.env` (voir plus haut) : c'est l'adresse que Puppeteer utilise pour charger la page à imprimer.
 
+**File de tâches asynchrones** : les nouvelles demandes sont traitées par Redis Streams avec consumer group, acquittement après état terminal (`XACK`) et reprise des tâches pending (`XAUTOCLAIM`). Les anciennes tâches encore présentes dans la liste Redis sont migrées au démarrage du worker. La livraison est au moins une fois : voir [PDF_QUEUE_OPERATIONS.md](PDF_QUEUE_OPERATIONS.md) pour le délai de visibilité, les tentatives, la persistance Redis et la recette de reprise.
+
+Les PDF temporaires des tâches sont purgés automatiquement par le worker après une rétention configurable (25 heures par défaut), sans toucher aux fichiers étrangers au format UUID attendu. Les métadonnées de job expirent séparément selon `PDF_JOB_TTL_SECONDS`.
+
 ## Notifications en temps réel (Socket.io)
 
 L'application pousse des notifications instantanées au navigateur, sans rechargement de page ni sondage répété du serveur : facture marquée payée, nouveau client ajouté, quota du plan Gratuit atteint. Elles apparaissent sous forme de petites notifications ("toast") en bas de l'écran, sur tous les onglets/appareils connectés au même compte.
@@ -305,29 +318,35 @@ L'application pousse des notifications instantanées au navigateur, sans recharg
 
 **Pour être bien référencé**, pensez à renseigner `APP_URL` avec votre vrai nom de domaine une fois en ligne (pas `localhost`), et à soumettre `sitemap.xml` à [Google Search Console](https://search.google.com/search-console).
 
-## Paiement des abonnements (Wave, Orange Money, carte bancaire)
+## Paiement des plans (Wave et PayDunya)
 
-Le passage à un plan payant (Starter, Pro, Entreprise) peut se faire réellement via :
-- **Wave for Business** — paiement direct
-- **PayDunya** — agrégateur qui gère en une seule intégration Orange Money **et** la carte bancaire (Visa/Mastercard)
+Le paiement en ligne des plans payants (Starter, Pro, Entreprise) est actuellement proposé par :
+- **Wave for Business** — paiement direct ;
+- **PayDunya** — agrégateur pouvant proposer Orange Money et carte bancaire selon le compte marchand et sa configuration.
 
-Les plans payants ne peuvent être activés que par un flux de paiement confirmé côté serveur. Tant qu'aucun prestataire n'est configuré dans `server/.env`, les boutons de paiement restent masqués ; le compte peut seulement revenir au plan Gratuit. Une requête API directe ne permet pas de s'attribuer Starter, Pro ou Entreprise.
+Ces flux sont des **paiements uniques en XOF**. Le backend ne met pas en place de prélèvement ultérieur, ne renouvelle pas automatiquement les formules et n'applique pas d'expiration automatique aux plans payés. Les moyens réellement exposés par l'API pour le checkout des plans sont Wave et PayDunya lorsque les identifiants correspondants sont configurés.
+
+Les décisions, vérifications fournisseur et exigences préalables à la facturation récurrente sont consignées dans [ABONNEMENTS_RECURRENTES_DECISIONS.md](ABONNEMENTS_RECURRENTES_DECISIONS.md). Aucune facturation récurrente n'est actuellement activée.
+
+Les moyens inscrits manuellement lors de l'enregistrement d'un règlement de facture (par exemple espèces, virement, paiement mobile ou carte) sont des informations de suivi comptable ; ils ne prouvent pas l'existence d'un checkout en ligne ou d'une connexion directe à chaque fournisseur.
+
+Les plans payants ne peuvent être activés que par un paiement confirmé côté serveur. Tant qu'aucun fournisseur n'est configuré dans `server/.env`, les boutons de paiement restent masqués ; le compte peut seulement revenir au plan Gratuit. Une requête API directe ne permet pas de s'attribuer Starter, Pro ou Entreprise.
 
 ### Configurer Wave
-1. Créez un compte sur [business.wave.com](https://business.wave.com), section "Developers" (validation sous 48–72h, NINEA requis)
-2. Récupérez votre clé API et votre secret de signature de webhook
-3. Renseignez `WAVE_API_KEY` et `WAVE_SIGNING_SECRET` dans `.env`
-4. Configurez l'URL de webhook dans le tableau de bord Wave : `https://votredomaine.com/api/abonnement/webhook/wave`
+1. Créez un compte sur [business.wave.com](https://business.wave.com) et vérifiez les conditions d'accès au checkout marchand.
+2. Récupérez la clé API et le secret de signature de webhook.
+3. Renseignez `WAVE_API_KEY` et `WAVE_SIGNING_SECRET` dans `.env`.
+4. Configurez l'URL de webhook dans le tableau de bord Wave : `https://votredomaine.com/api/abonnement/webhook/wave`.
 
-### Configurer PayDunya (Orange Money + carte)
-1. Créez un compte sur [paydunya.com](https://paydunya.com)
-2. Créez une "App" dans le tableau de bord pour obtenir vos 4 clés
-3. Renseignez `PAYDUNYA_MASTER_KEY`, `PAYDUNYA_PRIVATE_KEY`, `PAYDUNYA_PUBLIC_KEY`, `PAYDUNYA_TOKEN`
-4. Laissez `PAYDUNYA_MODE=test` tant que votre compte n'est pas validé en mode réel (aucun argent réel ne circule en mode test)
+### Configurer PayDunya
+1. Créez un compte sur [paydunya.com](https://paydunya.com).
+2. Créez une application dans le tableau de bord et récupérez les clés requises.
+3. Renseignez les identifiants PayDunya dans `.env`.
+4. Conservez `PAYDUNYA_MODE=test` tant que le compte marchand n'est pas validé pour les paiements réels.
 
-**⚠️ Important** : les API Wave et PayDunya (endpoints, formats de réponse) peuvent évoluer. Le code suit leur documentation au moment de son écriture — vérifiez-la avant une mise en production réelle, en particulier les URLs d'API et le format des webhooks.
+**Important :** vérifiez les versions actuelles des API, les moyens effectivement activés sur le compte marchand, les frais, les remboursements et les webhooks avant la mise en production.
 
-Les tarifs des plans (5 000 / 15 000 / 35 000 FCFA par mois pour Starter/Pro/Entreprise) sont définis dans `server/routes/abonnement.js` — à ajuster selon votre marché.
+Les tarifs Starter / Pro / Entreprise (5 000 / 15 000 / 35 000 FCFA) sont définis dans `server/routes/abonnement.js`. Ils correspondent actuellement à des paiements uniques, et non à des prix mensuels récurrents.
 
 ## Authentification : Google et mot de passe oublié
 

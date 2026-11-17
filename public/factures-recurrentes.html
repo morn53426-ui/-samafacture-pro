@@ -49,17 +49,17 @@
     <form id="recurrente-form">
       <input type="hidden" id="recurrente-id" />
       <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px;">
-        <div class="field"><label>Libellé *</label><input type="text" id="libelle" required placeholder="Abonnement maintenance mensuelle" /></div>
-        <div class="field"><label>Client *</label><select id="client_id" required></select></div>
+        <div class="field"><label for="libelle">Libellé *</label><input type="text" id="libelle" required placeholder="Abonnement maintenance mensuelle" /></div>
+        <div class="field"><label for="client_id">Client *</label><select id="client_id" required></select></div>
         <div class="field">
-          <label>Fréquence</label>
+          <label for="frequence">Fréquence</label>
           <select id="frequence">
             <option value="hebdomadaire">Hebdomadaire</option>
             <option value="mensuelle" selected>Mensuelle</option>
             <option value="annuelle">Annuelle</option>
           </select>
         </div>
-        <div class="field"><label>Première génération</label><input type="date" id="prochaine_date" required /></div>
+        <div class="field"><label for="prochaine_date">Première génération</label><input type="date" id="prochaine_date" required /></div>
       </div>
 
       <h3 style="margin-top:6px;">Articles</h3>
@@ -70,18 +70,29 @@
       <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addLigne()">+ Ajouter une ligne</button>
 
       <div class="grid" style="grid-template-columns: 1fr 1fr; gap:14px; margin-top:18px;">
-        <div class="field"><label>Remise</label><input type="number" id="remise" min="0" step="1" value="0" /></div>
-        <div class="field"><label>Frais de livraison</label><input type="number" id="frais_livraison" min="0" step="1" value="0" /></div>
+        <div class="field"><label for="remise">Remise</label><input type="number" id="remise" min="0" step="1" value="0" /></div>
+        <div class="field"><label for="frais_livraison">Frais de livraison</label><input type="number" id="frais_livraison" min="0" step="1" value="0" /></div>
       </div>
       <div class="field">
-        <label>Mode de paiement</label>
+        <label for="mode_paiement">Mode de paiement</label>
         <select id="mode_paiement">
           <option value="">—</option>
           <option>Espèces</option><option>Wave</option><option>Orange Money</option>
           <option>PayDunya</option><option>Virement bancaire</option><option>Chèque</option><option>Carte bancaire</option>
         </select>
       </div>
-      <div class="field"><label>Commentaires</label><textarea id="commentaires"></textarea></div>
+      <div class="field"><label for="commentaires">Commentaires</label><textarea id="commentaires"></textarea></div>
+      <div class="field">
+        <label for="envoi_auto_email">
+          <input type="checkbox" id="envoi_auto_email" />
+          Envoyer automatiquement chaque facture générée au client
+        </label>
+        <small>
+          Option désactivée par défaut. Nécessite un serveur SMTP configuré et une adresse email client.
+          Si un envoi échoue, la facture reste créée mais l'email n'est pas retenté automatiquement :
+          vous devrez le renvoyer depuis la facture.
+        </small>
+      </div>
 
       <div style="display:flex; gap:10px; justify-content:flex-end;">
         <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
@@ -102,16 +113,26 @@
   let clients = [];
   let produits = [];
   let ligneCount = 0;
+  let accountTimezone = 'Africa/Dakar';
 
   const freqLabels = { hebdomadaire: 'Hebdomadaire', mensuelle: 'Mensuelle', annuelle: 'Annuelle' };
 
   async function load() {
-    const [{ recurrentes: rows }, { clients: c }, { produits: p }] = await Promise.all([
-      Api.get('/factures-recurrentes'), Api.get('/clients'), Api.get('/produits')
+    const [
+      { recurrentes: rows },
+      { clients: c },
+      { produits: p },
+      { user }
+    ] = await Promise.all([
+      Api.get('/factures-recurrentes'),
+      Api.get('/clients'),
+      Api.get('/produits'),
+      Api.get('/auth/me')
     ]);
     recurrentes = rows;
     clients = c;
     produits = p;
+    accountTimezone = user?.fuseau_horaire || 'Africa/Dakar';
     renderTable();
   }
 
@@ -123,8 +144,12 @@
         <td data-label="Fréquence">${freqLabels[r.frequence] || r.frequence}</td>
         <td data-label="Prochaine génération">${formatDate(r.prochaine_date)}</td>
         <td data-label="Générées" class="mono">${r.factures_generees}</td>
-        <td data-label="Statut"><span class="badge ${r.actif ? 'badge-payee' : 'badge-annulee'}">${r.actif ? 'Active' : 'En pause'}</span></td>
+        <td data-label="Statut">
+          <span class="badge ${r.actif ? 'badge-payee' : 'badge-annulee'}">${r.actif ? 'Active' : 'En pause'}</span>
+          ${Number(r.envoi_auto_email) === 1 ? '<small class="subscription-overline">Email auto activé</small>' : ''}
+        </td>
         <td style="text-align:right; white-space:nowrap;">
+          <button class="btn btn-sm btn-outline" onclick="modifierRecurrente(${r.id})" title="Modifier ce modèle">${Icon('edit-2')} Modifier</button>
           <button class="btn btn-sm btn-outline" onclick="genererMaintenant(${r.id})" title="Générer une facture immédiatement">${Icon('file-plus')} Générer maintenant</button>
           <button class="btn btn-sm btn-outline" onclick="toggleActif(${r.id}, ${r.actif ? 0 : 1})">${Icon(r.actif ? 'pause-circle' : 'play-circle')} ${r.actif ? 'Mettre en pause' : 'Réactiver'}</button>
           <button class="btn btn-sm btn-danger" onclick="deleteRecurrente(${r.id})">${Icon('trash-2')} Supprimer</button>
@@ -138,13 +163,48 @@
     document.getElementById('recurrente-form').reset();
     document.getElementById('recurrente-id').value = '';
     document.getElementById('modal-error').innerHTML = '';
-    document.getElementById('prochaine_date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('prochaine_date').value = dateCivileAujourdhui(accountTimezone);
     document.getElementById('client_id').innerHTML = clients.map(c => `<option value="${c.id}">${escapeHtml(c.nom)}</option>`).join('');
     document.getElementById('lignes-body').innerHTML = '';
     addLigne();
     document.getElementById('modal').style.display = 'flex';
   }
   function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+  function modifierRecurrente(id) {
+    const modele = recurrentes.find(item => Number(item.id) === Number(id));
+    if (!modele) return;
+
+    document.getElementById('modal-title').textContent = 'Modifier la facture récurrente';
+    document.getElementById('recurrente-form').reset();
+    document.getElementById('recurrente-id').value = modele.id;
+    document.getElementById('modal-error').innerHTML = '';
+    document.getElementById('client_id').innerHTML = clients
+      .map(client => `<option value="${client.id}">${escapeHtml(client.nom)}</option>`)
+      .join('');
+    document.getElementById('libelle').value = modele.libelle || '';
+    document.getElementById('client_id').value = String(modele.client_id);
+    document.getElementById('frequence').value = modele.frequence || 'mensuelle';
+    document.getElementById('prochaine_date').value = String(modele.prochaine_date || '').slice(0, 10);
+    document.getElementById('remise').value = modele.remise ?? 0;
+    document.getElementById('frais_livraison').value = modele.frais_livraison ?? 0;
+    document.getElementById('mode_paiement').value = modele.mode_paiement || '';
+    document.getElementById('commentaires').value = modele.commentaires || '';
+    document.getElementById('envoi_auto_email').checked = Number(modele.envoi_auto_email) === 1;
+
+    document.getElementById('lignes-body').innerHTML = '';
+    (Array.isArray(modele.lignes) ? modele.lignes : []).forEach(ligne => {
+      addLigne();
+      const row = document.getElementById('l' + ligneCount);
+      row.querySelector('.ligne-designation').value = ligne.designation || '';
+      row.querySelector('.ligne-qte').value = ligne.quantite ?? 1;
+      row.querySelector('.ligne-pu').value = ligne.prix_unitaire ?? 0;
+      row.querySelector('.ligne-tva').value = ligne.tva ?? 0;
+    });
+    if (!document.getElementById('lignes-body').children.length) addLigne();
+
+    document.getElementById('modal').style.display = 'flex';
+  }
 
   function addLigne() {
     ligneCount++;
@@ -154,16 +214,16 @@
     row.id = id;
     row.innerHTML = `
       <td>
-        <select style="margin-bottom:4px;" onchange="applyProduit('${id}', this)">
+        <select aria-label="Produit du catalogue (optionnel)" style="margin-bottom:4px;" onchange="applyProduit('${id}', this)">
           <option value="">Produit du catalogue (optionnel)</option>
           ${produitOptions}
         </select>
-        <input type="text" class="ligne-designation" placeholder="Désignation" required />
+        <input type="text" class="ligne-designation" aria-label="Désignation de l’article" placeholder="Désignation" required />
       </td>
-      <td><input type="number" class="ligne-qte" value="1" min="0" step="1" /></td>
-      <td><input type="number" class="ligne-pu" value="0" min="0" step="1" /></td>
-      <td><input type="number" class="ligne-tva" value="0" min="0" max="100" step="1" /></td>
-      <td><button type="button" class="btn btn-sm btn-danger" onclick="document.getElementById('${id}').remove()">${Icon('x')}</button></td>
+      <td><input type="number" class="ligne-qte" aria-label="Quantité" value="1" min="0" step="1" /></td>
+      <td><input type="number" class="ligne-pu" aria-label="Prix unitaire" value="0" min="0" step="1" /></td>
+      <td><input type="number" class="ligne-tva" aria-label="TVA en pourcentage" value="0" min="0" max="100" step="1" /></td>
+      <td><button type="button" class="btn btn-sm btn-danger" aria-label="Supprimer la ligne ${ligneCount}" onclick="document.getElementById('${id}').remove()">${Icon('x')}</button></td>
     `;
     document.getElementById('lignes-body').appendChild(row);
   }
@@ -203,6 +263,7 @@
       frais_livraison: parseFloat(document.getElementById('frais_livraison').value) || 0,
       mode_paiement: document.getElementById('mode_paiement').value,
       commentaires: document.getElementById('commentaires').value,
+      envoi_auto_email: document.getElementById('envoi_auto_email').checked,
       lignes
     };
     const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Enregistrement…');

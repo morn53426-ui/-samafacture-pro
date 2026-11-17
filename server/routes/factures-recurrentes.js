@@ -5,16 +5,60 @@ const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
 const { computeTotals, insererLignesFacture } = require('./factures');
 const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
+const { localDateString } = require('../utils/local-date');
 
 const router = express.Router();
+function parseBooleanInput(value, fieldName, fallback) {
+  if (value === undefined) return fallback;
+  if (value === null) return false;
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0' || normalized === '') return false;
+  }
+  throw new TypeError(fieldName + ' doit être un booléen (true/false).');
+}
+
 router.use(requireAuth, resolveTenant, requirePermission);
 
-function addInterval(date, frequence) {
-  const d = new Date(date);
-  if (frequence === 'hebdomadaire') d.setDate(d.getDate() + 7);
-  else if (frequence === 'annuelle') d.setFullYear(d.getFullYear() + 1);
-  else d.setMonth(d.getMonth() + 1); // mensuelle par défaut
-  return d.toISOString().slice(0, 10);
+function parseDateOnly(value) {
+  const iso = value instanceof Date
+    ? value.toISOString().slice(0, 10)
+    : String(value ?? '').trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) throw new TypeError('La date doit respecter le format AAAA-MM-JJ.');
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const normalized = new Date(Date.UTC(year, month - 1, day));
+  if (year < 1000 || year > 9999 ||
+      normalized.getUTCFullYear() !== year ||
+      normalized.getUTCMonth() + 1 !== month ||
+      normalized.getUTCDate() !== day) {
+    throw new TypeError('La date de facturation est invalide.');
+  }
+  return { iso, year, month, day };
+}
+
+function addInterval(date, frequence, jourAncre) {
+  const current = parseDateOnly(date);
+  if (frequence === 'hebdomadaire') {
+    const next = new Date(Date.UTC(current.year, current.month - 1, current.day + 7));
+    return next.toISOString().slice(0, 10);
+  }
+
+  const anchor = Number.isInteger(Number(jourAncre)) && Number(jourAncre) >= 1 && Number(jourAncre) <= 31
+    ? Number(jourAncre)
+    : current.day;
+  const monthIndex = current.year * 12 + current.month - 1 +
+    (frequence === 'annuelle' ? 12 : 1);
+  const nextYear = Math.floor(monthIndex / 12);
+  const nextMonth = monthIndex % 12 + 1;
+  const lastDay = new Date(Date.UTC(nextYear, nextMonth, 0)).getUTCDate();
+  const nextDay = Math.min(anchor, lastDay);
+  return new Date(Date.UTC(nextYear, nextMonth - 1, nextDay)).toISOString().slice(0, 10);
 }
 
 /**
@@ -64,6 +108,7 @@ router.get('/', async (req, res, next) => {
  *               frais_livraison: { type: number, default: 0 }
  *               mode_paiement: { type: string, nullable: true }
  *               commentaires: { type: string, nullable: true }
+ *               envoi_auto_email: { type: boolean, default: false }
  *               lignes: { type: array, items: { $ref: '#/components/schemas/LigneFacture' } }
  *     responses:
  *       201: { description: "Créée.", content: { application/json: { schema: { type: object, properties: { recurrente: { $ref: '#/components/schemas/FactureRecurrente' } } } } } }
@@ -73,6 +118,13 @@ router.post('/', async (req, res, next) => {
   try {
     const { client_id, libelle, frequence, prochaine_date, remise, frais_livraison, mode_paiement, commentaires, lignes, envoi_auto_email } = req.body;
 
+    let envoiAutoEmail;
+    try {
+      envoiAutoEmail = parseBooleanInput(envoi_auto_email, 'envoi_auto_email', false);
+    } catch (booleanErr) {
+      return res.status(400).json({ error: booleanErr.message });
+    }
+
     if (!client_id || !libelle || !Array.isArray(lignes) || lignes.length === 0) {
       return res.status(400).json({ error: 'Client, libellé et au moins une ligne sont requis.' });
     }
@@ -80,7 +132,26 @@ router.post('/', async (req, res, next) => {
     if (!clientRows.length) return res.status(400).json({ error: 'Client invalide.' });
 
     const freqValides = ['hebdomadaire', 'mensuelle', 'annuelle'];
-    const freq = freqValides.includes(frequence) ? frequence : 'mensuelle';
+    if (frequence !== undefined && !freqValides.includes(frequence)) {
+      return res.status(400).json({ error: 'Fréquence de facturation invalide.' });
+    }
+    const freq = frequence || 'mensuelle';
+
+    let prochaineDate;
+    try {
+      let premiereDate = prochaine_date;
+      if (!premiereDate) {
+        const [[company]] = await pool.query(
+          'SELECT fuseau_horaire FROM users WHERE id = ?',
+          [req.tenantId]
+        );
+        premiereDate = localDateString(company?.fuseau_horaire || 'Africa/Dakar');
+      }
+      prochaineDate = parseDateOnly(premiereDate).iso;
+    } catch (dateErr) {
+      return res.status(400).json({ error: dateErr.message });
+    }
+    const jourAncre = parseDateOnly(prochaineDate).day;
 
     const lignesClean = lignes.map(l => ({
       designation: String(l.designation || '').slice(0, 255),
@@ -90,12 +161,12 @@ router.post('/', async (req, res, next) => {
     }));
 
     const [result] = await pool.query(
-      `INSERT INTO factures_recurrentes (user_id, client_id, libelle, frequence, prochaine_date, remise, frais_livraison, mode_paiement, commentaires, lignes_json, envoi_auto_email)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO factures_recurrentes (user_id, client_id, libelle, frequence, prochaine_date, jour_ancre, remise, frais_livraison, mode_paiement, commentaires, lignes_json, envoi_auto_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        req.tenantId, client_id, libelle, freq, prochaine_date || new Date().toISOString().slice(0, 10),
+        req.tenantId, client_id, libelle, freq, prochaineDate, jourAncre,
         positiveNumber(remise, 0), positiveNumber(frais_livraison, 0), mode_paiement || null, commentaires || null,
-        JSON.stringify(lignesClean), envoi_auto_email ? 1 : 0
+        JSON.stringify(lignesClean), envoiAutoEmail ? 1 : 0
       ]
     );
 
@@ -129,6 +200,7 @@ router.post('/', async (req, res, next) => {
  *               mode_paiement: { type: string, nullable: true }
  *               commentaires: { type: string, nullable: true }
  *               actif: { type: boolean }
+ *               envoi_auto_email: { type: boolean }
  *     responses:
  *       200: { description: "Mise à jour.", content: { application/json: { schema: { type: object, properties: { recurrente: { $ref: '#/components/schemas/FactureRecurrente' } } } } } }
  *       404: { description: "Introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
@@ -140,6 +212,19 @@ router.put('/:id', async (req, res, next) => {
     if (!existing) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
 
     const { libelle, frequence, prochaine_date, remise, frais_livraison, mode_paiement, commentaires, actif, envoi_auto_email } = req.body;
+
+    let actifValue;
+    let envoiAutoEmailValue;
+    try {
+      actifValue = parseBooleanInput(actif, 'actif', Number(existing.actif) === 1);
+      envoiAutoEmailValue = parseBooleanInput(
+        envoi_auto_email,
+        'envoi_auto_email',
+        Number(existing.envoi_auto_email) === 1
+      );
+    } catch (booleanErr) {
+      return res.status(400).json({ error: booleanErr.message });
+    }
     const freqValides = ['hebdomadaire', 'mensuelle', 'annuelle'];
     // Même règle qu'à la création (POST ci-dessus) : le libellé est obligatoire — corrige la
     // même incohérence que celle déjà trouvée sur clients/produits/dépenses (une chaîne vide
@@ -147,20 +232,36 @@ router.put('/:id', async (req, res, next) => {
     if (libelle !== undefined && !libelle) {
       return res.status(400).json({ error: 'Le libellé est obligatoire.' });
     }
+    if (frequence !== undefined && !freqValides.includes(frequence)) {
+      return res.status(400).json({ error: 'Fréquence de facturation invalide.' });
+    }
+
+    let prochaineDate;
+    try {
+      prochaineDate = prochaine_date !== undefined
+        ? parseDateOnly(prochaine_date).iso
+        : parseDateOnly(existing.prochaine_date).iso;
+    } catch (dateErr) {
+      return res.status(400).json({ error: dateErr.message });
+    }
+    const jourAncre = prochaine_date !== undefined
+      ? parseDateOnly(prochaineDate).day
+      : (Number(existing.jour_ancre) || parseDateOnly(prochaineDate).day);
 
     await pool.query(
-      `UPDATE factures_recurrentes SET libelle=?, frequence=?, prochaine_date=?, remise=?, frais_livraison=?, mode_paiement=?, commentaires=?, actif=?, envoi_auto_email=?
+      `UPDATE factures_recurrentes SET libelle=?, frequence=?, prochaine_date=?, jour_ancre=?, remise=?, frais_livraison=?, mode_paiement=?, commentaires=?, actif=?, envoi_auto_email=?
        WHERE id = ? AND user_id = ?`,
       [
         libelle ?? existing.libelle,
-        freqValides.includes(frequence) ? frequence : existing.frequence,
-        prochaine_date ?? existing.prochaine_date,
+        frequence ?? existing.frequence,
+        prochaineDate,
+        jourAncre,
         remise !== undefined ? positiveNumber(remise, existing.remise) : existing.remise,
         frais_livraison !== undefined ? positiveNumber(frais_livraison, existing.frais_livraison) : existing.frais_livraison,
         mode_paiement ?? existing.mode_paiement,
         commentaires ?? existing.commentaires,
-        actif !== undefined ? (actif ? 1 : 0) : existing.actif,
-        envoi_auto_email !== undefined ? (envoi_auto_email ? 1 : 0) : existing.envoi_auto_email,
+        actifValue ? 1 : 0,
+        envoiAutoEmailValue ? 1 : 0,
         existing.id, req.tenantId
       ]
     );
@@ -211,7 +312,7 @@ router.delete('/:id', async (req, res, next) => {
  */
 router.post('/:id/generer', async (req, res, next) => {
   try {
-    const facture = await genererFactureDepuisModele(req.params.id, req.tenantId);
+    const facture = await genererFactureDepuisModele(req.params.id, req.tenantId, { onlyIfDue: false });
     if (!facture) return res.status(404).json({ error: 'Facture récurrente introuvable.' });
     res.status(201).json({ facture });
   } catch (err) {
@@ -225,21 +326,35 @@ router.post('/:id/generer', async (req, res, next) => {
  * logique de numérotation atomique que la création manuelle. Exportée pour être appelée
  * aussi bien depuis la route "générer maintenant" que depuis le vérificateur périodique.
  */
-async function genererFactureDepuisModele(id, userId) {
+async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}) {
   const conn = await pool.getConnection();
   let transactionCommitted = false;
   try {
     await conn.beginTransaction();
     // Même ordre de verrouillage que les autres créations : compte, puis modèle.
-    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
+    const [[company]] = await conn.query('SELECT devise, fuseau_horaire FROM users WHERE id = ? FOR UPDATE', [userId]);
 
-    // SELECT ... FOR UPDATE verrouille la ligne le temps de la transaction : si le
-    // vérificateur périodique et un appel manuel (ou deux workers en mode cluster)
-    // tentent de générer la même facture en même temps, le second attend que le premier
-    // termine, puis constate que la date a déjà été avancée et ne génère rien en double.
+    // SELECT ... FOR UPDATE sérialise les générations du même modèle. Le scheduler
+    // recontrôle l'échéance après le verrou (onlyIfDue) et saute une échéance déjà traitée.
+    // Une action manuelle explicite peut toujours créer une facture supplémentaire.
     const [rows] = await conn.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ? FOR UPDATE', [id, userId]);
     const modele = rows[0];
     if (!modele) {
+      await conn.rollback();
+      return null;
+    }
+    if (onlyIfDue && Number(modele.actif) !== 1) {
+      await conn.rollback();
+      return null;
+    }
+
+    // Un passage du scheduler peut avoir sélectionné ce modèle avant qu'une génération
+    // manuelle ou un autre passage n'obtienne le verrou et n'avance l'échéance. Recontrôler
+    // la date sous verrou évite de générer une seconde facture pour la même échéance.
+    const companyLocalDate = localDateString(company?.fuseau_horaire || 'Africa/Dakar');
+    const modeleNextDate = parseDateOnly(modele.prochaine_date).iso;
+    const scheduledDateDue = Number(modele.actif) === 1 && modeleNextDate <= companyLocalDate;
+    if (onlyIfDue && !scheduledDateDue) {
       await conn.rollback();
       return null;
     }
@@ -254,8 +369,8 @@ async function genererFactureDepuisModele(id, userId) {
       throw error;
     }
 
-    const [[company]] = await conn.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [userId]);
     const documentCurrency = String(company?.devise || 'FCFA').toUpperCase();
+    const documentDate = companyLocalDate;
 
     const lignes = JSON.parse(modele.lignes_json);
     // Même règle de calcul qu'une facture créée manuellement (voir routes/factures.js) :
@@ -267,7 +382,7 @@ async function genererFactureDepuisModele(id, userId) {
 
     // Numérotation atomique (même mécanisme que POST /api/factures)
     const prefix = 'FAC';
-    const year = new Date().getFullYear();
+    const year = Number(documentDate.slice(0, 4));
     await conn.query(
       `INSERT INTO compteurs_numerotation (user_id, type, annee, dernier_numero)
        VALUES (?, 'facture', ?, LAST_INSERT_ID(1))
@@ -279,18 +394,27 @@ async function genererFactureDepuisModele(id, userId) {
 
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, numero, type, date_emission, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
-       VALUES (?, ?, ?, 'facture', CURDATE(), ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, modele.client_id, numero, documentCurrency, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
+       VALUES (?, ?, ?, 'facture', ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, modele.client_id, numero, documentDate, documentCurrency, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
     );
     const factureId = result.insertId;
 
     await insererLignesFacture(conn, factureId, computedLignes);
 
-    const nextDate = addInterval(modele.prochaine_date, modele.frequence);
-    await conn.query(
-      `UPDATE factures_recurrentes SET prochaine_date = ?, derniere_generation = NOW(), factures_generees = factures_generees + 1 WHERE id = ?`,
-      [nextDate, modele.id]
-    );
+    if (scheduledDateDue) {
+      const nextDate = addInterval(modele.prochaine_date, modele.frequence, modele.jour_ancre);
+      await conn.query(
+        `UPDATE factures_recurrentes SET prochaine_date = ?, derniere_generation = NOW(), factures_generees = factures_generees + 1 WHERE id = ? AND user_id = ?`,
+        [nextDate, modele.id, userId]
+      );
+    } else {
+      // Une génération manuelle anticipée est une facture supplémentaire : elle ne doit
+      // pas décaler l'échéance automatique future du modèle.
+      await conn.query(
+        `UPDATE factures_recurrentes SET derniere_generation = NOW(), factures_generees = factures_generees + 1 WHERE id = ? AND user_id = ?`,
+        [modele.id, userId]
+      );
+    }
 
     await conn.commit();
     transactionCommitted = true;
@@ -306,3 +430,5 @@ async function genererFactureDepuisModele(id, userId) {
 
 module.exports = router;
 module.exports.genererFactureDepuisModele = genererFactureDepuisModele;
+module.exports.addInterval = addInterval;
+module.exports.parseDateOnly = parseDateOnly;
