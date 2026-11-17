@@ -27,7 +27,9 @@ test("le README décrit l'état indisponible des abonnements et le renouvellemen
   assert.doesNotMatch(readme, /paiements uniques en XOF/i);
   assert.doesNotMatch(readme, /intégrations d'abonnement Wave et PayDunya déjà présentes/i);
   assert.match(readme, /PayDunya présente aussi \[Collect\]\(https:\/\/paydunya\.com\/collect\)/);
+  assert.match(readme, /les payeurs reçoivent un SMS avec un lien pour effectuer le paiement/i);
   assert.match(readme, /Une demande de paiement envoyée automatiquement ne signifie pas que le client est prélevé automatiquement/i);
+  assert.match(readme, /WhatsApp d'assistance intégration \*\*\+221 77 190 26 41\*\*/);
   assert.match(readme, /le blocage HTTP 503 reste obligatoire/i);
 });
 
