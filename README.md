@@ -320,9 +320,7 @@ L'application pousse des notifications instantanées au navigateur, sans recharg
 
 ## Paiement des plans (Wave et PayDunya)
 
-Le paiement en ligne des plans payants (Starter, Pro, Entreprise) est actuellement proposé par :
-- **Wave for Business** — paiement direct ;
-- **PayDunya** — agrégateur pouvant proposer Orange Money et carte bancaire selon le compte marchand et sa configuration.
+Wave for Business et PayDunya sont les fournisseurs envisagés pour les paiements, mais **aucun moyen de paiement d'abonnement mensuel n'est actuellement ouvert** dans l'application. La présence de leurs identifiants dans `.env` ne vaut ni autorisation de prélèvement récurrent ni validation d'un mandat.
 
 Les paiements actuellement disponibles pour les factures clients et les abonnements doivent être distingués. Pour les abonnements Starter, Pro et Entreprise, l'API **n'ouvre aucun checkout** : `GET /api/abonnement/moyens-disponibles` renvoie `wave: false`, `paydunya: false`, aucun tarif mensuel approuvé et `disponible: false`. `POST /api/abonnement/payer` renvoie HTTP 503 avec le code `PAIEMENT_RECURRENT_NON_CONFIGURE`.
 
