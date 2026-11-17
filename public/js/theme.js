@@ -27,6 +27,7 @@
     // existant) : on retire simplement l'attribut plutôt que d'en imposer un.
     if (theme === 'auto') html.removeAttribute('data-theme');
     else html.setAttribute('data-theme', theme);
+    document.dispatchEvent(new CustomEvent('sf:theme-change', { detail: { theme } }));
   }
 
   // Appliqué immédiatement, de façon synchrone, avant tout rendu de la page.
