@@ -57,6 +57,13 @@ describe('Navigation et structure des pages métier', () => {
 
 
 
+  test('le bandeau Entreprise reste sur une seule rangée sur écran intermédiaire', () => {
+    assert.ok(enterpriseStyles.includes('@media (min-width: 901px) and (max-width: 1100px)'));
+    assert.ok(enterpriseStyles.includes('flex-wrap: nowrap !important'));
+    assert.ok(enterpriseStyles.includes('height: 54px'));
+    assert.ok(enterpriseStyles.includes('min-width: 118px'));
+  });
+
   test('toutes les icônes appelées par la navigation existent dans le catalogue SVG', () => {
     const definitions = new Set(
       [...iconCatalogue.matchAll(/^\\s*(?:['"]([^'"]+)['"]|([A-Za-z][\\w-]*))\\s*:/gm)]
