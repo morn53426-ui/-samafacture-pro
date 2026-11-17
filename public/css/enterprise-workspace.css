@@ -1064,3 +1064,46 @@ body.enterprise-console-shell .group-disclaimer {
     transition: none;
   }
 }
+
+
+.enterprise-console-utility-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.enterprise-console-utility-links a {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #e8f1fb;
+}
+.enterprise-console-utility-links .icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+}
+.enterprise-console-utility-links a:hover {
+  border-color: rgba(255,255,255,.14);
+  background: rgba(255,255,255,.1);
+  color: #fff;
+}
+.enterprise-console-utility-links a:focus-visible {
+  outline: 2px solid #9bd3ff;
+  outline-offset: 2px;
+}
+body.enterprise-console-shell .enterprise-console-topbar .app-topbar-account {
+  margin-left: 0;
+}
+@media (max-width: 900px) {
+  .enterprise-console-utility-links { gap: 3px; }
+  .enterprise-console-utility-links a { width: 31px; height: 34px; }
+}
+@media (max-width: 420px) {
+  .enterprise-console-utility-links { gap: 1px; }
+  .enterprise-console-utility-links a { width: 28px; }
+}
