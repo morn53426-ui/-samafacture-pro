@@ -1710,7 +1710,7 @@ router.get('/company-group/dashboard', async (req, res, next) => {
        FROM pro_company_group_companies gc
        JOIN users u ON u.id = gc.company_owner_id
        WHERE gc.group_id = ?
-       ORDER BY gc.is_primary DESC, u.entreprise_nom ASC`,
+       ORDER BY gc.is_primary DESC, u.entreprise_nom ASC, gc.company_owner_id ASC`,
       [group.id]
     );
     const ids = companies.map(company => Number(company.id));
