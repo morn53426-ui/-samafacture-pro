@@ -14,7 +14,15 @@ const pages = [
   'achats.html',
   'comptabilite.html',
   'depenses.html',
-  'rapports.html'
+  'rapports.html',
+  'crm.html',
+  'automatisations.html',
+  'paiements-professionnels.html',
+  'parametres.html',
+  'factures-recurrentes.html',
+  'assistant-ia.html',
+  'internationalisation.html',
+  'finances.html'
 ];
 
 function readPage(file) {
