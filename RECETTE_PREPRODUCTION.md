@@ -4,70 +4,90 @@ Ce document décrit le contrôle à réaliser sur un environnement **staging sé
 
 ## 1. Isoler l'environnement
 
-- Utiliser un sous-domaine distinct, par exemple `staging.votre-domaine.tld`, avec son propre certificat TLS.
-- Utiliser une base dédiée, par exemple `samafacture_staging`, et un utilisateur MySQL dédié. Ne jamais connecter cette instance à la base de production.
-- Utiliser Redis de staging (service Compose séparé ou instance/DB Redis réservée à la préproduction).
-- Utiliser un espace de sauvegarde distinct de la production.
-- Ne pas copier des données personnelles réelles en staging. Créer des utilisateurs, clients, factures et documents fictifs.
+- Utiliser de préférence un **VPS de staging distinct** avec un sous-domaine dédié (par exemple `staging.votre-domaine.tld`) et son propre certificat TLS.
+- L'overlay `docker-compose.production.yml` démarre Caddy et publie les ports 80/443. Ne pas démarrer une seconde instance Caddy sur le même hôte que la production si ces ports sont déjà occupés ; utiliser un VPS distinct ou une configuration de proxy partagé explicitement administrée (non décrite par cet overlay).
+- Utiliser un nom de projet Compose distinct, `samafacture-staging`, afin de séparer les réseaux et volumes nommés de staging de ceux de production.
+- Utiliser une base dédiée (par exemple `samafacture_staging`) et un utilisateur MySQL dédié. Ne jamais connecter cette instance à la base de production.
+- Utiliser Redis de staging et un espace de sauvegarde distincts de la production.
+- Ne pas copier de données personnelles réelles en staging. Créer des utilisateurs, clients, factures et documents fictifs.
 - Conserver le SHA Git exact testé pour pouvoir reproduire la recette.
 
-## 2. Préparer les variables
+## 2. Préparer les deux fichiers d'environnement
 
-Depuis la racine du dépôt :
+Depuis la racine du dépôt, créer **les deux fichiers** attendus par Compose :
 
 ```bash
+cp .env.example .env
 cp server/.env.example server/.env
 ```
 
-Renseigner au minimum les variables suivantes dans `server/.env` :
+Ils ont deux rôles différents :
+
+- Le fichier racine `.env` fournit les variables d'interpolation Compose (`APP_DOMAIN`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_ROOT_PASSWORD`, etc.). Il est lu par `--env-file .env`.
+- `server/.env` est le fichier `env_file` monté dans les services `app` et `pdf-worker` pour leurs paramètres applicatifs. Ne pas le substituer à `--env-file .env` : cela laisserait les variables d'infrastructure du Compose racine absentes ou incohérentes.
+
+### Fichier racine `.env`
+
+Renseigner au minimum :
 
 | Variable | Valeur attendue en staging |
 |---|---|
-| `NODE_ENV` | `production` pour vérifier les mêmes protections qu'en production |
-| `PORT` | `4000` dans le conteneur |
-| `APP_URL` | URL HTTPS du sous-domaine staging |
-| `JWT_SECRET` | Secret aléatoire d'au moins 32 caractères, propre à staging |
-| `DATA_ENCRYPTION_KEY` | Clé aléatoire propre à staging, conservée durablement |
-| `DB_NAME` | Nom de base de staging, jamais le nom de la base de production |
-| `DB_USER` / `DB_PASSWORD` | Compte MySQL dédié à staging |
-| `DB_ROOT_PASSWORD` | Mot de passe fort utilisé pour initialiser le conteneur MySQL |
-| `ALLOWED_ORIGINS` | Origine HTTPS de staging, sans chemin |
-| `BACKUP_ENABLED` | `true`, avec un stockage de sauvegarde réservé à staging |
-| `BACKUP_DIR` | Répertoire persistant prévu pour les sauvegardes de staging |
+| `APP_DOMAIN` | Nom DNS HTTPS du staging, sans protocole ni chemin |
+| `DB_NAME` | Nom de base staging, par exemple `samafacture_staging` |
+| `DB_USER` / `DB_PASSWORD` | Compte MySQL dédié au staging |
+| `DB_ROOT_PASSWORD` | Mot de passe fort pour initialiser MySQL |
+| `JWT_SECRET` | Secret aléatoire d'au moins 32 caractères, propre au staging |
+| `HTTP_PORT` | Port local de Nginx si nécessaire ; ne pas l'exposer publiquement |
 
-Générer deux secrets différents, puis les conserver dans un gestionnaire de secrets :
+### Fichier applicatif `server/.env`
+
+Renseigner au minimum :
+
+| Variable | Valeur attendue en staging |
+|---|---|
+| `DATA_ENCRYPTION_KEY` | Clé aléatoire propre au staging, conservée durablement |
+| `BACKUP_ENCRYPTION_KEY` | Clé dédiée au chiffrement des sauvegardes staging |
+| `BACKUP_ENABLED` | `true` |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` | Boîte de test uniquement, qui ne contacte aucun client réel |
+| `PAYDUNYA_MODE` | `test` ; n'utiliser aucune clé de compte marchand live |
+| `ENABLE_API_DOCS` | `false` pour rester aligné sur la production |
+
+Les services Compose reçoivent les variables DB et JWT explicites du fichier racine ; elles prévalent sur les valeurs de même nom dans `server/.env`. L'overlay de production construit `APP_URL` et `ALLOWED_ORIGINS` à partir de `APP_DOMAIN`.
+
+Générer trois secrets indépendants, puis les conserver dans un gestionnaire de secrets :
 
 ```bash
-openssl rand -hex 48
-openssl rand -hex 32
+openssl rand -hex 48  # JWT_SECRET dans .env
+openssl rand -hex 32  # DATA_ENCRYPTION_KEY dans server/.env
+openssl rand -hex 32  # BACKUP_ENCRYPTION_KEY dans server/.env
 ```
 
-Le premier résultat peut servir pour `JWT_SECRET`, le second pour `DATA_ENCRYPTION_KEY`. Ne pas publier les secrets dans Git, les tickets ou les captures d'écran. Ne pas changer `DATA_ENCRYPTION_KEY` après avoir créé des webhooks chiffrés, sauf si les secrets concernés sont recréés.
+Ne jamais publier ces valeurs dans Git, les tickets ou les captures d'écran. Ne pas changer `DATA_ENCRYPTION_KEY` après avoir créé des webhooks/secrets chiffrés, ni `BACKUP_ENCRYPTION_KEY` après avoir créé des sauvegardes, sauf si les éléments concernés sont recréés ou ré-encryptés.
 
-Le fichier Compose définit `REDIS_URL=redis://redis:6379` dans le réseau interne. Ne remplacez pas cette adresse par `localhost` depuis un conteneur. Configurez SMTP avec une boîte de test qui ne contacte aucun client réel. Gardez les clés des prestataires en mode sandbox/test lorsqu'un parcours existant les utilise.
+Le fichier Compose définit `REDIS_URL=redis://redis:6379` dans le réseau interne. Ne remplacez pas cette adresse par `localhost` depuis un conteneur. Garder les clés des prestataires en mode sandbox/test lorsqu'un parcours existant les utilise ; en absence de sandbox vérifiée, laisser ces intégrations désactivées.
 
 ## 3. Vérifier la configuration et démarrer
 
-La procédure Compose référence explicitement `server/.env`. Depuis la racine du dépôt :
+Depuis la racine du dépôt, utiliser **la même combinaison de fichiers et le même nom de projet pour toutes les commandes** :
 
 ```bash
-docker compose --env-file server/.env config --quiet
-docker compose --env-file server/.env build --pull
-docker compose --env-file server/.env up -d
-docker compose --env-file server/.env ps
+docker compose --project-name samafacture-staging --env-file .env -f docker-compose.yml -f docker-compose.production.yml config --quiet
+docker compose --project-name samafacture-staging --env-file .env -f docker-compose.yml -f docker-compose.production.yml build --pull
+docker compose --project-name samafacture-staging --env-file .env -f docker-compose.yml -f docker-compose.production.yml up -d
+docker compose --project-name samafacture-staging --env-file .env -f docker-compose.yml -f docker-compose.production.yml ps
 ```
 
 Contrôler les journaux de chaque service :
 
 ```bash
-docker compose --env-file server/.env logs --tail=200 mysql redis app pdf-worker nginx
+docker compose --project-name samafacture-staging --env-file .env -f docker-compose.yml -f docker-compose.production.yml logs --tail=200 mysql redis app pdf-worker nginx caddy
 ```
 
 Les conteneurs `mysql` et `redis` doivent être sains. Le conteneur `app` doit passer à l'état `healthy` : son contrôle Docker appelle `/api/ready`, qui vérifie MySQL et Redis lorsque Redis est configuré. `/api/health` reste une sonde de vie du processus et ne prouve pas que la base est disponible.
 
 Les migrations sont appliquées au démarrage de l'application. Faire une sauvegarde vérifiée de la base de staging avant le premier démarrage sur une base qui contient déjà des données.
 
-## 4. Vérifier les sondes et le frontend
+## 4. Vérifier les sondes, HTTPS et le frontend
 
 Depuis une machine qui peut joindre l'URL HTTPS de staging :
 
@@ -79,17 +99,19 @@ curl -fsSI https://staging.votre-domaine.tld/
 
 Résultats attendus :
 - `/api/health` renvoie HTTP 200 et `status: ok`.
-- `/api/ready` renvoie HTTP 200 et `status: ready`, avec MySQL actif et Redis actif s'il est configuré.
+- `/api/ready` renvoie HTTP 200 et `status: ready`, avec MySQL actif et Redis actif.
 - La page d'accueil se charge en HTTPS sans erreur serveur.
+- Le certificat TLS est valide pour le nom DNS staging.
 
 Le script non destructif suivant automatise ces contrôles de base :
 
 ```bash
 cd server
-SAMAFACTURE_BASE_URL=https://staging.votre-domaine.tld npm run smoke:staging
+SAMAFACTURE_BASE_URL=https://staging.votre-domaine.tld EXPECT_STAGING_REDIS=true npm run smoke:staging
 ```
 
-Le script vérifie aussi qu'une route métier protégée refuse une requête sans jeton. Il ne crée ni ne modifie de données.
+Le script vérifie aussi qu'une route métier protégée refuse une requête sans jeton. Il ne crée ni ne modifie de données. Pour vérifier en plus une session propriétaire, fournir un jeton de test via `SAMAFACTURE_STAGING_TOKEN` dans l'environnement du shell sans l'écrire dans le dépôt ni dans une commande conservée dans l'historique. La recette métier manuelle reste obligatoire.
+
 
 ## 5. Parcours métier à réaliser dans le navigateur
 
