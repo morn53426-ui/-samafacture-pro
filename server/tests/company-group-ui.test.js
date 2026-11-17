@@ -97,7 +97,8 @@ describe('Retour visuel des invitations Entreprise', () => {
     assert.match(page, /stocks_par_devise/);
     assert.match(page, /Valeur estimée du stock/);
     assert.match(page, /Alertes de stock/);
-    assert.match(page, /stock\.valeur_estimee/);
+    assert.match(page, /stock\.valeur_stock_estimee/);
+    assert.match(page, /row\.valeur_estimee/);
   });
 
   test('affiche les alertes par filiale et la tendance mensuelle', () => {
