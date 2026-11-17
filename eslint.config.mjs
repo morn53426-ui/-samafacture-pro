@@ -1,16 +1,19 @@
 const browserGlobals = Object.fromEntries([
   'AbortController', 'Api', 'Audio', 'Blob', 'CSS', 'CanvasRenderingContext2D',
-  'CustomEvent', 'DOMParser', 'Document', 'Element', 'Event', 'File', 'FileReader',
-  'FormData', 'HTMLButtonElement', 'HTMLImageElement', 'HTMLInputElement',
-  'HTMLElement', 'Image', 'Icon', 'IntersectionObserver', 'KeyboardEvent',
-  'MouseEvent', 'MutationObserver', 'Node', 'NodeList', 'ResizeObserver',
-  'SamaTheme', 'SVGElement', 'TextDecoder', 'TextEncoder', 'URL', 'URLSearchParams',
-  'XMLHttpRequest', 'XMLSerializer', 'addEventListener', 'alert', 'atob', 'btoa',
-  'cancelAnimationFrame', 'clearTimeout', 'confirm', 'crypto', 'devicePixelRatio',
-  'document', 'escapeHtml', 'fetch', 'getComputedStyle', 'getSelection', 'history',
-  'initials', 'innerHeight', 'innerWidth', 'localStorage', 'location', 'matchMedia',
-  'navigator', 'performance', 'prompt', 'requestAnimationFrame', 'requestIdleCallback',
-  'scrollTo', 'sessionStorage', 'setInterval', 'setTimeout', 'window'
+  'CustomEvent', 'DOMParser', 'Document', 'Element', 'Event', 'EventTarget', 'File',
+  'FileReader', 'FormData', 'HTMLButtonElement', 'HTMLImageElement',
+  'HTMLInputElement', 'HTMLElement', 'Image', 'Icon', 'IntersectionObserver',
+  'io', 'KeyboardEvent', 'MouseEvent', 'MutationObserver', 'Node', 'NodeList',
+  'ResizeObserver', 'SamaTheme', 'SVGElement', 'TextDecoder', 'TextEncoder',
+  'URL', 'URLSearchParams', 'XMLHttpRequest', 'XMLSerializer',
+  'addEventListener', 'alert', 'atob', 'btoa', 'cancelAnimationFrame',
+  'clearTimeout', 'closeWorkspaceNotifications', 'confirm', 'console',
+  'crypto', 'clearWorkspaceNotifications', 'devicePixelRatio', 'document',
+  'escapeHtml', 'fetch', 'getComputedStyle', 'getSelection', 'history',
+  'initials', 'innerHeight', 'innerWidth', 'localStorage', 'location',
+  'matchMedia', 'navigator', 'performance', 'prompt', 'pushWorkspaceNotification',
+  'requestAnimationFrame', 'requestIdleCallback', 'sessionStorage', 'setInterval',
+  'setTimeout', 'showToast', 'toggleWorkspaceNotifications', 'window'
 ].map((name) => [name, 'readonly']));
 
 const nodeGlobals = Object.fromEntries([
@@ -40,6 +43,14 @@ const correctnessRules = {
 };
 
 export default [
+  {
+    files: ['eslint.config.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module'
+    },
+    rules: correctnessRules
+  },
   {
     files: ['public/js/sidebar.js'],
     languageOptions: {
