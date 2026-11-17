@@ -40,7 +40,7 @@ describe('Galerie de sélection des modèles (public/parametres.html)', () => {
     assert.ok(declaration, 'La page Paramètres doit déclarer son catalogue visuel de modèles.');
     const galleryIds = Array.from(declaration[1].matchAll(/id: '([^']+)'/g), match => match[1]);
     assert.deepEqual([...galleryIds].sort(), [...TEMPLATES_ATTENDUS].sort(),
-      'La galerie doit rester synchronisée avec les vingt-quatre modèles rendus par le moteur.');
+      'La galerie doit rester synchronisée avec les trente et un modèles rendus par le moteur.');
 
     assert.match(source, /id="invoice-template-gallery"/,
       'La page doit offrir une zone de galerie dédiée.');
