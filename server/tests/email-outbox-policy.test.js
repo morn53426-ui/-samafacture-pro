@@ -6,7 +6,8 @@ const {
   MAX_ATTEMPTS,
   RETRY_DELAYS_SECONDS,
   retryDelaySeconds,
-  safeErrorCode
+  safeErrorCode,
+  extractEmailVerificationToken
 } = require('../email-outbox');
 
 describe('Politique de reprise de l’outbox email', () => {
@@ -19,6 +20,24 @@ describe('Politique de reprise de l’outbox email', () => {
     assert.equal(retryDelaySeconds(7), 86400);
     assert.equal(retryDelaySeconds(0), 60);
     assert.equal(retryDelaySeconds(99), 86400);
+  });
+
+  test('extrait le jeton de preuve du fragment sans l’exposer dans la query string', () => {
+    const invitationToken = 'a'.repeat(64);
+    const verificationToken = 'b'.repeat(64);
+    const url = 'https://samafacture.example/invitation.html?type=company-group#token=' +
+      invitationToken + '&verification_token=' + verificationToken;
+    assert.equal(extractEmailVerificationToken(url), verificationToken);
+  });
+
+  test('conserve la compatibilité des anciens emails dont le jeton est dans la query string', () => {
+    const verificationToken = 'c'.repeat(64);
+    const url = 'https://samafacture.example/invitation.html?type=company-group&verification_token=' + verificationToken;
+    assert.equal(extractEmailVerificationToken(url), verificationToken);
+  });
+
+  test('refuse une URL de preuve malformée', () => {
+    assert.equal(extractEmailVerificationToken('not a URL'), '');
   });
 
   test('ne conserve que des codes d’erreur sûrs et bornés', () => {

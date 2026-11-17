@@ -1029,19 +1029,21 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
     }
     const token = String(req.body.token || '');
     if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(400).json({ error: 'Jeton d’invitation invalide.' });
-    if (!req.user.email) return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
-
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    const [[currentAccount]] = await conn.query(
+      'SELECT email FROM users WHERE id = ? LIMIT 1 FOR UPDATE',
+      [actor(req)]
+    );
+    if (!currentAccount?.email) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
+    }
     const [invites] = await conn.query(
-      `SELECT i.id, i.group_id, i.invited_email, i.statut, i.expire_at,
-              g.owner_user_id, g.nom AS group_name, u.plan AS owner_plan
-       FROM pro_company_group_invitations i
-       JOIN pro_company_groups g ON g.id = i.group_id
-       JOIN users u ON u.id = g.owner_user_id
-       WHERE i.token_hash = ? AND i.statut = 'envoyee' AND i.expire_at > NOW()
-       LIMIT 1 FOR UPDATE`,
+      "SELECT i.id, i.group_id, i.invited_email, i.statut, i.expire_at, g.owner_user_id, g.nom AS group_name, u.plan AS owner_plan\n" +
+      "FROM pro_company_group_invitations i JOIN pro_company_groups g ON g.id = i.group_id JOIN users u ON u.id = g.owner_user_id\n" +
+      "WHERE i.token_hash = ? AND i.statut = 'envoyee' AND i.expire_at > NOW() LIMIT 1 FOR UPDATE",
       [tokenHash]
     );
     const invite = invites[0];
@@ -1049,7 +1051,7 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Invitation expirée, révoquée ou déjà utilisée.' });
     }
-    if (String(invite.invited_email).toLowerCase() !== String(req.user.email).toLowerCase()) {
+    if (String(invite.invited_email).toLowerCase() !== String(currentAccount.email).toLowerCase()) {
       await conn.rollback();
       return res.status(403).json({ error: 'Connectez-vous avec l’adresse email qui a reçu cette invitation.' });
     }
@@ -1069,10 +1071,168 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
       await conn.rollback();
       return res.status(409).json({ error: 'Cette société est déjà rattachée à un groupe.' });
     }
-    const [company] = await conn.query('SELECT id FROM users WHERE id = ? LIMIT 1', [actor(req)]);
-    if (!company.length) {
+
+    const [[existingProof]] = await conn.query(
+      "SELECT id, used_at, (expires_at > NOW()) AS is_active, (sent_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE)) AS recently_sent " +
+      "FROM pro_company_group_invitation_verifications WHERE invitation_id = ? LIMIT 1 FOR UPDATE",
+      [invite.id]
+    );
+    if (existingProof && !existingProof.used_at && Number(existingProof.is_active) === 1 &&
+        Number(existingProof.recently_sent) === 1) {
+      const [[outbox]] = await conn.query(
+        "SELECT statut FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ? LIMIT 1",
+        [existingProof.id]
+      );
+      await conn.commit();
+      res.set('Cache-Control', 'no-store, private');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      return res.status(202).json({
+        verification_required: true,
+        email_en_file: true,
+        email_statut: outbox?.statut || 'queued',
+        message: 'Un lien de vérification a déjà été demandé récemment. Consultez la boîte de réception de l’adresse invitée avant de demander un nouvel envoi.'
+      });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    const expires = new Date(Date.now() + 20 * 60 * 1000);
+    await conn.query(
+      "INSERT INTO pro_company_group_invitation_verifications (invitation_id, company_owner_id, token_hash, expires_at, sent_at, used_at) " +
+      "VALUES (?, ?, ?, ?, NOW(), NULL) ON DUPLICATE KEY UPDATE company_owner_id = VALUES(company_owner_id), " +
+      "token_hash = VALUES(token_hash), expires_at = VALUES(expires_at), sent_at = NOW(), used_at = NULL",
+      [invite.id, actor(req), verificationHash, expires]
+    );
+    const [[proof]] = await conn.query(
+      'SELECT id FROM pro_company_group_invitation_verifications WHERE invitation_id = ? LIMIT 1',
+      [invite.id]
+    );
+    const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
+    const verificationUrl = base + '/invitation.html?type=company-group#token=' +
+      encodeURIComponent(token) + '&verification_token=' + encodeURIComponent(verificationToken);
+    const subject = 'Confirmez votre adresse email pour rejoindre le groupe SamaFacture Pro';
+    const text = 'Une demande a été faite pour rattacher votre société au groupe « ' + invite.group_name +
+      ' ». Pour confirmer que vous contrôlez cette adresse email et autoriser le rattachement, ouvrez ce lien valable 20 minutes : ' +
+      verificationUrl + '\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message. Votre société ne sera pas rattachée sans cette confirmation.';
+    const payloadEnc = encryptEmailPayload({
+      to: invite.invited_email,
+      subject,
+      text,
+      verification_url: verificationUrl
+    });
+    const idempotencyKey = crypto.createHash('sha256')
+      .update('company-group-invitation-verification:' + proof.id)
+      .digest('hex');
+    await conn.query(
+      "INSERT INTO email_outbox (owner_user_id, entity_type, entity_id, idempotency_key, payload_enc, statut, tentatives, prochaine_tentative) " +
+      "VALUES (?, 'company_group_invitation_verification', ?, ?, ?, 'queued', 0, NOW()) " +
+      "ON DUPLICATE KEY UPDATE payload_enc = VALUES(payload_enc), statut = 'queued', tentatives = 0, " +
+      "prochaine_tentative = NOW(), verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = NULL, envoye_le = NULL, updated_at = NOW()",
+      [invite.owner_user_id, proof.id, idempotencyKey, payloadEnc]
+    );
+    await conn.commit();
+
+    await audit(req, 'groupe.societes.verification_email_demandee', 'invitation_groupe', invite.id, {
+      company_owner_id: actor(req)
+    });
+    res.set('Cache-Control', 'no-store, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    return res.status(202).json({
+      verification_required: true,
+      email_en_file: true,
+      email_statut: 'queued',
+      message: 'Un lien de confirmation a été placé dans la file d’envoi sécurisée à l’adresse invitée. Le rattachement ne sera effectué qu’après ouverture de ce lien depuis cette boîte email.'
+    });
+  } catch (err) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Cette société appartient déjà à un groupe.' });
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+router.post('/company-group/invitations/accept/verify', async (req, res, next) => {
+  let conn;
+  try {
+    if (actor(req) !== owner(req) || req.companyMembership) {
+      return res.status(403).json({ error: 'Connectez-vous au compte propriétaire de la société à rattacher.' });
+    }
+    const token = String(req.body.token || '');
+    const verificationToken = String(req.body.verification_token || '');
+    if (!/^[a-f0-9]{64}$/i.test(token) || !/^[a-f0-9]{64}$/i.test(verificationToken)) {
+      return res.status(400).json({ error: 'Lien de vérification invalide.' });
+    }
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const verificationHash = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [[currentAccount]] = await conn.query(
+      'SELECT email FROM users WHERE id = ? LIMIT 1 FOR UPDATE',
+      [actor(req)]
+    );
+    if (!currentAccount?.email) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Le compte connecté doit disposer d’une adresse email.' });
+    }
+    const [invites] = await conn.query(
+      "SELECT i.id, i.group_id, i.invited_email, i.statut, i.expire_at, g.owner_user_id, g.nom AS group_name, u.plan AS owner_plan\n" +
+      "FROM pro_company_group_invitations i JOIN pro_company_groups g ON g.id = i.group_id JOIN users u ON u.id = g.owner_user_id\n" +
+      "WHERE i.token_hash = ? AND i.statut = 'envoyee' AND i.expire_at > NOW() LIMIT 1 FOR UPDATE",
+      [tokenHash]
+    );
+    const invite = invites[0];
+    if (!invite) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Invitation expirée, révoquée ou déjà utilisée.' });
+    }
+    if (String(invite.invited_email).toLowerCase() !== String(currentAccount.email).toLowerCase()) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'Connectez-vous avec le compte associé à l’adresse email invitée.' });
+    }
+    if (!isEnterprisePlan(invite.owner_plan)) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Le compte propriétaire du groupe n’a plus la formule Entreprise active.' });
+    }
+    if (Number(invite.owner_user_id) === actor(req)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'La société principale ne peut pas être ajoutée une seconde fois.' });
+    }
+    const [[alreadyLinked]] = await conn.query(
+      'SELECT id FROM pro_company_group_companies WHERE company_owner_id = ? LIMIT 1 FOR UPDATE',
+      [actor(req)]
+    );
+    if (alreadyLinked) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Cette société est déjà rattachée à un groupe.' });
+    }
+    const [companies] = await conn.query('SELECT id FROM users WHERE id = ? LIMIT 1', [actor(req)]);
+    if (!companies.length) {
       await conn.rollback();
       return res.status(404).json({ error: 'Compte société introuvable.' });
+    }
+    const [proofs] = await conn.query(
+      "SELECT id FROM pro_company_group_invitation_verifications " +
+      "WHERE invitation_id = ? AND company_owner_id = ? AND token_hash = ? AND used_at IS NULL AND expires_at > NOW() " +
+      "LIMIT 1 FOR UPDATE",
+      [invite.id, actor(req), verificationHash]
+    );
+    const proof = proofs[0];
+    if (!proof) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Le lien de confirmation est expiré, invalide ou déjà utilisé. Demandez un nouveau lien depuis l’invitation.' });
+    }
+
+    const [used] = await conn.query(
+      "UPDATE pro_company_group_invitation_verifications SET used_at = NOW() " +
+      "WHERE id = ? AND company_owner_id = ? AND token_hash = ? AND used_at IS NULL AND expires_at > NOW()",
+      [proof.id, actor(req), verificationHash]
+    );
+    if (used.affectedRows !== 1) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Ce lien de confirmation a déjà été utilisé.' });
     }
     await conn.query(
       'INSERT INTO pro_company_group_companies (group_id, company_owner_id, is_primary) VALUES (?, ?, 0)',
@@ -1083,23 +1243,27 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
       [actor(req), invite.id]
     );
     await conn.query(
-      `UPDATE email_outbox
-       SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL,
-           dernier_code_erreur = 'invitation_accepted', updated_at = NOW()
-       WHERE entity_type = 'company_group_invitation' AND entity_id = ?
-         AND statut IN ('queued', 'retry')`,
-      [invite.id]
+      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, " +
+      "dernier_code_erreur = 'invitation_accepted', updated_at = NOW() " +
+      "WHERE entity_type IN ('company_group_invitation', 'company_group_invitation_verification') " +
+      "AND ((entity_type = 'company_group_invitation' AND entity_id = ?) " +
+      "OR (entity_type = 'company_group_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
+      [invite.id, proof.id]
     );
     await conn.query(
       'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [invite.owner_user_id, actor(req), 'groupe.societe.invitation_acceptee', 'societe', String(actor(req)), JSON.stringify({ group_id: invite.group_id, group_name: invite.group_name }), req.ip || null]
+      [invite.owner_user_id, actor(req), 'groupe.societe.invitation_acceptee', 'societe', String(actor(req)), JSON.stringify({ group_id: invite.group_id, group_name: invite.group_name, email_verified: true }), req.ip || null]
     );
     await conn.commit();
+
+    res.set('Cache-Control', 'no-store, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json({
       success: true,
       groupe_id: invite.group_id,
       entreprise_id: Number(invite.owner_user_id),
-      message: 'Votre société a rejoint le groupe. Le propriétaire du groupe peut maintenant ouvrir cet espace avec les droits administrateur.'
+      message: 'Adresse email confirmée. Votre société a rejoint le groupe. Le propriétaire du groupe peut maintenant ouvrir cet espace avec les droits administrateur.'
     });
   } catch (err) {
     if (conn) { try { await conn.rollback(); } catch (_) {} }

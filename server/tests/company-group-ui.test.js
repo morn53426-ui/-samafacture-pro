@@ -9,8 +9,31 @@ const page = fs.readFileSync(
   path.join(__dirname, '..', '..', 'public', 'groupe-entreprise.html'),
   'utf8'
 );
+const invitationPage = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'public', 'invitation.html'),
+  'utf8'
+);
 
 describe('Retour visuel des invitations Entreprise', () => {
+  test('ne termine pas le rattachement d’un groupe avant la preuve email indépendante', () => {
+    assert.match(invitationPage, /verification_required/);
+    assert.match(invitationPage, /Connectez-vous avec l’adresse email/i);
+    assert.match(invitationPage, /confirmation sera envoyée à cette adresse/i);
+  });
+
+  test('préserve les jetons hors des URL pendant la connexion puis les consomme via la route dédiée', () => {
+    assert.ok(invitationPage.includes("new URLSearchParams(location.hash.replace(/^#/,''))"));
+    assert.ok(invitationPage.includes('sessionStorage.setItem(invitationStorageKey,token)'));
+    assert.ok(invitationPage.includes('sessionStorage.setItem(verificationStorageKey,verificationToken)'));
+    assert.ok(invitationPage.includes("groupResumeUrl='invitation.html?type=company-group&resume=1'"));
+    assert.doesNotMatch(invitationPage, /nextParams\.set\('verification_token'/);
+    assert.ok(invitationPage.includes('/pro/company-group/invitations/accept/verify'));
+  });
+  test('ne laisse pas les jetons de vérification dans le referer ou la barre d’adresse après lecture', () => {
+    assert.match(invitationPage, /name="referrer" content="no-referrer"/);
+    assert.match(invitationPage, /history\.replaceState/);
+  });
+
   test('affiche un état email confirmé uniquement lorsque le serveur le confirme', () => {
     assert.match(page, /result\.email_envoye\s*\?/);
     assert.match(page, /Email envoyé et confirmé\./);

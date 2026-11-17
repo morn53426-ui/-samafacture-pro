@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { decryptEmailPayload } = require('../utils/email-outbox-crypto');
 const { dispatchPendingEmails } = require('../email-outbox');
 const {
@@ -23,6 +24,17 @@ let subsidiaryToken;
 let outsiderToken;
 let starterToken;
 let subsidiaryClientId;
+
+function getVerificationTokens(verificationUrl) {
+  const url = new URL(verificationUrl);
+  const fragment = new URLSearchParams(url.hash.replace(/^#/, ''));
+  assert.equal(url.searchParams.has('token'), false, 'le jeton d’invitation ne doit pas être transmis dans la requête GET');
+  assert.equal(url.searchParams.has('verification_token'), false, 'le jeton de preuve ne doit pas être transmis dans la requête GET');
+  return {
+    token: fragment.get('token'),
+    verificationToken: fragment.get('verification_token')
+  };
+}
 
 async function register(prefix, companyName) {
   const response = await request(app)
@@ -85,10 +97,11 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v12 sans perdre les données existantes', async () => {
+test('une base v8 reçoit les migrations v9 à v13 sans perdre les données existantes', async () => {
   // Simule strictement l'état de main : schéma v8 sans colonne/index v9-v10,
-  // ni tables multi-sociétés v11 et outbox v12.
+  // ni tables multi-sociétés v11, outbox v12 et preuve email v13.
   await pool.query('DROP TABLE IF EXISTS email_outbox');
+  await pool.query('DROP TABLE IF EXISTS pro_company_group_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitations');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_companies');
   await pool.query('DROP TABLE IF EXISTS pro_company_groups');
@@ -119,10 +132,10 @@ test('une base v8 reçoit les migrations v9 à v12 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v12 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v13 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 12, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12');
+  assert.equal(Number(meta.version), 13, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12 → v13');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -145,13 +158,13 @@ test('une base v8 reçoit les migrations v9 à v12 sans perdre les données exis
   assert.equal(dueIndexes.length, 1, 'l’index d’échéances actives de la migration v10 doit être créé');
 
   const [tables] = await pool.query(
-    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?)',
-    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations', 'email_outbox']
+    'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?, ?, ?, ?, ?)',
+    ['pro_company_groups', 'pro_company_group_companies', 'pro_company_group_invitations', 'email_outbox', 'pro_company_group_invitation_verifications']
   );
   assert.deepEqual(
     tables.map(row => row.TABLE_NAME).sort(),
-    ['email_outbox', 'pro_company_group_companies', 'pro_company_group_invitations', 'pro_company_groups'],
-    'les tables de groupes v11 et de l’outbox v12 doivent être créées'
+    ['email_outbox', 'pro_company_group_companies', 'pro_company_group_invitation_verifications', 'pro_company_group_invitations', 'pro_company_groups'],
+    'les tables de groupes v11, de l’outbox v12 et de preuve email v13 doivent être créées'
   );
 });
 
@@ -465,9 +478,131 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .send({ token });
   assert.equal(wrongOwner.status, 403);
 
-  // Simule une remise déjà réclamée, mais dont le worker a été interrompu
-  // avant SMTP. L'acceptation ne doit pas falsifier son état en "annulé" :
-  // le worker doit reprendre le bail, constater l'invitation acceptée, puis annuler.
+  // Un JWT conservé après changement d'adresse ne doit pas suffire : l'API relit l'email courant en base.
+  const changedAccountEmail = emailDeTest('group-email-changed');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [changedAccountEmail, subsidiaryOwnerId]);
+  const staleSessionChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token });
+  assert.equal(staleSessionChallenge.status, 403, 'une ancienne adresse présente dans le JWT ne doit pas autoriser une invitation');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [recipient.email, subsidiaryOwnerId]);
+
+  // Le lien d'invitation seul ne suffit plus : une preuve indépendante est envoyée à la boîte invitée.
+  const pendingAcceptance = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token });
+  assert.equal(pendingAcceptance.status, 202, pendingAcceptance.text);
+  assert.equal(pendingAcceptance.body.verification_required, true);
+  assert.match(pendingAcceptance.headers['cache-control'] || '', /no-store/i);
+
+  const [[proofRow]] = await pool.query(
+    'SELECT id, token_hash, expires_at, used_at FROM pro_company_group_invitation_verifications WHERE invitation_id = ?',
+    [invitation.body.id]
+  );
+  assert.ok(proofRow);
+  assert.ok(!proofRow.used_at);
+  const [[proofOutbox]] = await pool.query(
+    "SELECT id, statut, payload_enc FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [proofRow.id]
+  );
+  assert.equal(proofOutbox.statut, 'queued');
+  let proofEmail = decryptEmailPayload(proofOutbox.payload_enc);
+  assert.equal(proofEmail.to, recipient.email);
+  const verificationTokens = getVerificationTokens(proofEmail.verification_url);
+  assert.equal(verificationTokens.token, token, 'le jeton d’invitation est conservé dans le fragment');
+  let verificationToken = verificationTokens.verificationToken;
+  assert.match(verificationToken || '', /^[a-f0-9]{64}$/i);
+  assert.equal(proofRow.token_hash, crypto.createHash('sha256').update(verificationToken).digest('hex'), 'la base doit stocker le SHA-256 du jeton, jamais sa valeur brute');
+  assert.doesNotMatch(proofOutbox.payload_enc, new RegExp(verificationToken));
+
+  const [[membershipBeforeProof]] = await pool.query(
+    'SELECT id FROM pro_company_group_companies WHERE company_owner_id = ?',
+    [subsidiaryOwnerId]
+  );
+  assert.equal(membershipBeforeProof, undefined, 'aucun rattachement ne doit exister avant la preuve email');
+
+  const wrongProof = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token, verification_token: '0'.repeat(64) });
+  assert.equal(wrongProof.status, 404);
+
+  const cooldown = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token });
+  assert.equal(cooldown.status, 202);
+  const [[proofOutboxCount]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [proofRow.id]
+  );
+  assert.equal(Number(proofOutboxCount.total), 1, 'un nouvel email ne doit pas être créé pendant le délai anti-abus');
+
+  // Après le délai anti-abus, un nouveau lien remplace l'ancien sans créer de doublon d'outbox.
+  const originalProofHash = proofRow.token_hash;
+  await pool.query(
+    'UPDATE pro_company_group_invitation_verifications SET sent_at = DATE_SUB(NOW(), INTERVAL 2 MINUTE) WHERE id = ?',
+    [proofRow.id]
+  );
+  const resentChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token });
+  assert.equal(resentChallenge.status, 202, resentChallenge.text);
+  const [[rotatedProof]] = await pool.query(
+    'SELECT token_hash FROM pro_company_group_invitation_verifications WHERE id = ?',
+    [proofRow.id]
+  );
+  assert.notEqual(rotatedProof.token_hash, originalProofHash, 'le renvoi doit invalider le précédent jeton');
+  const [[rotatedOutbox]] = await pool.query(
+    "SELECT id, payload_enc FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [proofRow.id]
+  );
+  assert.equal(rotatedOutbox.id, proofOutbox.id, 'le renvoi doit réutiliser la ligne outbox de l’invitation');
+  proofEmail = decryptEmailPayload(rotatedOutbox.payload_enc);
+  const rotatedVerificationToken = getVerificationTokens(proofEmail.verification_url).verificationToken;
+  assert.match(rotatedVerificationToken || '', /^[a-f0-9]{64}$/i);
+  assert.notEqual(rotatedVerificationToken, verificationToken);
+  const oldProofReplay = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(oldProofReplay.status, 404);
+  verificationToken = rotatedVerificationToken;
+
+  let deliveredVerificationPayload;
+  const verificationDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async payload => {
+      deliveredVerificationPayload = payload;
+      return { sent: true };
+    }
+  });
+  assert.deepEqual(verificationDelivery, { claimed: 1, sent: 1, retried: 0, failed: 0, cancelled: 0 });
+  assert.equal(deliveredVerificationPayload.to, recipient.email);
+  assert.equal(deliveredVerificationPayload.verification_url, proofEmail.verification_url);
+  const [[proofSent]] = await pool.query('SELECT statut FROM email_outbox WHERE id = ?', [proofOutbox.id]);
+  assert.equal(proofSent.statut, 'sent');
+
+  const wrongAccountProof = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + outsiderToken)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(wrongAccountProof.status, 403);
+
+  // Un changement d'adresse après l'envoi invalide aussi un JWT encore signé avec l'ancienne adresse.
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [changedAccountEmail, subsidiaryOwnerId]);
+  const staleSessionProof = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(staleSessionProof.status, 403, 'une preuve email ne doit pas rattacher un compte qui a changé d’adresse');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [recipient.email, subsidiaryOwnerId]);
+
+  // Simule une remise initiale déjà réclamée puis interrompue. Après acceptation vérifiée,
+  // le worker doit reprendre le bail, constater l'invitation acceptée et annuler l'ancien email.
   await pool.query(
     `UPDATE email_outbox
      SET statut = 'processing',
@@ -478,16 +613,30 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   );
 
   const accepted = await request(app)
-    .post('/api/pro/company-group/invitations/accept')
+    .post('/api/pro/company-group/invitations/accept/verify')
     .set('Authorization', 'Bearer ' + subsidiaryToken)
-    .send({ token });
+    .send({ token, verification_token: verificationToken });
   assert.equal(accepted.status, 200, accepted.text);
   assert.equal(accepted.body.groupe_id, created.body.id);
+  assert.match(accepted.body.message, /Adresse email confirmée/i);
+
+  const replay = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + subsidiaryToken)
+    .send({ token, verification_token: verificationToken });
+  assert.equal(replay.status, 404, 'une preuve consommée ne doit jamais être réutilisable');
+
+  const [[proofUsed]] = await pool.query(
+    'SELECT used_at FROM pro_company_group_invitation_verifications WHERE id = ?',
+    [proofRow.id]
+  );
+  assert.ok(proofUsed.used_at, 'la preuve doit être consommée au moment du rattachement');
+
   const [[outboxAfterAcceptance]] = await pool.query(
     'SELECT statut FROM email_outbox WHERE id = ?',
     [queuedEmail.id]
   );
-  assert.equal(outboxAfterAcceptance.statut, 'processing', 'l’API ne doit pas annuler une remise SMTP déjà réclamée');
+  assert.equal(outboxAfterAcceptance.statut, 'processing', 'l’API ne doit pas falsifier une remise SMTP déjà réclamée');
 
   let acceptedInvitationEmailSent = false;
   const acceptedInvitationDelivery = await dispatchPendingEmails({
@@ -500,7 +649,7 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.deepEqual(acceptedInvitationDelivery, {
     claimed: 1, sent: 0, retried: 0, failed: 0, cancelled: 1
   });
-  assert.equal(acceptedInvitationEmailSent, false, 'le worker ne doit pas transmettre un lien déjà accepté');
+  assert.equal(acceptedInvitationEmailSent, false, 'le worker ne doit pas transmettre un lien d’invitation déjà accepté');
   const [[acceptedOutbox]] = await pool.query(
     'SELECT statut, dernier_code_erreur FROM email_outbox WHERE id = ?',
     [queuedEmail.id]
@@ -568,6 +717,81 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   ]);
   assert.match(dashboard.body.note, /aucune conversion de change/i);
 
+  // Un jeton expiré doit être rejeté par l'API et par le worker email.
+  const [[starterRecipient]] = await pool.query('SELECT email FROM users WHERE id = ?', [starterId]);
+  const expiryInvitation = await request(app)
+    .post('/api/pro/company-group/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: starterRecipient.email });
+  assert.equal(expiryInvitation.status, 201, expiryInvitation.text);
+  const expiryInviteToken = new URL(expiryInvitation.body.invitation_url).searchParams.get('token');
+  const expiryChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + starterToken)
+    .send({ token: expiryInviteToken });
+  assert.equal(expiryChallenge.status, 202, expiryChallenge.text);
+  const [[expiryProof]] = await pool.query(
+    'SELECT id FROM pro_company_group_invitation_verifications WHERE invitation_id = ?',
+    [expiryInvitation.body.id]
+  );
+  const [[expiryProofOutbox]] = await pool.query(
+    "SELECT id, payload_enc FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [expiryProof.id]
+  );
+  const expiryProofEmail = decryptEmailPayload(expiryProofOutbox.payload_enc);
+  const expiryVerificationToken = getVerificationTokens(expiryProofEmail.verification_url).verificationToken;
+  await pool.query(
+    'UPDATE email_outbox SET statut = \'sent\' WHERE entity_type = ? AND entity_id = ?',
+    ['company_group_invitation', expiryInvitation.body.id]
+  );
+  await pool.query(
+    'UPDATE pro_company_group_invitation_verifications SET expires_at = DATE_SUB(NOW(), INTERVAL 1 SECOND) WHERE id = ?',
+    [expiryProof.id]
+  );
+  const expiredProof = await request(app)
+    .post('/api/pro/company-group/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + starterToken)
+    .send({ token: expiryInviteToken, verification_token: expiryVerificationToken });
+  assert.equal(expiredProof.status, 404, 'un jeton expiré ne doit pas rattacher la société');
+  const expiredProofDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async () => ({ sent: true })
+  });
+  assert.deepEqual(expiredProofDelivery, { claimed: 1, sent: 0, retried: 0, failed: 0, cancelled: 1 });
+  const [[expiredProofOutboxState]] = await pool.query(
+    'SELECT statut FROM email_outbox WHERE id = ?',
+    [expiryProofOutbox.id]
+  );
+  assert.equal(expiredProofOutboxState.statut, 'cancelled');
+
+  // Le worker ne doit pas envoyer une preuve à l'ancienne adresse après un changement de compte.
+  const freshChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + starterToken)
+    .send({ token: expiryInviteToken });
+  assert.equal(freshChallenge.status, 202, freshChallenge.text);
+  const [[freshProof]] = await pool.query(
+    'SELECT id FROM pro_company_group_invitation_verifications WHERE invitation_id = ?',
+    [expiryInvitation.body.id]
+  );
+  const [[freshProofOutbox]] = await pool.query(
+    "SELECT id FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [freshProof.id]
+  );
+  const changedStarterEmail = emailDeTest('group-starter-email-changed');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [changedStarterEmail, starterId]);
+  const changedAddressDelivery = await dispatchPendingEmails({
+    batchSize: 1,
+    sender: async () => ({ sent: true })
+  });
+  assert.deepEqual(changedAddressDelivery, { claimed: 1, sent: 0, retried: 0, failed: 0, cancelled: 1 });
+  const [[changedAddressOutbox]] = await pool.query(
+    'SELECT statut FROM email_outbox WHERE id = ?',
+    [freshProofOutbox.id]
+  );
+  assert.equal(changedAddressOutbox.statut, 'cancelled');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [starterRecipient.email, starterId]);
+
   const [[outsiderRecipient]] = await pool.query('SELECT email FROM users WHERE id = ?', [outsiderId]);
   const secondInvitation = await request(app)
     .post('/api/pro/company-group/invitations')
@@ -607,6 +831,54 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
     .set('Authorization', 'Bearer ' + groupOwnerToken);
   assert.equal(groupAfterLeave.status, 200);
   assert.equal(groupAfterLeave.body.societes.length, 1);
+
+  // Deux confirmations simultanées avec le même jeton ne doivent créer qu'un seul rattachement.
+  const concurrentInvitation = await request(app)
+    .post('/api/pro/company-group/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: outsider.email });
+  assert.equal(concurrentInvitation.status, 201, concurrentInvitation.text);
+  const concurrentInviteToken = new URL(concurrentInvitation.body.invitation_url).searchParams.get('token');
+  const concurrentChallenge = await request(app)
+    .post('/api/pro/company-group/invitations/accept')
+    .set('Authorization', 'Bearer ' + outsiderToken)
+    .send({ token: concurrentInviteToken });
+  assert.equal(concurrentChallenge.status, 202, concurrentChallenge.text);
+  const [[concurrentProof]] = await pool.query(
+    'SELECT id FROM pro_company_group_invitation_verifications WHERE invitation_id = ?',
+    [concurrentInvitation.body.id]
+  );
+  const [[concurrentOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'company_group_invitation_verification' AND entity_id = ?",
+    [concurrentProof.id]
+  );
+  const concurrentVerificationTokens = getVerificationTokens(decryptEmailPayload(concurrentOutbox.payload_enc).verification_url);
+  const concurrentVerificationToken = concurrentVerificationTokens.verificationToken;
+  assert.match(concurrentVerificationToken || '', /^[a-f0-9]{64}$/i);
+  const concurrentAcceptances = await Promise.all([
+    request(app)
+      .post('/api/pro/company-group/invitations/accept/verify')
+      .set('Authorization', 'Bearer ' + outsiderToken)
+      .send({ token: concurrentInviteToken, verification_token: concurrentVerificationToken }),
+    request(app)
+      .post('/api/pro/company-group/invitations/accept/verify')
+      .set('Authorization', 'Bearer ' + outsiderToken)
+      .send({ token: concurrentInviteToken, verification_token: concurrentVerificationToken })
+  ]);
+  assert.deepEqual(
+    concurrentAcceptances.map(result => result.status).sort((a, b) => a - b),
+    [200, 404],
+    'une seule requête concurrente peut accepter et consommer le jeton'
+  );
+  const [[concurrentMembershipCount]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_company_group_companies WHERE company_owner_id = ?',
+    [outsiderId]
+  );
+  assert.equal(Number(concurrentMembershipCount.total), 1, 'une seule ligne de rattachement doit exister');
+  const leaveConcurrent = await request(app)
+    .delete('/api/pro/company-group/leave')
+    .set('Authorization', 'Bearer ' + outsiderToken);
+  assert.equal(leaveConcurrent.status, 200, leaveConcurrent.text);
 });
 
 after(async () => {

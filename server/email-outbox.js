@@ -61,16 +61,50 @@ async function claimPendingEmails(batchSize = DEFAULT_BATCH_SIZE) {
   }
 }
 
-async function isEmailJobDeliverable(job) {
-  if (job.entity_type !== 'company_group_invitation') return true;
-  const [[invitation]] = await pool.query(
-    `SELECT id
-     FROM pro_company_group_invitations
-     WHERE id = ? AND statut = 'envoyee' AND expire_at > NOW()
-     LIMIT 1`,
-    [job.entity_id]
-  );
-  return Boolean(invitation);
+function extractEmailVerificationToken(verificationUrl) {
+  try {
+    const url = new URL(String(verificationUrl || ''));
+    const fragment = new URLSearchParams(url.hash.replace(/^#/, ''));
+    // Le fragment est utilisé pour les nouveaux liens : il n'est jamais envoyé dans le GET.
+    // La query string reste lue temporairement pour les emails plus anciens encore valides.
+    return fragment.get('verification_token') || url.searchParams.get('verification_token') || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+async function isEmailJobDeliverable(job, message) {
+  if (job.entity_type === 'company_group_invitation') {
+    const [[invitation]] = await pool.query(
+      `SELECT id
+       FROM pro_company_group_invitations
+       WHERE id = ? AND statut = 'envoyee' AND expire_at > NOW()
+       LIMIT 1`,
+      [job.entity_id]
+    );
+    return Boolean(invitation);
+  }
+
+  if (job.entity_type === 'company_group_invitation_verification') {
+    const proofToken = extractEmailVerificationToken(message?.verification_url);
+    if (!/^[a-f0-9]{64}$/i.test(proofToken)) return false;
+    const proofHash = crypto.createHash('sha256').update(proofToken).digest('hex');
+    const [[verification]] = await pool.query(
+      `SELECT v.id
+       FROM pro_company_group_invitation_verifications v
+       JOIN pro_company_group_invitations i ON i.id = v.invitation_id
+       JOIN users account ON account.id = v.company_owner_id
+       WHERE v.id = ? AND v.token_hash = ?
+         AND v.used_at IS NULL AND v.expires_at > NOW()
+         AND i.statut = 'envoyee' AND i.expire_at > NOW()
+         AND LOWER(account.email) = LOWER(i.invited_email)
+       LIMIT 1`,
+      [job.entity_id, proofHash]
+    );
+    return Boolean(verification);
+  }
+
+  return true;
 }
 
 async function markEmailCancelled(job) {
@@ -136,7 +170,12 @@ async function dispatchPendingEmails({ sender = sendMail, batchSize = DEFAULT_BA
 
   for (const job of jobs) {
     try {
-      if (!await isEmailJobDeliverable(job)) {
+      // Déchiffre d'abord les preuves afin de lier la tâche à la version courante du jeton.
+      // Un ancien email repris après une demande de renvoi ne doit pas livrer un lien déjà remplacé.
+      const message = job.entity_type === 'company_group_invitation_verification'
+        ? decryptEmailPayload(job.payload_enc)
+        : null;
+      if (!await isEmailJobDeliverable(job, message)) {
         await markEmailCancelled(job);
         summary.cancelled += 1;
         continue;
@@ -153,8 +192,8 @@ async function dispatchPendingEmails({ sender = sendMail, batchSize = DEFAULT_BA
         console.warn('Email outbox #' + job.id + ' abandonné : ' + exhausted.code);
         continue;
       }
-      const message = decryptEmailPayload(job.payload_enc);
-      const result = await sender(message);
+      const deliveryMessage = message || decryptEmailPayload(job.payload_enc);
+      const result = await sender(deliveryMessage);
       if (!result || result.sent !== true) {
         const error = new Error('Email delivery was not confirmed.');
         error.code = result?.reason || 'email_not_confirmed';
@@ -226,6 +265,7 @@ module.exports = {
   RETRY_DELAYS_SECONDS,
   retryDelaySeconds,
   safeErrorCode,
+  extractEmailVerificationToken,
   claimPendingEmails,
   isEmailJobDeliverable,
   markEmailCancelled,
