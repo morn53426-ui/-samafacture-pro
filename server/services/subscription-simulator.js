@@ -73,9 +73,25 @@ function parseInstant(value, fieldName) {
     if (Number.isNaN(value.getTime())) throw new TypeError(fieldName + ' invalide.');
     return value;
   }
-  if (typeof value !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
+  const match = typeof value === 'string'
+    ? value.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})$/)
+    : null;
+  if (!match) {
     throw new TypeError(fieldName + ' doit inclure un fuseau explicite (Z ou ±HH:MM).');
+  }
+  parseCivilDate(match[1]);
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  const second = Number(match[4]);
+  if (hour > 23 || minute > 59 || second > 59) {
+    throw new TypeError(fieldName + ' contient une heure invalide.');
+  }
+  if (match[6] !== 'Z') {
+    const offsetHour = Number(match[6].slice(1, 3));
+    const offsetMinute = Number(match[6].slice(4, 6));
+    if (offsetHour > 23 || offsetMinute > 59) {
+      throw new TypeError(fieldName + ' contient un décalage horaire invalide.');
+    }
   }
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) throw new TypeError(fieldName + ' invalide.');
