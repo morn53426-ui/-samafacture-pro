@@ -52,3 +52,26 @@
     min-height:42px;white-space:normal
   }
 }
+
+
+/* Fenêtres de gestion : lisibilité, clavier et affichage sur petits écrans. */
+body.workspace-modal-open{overflow:hidden}
+[data-workspace-modal]{padding:12px;overscroll-behavior:contain}
+.workspace-modal-panel{
+  box-sizing:border-box;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;outline:none
+}
+.workspace-modal-panel:focus-visible{outline:2px solid var(--emerald);outline-offset:2px}
+.workspace-modal-panel .workspace-modal-actions{flex-wrap:wrap;align-items:center;margin-top:18px}
+.workspace-modal-fields{flex-wrap:wrap}
+.workspace-modal-fields>.field{min-width:min(190px,100%)}
+.workspace-modal-panel .field label{display:block}
+.workspace-modal-panel :is(input,select,textarea){box-sizing:border-box;min-width:0}
+@media(max-width:560px){
+  [data-workspace-modal]{padding:10px}
+  .workspace-modal-panel{width:100%!important;max-width:100%!important;max-height:calc(100dvh - 20px);padding:18px!important;margin:0;border-radius:16px}
+  .workspace-modal-fields{flex-direction:column;gap:0!important}
+  .workspace-modal-fields>.field{width:100%;min-width:0}
+  .workspace-modal-panel .workspace-modal-actions{display:flex;flex-direction:column-reverse;align-items:stretch}
+  .workspace-modal-panel .workspace-modal-actions>.btn{width:100%;justify-content:center}
+}

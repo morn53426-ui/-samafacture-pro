@@ -54,20 +54,20 @@
 </div>
 
 <!-- Modal client -->
-<div id="modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
-  <div class="card" style="width:440px; max-width:92vw;">
+<div id="modal" data-workspace-modal role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card workspace-modal-panel" tabindex="-1" style="width:440px; max-width:92vw;">
     <h3 id="modal-title">Nouveau client</h3>
-    <div id="modal-error"></div>
+    <div id="modal-error" role="alert" aria-live="assertive"></div>
     <form id="client-form">
       <input type="hidden" id="client-id" />
-      <div class="field"><label>Nom du client *</label><input type="text" id="nom" required /></div>
-      <div class="field"><label>Téléphone</label><input type="tel" id="telephone" placeholder="+221 77 000 00 00" /></div>
-      <div class="field"><label>WhatsApp</label><input type="tel" id="whatsapp" /></div>
-      <div class="field"><label>Email</label><input type="email" id="email" /></div>
-      <div class="field"><label>Adresse</label><input type="text" id="adresse" /></div>
-      <div class="field"><label>Notes</label><textarea id="notes"></textarea></div>
-      <div style="display:flex; gap:10px; justify-content:flex-end;">
-        <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
+      <div class="field"><label for="nom">Nom du client *</label><input type="text" id="nom" required /></div>
+      <div class="field"><label for="telephone">Téléphone</label><input type="tel" id="telephone" placeholder="+221 77 000 00 00" /></div>
+      <div class="field"><label for="whatsapp">WhatsApp</label><input type="tel" id="whatsapp" /></div>
+      <div class="field"><label for="email">Email</label><input type="email" id="email" /></div>
+      <div class="field"><label for="adresse">Adresse</label><input type="text" id="adresse" /></div>
+      <div class="field"><label for="notes">Notes</label><textarea id="notes"></textarea></div>
+      <div class="workspace-modal-actions" style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" data-modal-close onclick="closeModal()">Annuler</button>
         <button type="submit" class="btn btn-primary">Enregistrer</button>
       </div>
     </form>
@@ -77,6 +77,7 @@
 <script src="js/api.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/sidebar.js"></script>
+<script src="js/workspace-modals.js"></script>
 <script>
   requireAuthPage();
   renderSidebar('clients');

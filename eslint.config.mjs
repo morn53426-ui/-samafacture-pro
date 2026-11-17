@@ -52,7 +52,7 @@ export default [
     rules: correctnessRules
   },
   {
-    files: ['public/js/sidebar.js'],
+    files: ['public/js/sidebar.js', 'public/js/workspace-modals.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'script',
@@ -63,7 +63,8 @@ export default [
   {
     files: [
       'server/tests/visual/recette-visuelle.js',
-      'server/tests/workspace-navigation.test.js'
+      'server/tests/workspace-navigation.test.js',
+      'server/tests/workspace-modal-accessibility.test.js'
     ],
     languageOptions: {
       ecmaVersion: 'latest',

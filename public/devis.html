@@ -43,15 +43,15 @@
   </main>
 </div>
 
-<div id="send-modal" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
-  <div class="card" style="width:400px; max-width:92vw;">
-    <h3>Envoyer par email</h3>
-    <div id="send-error"></div>
+<div id="send-modal" data-workspace-modal role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="send-modal-title" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card workspace-modal-panel" tabindex="-1" style="width:400px; max-width:92vw;">
+    <h3 id="send-modal-title">Envoyer par email</h3>
+    <div id="send-error" role="alert" aria-live="assertive"></div>
     <form id="send-form">
       <input type="hidden" id="send-facture-id" />
-      <div class="field"><label>Adresse email du client *</label><input type="email" id="send-email" required /></div>
-      <div style="display:flex; gap:10px; justify-content:flex-end;">
-        <button type="button" class="btn btn-outline" onclick="closeSendModal()">Annuler</button>
+      <div class="field"><label for="send-email">Adresse email du client *</label><input type="email" id="send-email" required /></div>
+      <div class="workspace-modal-actions" style="display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline" data-modal-close onclick="closeSendModal()">Annuler</button>
         <button type="submit" class="btn btn-primary">Envoyer</button>
       </div>
     </form>
@@ -62,6 +62,7 @@
 <script src="js/whatsapp-share.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/sidebar.js"></script>
+<script src="js/workspace-modals.js"></script>
 <script>
   requireAuthPage();
   renderSidebar('devis');
