@@ -1021,8 +1021,8 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   if (pageDefinition.name === 'parametres') {
     const gallery = metrics.invoiceTemplateGallery;
     assert.equal(gallery?.found, true, 'La galerie de modèles doit être présente dans les paramètres.');
-    assert.equal(gallery.count, 24, 'Les 24 modèles de facture doivent être visibles.');
-    assert.equal(gallery.triggers, 24, 'Chaque modèle doit proposer un aperçu A4 cliquable.');
+    assert.equal(gallery.count, 31, 'Les 31 modèles de facture doivent être visibles.');
+    assert.equal(gallery.triggers, 31, 'Chaque modèle doit proposer un aperçu A4 cliquable.');
     assert.ok(gallery.left >= -1 && gallery.right <= metrics.viewport + 1,
       'La galerie des modèles ne doit pas déborder de l’écran : ' + JSON.stringify(gallery));
     if (viewport.width <= 640) {

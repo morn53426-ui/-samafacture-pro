@@ -18,7 +18,8 @@ const TEMPLATES_ATTENDUS = [
   'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
   'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
   'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs',
-  'nova', 'nordique', 'luxe', 'tech', 'horizon'
+  'nova', 'nordique', 'luxe', 'tech', 'horizon',
+  'eclipse', 'saphir', 'conseil', 'imperial', 'panorama', 'groupe', 'majeste'
 ];
 
 describe('Galerie de sélection des modèles (public/parametres.html)', () => {
@@ -31,7 +32,7 @@ describe('Galerie de sélection des modèles (public/parametres.html)', () => {
     }
   });
 
-  test('présente les vingt-quatre rendus réels et affiche clairement les restrictions de formule', () => {
+  test('présente les trente et un rendus réels et affiche clairement les restrictions de formule', () => {
     const settingsPath = path.resolve(__dirname, '../../public/parametres.html');
     const source = fs.readFileSync(settingsPath, 'utf8');
     const declaration = source.match(/const INVOICE_TEMPLATE_META = \[([\s\S]*?)\n  \];/);
@@ -39,7 +40,7 @@ describe('Galerie de sélection des modèles (public/parametres.html)', () => {
     assert.ok(declaration, 'La page Paramètres doit déclarer son catalogue visuel de modèles.');
     const galleryIds = Array.from(declaration[1].matchAll(/id: '([^']+)'/g), match => match[1]);
     assert.deepEqual([...galleryIds].sort(), [...TEMPLATES_ATTENDUS].sort(),
-      'La galerie doit rester synchronisée avec les vingt-quatre modèles rendus par le moteur.');
+      'La galerie doit rester synchronisée avec les trente et un modèles rendus par le moteur.');
 
     assert.match(source, /id="invoice-template-gallery"/,
       'La page doit offrir une zone de galerie dédiée.');
@@ -51,9 +52,17 @@ describe('Galerie de sélection des modèles (public/parametres.html)', () => {
       'Un modèle disponible doit pouvoir être sélectionné depuis sa vignette.');
     assert.match(source, /aria-pressed/,
       'La sélection doit être annoncée correctement aux technologies d’assistance.');
-    assert.match(source, /PRO_TEMPLATE_IDS = new Set\(\['elegant', 'corporate', 'creatif'\]\)/,
+    for (const id of ['eclipse', 'saphir', 'conseil']) {
+      assert.match(source, new RegExp("id: '" + id + "'[^\\n]*tier: 'pro'"), id + ' doit être réservé au plan Pro');
+      assert.ok(source.includes('<option value="' + id + '">'), id + ' doit être présent dans le sélecteur natif');
+    }
+    for (const id of ['imperial', 'panorama', 'groupe', 'majeste']) {
+      assert.match(source, new RegExp("id: '" + id + "'[^\\n]*tier: 'enterprise'"), id + ' doit être réservé au plan Entreprise');
+      assert.ok(source.includes('<option value="' + id + '">'), id + ' doit être présent dans le sélecteur natif');
+    }
+    assert.match(source, /PRO_TEMPLATE_IDS = new Set\(\['elegant', 'corporate', 'creatif', 'eclipse', 'saphir', 'conseil'\]\)/,
       'Les modèles Pro doivent être clairement identifiés comme réservés au plan Pro.');
-    assert.match(source, /ENTERPRISE_TEMPLATE_IDS = new Set\(\['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide'\]\)/,
+    assert.match(source, /ENTERPRISE_TEMPLATE_IDS = new Set\(\['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide', 'imperial', 'panorama', 'groupe', 'majeste'\]\)/,
       'Les modèles Entreprise doivent être clairement identifiés comme réservés au plan Entreprise.');
     assert.match(source, /invoice-template-native-select/,
       'La valeur choisie dans la galerie doit rester synchronisée avec le champ enregistré.');
@@ -220,7 +229,7 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     assert.doesNotMatch(html, /undefined|NaN/);
   });
 
-  test('les vingt-quatre modèles distinguent le prix HT, le total TTC et le solde de facture', () => {
+  test('les trente et un modèles distinguent le prix HT, le total TTC et le solde de facture', () => {
     for (const template of TEMPLATES_ATTENDUS) {
       const html = templates.renderInvoiceHtml({
         user: userDeTest(), facture: factureDeTest({ montant_paye: 25000 }), lignes: lignesDeTest,
@@ -239,7 +248,7 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     }
   });
 
-  test('les vingt-quatre modèles identifient clairement les dates de facture', () => {
+  test('les trente et un modèles identifient clairement les dates de facture', () => {
     for (const template of TEMPLATES_ATTENDUS) {
       const html = templates.renderInvoiceHtml({
         user: userDeTest(),

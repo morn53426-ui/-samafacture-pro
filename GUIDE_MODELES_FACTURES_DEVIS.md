@@ -56,9 +56,9 @@ Cette zone est une zone d'acceptation à compléter par le client. Elle ne const
 
 Les ajouts sont communs aux 24 thèmes : Classique, Moderne, Minimaliste, Élégant, Corporate, Créatif, Prestige, Héritage, Diamant, Exécutif, Institution, Signature, Consolidé, Épuré, Azur, Circuit, Platine, Atelier, Saveurs, Nova, Nordique, Luxe, Tech et Horizon. Les cinq nouveaux modèles (Nova, Nordique, Luxe, Tech et Horizon) sont disponibles sur tous les plans.
 
-Les huit modèles Entreprise exclusifs sont Prestige, Héritage, Diamant, Platine, Exécutif, Institution, Signature et Consolidé. Ils apparaissent dans la galerie pour comparaison, mais ne peuvent être sélectionnés et enregistrés que par un compte au plan Entreprise.
+Les douze modèles Entreprise exclusifs sont Prestige, Héritage, Diamant, Platine, Exécutif, Institution, Signature, Consolidé, Impérial, Panorama, Groupe et Majesté. Ils apparaissent dans la galerie pour comparaison, mais ne peuvent être sélectionnés et enregistrés que par un compte au plan Entreprise.
 
-Les préférences de thème, couleurs, polices et logo déjà configurées restent prises en charge. Les données utilisateur sont échappées avant leur insertion dans le HTML.
+Les six modèles Pro sont Élégant, Corporate, Créatif, Éclipse, Saphir et Conseil ; ils sont sélectionnables avec un abonnement Pro ou Entreprise. Les préférences de thème, couleurs, polices et logo déjà configurées restent prises en charge. Les données utilisateur sont échappées avant leur insertion dans le HTML.
 
 ## 6. Mise à niveau de la base
 

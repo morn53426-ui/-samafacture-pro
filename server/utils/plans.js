@@ -5,12 +5,12 @@ const FREE_MONTHLY_INVOICE_LIMIT = 10;
 
 // Modèles de facture réservés au plan Pro (et Entreprise) — les autres sont disponibles
 // pour tous les plans, y compris Gratuit.
-const PRO_TEMPLATES = ['elegant', 'corporate', 'creatif'];
+const PRO_TEMPLATES = ['elegant', 'corporate', 'creatif', 'eclipse', 'saphir', 'conseil'];
 
 // Modèles réservés exclusivement au plan Entreprise (Pro n'y a pas accès, contrairement à
 // PRO_TEMPLATES ci-dessus qui est partagé par Pro et Entreprise) — avantage propre au plan
 // le plus élevé plutôt qu'un simple palier supplémentaire du plan Pro.
-const ENTERPRISE_TEMPLATES = ['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide'];
+const ENTERPRISE_TEMPLATES = ['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide', 'imperial', 'panorama', 'groupe', 'majeste'];
 
 /** Un plan payant quel qu'il soit (débloque les factures illimitées). */
 function isPaidPlan(plan) {
