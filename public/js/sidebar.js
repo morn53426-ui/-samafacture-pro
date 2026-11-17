@@ -62,10 +62,12 @@ function renderSidebar(activePage) {
   document.body.classList.toggle('enterprise-console-shell', isEnterpriseConsole);
   // Le centre de pilotage possède son propre rail vertical, avec libellés sous les icônes.
   // La préférence de repli générale n'est donc pas modifiée pour les autres pages.
-  const sidebarCollapsed = !isEnterpriseConsole && window.matchMedia('(min-width: 901px)').matches && (() => {
-    try { return localStorage.getItem('sf-sidebar-collapsed') !== 'false'; }
-    catch { return true; }
-  })();
+  const sidebarCollapsed = window.matchMedia('(min-width: 901px)').matches && (
+    isEnterpriseConsole || (() => {
+      try { return localStorage.getItem('sf-sidebar-collapsed') !== 'false'; }
+      catch { return true; }
+    })()
+  );
   // Évite de montrer le menu en position développée pendant son repli initial.
   // La transition reste disponible après l'initialisation pour les clics utilisateur.
   document.body.classList.add('sidebar-initializing');
