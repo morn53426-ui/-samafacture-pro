@@ -66,14 +66,17 @@ describe('Navigation et structure des pages métier', () => {
 
   test('toutes les icônes appelées par la navigation existent dans le catalogue SVG', () => {
     const definitions = new Set(
-      [...iconCatalogue.matchAll(/^\\s*(?:['"]([^'"]+)['"]|([A-Za-z][\\w-]*))\\s*:/gm)]
+      [...iconCatalogue.matchAll(/^\s*(?:['"]([^'"]+)['"]|([A-Za-z][\w-]*))\s*:/gm)]
         .map(match => match[1] || match[2])
     );
     const used = new Set([
-      ...[...sidebarScript.matchAll(/\\bIcon\\(([^)]*)\\)/g)]
+      ...[...sidebarScript.matchAll(/\bIcon\(([^)]*)\)/g)]
         .flatMap(([, args]) => [...args.matchAll(/['"]([^'"]+)['"]/g)].map(match => match[1])),
-      ...[...sidebarScript.matchAll(/\\bicon:\\s*['"]([^'"]+)['"]/g)].map(match => match[1])
+      ...[...sidebarScript.matchAll(/\bicon:\s*['"]([^'"]+)['"]/g)].map(match => match[1])
     ]);
+
+    assert.ok(definitions.size > 0, 'Le catalogue SVG doit contenir des icônes.');
+    assert.ok(used.size > 0, 'La navigation doit référencer des icônes.');
     for (const name of used) {
       assert.ok(definitions.has(name), 'Icône manquante dans icons.js : ' + name);
     }
