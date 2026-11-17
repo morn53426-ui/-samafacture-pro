@@ -98,6 +98,14 @@ export default [
       }
     },
     rules: correctnessRules
+  },
+  {
+    files: ['server/tests/facture-pdf.test.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'commonjs',
+      globals: { ...nodeGlobals, ...browserGlobals }
+    },
+    rules: correctnessRules
   }
-
 ];
