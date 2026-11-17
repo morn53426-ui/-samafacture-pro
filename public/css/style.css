@@ -2117,7 +2117,7 @@ textarea { line-height: 1.55; }
   align-items: center;
   justify-content: center;
   gap: 12px;
-  min-height: 140px;
+  min-height: 136px;
   color: var(--ink-soft);
 }
 .loading-spinner {
@@ -6777,7 +6777,7 @@ a.btn .icon {
    fournie. Le menu mobile conserve son panneau horizontal classique.
    -------------------------------------------------------------------------- */
 :root {
-  --sidebar-collapsed-w: 96px;
+  --sidebar-collapsed-w: 76px;
 }
 
 @media (min-width: 901px) {
@@ -6871,7 +6871,7 @@ a.btn .icon {
   body #app-sidebar.sidebar.is-collapsed .sidebar-nav {
     flex: 1 1 auto;
     min-height: 0;
-    padding: 9px 5px 12px;
+    padding: 9px 3px 12px;
     overflow-x: hidden;
     overflow-y: auto;
     background: #fff;
@@ -6911,8 +6911,8 @@ a.btn .icon {
     align-items: center;
     justify-content: center;
     gap: 4px;
-    width: 84px;
-    min-height: 70px;
+    width: 68px;
+    min-height: 68px;
     margin: 3px auto;
     padding: 5px 3px;
     border: 1px solid transparent;
@@ -6945,11 +6945,11 @@ a.btn .icon {
   body #app-sidebar.sidebar.is-collapsed .nav-item .nav-label {
     display: block !important;
     width: 100%;
-    max-width: 82px;
-    max-height: 2.35em;
+    max-width: 66px;
+    max-height: 2.55em;
     overflow: hidden;
     color: inherit;
-    font-size: .58rem;
+    font-size: .54rem;
     font-weight: 650;
     line-height: 1.17;
     text-align: center;
