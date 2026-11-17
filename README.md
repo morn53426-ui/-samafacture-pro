@@ -324,29 +324,14 @@ Le paiement en ligne des plans payants (Starter, Pro, Entreprise) est actuelleme
 - **Wave for Business** — paiement direct ;
 - **PayDunya** — agrégateur pouvant proposer Orange Money et carte bancaire selon le compte marchand et sa configuration.
 
-Ces flux sont des **paiements uniques en XOF**. Le backend ne met pas en place de prélèvement ultérieur, ne renouvelle pas automatiquement les formules et n'applique pas d'expiration automatique aux plans payés. Les moyens réellement exposés par l'API pour le checkout des plans sont Wave et PayDunya lorsque les identifiants correspondants sont configurés.
+Les paiements actuellement disponibles pour les factures clients et les abonnements doivent être distingués. Pour les abonnements Starter, Pro et Entreprise, l'API **n'ouvre aucun checkout** : `GET /api/abonnement/moyens-disponibles` renvoie `wave: false`, `paydunya: false`, aucun tarif mensuel approuvé et `disponible: false`. `POST /api/abonnement/payer` renvoie HTTP 503 avec le code `PAIEMENT_RECURRENT_NON_CONFIGURE`.
 
-Les décisions, vérifications fournisseur et exigences préalables à la facturation récurrente sont consignées dans [ABONNEMENTS_RECURRENTES_DECISIONS.md](ABONNEMENTS_RECURRENTES_DECISIONS.md). Aucune facturation récurrente n'est actuellement activée.
+Les formules ciblées sont mensuelles et le renouvellement automatique est la cible produit confirmée, mais aucun mandat de prélèvement récurrent utilisable n'est actuellement validé dans le dépôt. Les identifiants Wave/PayDunya configurés dans `.env` ne rendent donc pas la souscription mensuelle disponible. Ne pas réutiliser un checkout ponctuel comme abonnement et ne jamais activer un plan payant sans confirmation serveur d'un paiement autorisé.
 
-Les moyens inscrits manuellement lors de l'enregistrement d'un règlement de facture (par exemple espèces, virement, paiement mobile ou carte) sont des informations de suivi comptable ; ils ne prouvent pas l'existence d'un checkout en ligne ou d'une connexion directe à chaque fournisseur.
+Le endpoint `PUT /api/auth/plan` n'autorise que le retour au plan Gratuit ; les plans payants renvoient HTTP 403 (`PAIEMENT_REQUIS`). Cette règle est appliquée côté serveur, pas seulement par l'interface.
 
-Les plans payants ne peuvent être activés que par un paiement confirmé côté serveur. Tant qu'aucun fournisseur n'est configuré dans `server/.env`, les boutons de paiement restent masqués ; le compte peut seulement revenir au plan Gratuit. Une requête API directe ne permet pas de s'attribuer Starter, Pro ou Entreprise.
+Les décisions encore requises avant mise en service (contrat et confirmation fournisseur, mandat et preuve de consentement, dates et règles de renouvellement, résiliation, impayés, prorata, remboursement et fiscalité) sont suivies dans [ABONNEMENTS_RECURRENTES_DECISIONS.md](ABONNEMENTS_RECURRENTES_DECISIONS.md). En développement local, aucun débit réel ne doit être exécuté.
 
-### Configurer Wave
-1. Créez un compte sur [business.wave.com](https://business.wave.com) et vérifiez les conditions d'accès au checkout marchand.
-2. Récupérez la clé API et le secret de signature de webhook.
-3. Renseignez `WAVE_API_KEY` et `WAVE_SIGNING_SECRET` dans `.env`.
-4. Configurez l'URL de webhook dans le tableau de bord Wave : `https://votredomaine.com/api/abonnement/webhook/wave`.
-
-### Configurer PayDunya
-1. Créez un compte sur [paydunya.com](https://paydunya.com).
-2. Créez une application dans le tableau de bord et récupérez les clés requises.
-3. Renseignez les identifiants PayDunya dans `.env`.
-4. Conservez `PAYDUNYA_MODE=test` tant que le compte marchand n'est pas validé pour les paiements réels.
-
-**Important :** vérifiez les versions actuelles des API, les moyens effectivement activés sur le compte marchand, les frais, les remboursements et les webhooks avant la mise en production.
-
-Les tarifs Starter / Pro / Entreprise (5 000 / 15 000 / 35 000 FCFA) sont définis dans `server/routes/abonnement.js`. Ils correspondent actuellement à des paiements uniques, et non à des prix mensuels récurrents.
 
 ## Authentification : Google et mot de passe oublié
 
