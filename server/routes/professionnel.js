@@ -71,6 +71,40 @@ async function invoiceOwned(userId, invoiceId) {
   return rows[0] || null;
 }
 
+
+function parseCompanyGroupPagination(query) {
+  const requested = query.page !== undefined || query.limit !== undefined;
+  if (!requested) return null;
+  const rawPage = query.page === undefined ? '1' : query.page;
+  const rawLimit = query.limit === undefined ? '20' : query.limit;
+  if (Array.isArray(rawPage) || Array.isArray(rawLimit) ||
+      !/^\\d+$/.test(String(rawPage)) || !/^\\d+$/.test(String(rawLimit))) {
+    return { error: 'Paramètres de pagination invalides.' };
+  }
+  const page = Number(rawPage);
+  const limit = Number(rawLimit);
+  if (!Number.isSafeInteger(page) || page < 1 || page > 1000000 ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+    return { error: 'La page doit être positive et la limite comprise entre 1 et 50.' };
+  }
+  return { page, limit, offset: (page - 1) * limit };
+}
+
+function companyGroupPaginationMeta(total, pagination) {
+  if (!pagination) return undefined;
+  const totalPages = Math.ceil(total / pagination.limit);
+  return {
+    page: pagination.page,
+    limit: pagination.limit,
+    total,
+    totalPages,
+    from: total ? pagination.offset + 1 : 0,
+    to: Math.min(pagination.offset + pagination.limit, total),
+    hasPrevious: pagination.page > 1 && totalPages > 0,
+    hasNext: pagination.page < totalPages
+  };
+}
+
 async function assertEnterpriseGroupOwner(req, res) {
   // Le groupe appartient toujours au compte de connexion (actor), même si l'utilisateur
   // a actuellement sélectionné une filiale via X-SF-Company-Owner.
@@ -969,22 +1003,38 @@ router.get('/company-group/membership', async (req, res, next) => {
 router.get('/company-group', async (req, res, next) => {
   try {
     if (!await assertEnterpriseGroupOwner(req, res)) return;
+    const pagination = parseCompanyGroupPagination(req.query);
+    if (pagination?.error) return res.status(400).json({ error: pagination.error });
     const [groups] = await pool.query(
       'SELECT id, owner_user_id, nom, created_at, updated_at FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
       [actor(req)]
     );
-    if (!groups.length) return res.json({ groupe: null, societes: [], invitations: [] });
+    if (!groups.length) {
+      return res.json({
+        groupe: null, societes: [], invitations: [],
+        ...(pagination ? { pagination: companyGroupPaginationMeta(0, pagination) } : {})
+      });
+    }
     const group = groups[0];
-    const [companies] = await pool.query(
-      `SELECT gc.id AS liaison_id, gc.company_owner_id AS id, gc.is_primary, gc.linked_at,
-              u.nom AS contact_nom, u.email, u.entreprise_nom, u.entreprise_ninea,
-              u.entreprise_rccm, u.pays_code, u.devise
-       FROM pro_company_group_companies gc
-       JOIN users u ON u.id = gc.company_owner_id
-       WHERE gc.group_id = ?
-       ORDER BY gc.is_primary DESC, u.entreprise_nom ASC`,
+    const [[companyCount]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM pro_company_group_companies WHERE group_id = ?',
       [group.id]
     );
+    const companyTotal = Number(companyCount.total || 0);
+    const companySql = `
+      SELECT gc.id AS liaison_id, gc.company_owner_id AS id, gc.is_primary, gc.linked_at,
+             u.nom AS contact_nom, u.email, u.entreprise_nom, u.entreprise_ninea,
+             u.entreprise_rccm, u.pays_code, u.devise
+      FROM pro_company_group_companies gc
+      JOIN users u ON u.id = gc.company_owner_id
+      WHERE gc.group_id = ?
+      ORDER BY gc.is_primary DESC, u.entreprise_nom ASC, gc.company_owner_id ASC`;
+    const companyParams = [group.id];
+    const companyQuery = pagination
+      ? companySql + ' LIMIT ? OFFSET ?'
+      : companySql;
+    if (pagination) companyParams.push(pagination.limit, pagination.offset);
+    const [companies] = await pool.query(companyQuery, companyParams);
     const [invitations] = await pool.query(
       `SELECT i.id, i.invited_email, i.statut, i.expire_at, i.created_at,
               e.statut AS email_statut, e.tentatives AS tentatives_email,
@@ -996,7 +1046,12 @@ router.get('/company-group', async (req, res, next) => {
        ORDER BY i.created_at DESC LIMIT 100`,
       [group.id]
     );
-    res.json({ groupe: group, societes: companies, invitations });
+    res.json({
+      groupe: group,
+      societes: companies,
+      invitations,
+      ...(pagination ? { pagination: companyGroupPaginationMeta(companyTotal, pagination) } : {})
+    });
   } catch (err) { next(err); }
 });
 
@@ -1641,6 +1696,8 @@ router.delete('/company-group/invitations/:invitationId', async (req, res, next)
 router.get('/company-group/dashboard', async (req, res, next) => {
   try {
     if (!await assertEnterpriseGroupOwner(req, res)) return;
+    const pagination = parseCompanyGroupPagination(req.query);
+    if (pagination?.error) return res.status(400).json({ error: pagination.error });
     const [[group]] = await pool.query(
       'SELECT id, nom FROM pro_company_groups WHERE owner_user_id = ? LIMIT 1',
       [actor(req)]
@@ -1657,10 +1714,12 @@ router.get('/company-group/dashboard', async (req, res, next) => {
       [group.id]
     );
     const ids = companies.map(company => Number(company.id));
+    const paginationMeta = companyGroupPaginationMeta(ids.length, pagination);
     if (!ids.length) {
       return res.json({
         groupe: group, societes: [], factures_par_devise: [], depenses_par_devise: [],
-        stocks_par_devise: [], caisses_par_devise: [], performance_mensuelle: [], alertes: []
+        stocks_par_devise: [], caisses_par_devise: [], performance_mensuelle: [], alertes: [],
+        ...(pagination ? { pagination: paginationMeta } : {})
       });
     }
 
@@ -1805,7 +1864,10 @@ router.get('/company-group/dashboard', async (req, res, next) => {
     }
 
     const companyById = new Map(companies.map(company => [Number(company.id), company]));
-    const companiesWithTotals = companies.map(company => {
+    const companiesForResponse = pagination
+      ? companies.slice(pagination.offset, pagination.offset + pagination.limit)
+      : companies;
+    const companiesWithTotals = companiesForResponse.map(company => {
       const companyId = Number(company.id);
       return {
         ...company,
@@ -1843,7 +1905,8 @@ router.get('/company-group/dashboard', async (req, res, next) => {
           societe: company?.entreprise_nom || company?.contact_nom || 'Société',
           devise: row.devise || company?.devise || 'INCONNUE',
           nombre: Number(row.nombre_en_retard),
-          montant: Number(row.total_en_retard)
+          montant: Number(row.total_en_retard),
+          societe_is_primary: Number(company?.is_primary) === 1
         });
       }
     }
@@ -1857,7 +1920,8 @@ router.get('/company-group/dashboard', async (req, res, next) => {
           societe: company?.entreprise_nom || company?.contact_nom || 'Société',
           devise: row.devise || company?.devise || 'INCONNUE',
           ruptures: Number(row.ruptures_stock || 0),
-          stocks_faibles: Number(row.stocks_faibles || 0)
+          stocks_faibles: Number(row.stocks_faibles || 0),
+          societe_is_primary: Number(company?.is_primary) === 1
         });
       }
     }
@@ -1874,6 +1938,7 @@ router.get('/company-group/dashboard', async (req, res, next) => {
         nombre_factures: Number(row.nombre_factures), total_facture: Number(row.total_facture)
       })),
       alertes,
+      ...(pagination ? { pagination: paginationMeta } : {}),
       note: 'Les montants sont regroupés par devise ; les soldes affichés concernent uniquement les caisses actives enregistrées dans SamaFacture. La valorisation du stock utilise les prix d’achat renseignés. Aucune conversion de change ou consolidation comptable OHADA n’est réalisée.'
     });
   } catch (err) { next(err); }
