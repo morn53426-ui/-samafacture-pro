@@ -3,11 +3,12 @@ const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const { pool } = require('./config/db');
 const { getRedisClient, isRedisConfigured, isRedisReady } = require('./config/redis');
+const { isEnterprisePlan } = require('./utils/plans');
 
 let io = null;
 let redisSub = null;
 
-/** Résout l'espace temps réel demandé en vérifiant l'adhésion active du membre. */
+/** Résout l'espace temps réel demandé via une adhésion d'équipe ou un groupe Entreprise actif. */
 async function resolveSocketTenant(userId, requestedOwner, query = pool.query.bind(pool)) {
   const actorId = Number(userId);
   if (!Number.isSafeInteger(actorId) || actorId <= 0) throw new Error('Utilisateur Socket.IO invalide.');
@@ -18,12 +19,29 @@ async function resolveSocketTenant(userId, requestedOwner, query = pool.query.bi
   if (!Number.isSafeInteger(selectedOwner) || selectedOwner <= 0) throw new Error('Sélection d’entreprise invalide.');
   if (selectedOwner === actorId) return actorId;
 
-  const [rows] = await query(
+  const [teamRows] = await query(
     'SELECT owner_user_id FROM pro_team_members WHERE member_user_id = ? AND owner_user_id = ? AND active = 1 LIMIT 1',
     [actorId, selectedOwner]
   );
-  if (!rows.length) throw new Error('Adhésion à cette entreprise absente ou inactive.');
-  return Number(rows[0].owner_user_id);
+  if (teamRows.length) return Number(teamRows[0].owner_user_id);
+
+  // Le propriétaire d'un groupe peut ouvrir une filiale uniquement après son
+  // rattachement explicite et tant que son propre plan Entreprise reste actif.
+  // La relation est orientée : une filiale ne peut pas remonter vers le groupe.
+  const [groupRows] = await query(
+    `SELECT gc.company_owner_id AS owner_user_id, group_owner.plan AS group_plan
+     FROM pro_company_group_companies gc
+     JOIN pro_company_groups g ON g.id = gc.group_id
+     JOIN users group_owner ON group_owner.id = g.owner_user_id
+     WHERE g.owner_user_id = ? AND gc.company_owner_id = ?
+     LIMIT 1`,
+    [actorId, selectedOwner]
+  );
+  if (groupRows.length && isEnterprisePlan(groupRows[0].group_plan)) {
+    return Number(groupRows[0].owner_user_id);
+  }
+
+  throw new Error('Adhésion à cette entreprise absente ou inactive.');
 }
 
 async function initSocket(httpServer) {
@@ -80,8 +98,8 @@ async function initSocket(httpServer) {
   });
 
   io.on('connection', (socket) => {
-    // La salle personnelle reste disponible ; le membre rejoint celle du propriétaire
-    // uniquement après contrôle de son adhésion active dans resolveSocketTenant().
+    // La salle personnelle reste disponible ; un membre ou le propriétaire d'un groupe
+    // rejoint le tenant sélectionné uniquement après validation de son accès actif.
     socket.join(`user:${socket.userId}`);
     if (socket.tenantId !== socket.userId) socket.join(`user:${socket.tenantId}`);
   });
