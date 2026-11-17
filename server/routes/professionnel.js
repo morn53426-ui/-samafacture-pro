@@ -78,7 +78,7 @@ function parseCompanyGroupPagination(query) {
   const rawPage = query.page === undefined ? '1' : query.page;
   const rawLimit = query.limit === undefined ? '20' : query.limit;
   if (Array.isArray(rawPage) || Array.isArray(rawLimit) ||
-      !/^\\d+$/.test(String(rawPage)) || !/^\\d+$/.test(String(rawLimit))) {
+      !/^\d+$/.test(String(rawPage)) || !/^\d+$/.test(String(rawLimit))) {
     return { error: 'Paramètres de pagination invalides.' };
   }
   const page = Number(rawPage);
