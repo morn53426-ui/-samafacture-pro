@@ -2117,7 +2117,7 @@ textarea { line-height: 1.55; }
   align-items: center;
   justify-content: center;
   gap: 12px;
-  min-height: 140px;
+  min-height: 136px;
   color: var(--ink-soft);
 }
 .loading-spinner {
@@ -6769,4 +6769,311 @@ a.btn .icon {
 }
 @media (prefers-reduced-motion: reduce) {
   .nav-item, .sidebar-collapse-toggle { transition: none; }
+}
+
+
+/* --------------------------------------------------------------------------
+   Rail de navigation desktop — icônes avec libellés, inspiré de la référence
+   fournie. Le menu mobile conserve son panneau horizontal classique.
+   -------------------------------------------------------------------------- */
+:root {
+  --sidebar-collapsed-w: 76px;
+}
+
+@media (min-width: 901px) {
+  body #app-sidebar.sidebar.is-collapsed {
+    display: flex !important;
+    flex-direction: column;
+    width: var(--sidebar-collapsed-w) !important;
+    min-width: var(--sidebar-collapsed-w) !important;
+    max-width: var(--sidebar-collapsed-w) !important;
+    overflow: hidden;
+    border-right: 1px solid #e3e8ef;
+    background: #fff !important;
+    color: #25334a;
+    box-shadow: 3px 0 16px rgba(25, 40, 66, .07);
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-brand {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 140px;
+    padding: 12px 6px 11px;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    background: linear-gradient(180deg, #172a4b 0%, #20385f 100%);
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-brand .mark {
+    display: grid;
+    width: 52px;
+    height: 52px;
+    flex: 0 0 52px;
+    place-items: center;
+    padding: 4px;
+    border: 1px solid rgba(255,255,255,.26);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 3px 9px rgba(0,0,0,.16);
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-brand .mark img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-brand-copy {
+    display: block !important;
+    min-width: 0;
+    width: 100%;
+    text-align: center;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-brand .name {
+    display: block;
+    color: #fff;
+    font-size: .63rem;
+    font-weight: 750;
+    line-height: 1.2;
+    letter-spacing: -.01em;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-brand .sub {
+    display: none !important;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-collapse-toggle {
+    display: inline-flex;
+    flex: 0 0 29px;
+    width: 29px;
+    height: 29px;
+    margin: 0;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 9px;
+    background: rgba(255,255,255,.09);
+    color: #fff;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-collapse-toggle:hover {
+    border-color: rgba(255,255,255,.38);
+    background: rgba(255,255,255,.16);
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 9px 3px 12px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: #fff;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd3df #fff;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-nav::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-nav::-webkit-scrollbar-thumb {
+    border-radius: 99px;
+    background: #cbd3df;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-group-label {
+    display: block !important;
+    width: 36px;
+    height: 1px;
+    margin: 9px auto 8px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: 99px;
+    background: #e2e7ee;
+    color: transparent;
+    font-size: 0;
+    line-height: 0;
+    letter-spacing: 0;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 68px;
+    min-height: 68px;
+    margin: 3px auto;
+    padding: 5px 3px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    background: transparent;
+    color: #5e6b7f;
+    text-align: center;
+    box-shadow: none;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item .ic {
+    display: grid;
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border-radius: 9px;
+    background: #f3f5f8;
+    color: #607087;
+    font-size: 1.05rem;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item .ic .icon {
+    display: block;
+    width: 24px;
+    height: 24px;
+    stroke-width: 1.8;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item .nav-label {
+    display: block !important;
+    width: 100%;
+    max-width: 66px;
+    max-height: 2.55em;
+    overflow: hidden;
+    color: inherit;
+    font-size: .54rem;
+    font-weight: 650;
+    line-height: 1.17;
+    text-align: center;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item:hover,
+  body #app-sidebar.sidebar.is-collapsed .nav-item:focus-visible {
+    border-color: #e3e9f1;
+    background: #f5f7fa;
+    color: #1c2e4c;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item:focus-visible {
+    outline: 2px solid #476b9e;
+    outline-offset: 1px;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item.active,
+  body #app-sidebar.sidebar.is-collapsed .nav-item.active:hover {
+    border-color: #e4eaf2;
+    background: #f0f3f8;
+    color: #172a4b !important;
+    box-shadow: none !important;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item.active .ic {
+    background: #172a4b;
+    color: #fff !important;
+    box-shadow: 0 3px 8px rgba(23,42,75,.2);
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-foot {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    min-height: 62px;
+    padding: 8px 5px 10px;
+    border-top: 1px solid #e5e9ef;
+    background: #fff;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-user-info,
+  body #app-sidebar.sidebar.is-collapsed .install-app-btn,
+  body #app-sidebar.sidebar.is-collapsed .sidebar-logout-label {
+    display: none !important;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-logout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    min-height: 42px;
+    height: 42px;
+    margin: 0 auto;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    background: transparent;
+    color: #5e6b7f;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-logout .ic {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    color: inherit;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-logout:hover,
+  body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
+    border-color: #e3e9f1;
+    background: #f5f7fa;
+    color: #172a4b;
+  }
+}
+
+@media (max-width: 900px) {
+  /* Les libellés restent horizontaux dans le tiroir mobile pour être faciles à lire. */
+  body #app-sidebar.sidebar .nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    min-width: 0;
+    text-align: left;
+  }
+
+  body #app-sidebar.sidebar .nav-item .nav-label {
+    display: block;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body #app-sidebar.sidebar.is-collapsed .nav-item {
+    transition: none !important;
+  }
+}
+
+
+/* Sur grand écran, élargir légèrement le rail pour que les libellés métier
+   restent lisibles sous les icônes. Entre 901 et 1199 px, garder 76 px. */
+@media (min-width: 1200px) {
+  :root { --sidebar-collapsed-w: 96px; }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item {
+    width: 84px;
+    min-height: 70px;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .nav-item .nav-label {
+    max-width: 82px;
+    font-size: .58rem;
+    line-height: 1.2;
+  }
+
+  body #app-sidebar.sidebar.is-collapsed .sidebar-nav {
+    padding-right: 5px;
+    padding-left: 5px;
+  }
 }

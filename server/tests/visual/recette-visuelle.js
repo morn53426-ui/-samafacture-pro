@@ -797,16 +797,40 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
         ? Math.round(main.querySelector('.dashboard-welcome, .page-header, .workspace-page-header').getBoundingClientRect().width)
         : null,
       contentPaddingLeft: main ? Math.round(parseFloat(getComputedStyle(main).paddingLeft) || 0) : null,
-      expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim()
+      expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim(),
+      enterpriseToolbar: (() => {
+        const toolbar = document.querySelector('.enterprise-console-topbar');
+        const heading = document.querySelector('.enterprise-dashboard-heading');
+        if (!toolbar || !heading) return null;
+        const toolbarRect = toolbar.getBoundingClientRect();
+        const headingRect = heading.getBoundingClientRect();
+        const directChildren = Array.from(toolbar.children).map(element => {
+          const rect = element.getBoundingClientRect();
+          return {
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            top: Math.round(rect.top),
+            bottom: Math.round(rect.bottom)
+          };
+        });
+        return {
+          height: Math.round(toolbarRect.height),
+          bottom: Math.round(toolbarRect.bottom),
+          headingTop: Math.round(headingRect.top),
+          flexWrap: getComputedStyle(toolbar).flexWrap,
+          directChildren
+        };
+      })()
     };
   });
   if (!pageDefinition.public && viewport.width >= 901) {
     assert.equal(navigationGeometry.sidebarCollapsed, true,
       pageDefinition.name + ' : le menu de bureau doit démarrer compact.');
-    assert.equal(navigationGeometry.sidebarWidth, 76,
-      pageDefinition.name + ' : la largeur réelle du rail desktop doit rester à 76 px : ' + JSON.stringify(navigationGeometry));
-    assert.ok(navigationGeometry.mainMargin >= 76 && navigationGeometry.mainMargin <= 92,
-      pageDefinition.name + ' : la marge CSS du contenu doit réserver la largeur du rail compact sans espace excessif : ' + JSON.stringify(navigationGeometry));
+    const compactWidth = Number.parseFloat(navigationGeometry.expectedCompactWidth);
+    assert.equal(navigationGeometry.sidebarWidth, compactWidth,
+      pageDefinition.name + ' : le rail desktop doit respecter sa largeur responsive : ' + JSON.stringify(navigationGeometry));
+    assert.equal(navigationGeometry.mainMargin, compactWidth,
+      pageDefinition.name + ' : la marge du contenu doit suivre exactement la largeur du rail : ' + JSON.stringify(navigationGeometry));
     assert.ok(navigationGeometry.mainLeft >= navigationGeometry.sidebarWidth &&
       navigationGeometry.mainLeft <= navigationGeometry.sidebarWidth + 16,
       pageDefinition.name + ' : le conteneur principal ne doit pas chevaucher le rail : ' + JSON.stringify(navigationGeometry));
@@ -818,6 +842,22 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' : le tiroir mobile ne doit pas s’ouvrir sur ordinateur.');
     assert.equal(navigationGeometry.overlayVisible, false,
       pageDefinition.name + ' : aucun voile de navigation ne doit masquer le contenu desktop.');
+  }
+
+
+  if (pageDefinition.name === 'groupe-entreprise' && viewport.width >= 901 && viewport.width <= 1100) {
+    const toolbar = navigationGeometry.enterpriseToolbar;
+    assert.ok(toolbar, 'Le centre Entreprise doit exposer son bandeau supérieur.');
+    assert.equal(toolbar.flexWrap, 'nowrap',
+      'Le bandeau du centre Entreprise doit rester sur une seule rangée à ' + viewport.width + 'px : ' + JSON.stringify(toolbar));
+    assert.ok(toolbar.height <= 56,
+      'Le bandeau du centre Entreprise ne doit pas grandir sur deux rangées : ' + JSON.stringify(toolbar));
+    assert.ok(toolbar.headingTop >= toolbar.bottom + 12,
+      'Le titre Entreprise doit conserver un espace sous le bandeau : ' + JSON.stringify(toolbar));
+    assert.ok(toolbar.directChildren.every(child =>
+      child.top >= 0 && child.bottom <= toolbar.height + 1 &&
+      child.left >= 0 && child.right <= viewport.width + 1
+    ), 'Les commandes du bandeau doivent rester dans sa rangée visible : ' + JSON.stringify(toolbar));
   }
 
   if (!pageDefinition.public && viewport.width >= 1900) {
@@ -1659,7 +1699,8 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
     mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
     bodyState: document.body.classList.contains('sidebar-collapsed'),
-    labelsHidden: [...document.querySelectorAll('.nav-label')].every(element => getComputedStyle(element).display === 'none'),
+    labelsVisible: [...document.querySelectorAll('.nav-label')].length > 0 &&
+      [...document.querySelectorAll('.nav-label')].every(element => getComputedStyle(element).display !== 'none'),
     promoRemoved: !document.querySelector('.sidebar-promo'),
     toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded'),
     headingFont: getComputedStyle(document.querySelector('.page-header h1') || document.querySelector('h1')).fontFamily,
@@ -1683,10 +1724,10 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
   }));
   assert.deepEqual(compact, {
     collapsed: true,
-    sidebarWidth: 76,
-    mainMargin: 76,
+    sidebarWidth: 96,
+    mainMargin: 96,
     bodyState: true,
-    labelsHidden: true,
+    labelsVisible: true,
     promoRemoved: true,
     toggleExpanded: 'false',
     headingFont: '"IBM Plex Sans", sans-serif',

@@ -25,6 +25,11 @@ const pages = [
   'finances.html'
 ];
 
+const sidebarScript = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'sidebar.js'), 'utf8');
+const sidebarStyles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'style.css'), 'utf8');
+const enterpriseStyles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'enterprise-workspace.css'), 'utf8');
+const iconCatalogue = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'icons.js'), 'utf8');
+
 function readPage(file) {
   return fs.readFileSync(path.join(PUBLIC_DIR, file), 'utf8');
 }
@@ -41,6 +46,46 @@ describe('Navigation et structure des pages métier', () => {
         'Le contenu principal doit être un repère focusable.');
     });
   }
+
+
+  test('le centre Entreprise aligne le rail et le contenu sur la largeur responsive', () => {
+    assert.ok(enterpriseStyles.includes('width: var(--sidebar-collapsed-w) !important'));
+    assert.ok(enterpriseStyles.includes('width: calc(100% - var(--sidebar-collapsed-w))'));
+    assert.ok(enterpriseStyles.includes('margin-left: var(--sidebar-collapsed-w) !important'));
+  });
+
+
+
+
+  test('le bandeau Entreprise reste sur une seule rangée sur écran intermédiaire', () => {
+    assert.ok(enterpriseStyles.includes('@media (min-width: 901px) and (max-width: 1100px)'));
+    assert.ok(enterpriseStyles.includes('flex-wrap: nowrap !important'));
+    assert.ok(enterpriseStyles.includes('height: 54px'));
+    assert.ok(enterpriseStyles.includes('min-width: 118px'));
+  });
+
+  test('toutes les icônes appelées par la navigation existent dans le catalogue SVG', () => {
+    const definitions = new Set(
+      [...iconCatalogue.matchAll(/^\s*(?:['"]([^'"]+)['"]|([A-Za-z][\w-]*))\s*:/gm)]
+        .map(match => match[1] || match[2])
+    );
+    const used = new Set([
+      ...[...sidebarScript.matchAll(/\bIcon\(([^)]*)\)/g)]
+        .flatMap(([, args]) => [...args.matchAll(/['"]([^'"]+)['"]/g)].map(match => match[1])),
+      ...[...sidebarScript.matchAll(/\bicon:\s*['"]([^'"]+)['"]/g)].map(match => match[1])
+    ]);
+
+    assert.ok(definitions.size > 0, 'Le catalogue SVG doit contenir des icônes.');
+    assert.ok(used.size > 0, 'La navigation doit référencer des icônes.');
+    for (const name of used) {
+      assert.ok(definitions.has(name), 'Icône manquante dans icons.js : ' + name);
+    }
+  });
+
+  test('la navigation ne plante pas quand le stockage local ou le point de montage manque', () => {
+    assert.match(sidebarScript, /try\s*\{\s*return localStorage\.getItem\('sf_company_group_member'\) === 'true';\s*\}\s*catch\s*\{\s*return false;/);
+    assert.match(sidebarScript, /const sidebarRoot = document\.getElementById\('sidebar-root'\);\s*if \(sidebarRoot\) sidebarRoot\.outerHTML = html;/);
+  });
 
   test('Achats & stocks permet de rejoindre directement chacune des opérations', () => {
     const html = readPage('achats.html');
