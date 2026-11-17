@@ -17,6 +17,10 @@ const professionalPage = fs.readFileSync(
   path.join(__dirname, '..', '..', 'public', 'professionnel.html'),
   'utf8'
 );
+const enterpriseStylesheet = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'public', 'css', 'enterprise-workspace.css'),
+  'utf8'
+);
 
 describe('Retour visuel des invitations Entreprise', () => {
   test('ne termine pas le rattachement d’un groupe avant la preuve email indépendante', () => {
@@ -132,6 +136,45 @@ describe('Retour visuel des invitations Entreprise', () => {
     assert.match(page, /performance_mensuelle/);
     assert.match(page, /Performance sur les six derniers mois/);
     assert.match(page, /Factures échues et niveaux de stock/);
+  });
+
+  test('organise le centre de pilotage en modules, actions rapides et cartes consolidées', () => {
+    assert.match(page, /class="enterprise-module-strip"/);
+    assert.match(page, /class="enterprise-create-actions"/);
+    assert.match(page, /class="enterprise-dashboard-grid"/);
+    assert.match(page, /renderDashboardCard\('Chiffre d’affaires facturé'/);
+    assert.match(page, /renderDashboardCard\('Encaissements'/);
+    assert.match(page, /renderDashboardCard\('Dépenses enregistrées'/);
+    assert.match(page, /renderDashboardCard\('Factures impayées &amp; retards|renderDashboardCard\('Factures impayées & retards/);
+    assert.match(page, /renderDashboardCard\('Évolution des ventes'/);
+    assert.match(page, /renderDashboardCard\('Stocks & trésorerie'/);
+  });
+
+  test('maintient une navigation latérale dédiée au centre de pilotage Entreprise', () => {
+    const sidebarScript = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'public', 'js', 'sidebar.js'),
+      'utf8'
+    );
+    assert.match(sidebarScript, /enterprise-console-shell/);
+    assert.match(sidebarScript, /enterprise-console-topbar/);
+    assert.match(sidebarScript, /enterprise-console-menu-toggle/);
+    assert.match(sidebarScript, /enterpriseToggle\.setAttribute\('aria-expanded'/);
+  });
+
+  test('conserve les commandes de pagination accessibles des sociétés', () => {
+    assert.match(page, /aria-label="Pagination des sociétés"/);
+    assert.match(page, /id="group-company-prev"/);
+    assert.match(page, /id="group-company-next"/);
+    assert.match(page, /aria-live="polite">Page/);
+  });
+
+  test('respecte les dimensions minimales du logo et des icônes du rail Entreprise', () => {
+    assert.match(enterpriseStylesheet, /sidebar-brand \.mark\s*\{[\s\S]*?width: 52px !important;/);
+    assert.match(enterpriseStylesheet, /sidebar-brand \.mark\s*\{[\s\S]*?height: 52px !important;/);
+    assert.match(enterpriseStylesheet, /nav-item \.ic \.icon\s*\{[\s\S]*?width: 24px;[\s\S]*?height: 24px;/);
+    assert.match(enterpriseStylesheet, /enterprise-console-topbar/);
+    assert.match(enterpriseStylesheet, /sidebar-brand-copy\s*\{\s*display: block;/,
+      'le logo et son nom restent présents dans le tiroir de navigation mobile');
   });
 
   test('conserve les limites de consolidation comptable et l’accès séparé aux filiales', () => {
