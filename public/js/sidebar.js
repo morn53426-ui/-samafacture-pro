@@ -208,6 +208,12 @@ function renderTopbar(title, subtitle) {
           <button type="submit" aria-label="Lancer la recherche">${Icon('arrow-up-right')}</button>
         </form>
       `}
+      ${isEnterpriseConsole ? `
+        <nav class="enterprise-console-utility-links" aria-label="Aide et paramètres">
+          <a href="parametres.html" aria-label="Paramètres" title="Paramètres">${Icon('settings')}</a>
+          <a href="aide.html" aria-label="Centre d’aide" title="Centre d’aide">${Icon('help-circle')}</a>
+        </nav>
+      ` : ''}
       <div class="app-topbar-account">
         <div class="app-topbar-avatar" aria-hidden="true">${escapeHtml(avatar)}</div>
         <div>
