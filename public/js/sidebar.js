@@ -122,6 +122,12 @@ function toggleSidebar() {
     btn.setAttribute('aria-expanded', String(!!isOpen));
     btn.setAttribute('aria-label', isOpen ? 'Fermer le menu' : 'Ouvrir le menu');
   }
+  const enterpriseToggle = document.querySelector('.enterprise-console-menu-toggle');
+  if (enterpriseToggle) {
+    enterpriseToggle.innerHTML = isOpen ? Icon('x') : Icon('menu');
+    enterpriseToggle.setAttribute('aria-expanded', String(!!isOpen));
+    enterpriseToggle.setAttribute('aria-label', isOpen ? 'Fermer la navigation' : 'Ouvrir la navigation');
+  }
 }
 function toggleDesktopSidebar() {
   const sidebar = document.getElementById('app-sidebar');
@@ -148,6 +154,12 @@ function closeSidebar() {
     btn.innerHTML = Icon('menu');
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-label', 'Ouvrir le menu');
+  }
+  const enterpriseToggle = document.querySelector('.enterprise-console-menu-toggle');
+  if (enterpriseToggle) {
+    enterpriseToggle.innerHTML = Icon('menu');
+    enterpriseToggle.setAttribute('aria-expanded', 'false');
+    enterpriseToggle.setAttribute('aria-label', 'Ouvrir la navigation');
   }
 }
 
