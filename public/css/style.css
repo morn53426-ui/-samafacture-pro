@@ -1543,7 +1543,7 @@ button, a, [role="button"] { touch-action: manipulation; }
 
 @media (pointer: coarse) {
   input[type=text], input[type=email], input[type=password], input[type=number],
-  input[type=date], input[type=tel], input[type=search], input[type=url],
+  input[type=date], input[type=datetime-local], input[type=tel], input[type=search], input[type=url],
   select, textarea {
     font-size: 16px !important;
   }
@@ -4030,8 +4030,8 @@ thead th { background: #F2F6FD; color: #52627D; }
 .sidebar-logout:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 @media (min-width: 901px) {
-  .main-content { margin-left: var(--sidebar-w); transition: margin-left .2s ease; }
-  .sidebar { width: var(--sidebar-w); transition: width .2s ease; }
+  .main-content { margin-left: var(--sidebar-w); }
+  .sidebar { width: var(--sidebar-w); }
   .sidebar-collapse-toggle { display: inline-flex; }
   .mobile-toggle { display: none; }
 
