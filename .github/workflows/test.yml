@@ -176,6 +176,21 @@ jobs:
           mkdir -p tests/diagnostics
           node --process-timeout=12m --report-on-process-timeout --report-exclude-env --report-directory=tests/diagnostics --test --test-concurrency=1 --test-timeout=300000 --test-reporter=spec "tests/*.test.js"
 
+      - name: Tester la restauration réelle d'une sauvegarde chiffrée
+        timeout-minutes: 8
+        run: |
+          docker run --rm --network host \
+            --env RUN_REAL_RESTORE_SMOKE=true \
+            --env NODE_ENV=test \
+            --env DB_HOST=127.0.0.1 \
+            --env DB_PORT=3306 \
+            --env DB_USER=root \
+            --env DB_PASSWORD=root \
+            --env DB_NAME=samafacture_test \
+            --env JWT_SECRET=ci-secret-ne-pas-utiliser-en-production \
+            --entrypoint /bin/sh \
+            samafacture-pro:ci \
+            -ec 'command -v mysqldump && command -v mysql && exec node --test tests/restore-backup-roundtrip.test.js'
       - name: Archiver les diagnostics des tests bloqués
         if: always()
         uses: actions/upload-artifact@v7
