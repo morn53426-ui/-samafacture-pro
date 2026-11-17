@@ -3,8 +3,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
-// Vérifie côté PUT /api/auth/entreprise que les modèles gratuits s'enregistrent et que
-// les huit modèles Entreprise restent interdits hors du plan Entreprise.
+// Vérifie que les modèles gratuits, Pro et Entreprise respectent le niveau d'abonnement côté API.
 describe('Nouveaux modèles de facture — PUT /api/auth/entreprise', () => {
   let userId, token;
   const email = emailDeTest('modeles');
@@ -34,7 +33,36 @@ describe('Nouveaux modèles de facture — PUT /api/auth/entreprise', () => {
     });
   }
 
-  const enterpriseTemplates = ['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide'];
+  const proTemplates = ['elegant', 'corporate', 'creatif', 'eclipse', 'saphir', 'conseil'];
+  for (const plan of ['gratuit', 'starter']) {
+    test(`les modèles Pro sont refusés sur le plan ${plan}`, async () => {
+      await pool.query('UPDATE users SET plan = ? WHERE id = ?', [plan, userId]);
+      for (const template of proTemplates) {
+        const res = await request(app)
+          .put('/api/auth/entreprise')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: template });
+        assert.equal(res.status, 403, `${template} doit être réservé au plan Pro`);
+        assert.equal(res.body.code, 'FONCTIONNALITE_PRO');
+      }
+    });
+  }
+
+  for (const plan of ['pro', 'entreprise']) {
+    test(`les modèles Pro sont autorisés sur le plan ${plan}`, async () => {
+      await pool.query('UPDATE users SET plan = ? WHERE id = ?', [plan, userId]);
+      for (const template of proTemplates) {
+        const res = await request(app)
+          .put('/api/auth/entreprise')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ entreprise_nom: 'Boutique Modèles', devise: 'FCFA', facture_template: template });
+        assert.equal(res.status, 200, `${template} doit être disponible avec le plan ${plan}`);
+        assert.equal(res.body.user.facture_template, template);
+      }
+    });
+  }
+
+  const enterpriseTemplates = ['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide', 'imperial', 'panorama', 'groupe', 'majeste'];
 
   for (const plan of ['gratuit', 'starter', 'pro']) {
     test(`les modèles Entreprise sont refusés sur le plan ${plan}`, async () => {
@@ -51,7 +79,7 @@ describe('Nouveaux modèles de facture — PUT /api/auth/entreprise', () => {
     });
   }
 
-  test('les huit modèles exclusifs s’enregistrent après le passage au plan Entreprise', async () => {
+  test('les douze modèles exclusifs s’enregistrent après le passage au plan Entreprise', async () => {
     await pool.query("UPDATE users SET plan = 'entreprise' WHERE id = ?", [userId]);
     for (const template of enterpriseTemplates) {
       const res = await request(app)
