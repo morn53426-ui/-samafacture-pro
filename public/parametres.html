@@ -610,6 +610,9 @@
             <option value="elegant">✦ Pro — Élégant — filets dorés, présentation centrée</option>
             <option value="corporate">✦ Pro — Corporate — mise en page structurée en blocs</option>
             <option value="creatif">✦ Pro — Créatif — coloré, formes arrondies</option>
+            <option value="eclipse">✦ Pro — Éclipse — vert profond, lignes épurées</option>
+            <option value="saphir">✦ Pro — Saphir — bleu premium et bandeau structuré</option>
+            <option value="conseil">✦ Pro — Conseil — mise en page sobre et institutionnelle</option>
             <option value="prestige">◆ Entreprise — Prestige — bandeau noir et or, total encadré</option>
             <option value="heritage">◆ Entreprise — Héritage — cadre à double filet or, style papier à en-tête</option>
             <option value="diamant">◆ Entreprise — Diamant — ultra-épuré, filets or fins</option>
@@ -623,6 +626,10 @@
             <option value="institution">◆ Entreprise — Institution — présentation formelle et structurée</option>
             <option value="signature">◆ Entreprise — Signature — style éditorial vert profond et bronze</option>
             <option value="consolide">◆ Entreprise — Consolidé — synthèse de gestion</option>
+            <option value="imperial">◆ Entreprise — Impérial — cadre sombre et accents champagne</option>
+            <option value="panorama">◆ Entreprise — Panorama — blocs de gestion turquoise</option>
+            <option value="groupe">◆ Entreprise — Groupe — structure multi-entités B2B</option>
+            <option value="majeste">◆ Entreprise — Majesté — en-tête éditorial et double filet</option>
             <option value="nova">Nova — bleu profond et turquoise</option>
             <option value="nordique">Nordique — tons sauge, mise en page aérée</option>
             <option value="luxe">Luxe — graphite et or champagne</option>
@@ -803,7 +810,7 @@
   // Déclarée avant toute fonction d'initialisation qui l'utilise.
   const PERSO_COULEURS = ['couleur_principale', 'couleur_secondaire', 'couleur_texte'];
 
-  // --- Galerie visuelle des 24 modèles ----------------------------------------------
+  // --- Galerie visuelle des 31 modèles ----------------------------------------------
   const INVOICE_TEMPLATE_META = [
     { id: 'classique', name: 'Classique', description: 'Sobre, clair et professionnel.', tier: 'all' },
     { id: 'moderne', name: 'Moderne', description: 'Bandeau graphique et logo mis en avant.', tier: 'all' },
@@ -828,10 +835,17 @@
     { id: 'nordique', name: 'Nordique', description: 'Mise en page aérée, tons sauge et typographie douce.', tier: 'all' },
     { id: 'luxe', name: 'Luxe', description: 'Noir graphite, or champagne et présentation premium.', tier: 'all' },
     { id: 'tech', name: 'Tech', description: 'Style digital, repères structurés et bleu cyan.', tier: 'all' },
-    { id: 'horizon', name: 'Horizon', description: 'Bleu professionnel, blocs lisibles et équilibre moderne.', tier: 'all' }
+    { id: 'horizon', name: 'Horizon', description: 'Bleu professionnel, blocs lisibles et équilibre moderne.', tier: 'all' },
+    { id: 'eclipse', name: 'Éclipse', description: 'Vert profond, lignes épurées et hiérarchie lisible.', tier: 'pro' },
+    { id: 'saphir', name: 'Saphir', description: 'Bandeau bleu premium et présentation structurée.', tier: 'pro' },
+    { id: 'conseil', name: 'Conseil', description: 'Mise en page sobre pour les prestations professionnelles.', tier: 'pro' },
+    { id: 'imperial', name: 'Impérial', description: 'Cadre sombre, accents champagne et présentation exécutive.', tier: 'enterprise' },
+    { id: 'panorama', name: 'Panorama', description: 'Blocs de gestion turquoise pour les dossiers B2B.', tier: 'enterprise' },
+    { id: 'groupe', name: 'Groupe', description: 'Hiérarchie structurée pour les organisations multi-entités.', tier: 'enterprise' },
+    { id: 'majeste', name: 'Majesté', description: 'En-tête éditorial et double filet raffiné.', tier: 'enterprise' }
   ];
-  const PRO_TEMPLATE_IDS = new Set(['elegant', 'corporate', 'creatif']);
-  const ENTERPRISE_TEMPLATE_IDS = new Set(['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide']);
+  const PRO_TEMPLATE_IDS = new Set(['elegant', 'corporate', 'creatif', 'eclipse', 'saphir', 'conseil']);
+  const ENTERPRISE_TEMPLATE_IDS = new Set(['prestige', 'heritage', 'diamant', 'platine', 'executive', 'institution', 'signature', 'consolide', 'imperial', 'panorama', 'groupe', 'majeste']);
 
   function canUseInvoiceTemplate(plan, templateId) {
     if (ENTERPRISE_TEMPLATE_IDS.has(templateId)) return plan === 'entreprise';
