@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { localDateString } = require('../utils/local-date');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 
 const router = express.Router();
@@ -41,6 +42,14 @@ function emptyDashboard() {
 }
 
 async function buildDashboard(userId) {
+  // The civil date used for due/overdue status belongs to the company, not the DB host.
+  // This is a lightweight indexed lookup; invoice/expense aggregation remains a single summary query.
+  const [accountRows] = await pool.query(
+    'SELECT fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+    [userId]
+  );
+  const localToday = localDateString(accountRows?.[0]?.fuseau_horaire || 'Africa/Dakar');
+
   // One summary query replaces the old factures + depenses queries. It also gives us
   // invoice_count so a brand-new account does not needlessly execute four more joins.
   const [summaryRows] = await pool.query(
@@ -49,14 +58,14 @@ async function buildDashboard(userId) {
        COALESCE(SUM(montant_paye),0) AS chiffre_affaires,
        COALESCE(SUM(CASE WHEN statut = 'payee' THEN 1 ELSE 0 END),0) AS payees_n,
        COALESCE(SUM(CASE WHEN statut = 'payee' THEN total ELSE 0 END),0) AS payees_total,
-       COALESCE(SUM(CASE WHEN statut = 'en_attente' AND (date_echeance IS NULL OR date_echeance >= CURDATE()) THEN 1 ELSE 0 END),0) AS attente_n,
-       COALESCE(SUM(CASE WHEN statut = 'en_attente' AND (date_echeance IS NULL OR date_echeance >= CURDATE()) THEN total ELSE 0 END),0) AS attente_total,
-       COALESCE(SUM(CASE WHEN statut = 'en_retard' OR (statut = 'en_attente' AND date_echeance IS NOT NULL AND date_echeance < CURDATE()) THEN 1 ELSE 0 END),0) AS retard_n,
-       COALESCE(SUM(CASE WHEN statut = 'en_retard' OR (statut = 'en_attente' AND date_echeance IS NOT NULL AND date_echeance < CURDATE()) THEN total ELSE 0 END),0) AS retard_total,
+       COALESCE(SUM(CASE WHEN statut = 'en_attente' AND (date_echeance IS NULL OR date_echeance >= ?) THEN 1 ELSE 0 END),0) AS attente_n,
+       COALESCE(SUM(CASE WHEN statut = 'en_attente' AND (date_echeance IS NULL OR date_echeance >= ?) THEN total ELSE 0 END),0) AS attente_total,
+       COALESCE(SUM(CASE WHEN statut = 'en_retard' OR (statut = 'en_attente' AND date_echeance IS NOT NULL AND date_echeance < ?) THEN 1 ELSE 0 END),0) AS retard_n,
+       COALESCE(SUM(CASE WHEN statut = 'en_retard' OR (statut = 'en_attente' AND date_echeance IS NOT NULL AND date_echeance < ?) THEN total ELSE 0 END),0) AS retard_total,
        (SELECT COALESCE(SUM(d.montant),0) FROM depenses d WHERE d.user_id = ?) AS total_depenses
      FROM factures
      WHERE user_id = ? AND type = 'facture'`,
-    [userId, userId]
+    [localToday, localToday, localToday, localToday, userId, userId]
   );
   const summary = summaryRows?.[0] || {};
 
@@ -73,9 +82,8 @@ async function buildDashboard(userId) {
   // the thousands of newly-created accounts used by load tests.
   if (Number(summary?.invoice_count || 0) === 0) {
     // Compte neuf / sans facture : conserver la liste des derniers clients tout en
-    // n'effectuant qu'UN seul aller-retour MySQL. Sous un test de charge avec 1000
-    // utilisateurs distincts, deux requêtes par utilisateur saturent inutilement la
-    // file du pool alors que la majorité des comptes n'ont aucune facture.
+    // évitant les quatre lectures métier supplémentaires. Le fuseau et l'agrégat résumé
+    // sont deux lectures légères, puis une seule lecture récupère les derniers clients.
         const [rows] = await pool.query(
       `SELECT 'client' AS row_type, c.id, c.user_id, c.nom, c.email, c.telephone, c.adresse, c.created_at
          FROM clients c
@@ -108,9 +116,9 @@ async function buildDashboard(userId) {
     pool.query(`SELECT * FROM clients WHERE user_id = ? ORDER BY created_at DESC LIMIT 5`, [userId]),
     pool.query(
       `SELECT DATE_FORMAT(date_emission, '%Y-%m') as mois, COALESCE(SUM(total),0) as total
-       FROM factures WHERE user_id = ? AND type = 'facture' AND date_emission >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+       FROM factures WHERE user_id = ? AND type = 'facture' AND date_emission >= DATE_SUB(?, INTERVAL 6 MONTH)
        GROUP BY mois ORDER BY mois`,
-      [userId]
+      [userId, localToday]
     ),
     pool.query(
       `SELECT c.id, c.nom, COUNT(f.id) as nb_factures, COALESCE(SUM(f.total),0) as total

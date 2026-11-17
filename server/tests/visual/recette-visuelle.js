@@ -479,6 +479,70 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       return canvas?.dataset.sfChartType && canvas.dataset.sfChartAnimation === 'disabled';
     }), { timeout: 15000 }, pageDefinition.charts);
   }
+
+  if (!pageDefinition.public) {
+    const accessibilityBaseline = await page.evaluate(() => {
+      const visible = element => {
+        const style = getComputedStyle(element);
+        return style.display !== 'none' && style.visibility !== 'hidden' &&
+          style.opacity !== '0' && element.getClientRects().length > 0 &&
+          !element.closest('[aria-hidden="true"]');
+      };
+      const hasText = value => typeof value === 'string' && value.trim().length > 0;
+      const hasName = element => {
+        if (hasText(element.getAttribute('aria-label'))) return true;
+        const labelledBy = (element.getAttribute('aria-labelledby') || '')
+          .split(/\\s+/).filter(Boolean);
+        if (labelledBy.some(id => hasText(document.getElementById(id)?.textContent))) return true;
+        if (hasText(element.getAttribute('title'))) return true;
+        if (element.matches('input, select, textarea')) {
+          const id = element.id;
+          const associated = id && document.querySelector('label[for="' + CSS.escape(id) + '"]');
+          if (hasText(associated?.textContent) || hasText(element.closest('label')?.textContent)) return true;
+          if (/^(button|submit|reset)$/i.test(element.type || '') && hasText(element.value)) return true;
+          return false;
+        }
+        if (hasText(element.textContent)) return true;
+        return Array.from(element.querySelectorAll('img[alt], svg[aria-label], svg title'))
+          .some(child => hasText(child.getAttribute('alt')) ||
+            hasText(child.getAttribute('aria-label')) || hasText(child.textContent));
+      };
+      const interactive = Array.from(document.querySelectorAll(
+        'a[href], button, input:not([type="hidden"]), select, textarea, [role="button"], [role="link"]'
+      )).filter(visible);
+      const imagesMissingAlt = Array.from(document.images)
+        .filter(image => visible(image) && !image.hasAttribute('alt'))
+        .map(image => image.currentSrc || image.src || 'image sans source')
+        .slice(0, 20);
+      const positiveTabIndex = Array.from(document.querySelectorAll('[tabindex]'))
+        .filter(element => visible(element) && Number(element.getAttribute('tabindex')) > 0)
+        .map(element => element.tagName.toLowerCase() + (element.id ? '#' + element.id : ''))
+        .slice(0, 20);
+      return {
+        language: Boolean(document.documentElement.lang.trim()),
+        visibleH1: Array.from(document.querySelectorAll('h1')).filter(visible).length,
+        unlabeledControls: interactive.filter(element => !hasName(element))
+          .map(element => element.tagName.toLowerCase() + (element.id ? '#' + element.id : '') +
+            (element.className && typeof element.className === 'string' ? '.' + element.className.trim().split(/\\s+/).slice(0, 2).join('.') : ''))
+          .slice(0, 30),
+        imagesMissingAlt,
+        positiveTabIndex
+      };
+    });
+    assert.equal(accessibilityBaseline.language, true,
+      pageDefinition.name + ' doit déclarer la langue du document.');
+    assert.ok(accessibilityBaseline.visibleH1 >= 1,
+      pageDefinition.name + ' doit fournir un titre principal visible.');
+    assert.deepEqual(accessibilityBaseline.unlabeledControls, [],
+      pageDefinition.name + ' contient des contrôles interactifs sans nom accessible : ' +
+      JSON.stringify(accessibilityBaseline.unlabeledControls));
+    assert.deepEqual(accessibilityBaseline.imagesMissingAlt, [],
+      pageDefinition.name + ' contient des images visibles sans attribut alt : ' +
+      JSON.stringify(accessibilityBaseline.imagesMissingAlt));
+    assert.deepEqual(accessibilityBaseline.positiveTabIndex, [],
+      pageDefinition.name + ' contient des tabindex positifs qui perturbent l’ordre de tabulation : ' +
+      JSON.stringify(accessibilityBaseline.positiveTabIndex));
+  }
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await new Promise((resolve) => setTimeout(resolve, 120));
 

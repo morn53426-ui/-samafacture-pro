@@ -1,7 +1,9 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+const { genererFactureDepuisModele } = require('../routes/factures-recurrentes');
+const { localDateString } = require('../utils/local-date');
 
 // Vérifie que la génération automatique d'une facture récurrente calcule exactement les
 // mêmes totaux qu'une facture créée manuellement avec les mêmes lignes et la même remise —
@@ -55,6 +57,212 @@ describe('Factures récurrentes : cohérence des calculs avec la création manue
     assert.equal(Number(generee.body.facture.total_tva), Number(manuelle.body.facture.total_tva),
       'la facture générée automatiquement doit calculer exactement la même TVA que la facture manuelle équivalente');
     assert.equal(Number(generee.body.facture.total), Number(manuelle.body.facture.total));
+  });
+
+  test("une génération manuelle anticipée ne décale pas la prochaine échéance planifiée", async () => {
+    const futureDate = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const modele = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Génération manuelle anticipée',
+        frequence: 'mensuelle',
+        prochaine_date: futureDate,
+        lignes: [{ designation: 'Maintenance', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(modele.status, 201);
+    assert.equal(Number(modele.body.recurrente.jour_ancre), Number(futureDate.slice(-2)));
+
+    const generee = await request(app)
+      .post(`/api/factures-recurrentes/${modele.body.recurrente.id}/generer`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(generee.status, 201);
+
+    const liste = await request(app)
+      .get('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`);
+    const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
+    assert.ok(updated);
+    assert.equal(String(updated.prochaine_date).slice(0, 10), futureDate,
+      'la génération manuelle ne doit pas avancer une échéance encore future');
+  });
+
+  test("le planificateur ignore un modèle qui n'est plus dû après l'obtention du verrou", async () => {
+    const futureDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const modele = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Contrôle de l’échéance sous verrou',
+        frequence: 'mensuelle',
+        prochaine_date: futureDate,
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(modele.status, 201);
+
+    const facture = await genererFactureDepuisModele(
+      modele.body.recurrente.id,
+      userId,
+      { onlyIfDue: true }
+    );
+    assert.equal(facture, null, 'le scheduler ne doit pas traiter un modèle encore futur');
+
+    const liste = await request(app)
+      .get('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`);
+    const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
+    assert.equal(Number(updated.factures_generees), 0);
+    assert.equal(String(updated.prochaine_date).slice(0, 10), futureDate);
+  });
+
+  test("le planificateur respecte la mise en pause même si le modèle était déjà sélectionné", async () => {
+    const modele = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Modèle mis en pause',
+        frequence: 'mensuelle',
+        prochaine_date: new Date().toISOString().slice(0, 10),
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(modele.status, 201);
+
+    const pause = await request(app)
+      .put(`/api/factures-recurrentes/${modele.body.recurrente.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ actif: false });
+    assert.equal(Number(pause.body.recurrente.actif), 0);
+
+    const facture = await genererFactureDepuisModele(
+      modele.body.recurrente.id,
+      userId,
+      { onlyIfDue: true }
+    );
+    assert.equal(facture, null, 'un modèle mis en pause ne doit pas être généré par le scheduler');
+
+    const liste = await request(app)
+      .get('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`);
+    const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
+    assert.equal(Number(updated.factures_generees), 0);
+  });
+
+  test("le scheduler ne génère pas un modèle désactivé après sa sélection initiale", async () => {
+    const [[dateDb]] = await pool.query('SELECT CURDATE() AS today');
+    const today = String(dateDb.today).slice(0, 10);
+    const modele = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Modèle mis en pause pendant le scheduler',
+        frequence: 'mensuelle',
+        prochaine_date: today,
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(modele.status, 201);
+
+    const pause = await request(app)
+      .put(`/api/factures-recurrentes/${modele.body.recurrente.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ actif: false });
+    assert.equal(pause.status, 200);
+
+    const facture = await genererFactureDepuisModele(
+      modele.body.recurrente.id,
+      userId,
+      { onlyIfDue: true }
+    );
+    assert.equal(facture, null, 'le scheduler doit respecter la pause après avoir obtenu le verrou');
+
+    const liste = await request(app)
+      .get('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`);
+    const updated = liste.body.recurrentes.find(row => row.id === modele.body.recurrente.id);
+    assert.equal(Number(updated.factures_generees), 0);
+    assert.equal(Number(updated.actif), 0);
+  });
+
+  test("la première échéance par défaut utilise la date civile du fuseau du compte", async () => {
+    const [[account]] = await pool.query(
+      'SELECT fuseau_horaire FROM users WHERE id = ?',
+      [userId]
+    );
+    const expectedDate = localDateString(account.fuseau_horaire || 'Africa/Dakar');
+    const response = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Date initiale selon fuseau du compte',
+        frequence: 'mensuelle',
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+
+    assert.equal(response.status, 201);
+    assert.equal(String(response.body.recurrente.prochaine_date).slice(0, 10), expectedDate);
+    assert.equal(Number(response.body.recurrente.jour_ancre), Number(expectedDate.slice(-2)));
+  });
+
+  test('la création interprète false comme désactivé et rejette les valeurs non booléennes', async () => {
+    const disabled = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Option email désactivée explicitement',
+        envoi_auto_email: 'false',
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+
+    assert.equal(disabled.status, 201);
+    assert.equal(Number(disabled.body.recurrente.envoi_auto_email), 0);
+
+    const invalid = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Option email invalide',
+        envoi_auto_email: 'off',
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+
+    assert.equal(invalid.status, 400);
+    assert.match(invalid.body.error, /envoi_auto_email doit être un booléen/);
+  });
+
+  test('la mise à jour conserve false comme false pour actif et envoi_auto_email', async () => {
+    const created = await request(app)
+      .post('/api/factures-recurrentes')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        libelle: 'Option email modifiable',
+        envoi_auto_email: true,
+        lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 5000, tva: 18 }]
+      });
+    assert.equal(created.status, 201);
+
+    const updated = await request(app)
+      .put(`/api/factures-recurrentes/${created.body.recurrente.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ actif: 'false', envoi_auto_email: 'false' });
+
+    assert.equal(updated.status, 200);
+    assert.equal(Number(updated.body.recurrente.actif), 0);
+    assert.equal(Number(updated.body.recurrente.envoi_auto_email), 0);
+
+    const invalid = await request(app)
+      .put(`/api/factures-recurrentes/${created.body.recurrente.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ envoi_auto_email: 'off' });
+
+    assert.equal(invalid.status, 400);
+    assert.match(invalid.body.error, /envoi_auto_email doit être un booléen/);
   });
 
   test('générer une facture récurrente inexistante renvoie 404', async () => {

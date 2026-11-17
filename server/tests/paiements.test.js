@@ -46,6 +46,22 @@ describe("Paiements d'abonnement", () => {
     assert.equal(res.status, 400);
   });
 
+  test('un canal PayDunya inconnu est refusé avant toute création de paiement', async () => {
+    const res = await request(app)
+      .post('/api/abonnement/payer')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ plan: 'starter', fournisseur: 'paydunya', moyen: 'paypal' });
+    assert.equal(res.status, 400);
+  });
+
+  test('un canal carte ne peut pas être envoyé au fournisseur Wave', async () => {
+    const res = await request(app)
+      .post('/api/abonnement/payer')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ plan: 'starter', fournisseur: 'wave', moyen: 'carte_bancaire' });
+    assert.equal(res.status, 400);
+  });
+
   test('un fournisseur non configuré (pas de clés en .env de test) répond 503, pas une erreur 500 opaque', async () => {
     const res = await request(app)
       .post('/api/abonnement/payer')

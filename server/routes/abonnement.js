@@ -19,6 +19,14 @@ const TARIFS = {
   entreprise: 35000
 };
 
+// Canaux PayDunya autorisés pour l'écran d'abonnement.
+// Les identifiants sont ceux de l'API officielle (invoice.channels).
+const CANAUX_PAYDUNYA = Object.freeze({
+  wave: 'wave-senegal',
+  orange_money: 'orange-money-senegal',
+  carte_bancaire: 'card'
+});
+
 function baseUrl(req) {
   return (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
 }
@@ -89,7 +97,7 @@ router.get('/moyens-disponibles', requireAuth, (req, res) => {
  * @openapi
  * /abonnement/payer:
  *   post:
- *     summary: Démarre un paiement d'abonnement (crée une session chez Wave ou PayDunya)
+ *     summary: Démarre un paiement ponctuel via Wave ou un canal PayDunya choisi
  *     tags: [Abonnement]
  *     requestBody:
  *       required: true
@@ -101,6 +109,7 @@ router.get('/moyens-disponibles', requireAuth, (req, res) => {
  *             properties:
  *               plan: { type: string, enum: [starter, pro, entreprise] }
  *               fournisseur: { type: string, enum: [wave, paydunya] }
+ *               moyen: { type: string, enum: [wave, orange_money, carte_bancaire], description: 'Choix du client ; facultatif pour compatibilité avec les anciens appels.' }
  *     responses:
  *       200:
  *         description: URL de paiement à ouvrir.
@@ -111,11 +120,18 @@ router.get('/moyens-disponibles', requireAuth, (req, res) => {
  */
 router.post('/payer', requireAuth, async (req, res, next) => {
   try {
-    const { plan, fournisseur } = req.body;
+    const { plan, fournisseur, moyen } = req.body;
     if (!TARIFS[plan]) return res.status(400).json({ error: 'Plan invalide.' });
-    if (!['wave', 'paydunya'].includes(fournisseur)) return res.status(400).json({ error: 'Moyen de paiement invalide.' });
+    if (!['wave', 'paydunya'].includes(fournisseur)) return res.status(400).json({ error: 'Fournisseur de paiement invalide.' });
+    if (moyen !== undefined && typeof moyen !== 'string') return res.status(400).json({ error: 'Moyen de paiement invalide.' });
+    if (fournisseur === 'wave' && moyen !== undefined && moyen !== 'wave') {
+      return res.status(400).json({ error: 'Le moyen sélectionné ne correspond pas au fournisseur Wave.' });
+    }
+    if (fournisseur === 'paydunya' && moyen !== undefined && !Object.hasOwn(CANAUX_PAYDUNYA, moyen)) {
+      return res.status(400).json({ error: 'PayDunya ne prend pas en charge ce moyen pour ce paiement.' });
+    }
     if (fournisseur === 'wave' && !waveConfigured()) return res.status(503).json({ error: "Le paiement Wave n'est pas configuré sur ce serveur." });
-    if (fournisseur === 'paydunya' && !paydunyaConfigured()) return res.status(503).json({ error: "Le paiement par Orange Money / carte n'est pas configuré sur ce serveur." });
+    if (fournisseur === 'paydunya' && !paydunyaConfigured()) return res.status(503).json({ error: "Le paiement PayDunya n'est pas configuré sur ce serveur." });
 
     const montant = TARIFS[plan];
     const reference = crypto.randomBytes(16).toString('hex');
@@ -149,7 +165,10 @@ router.post('/payer', requireAuth, async (req, res, next) => {
           storeName: req.user.nom,
           returnUrl: retourUrl,
           cancelUrl: retourUrl,
-          callbackUrl: `${baseUrl(req)}/api/abonnement/webhook/paydunya`
+          callbackUrl: `${baseUrl(req)}/api/abonnement/webhook/paydunya`,
+          // Un canal unique est envoyé lorsque le client l'a choisi dans SamaFacture.
+          // En l'absence de ce champ, le comportement historique reste inchangé.
+          channels: moyen ? [CANAUX_PAYDUNYA[moyen]] : undefined
         });
         checkoutUrl = invoice.checkoutUrl;
         await pool.query('UPDATE abonnement_paiements SET reference = ? WHERE id = ?', [invoice.token, result.insertId]);

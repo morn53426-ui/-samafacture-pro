@@ -208,6 +208,6 @@ $('transfer-form').addEventListener('submit',async e=>{
   e.preventDefault();try{const r=await Api.post('/pro/inventory/transfers',{produit_id:Number($('transfer-product').value),entrepot_source_id:Number($('transfer-from').value),entrepot_destination_id:Number($('transfer-to').value),quantite:Number($('transfer-qty').value)});e.target.reset();await loadAll();showToast('Transfert '+r.reference+' enregistré.','success');}catch(err){showToast(err.message,'error');}
 });
 $('refresh-buying').addEventListener('click',()=>loadAll().catch(err=>showFatalError(err.message)));
-const today=new Date().toISOString().slice(0,10);$('purchase-date').value=today;$('receipt-date').value=today;
+const today=dateCivileAujourdhui();$('purchase-date').value=today;$('receipt-date').value=today;
 loadAll().catch(err=>showFatalError(err.message));
 </script></body></html>
