@@ -13,15 +13,61 @@ Ne supprimez pas `server/package-lock.json` et n'utilisez pas `npm install` pour
 
 ## Développement local
 
+### Préparer les fichiers d'environnement
+
+Depuis la racine du dépôt, créer les deux fichiers locaux une seule fois. Ne jamais remplacer un fichier `.env` qui contient déjà vos valeurs :
+
+**Git Bash / macOS / Linux :**
+
+```bash
+[ -f .env ] || cp .env.example .env
+[ -f server/.env ] || cp server/.env.example server/.env
+```
+
+**PowerShell Windows :**
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+if (-not (Test-Path server/.env)) { Copy-Item server/.env.example server/.env }
+```
+
+Dans le fichier `.env` à la racine, remplacer les valeurs `CHANGE_ME` et vérifier au minimum les variables suivantes :
+
+```dotenv
+DB_ROOT_PASSWORD=mot-de-passe-root-local-long
+DB_USER=samafacture_app
+DB_PASSWORD=mot-de-passe-app-local-long
+DB_NAME=samafacture
+HTTP_PORT=4000
+ALLOWED_ORIGINS=http://localhost:4000
+APP_URL=http://localhost:4000
+JWT_SECRET=secret-local-aleatoire-de-32-caracteres-minimum
+```
+
+Dans `server/.env`, définir aussi un `JWT_SECRET` local solide et conserver les paramètres applicatifs. Ne pas copier de clés de production dans ces fichiers. Pour un environnement local sans paiement, laisser vides les clés Wave, PayDunya et autres fournisseurs : aucun moyen de paiement ni prélèvement réel ne doit être activé pour les essais locaux.
+
+**Important — deux rôles distincts :** le fichier `.env` à la racine fournit les variables utilisées par l'interpolation de Docker Compose (identifiants MySQL, port, URL et origine). Le fichier `server/.env` est injecté dans les conteneurs applicatifs par `env_file: ./server/.env`. Ne passez pas `server/.env` à `--env-file` à la place du fichier racine.
+
+### Démarrer et contrôler les conteneurs
+
 Depuis la racine du dépôt :
 
 ```bash
+docker compose config --quiet
 docker compose up -d --build
 docker compose ps
-docker compose logs -f app
+docker compose logs --tail=100 app
+```
+
+La commande `config --quiet` doit se terminer sans erreur avant le démarrage. Attendre que MySQL et Redis soient sains et que les services `app` et `nginx` soient démarrés. Vérifier ensuite l'API :
+
+```bash
+curl http://localhost:4000/api/health
 ```
 
 L'interface locale est accessible sur `http://localhost:4000`. Le proxy HTTP de développement est lié à `127.0.0.1` : il n'expose pas un endpoint HTTP public non chiffré sur le VPS.
+
+Pour arrêter les services sans supprimer les données, utiliser `docker compose stop` ou `docker compose down` sans option `-v`. Ne jamais supprimer le volume `mysql_data` pendant un simple redémarrage ou une mise à jour.
 
 ## Déploiement public HTTPS
 
