@@ -316,7 +316,7 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
   }
   body.enterprise-console-shell #app-sidebar .sidebar-brand {
     display: flex;
-    min-height: 61px;
+    min-height: 70px;
     flex-direction: column;
     justify-content: center;
     gap: 0;
@@ -324,9 +324,9 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
     border-bottom: 1px solid #edf0f4;
   }
   body.enterprise-console-shell #app-sidebar .sidebar-brand .mark {
-    width: 42px !important;
-    height: 42px !important;
-    flex: 0 0 42px;
+    width: 52px !important;
+    height: 52px !important;
+    flex: 0 0 52px;
     padding: 3px;
     border: 1px solid #e5eaf0;
     border-radius: 11px;
@@ -391,8 +391,8 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
     font-size: 1.18rem;
   }
   body.enterprise-console-shell #app-sidebar .nav-item .ic .icon {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     stroke-width: 1.9;
   }
   body.enterprise-console-shell #app-sidebar .nav-label {
