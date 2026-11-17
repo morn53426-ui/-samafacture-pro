@@ -985,7 +985,44 @@ test('le plan Entreprise permet de créer un groupe, inviter une société et lu
   assert.ok(dashboard.body.performance_mensuelle.some(row => row.devise === 'FCFA' && row.total_facture === 1000), 'la tendance inclut la facture de la période');
   assert.ok(dashboard.body.alertes.some(row => row.type === 'factures_en_retard' && Number(row.societe_id) === Number(subsidiaryOwnerId)), 'une facture échue doit produire une alerte');
   assert.ok(dashboard.body.alertes.some(row => row.type === 'stocks_a_surveiller' && Number(row.societe_id) === Number(subsidiaryOwnerId)), 'un stock faible ou en rupture doit produire une alerte');
+
   assert.match(dashboard.body.note, /aucune conversion de change/i);
+
+  // Les réponses paginées limitent les détails de société, mais gardent les totaux du groupe.
+  const companyPage = await request(app)
+    .get('/api/pro/company-group?page=1&limit=1')
+    .set('Authorization', 'Bearer ' + groupOwnerToken);
+  assert.equal(companyPage.status, 200, companyPage.text);
+  assert.equal(companyPage.body.societes.length, 1);
+  assert.deepEqual(companyPage.body.pagination, {
+    page: 1, limit: 1, total: 2, totalPages: 2, from: 1, to: 1,
+    hasPrevious: false, hasNext: true
+  });
+  assert.equal(Number(companyPage.body.societes[0].id), Number(groupOwnerId),
+    'la société principale reste en premier dans la pagination');
+
+  const dashboardPage = await request(app)
+    .get('/api/pro/company-group/dashboard?page=2&limit=1')
+    .set('Authorization', 'Bearer ' + groupOwnerToken);
+  assert.equal(dashboardPage.status, 200, dashboardPage.text);
+  assert.equal(dashboardPage.body.societes.length, 1);
+  assert.equal(Number(dashboardPage.body.societes[0].id), Number(subsidiaryOwnerId));
+  assert.equal(dashboardPage.body.pagination.total, 2);
+  assert.equal(dashboardPage.body.factures_par_devise[0].total_facture, 1000,
+    'les indicateurs consolidés continuent de couvrir toutes les sociétés, même hors page');
+  assert.ok(dashboardPage.body.alertes.some(row =>
+    Number(row.societe_id) === Number(subsidiaryOwnerId) && row.societe_is_primary === false
+  ), 'les alertes conservent les informations nécessaires pour ouvrir une filiale hors page');
+
+  const invalidCompanyPage = await request(app)
+    .get('/api/pro/company-group?page=0&limit=1')
+    .set('Authorization', 'Bearer ' + groupOwnerToken);
+  assert.equal(invalidCompanyPage.status, 400, 'une page invalide doit être rejetée proprement');
+
+  const oversizedCompanyPage = await request(app)
+    .get('/api/pro/company-group?page=1&limit=1000')
+    .set('Authorization', 'Bearer ' + groupOwnerToken);
+  assert.equal(oversizedCompanyPage.status, 400, 'une limite supérieure à 50 doit être rejetée');
 
   // Un jeton expiré doit être rejeté par l'API et par le worker email.
   const [[starterRecipient]] = await pool.query('SELECT email FROM users WHERE id = ?', [starterId]);
