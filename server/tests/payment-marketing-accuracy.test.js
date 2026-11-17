@@ -22,7 +22,8 @@ test("le README décrit l'état indisponible des abonnements et le renouvellemen
   assert.match(readme, /aucune souscription mensuelle, aucun mandat récurrent et aucun débit automatique ne sont activés/i);
   assert.match(readme, /HTTP .503.*PAIEMENT_RECURRENT_NON_CONFIGURE/);
   assert.match(readme, /renouvellement automatique sera facultatif.*désactivé par défaut.*consentement explicite/i);
-  assert.match(readme, /PUT .\/api\/auth\/plan.*HTTP .403.*PAIEMENT_REQUIS/);
+  assert.ok(readme.includes('PUT /api/auth/plan'));
+  assert.ok(readme.includes('HTTP `403` (`PAIEMENT_REQUIS`)'));
   assert.doesNotMatch(readme, /paiements uniques en XOF/i);
   assert.doesNotMatch(readme, /intégrations d'abonnement Wave et PayDunya déjà présentes/i);
 });
