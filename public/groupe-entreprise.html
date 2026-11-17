@@ -91,6 +91,8 @@ renderSidebar('groupe-entreprise');
 const root=document.getElementById('group-content');
 const statusRoot=document.getElementById('group-status');
 const currentUser=Api.currentUser()||{};
+let companyPage=1;
+const companyPageSize=20;
 
 function setGroupNavigation(visible){
   const navigation=document.getElementById('group-section-nav');
@@ -190,6 +192,10 @@ function renderGroup(data,dashboard){
   setGroupNavigation(true);
   const group=data.groupe;
   const companies=data.societes||[];
+  const companyPagination=data.pagination||dashboard?.pagination||null;
+  const totalCompanies=Number(companyPagination?.total??companies.length);
+  const currentCompanyPage=Number(companyPagination?.page||companyPage||1);
+  const totalCompanyPages=Number(companyPagination?.totalPages||1);
   const metricsByCompany=new Map((dashboard?.societes||[]).map(company=>[Number(company.id),company]));
   const invitations=data.invitations||[];
   const alertes=dashboard?.alertes||[];
@@ -263,9 +269,8 @@ function renderGroup(data,dashboard){
     const detail=isInvoice
       ? Number(item.nombre||0)+' facture(s) · '+money(item.montant,item.devise)+' à recouvrer'
       : Number(item.ruptures||0)+' rupture(s) · '+Number(item.stocks_faibles||0)+' stock(s) faible(s)';
-    const company=companies.find(row=>Number(row.id)===Number(item.societe_id));
-    const openAction=company&&!company.is_primary
-      ? '<button class="btn btn-outline" type="button" data-open="'+Number(company.id)+'">Ouvrir la filiale</button>'
+    const openAction=Number(item.societe_id)>0&&!item.societe_is_primary
+      ? '<button class="btn btn-outline" type="button" data-open="'+Number(item.societe_id)+'">Ouvrir la filiale</button>'
       : '';
     return `<article class="group-alert"><div><strong>${escapeHtml(title)} — ${escapeHtml(item.societe||'Société')}</strong><small>${escapeHtml(detail)}</small></div>${openAction}</article>`;
   }).join('');
@@ -301,12 +306,12 @@ function renderGroup(data,dashboard){
         <div>
           <div class="group-section-eyebrow">Vue d’ensemble</div>
           <h2 id="group-overview-title">${escapeHtml(group.nom)}</h2>
-          <p class="group-muted">Centre de pilotage de ${companies.length} société(s). Les comptes, utilisateurs et données restent séparés ; seules les sociétés ayant accepté le rattachement sont visibles ici.</p>
+          <p class="group-muted">Centre de pilotage de ${totalCompanies} société(s). Les comptes, utilisateurs et données restent séparés ; seules les sociétés ayant accepté le rattachement sont visibles ici.</p>
         </div>
         <span class="group-status-chip"><i class="ic" data-icon="check-circle" aria-hidden="true"></i> Groupe actif</span>
       </div>
       <div class="group-overview-kpis" aria-label="Résumé du groupe">
-        <article class="group-overview-kpi"><span>Sociétés rattachées</span><strong>${companies.length}</strong><small>Société principale incluse</small></article>
+        <article class="group-overview-kpi"><span>Sociétés rattachées</span><strong>${totalCompanies}</strong><small>Société principale incluse</small></article>
         <article class="group-overview-kpi"><span>Invitations en cours</span><strong>${invitations.length}</strong><small>Accès en attente de confirmation</small></article>
         <article class="group-overview-kpi"><span>Alertes à examiner</span><strong>${alertes.length}</strong><small>Factures ou stocks à surveiller</small></article>
         <article class="group-overview-kpi"><span>Devises suivies</span><strong>${currencies.length}</strong><small>Indicateurs gardés séparés par devise</small></article>
@@ -323,8 +328,9 @@ function renderGroup(data,dashboard){
       <div class="group-performance">${trendHtml||'<div class="group-empty">Aucune facture émise sur la période disponible.</div>'}</div>
     </section>
     <section class="group-panel" id="group-companies" aria-labelledby="group-companies-title">
-      <div class="group-panel-heading"><div><h2 id="group-companies-title">Sociétés du groupe</h2><p class="group-muted">${companies.length} société(s) rattachée(s), société principale incluse.</p></div></div>
-      <div class="group-company-list">${companyHtml}</div>
+      <div class="group-panel-heading"><div><h2 id="group-companies-title">Sociétés du groupe</h2><p class="group-muted">${totalCompanies} société(s) rattachée(s), société principale incluse. Affichage de ${companyPagination?.from||0} à ${companyPagination?.to||companies.length}.</p></div></div>
+      <div class="group-company-list">${companyHtml||'<div class="group-empty">Aucune société sur cette page.</div>'}</div>
+      ${companyPagination&&totalCompanyPages>1?'<nav class="group-company-pagination" aria-label="Pagination des sociétés"><button class="btn btn-outline btn-sm" type="button" id="group-company-prev" '+(companyPagination.hasPrevious?'':'disabled')+'>Précédent</button><span aria-live="polite">Page '+currentCompanyPage+' sur '+totalCompanyPages+'</span><button class="btn btn-outline btn-sm" type="button" id="group-company-next" '+(companyPagination.hasNext?'':'disabled')+'>Suivant</button></nav>':''}
     </section>
     <section class="group-panel" id="group-invitations" aria-labelledby="group-invitations-title">
       <div class="group-panel-heading"><div><h2 id="group-invitations-title">Inviter une société</h2><p class="group-muted">Le propriétaire de la société invitée doit accepter l’accès administrateur avant que ses données soient visibles par le groupe. L’invitation expire après 7 jours.</p></div></div>
@@ -337,6 +343,9 @@ function renderGroup(data,dashboard){
         <div class="group-invite"><div><strong>${escapeHtml(item.invited_email)}</strong><small class="group-muted">Expire le ${escapeHtml(formatDate(item.expire_at))}</small><small class="group-muted">${escapeHtml(emailStatusLabel(item))}</small></div><div class="group-actions"><button class="btn btn-outline" type="button" data-copy-invitation="${Number(item.id)}">Copier le lien</button>${item.email_statut==='failed'?'<button class="btn btn-outline" type="button" data-retry-email="'+Number(item.id)+'">Relancer l’email</button>':''}<button class="btn btn-outline group-danger" type="button" data-revoke="${Number(item.id)}">Révoquer</button></div></div>`).join('')}</div>`:''}
     </section>`;
   if(typeof window.hydrateIcons==='function')window.hydrateIcons(root);
+  document.getElementById('group-company-prev')?.addEventListener('click',()=>load(currentCompanyPage-1));
+  document.getElementById('group-company-next')?.addEventListener('click',()=>load(currentCompanyPage+1));
+
 
   document.getElementById('invite-company-form').addEventListener('submit',async event=>{
     event.preventDefault();
@@ -392,14 +401,18 @@ function renderGroup(data,dashboard){
     catch(err){message(err.message,'error');button.disabled=false;}
   }));
 }
-async function load(){
+async function load(requestedPage=companyPage){
+  if(Number.isSafeInteger(Number(requestedPage))&&Number(requestedPage)>0)companyPage=Number(requestedPage);
   setGroupNavigation(false);
   root.setAttribute('aria-busy','true');
   try{
     if(currentUser.plan==='entreprise'){
-      const data=await Api.get('/pro/company-group');
+      const pageQuery='?page='+encodeURIComponent(companyPage)+'&limit='+companyPageSize;
+      const data=await Api.get('/pro/company-group'+pageQuery);
       if(data.groupe){
-        const dashboard=await Api.get('/pro/company-group/dashboard');
+        const maxPage=Math.max(1,Number(data.pagination?.totalPages||1));
+        if(companyPage>maxPage&&companyPage!==maxPage)return load(maxPage);
+        const dashboard=await Api.get('/pro/company-group/dashboard'+pageQuery);
         renderGroup(data,dashboard);
         return;
       }
