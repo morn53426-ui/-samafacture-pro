@@ -6,8 +6,10 @@ on:
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'
+      - 'public/js/workspace-modals.js'
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
   push:
     branches:
@@ -15,8 +17,10 @@ on:
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'
+      - 'public/js/workspace-modals.js'
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
 
 permissions:
@@ -43,5 +47,7 @@ jobs:
           npx --yes --package=eslint@10.15.0 eslint
           eslint.config.mjs
           public/js/sidebar.js
+          public/js/workspace-modals.js
           server/tests/visual/recette-visuelle.js
           server/tests/workspace-navigation.test.js
+          server/tests/workspace-modal-accessibility.test.js
