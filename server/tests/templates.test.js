@@ -323,6 +323,10 @@ describe('Impression et génération PDF', () => {
     assert.match(cssSource, /--font-display:\s*'IBM Plex Sans', Arial, sans-serif/);
     assert.match(cssSource, /--font-body:\s*'IBM Plex Sans', Arial, sans-serif/);
     assert.match(cssSource, /--font-mono:\s*'IBM Plex Mono', 'Courier New', monospace/);
+    assert.match(cssSource, /\.invoice-doc\s*\{[^}]*font-family:\s*var\(--font-body\)/s,
+      'Le document doit déclarer explicitement sa famille de texte, sans dépendre de body.');
+    assert.match(cssSource, /\.invoice-doc h1,[\s\S]*?font-family:\s*var\(--font-display\)/,
+      'Les titres imprimés doivent utiliser explicitement la police display.');
     assert.doesNotMatch(cssSource, /--font-(?:display|body|mono):\s*'(?:Manrope|Inter|JetBrains Mono)'/,
       'Les variables ne doivent pas demander des polices qui ne sont pas chargées.');
   });
