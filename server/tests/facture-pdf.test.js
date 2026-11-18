@@ -133,6 +133,20 @@ describe('Génération PDF de facture', () => {
         timeout: 20000
       });
       await page.waitForFunction(() => window.__docReady === true, { timeout: 15000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+
+      const typographie = await page.evaluate(() => ({
+        documentFont: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily,
+        headingFont: getComputedStyle(document.querySelector('.invoice-doc h2')).fontFamily,
+        tableFont: getComputedStyle(document.querySelector('.invoice-doc .sf-doc-description')).fontFamily,
+        fontSize: getComputedStyle(document.querySelector('.invoice-doc')).fontSize,
+        documentFontLoaded: document.fonts ? document.fonts.check('12px "IBM Plex Sans"') : false
+      }));
+      assert.match(typographie.documentFont, /IBM Plex Sans/);
+      assert.match(typographie.headingFont, /IBM Plex Sans/);
+      assert.match(typographie.tableFont, /IBM Plex Sans/);
+      assert.ok(typographie.documentFontLoaded,
+        'IBM Plex Sans doit être disponible avant la capture PDF.');
 
       const lireEtatTheme = () => page.evaluate(() => ({
         theme: document.documentElement.getAttribute('data-theme'),
@@ -163,6 +177,19 @@ describe('Génération PDF de facture', () => {
       assert.equal(etat.couleurFondApp, couleurPaletteClaire);
       assert.equal(etat.toolbar, 'none');
       assert.equal(etat.fondDocument, 'rgb(255, 254, 252)', 'le fond papier doit rester blanc cassé en impression');
+      const printMetrics = await page.evaluate(() => ({
+        paddingLeft: getComputedStyle(document.querySelector('.invoice-doc')).paddingLeft,
+        paddingRight: getComputedStyle(document.querySelector('.invoice-doc')).paddingRight,
+        fontSize: getComputedStyle(document.querySelector('.invoice-doc')).fontSize,
+        tableFontSize: getComputedStyle(document.querySelector('.sf-document-table td')).fontSize
+      }));
+      assert.equal(printMetrics.paddingLeft, '0px',
+        'Les marges A4 de @page ne doivent pas être doublées par un padding de 40 px.');
+      assert.equal(printMetrics.paddingRight, '0px');
+      assert.equal(printMetrics.fontSize, '13.3333px',
+        'Le texte courant doit être imprimé à 10 pt minimum.');
+      assert.equal(printMetrics.tableFontSize, '12px',
+        'Les lignes du tableau doivent être imprimées à 9 pt minimum.');
 
       // À la fermeture de l'aperçu, le mode système sombre doit être rétabli.
       await appliquerMedia('screen');
