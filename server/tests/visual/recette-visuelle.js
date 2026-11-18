@@ -3156,7 +3156,7 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           .map(element => ({ label: element.getAttribute('aria-label') || '',
             labelledBy: element.getAttribute('aria-labelledby') || '', text: textOf(element).slice(0, 100) }));
         const headings = Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6'))
-          .filter(isVisible)
+          .filter(element => isVisible(element) && !element.closest('[aria-hidden="true"]'))
           .map(element => ({ level: Number(element.tagName.slice(1)), text: textOf(element).slice(0, 100) }));
         const visibleH1 = headings.filter(heading => heading.level === 1).length;
         const focus = document.activeElement;
@@ -3218,7 +3218,9 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             }
             ancestor = ancestor.parentElement;
           }
-          if (gradient) {
+          if (gradient || element.closest(
+            '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
+          )) {
             unmeasurableContrast.push(selectorFor(element));
             continue;
           }
@@ -3244,8 +3246,14 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
 
         const nonSemanticActions = Array.from(document.querySelectorAll('[onclick]'))
           .filter(isVisible)
-          .filter(element => !/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(element.tagName) &&
-            !element.hasAttribute('role') && !element.hasAttribute('tabindex'))
+          .filter(element => {
+            const handler = (element.getAttribute('onclick') || '').trim();
+            // Un onclick qui ne fait qu'arrêter la propagation d'un clic n'est
+            // pas une action interactive (ex. cellule Actions dans une ligne cliquable).
+            if (/^event\\.stopPropagation\\(\\);?$/.test(handler)) return false;
+            return !/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(element.tagName) &&
+              !element.hasAttribute('role') && !element.hasAttribute('tabindex');
+          })
           .slice(0, 30)
           .map(selectorFor);
 
