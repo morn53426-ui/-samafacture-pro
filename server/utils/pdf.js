@@ -145,7 +145,20 @@ async function genererPdfFacture(factureId, user) {
     });
     await page.emulateMediaType('print');
     await page.evaluate(async () => {
-      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      if (document.fonts) {
+        // Charger explicitement les familles et graisses utilisées par les documents.
+        // document.fonts.ready seul peut se résoudre avant que toutes les variantes
+        // attendues soient matérialisées dans le média d'impression.
+        await Promise.all([
+          document.fonts.load('400 12px "IBM Plex Sans"'),
+          document.fonts.load('500 12px "IBM Plex Sans"'),
+          document.fonts.load('600 12px "IBM Plex Sans"'),
+          document.fonts.load('700 12px "IBM Plex Sans"'),
+          document.fonts.load('400 12px "IBM Plex Mono"'),
+          document.fonts.load('500 12px "IBM Plex Mono"')
+        ]);
+        await document.fonts.ready;
+      }
       const images = Array.from(document.querySelectorAll('#doc img'));
       await Promise.all(images.map(image => {
         if (typeof image.decode === 'function') return image.decode().catch(() => {});
