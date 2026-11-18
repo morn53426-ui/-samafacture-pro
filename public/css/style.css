@@ -7193,3 +7193,62 @@ a.btn .icon {
     }
   }
 }
+
+/* --------------------------------------------------------------------------
+   Accessibilité WCAG — contrastes des actions et indicateurs de rapports.
+   Les teintes restent cohérentes avec la palette existante, avec un ratio
+   supérieur ou égal à 4,5:1 pour le texte courant sur les surfaces concernées.
+   -------------------------------------------------------------------------- */
+.btn-danger { color: #A8322D; }
+.btn-danger:hover:not(:disabled) {
+  background: #A8322D;
+  color: #fff;
+}
+:root[data-theme="dark"] .btn-danger { color: #FF9A95; }
+:root[data-theme="dark"] .btn-danger:hover:not(:disabled) {
+  background: #A8322D;
+  color: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn-danger { color: #FF9A95; }
+  :root:not([data-theme="light"]) .btn-danger:hover:not(:disabled) {
+    background: #A8322D;
+    color: #fff;
+  }
+}
+
+.billing-filter.is-active { color: #1456C0; }
+:root[data-theme="dark"] .billing-filter.is-active { color: #8AB8FF; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .billing-filter.is-active { color: #8AB8FF; }
+}
+
+.billing-icon-action.is-whatsapp,
+.btn.is-whatsapp { color: #0B6D32; }
+.billing-icon-action.is-whatsapp:hover,
+.btn.is-whatsapp:hover {
+  color: #0B6D32;
+  border-color: #0B6D32;
+}
+
+/* Les chiffres restent blancs sur les dégradés, désormais assez sombres
+   sur toute leur plage pour conserver le contraste, y compris les accents
+   vert et ambre. Le fond explicite empêche une règle générique de carte
+   d'effacer ces accents sur les pages de rapports. */
+.reports-kpi-blue {
+  background: linear-gradient(125deg, #1355B5, #1A62CA) !important;
+}
+.reports-kpi-green {
+  background: linear-gradient(125deg, #08724F, #0A7F59) !important;
+}
+.reports-kpi-purple {
+  background: linear-gradient(125deg, #7138E8, #8B38F1) !important;
+}
+.reports-kpi-amber {
+  background: linear-gradient(125deg, #905700, #A86500) !important;
+}
+.reports-kpi-blue .stat-label,
+.reports-kpi-green .stat-label,
+.reports-kpi-purple .stat-label,
+.reports-kpi-amber .stat-label { color: #fff; }
+

@@ -69,3 +69,15 @@ Cette suite n'est pas un diff pixel-à-pixel contre des captures de référence 
 produit des captures reproductibles et échoue sur les débordements et erreurs constatées.
 Les captures doivent être revues par une personne avant de considérer la recette visuelle
 comme acceptée.
+
+## Audit d’accessibilité (17 pages métier)
+
+La recette Chromium inclut un diagnostic dédié sur chaque page métier, à 1280 px CSS :
+- noms accessibles des liens, boutons, champs, sélecteurs et éléments interactifs ;
+- alternatives des images et titres des iframes ;
+- repères `main` et `nav`, libellés de navigation et hiérarchie des titres ;
+- premier arrêt clavier obtenu avec la touche Tab et présence d’un indicateur visuel de focus ;
+- estimation du contraste WCAG pour les textes courants lorsque le fond est une couleur unie mesurable ;
+- éléments cliquables non sémantiques à examiner.
+
+Les résultats sont ajoutés au rapport `rapport-recette-visuelle.json` sous la clé `accessibility`, avec une capture par page. Les fonds en dégradé sont comptés séparément et ne sont pas déclarés conformes sur la base d’une estimation trompeuse. Ce diagnostic sert à identifier les correctifs ; il ne remplace pas une revue avec lecteur d’écran (NVDA/VoiceOver), clavier complet, ni les essais sur Safari iOS et Chrome Android.

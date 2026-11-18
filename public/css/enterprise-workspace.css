@@ -1818,3 +1818,19 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
     background: transparent !important;
   }
 }
+
+/* Accessibilité : les commandes du bandeau Entreprise ont une surface claire.
+   Utiliser un texte et des icônes navy sur ces boutons, pas le bleu pâle réservé
+   au texte placé directement sur le fond navy du bandeau. */
+body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle,
+body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout,
+body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization {
+  color: #082B50;
+}
+body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle .icon,
+body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle svg,
+body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout .icon,
+body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization .icon {
+  color: #082B50;
+}
+
