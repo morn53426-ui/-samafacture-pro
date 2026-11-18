@@ -2410,7 +2410,13 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
           const bodyBackground = bodyStyle.backgroundColor;
           const bodyLuminance = luminance(parseColor(bodyBackground));
           const mainRect = main.getBoundingClientRect();
-          const navToggle = document.getElementById('mobile-toggle-btn');
+          // Les pages du centre entreprise utilisent le bouton du topbar dédié,
+          // tandis que les autres pages utilisent celui intégré à la sidebar.
+          const navToggle = document.querySelector('.enterprise-console-menu-toggle, #mobile-toggle-btn');
+          const navToggleStyle = navToggle ? getComputedStyle(navToggle) : null;
+          const navToggleRect = navToggle ? navToggle.getBoundingClientRect() : null;
+          const navToggleLabel = navToggle?.getAttribute('aria-label')?.trim() || '';
+          const navToggleControls = navToggle?.getAttribute('aria-controls') || '';
           return {
             viewport: window.innerWidth,
             documentWidth: root.scrollWidth,
@@ -2423,8 +2429,12 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
             mainLeft: Math.round(mainRect.left),
             mainRight: Math.round(mainRect.right),
             mobileToggleExists: Boolean(navToggle),
-            mobileToggleVisible: navToggle ? getComputedStyle(navToggle).display !== 'none' &&
-              navToggle.getClientRects().length > 0 : false
+            mobileToggleVisible: Boolean(navToggle && navToggleStyle && navToggleRect &&
+              navToggleStyle.display !== 'none' && navToggleStyle.visibility !== 'hidden' &&
+              Number(navToggleStyle.opacity) > 0 && navToggleRect.width >= 32 && navToggleRect.height >= 32),
+            mobileToggleAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
+              navToggleLabel && navToggleControls === 'app-navigation' &&
+              document.getElementById(navToggleControls))
           };
         });
 
@@ -2443,10 +2453,12 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
         assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
           pageDefinition.name + ' : la zone métier doit rester dans le viewport à ' + viewport.width + 'px : ' +
           JSON.stringify(metrics));
-        if (viewport.width <= 390 && metrics.mobileToggleExists) {
-          assert.equal(metrics.mobileToggleVisible, true,
-            pageDefinition.name + ' doit garder la commande de navigation mobile accessible.');
-        }
+        assert.equal(metrics.mobileToggleExists, true,
+          pageDefinition.name + ' doit exposer une commande de navigation mobile.');
+        assert.equal(metrics.mobileToggleVisible, true,
+          pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
+        assert.equal(metrics.mobileToggleAccessible, true,
+          pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
 
         const screenshot = 'theme-sombre-' + pageDefinition.name + '-' + viewport.name + '.png';
         await page.screenshot({
