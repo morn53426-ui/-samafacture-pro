@@ -2246,6 +2246,7 @@ async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
           if (style.display === 'none' || style.visibility === 'hidden' ||
               Number.parseFloat(style.opacity) === 0 || rect.width * rect.height < 12000) return false;
           if (style.backgroundImage && style.backgroundImage !== 'none') return false;
+          if (element.closest('.invoice-doc, .logo-live-preview .lp-mock')) return false;
           const selector = element.tagName.toLowerCase() +
             (element.id ? '#' + element.id : '') +
             (typeof element.className === 'string' && element.className.trim()
@@ -2278,6 +2279,17 @@ async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
           };
         });
 
+        const logoMock = document.querySelector('.logo-live-preview .lp-mock');
+        const readLogoPreviewColor = selector => {
+          const element = logoMock?.querySelector(selector);
+          return element ? getComputedStyle(element).color : null;
+        };
+        const logoPreview = logoMock ? {
+          background: getComputedStyle(logoMock).backgroundColor,
+          companyNameColor: readLogoPreviewColor('.lp-company-name'),
+          companySubColor: readLogoPreviewColor('.lp-company-sub'),
+          totalColor: readLogoPreviewColor('.lp-mock-total')
+        } : null;
         return {
           theme: root.getAttribute('data-theme'),
           colorScheme: rootStyle.colorScheme,
@@ -2287,6 +2299,7 @@ async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
           bodyLuminance: bodyLuminance === null ? null : Number(bodyLuminance.toFixed(3)),
           mainBackground: getComputedStyle(main).backgroundColor,
           horizontalOverflow: root.scrollWidth > window.innerWidth,
+          logoPreview,
           largeLightSurfaces
         };
       });
@@ -2306,10 +2319,24 @@ async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
         JSON.stringify({ bodyBackground: metrics.bodyBackground, creamToken: metrics.creamToken }));
       assert.equal(metrics.horizontalOverflow, false,
         pageDefinition.name + ' ne doit pas déborder horizontalement en thème sombre.');
+      let logoPreviewContrasts = null;
+      if (metrics.logoPreview) {
+        assert.equal(metrics.logoPreview.background, 'rgb(255, 255, 255)',
+          'Le mini-aperçu de facture doit conserver son papier blanc.');
+        logoPreviewContrasts = {
+          companyName: contrastRatio(metrics.logoPreview.companyNameColor, metrics.logoPreview.background),
+          companySub: contrastRatio(metrics.logoPreview.companySubColor, metrics.logoPreview.background),
+          total: contrastRatio(metrics.logoPreview.totalColor, metrics.logoPreview.background)
+        };
+        for (const [label, contrast] of Object.entries(logoPreviewContrasts)) {
+          assert.ok(contrast >= 4.5,
+            'Le texte ' + label + ' du mini-aperçu facture doit garder un contraste de 4,5:1 en thème sombre. Valeur : ' + contrast.toFixed(2));
+        }
+      }
       assert.deepEqual(pageErrors, [],
         pageDefinition.name + ' a généré des erreurs JavaScript en thème sombre : ' + pageErrors.join(' | '));
 
-      results.push({ page: pageDefinition.name, screenshot, ...metrics });
+      results.push({ page: pageDefinition.name, screenshot, ...metrics, logoPreviewContrasts });
     } finally {
       await page.close();
     }
