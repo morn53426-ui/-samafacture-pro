@@ -87,9 +87,11 @@ Les résultats sont ajoutés au rapport `rapport-recette-visuelle.json` sous la 
 L'audit d'accessibilité s'exécute sur les 17 pages métier en thème clair et sombre
 (34 passages Chromium, 1280 × 900). Il complète les vérifications sémantiques avec :
 - contrôle de `data-theme` et `color-scheme` pour chaque thème ;
-- parcours avec `Tab` jusqu'au retour au premier arrêt, en vérifiant le focus visible
-  et son indicateur sur chaque élément atteint ;
-- parcours inverse avec `Maj+Tab` ;
+- parcours séquentiel avec `Tab` et `Maj+Tab`, en vérifiant que tous les éléments
+  tabulables visibles sont atteignables et disposent d'un indicateur de focus ;
+- aucun retour circulaire n'est exigé au niveau de la page entière : le navigateur doit
+  pouvoir quitter le document après le dernier arrêt ; le confinement du focus est
+  vérifié séparément dans les composants modaux lorsqu'ils existent ;
 - mesure du contraste WCAG AA (4,5:1 texte courant ; 3:1 grand texte), y compris
   aux arrêts de couleur déclarés dans les dégradés CSS ;
 - captures distinctes `accessibilite-light-*.png` et `accessibilite-dark-*.png`.

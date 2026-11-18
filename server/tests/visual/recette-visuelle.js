@@ -3086,27 +3086,24 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
       await page.evaluate(() => document.fonts && document.fonts.ready);
       await new Promise(resolve => setTimeout(resolve, 80));
 
-      // Parcourir les arrêts de tabulation réels jusqu'au retour au premier arrêt.
-      // Chaque arrêt doit exposer un indicateur visuel, en avant comme en arrière.
-      const focusableCount = await page.evaluate(() => {
-        const selector = 'a[href],area[href],button,input:not([type="hidden"]),select,textarea,iframe,[contenteditable="true"],[tabindex]:not([tabindex="-1"])';
-        return Array.from(document.querySelectorAll(selector)).filter(element => {
-          const rect = element.getBoundingClientRect();
-          const style = getComputedStyle(element);
-          return element.tabIndex >= 0 && !element.matches(':disabled') &&
-            rect.width > 0 && rect.height > 0 && style.display !== 'none' &&
-            style.visibility !== 'hidden' && Number(style.opacity) > 0;
-        }).length;
-      });
-      const keyboardTraversal = [];
-      const maxTabSteps = Math.min(Math.max(focusableCount + 2, 4), 140);
-      let firstFocusKey = null;
-      let keyboardCycleCompleted = false;
-      for (let step = 0; step < maxTabSteps; step++) {
-        await page.keyboard.press('Tab');
-        const stop = await page.evaluate(() => {
-          const element = document.activeElement;
-          if (!element || element === document.body) return null;
+      // Recenser les éléments réellement visibles et tabulables, puis parcourir
+      // l'ordre clavier dans les deux sens. Une page entière ne doit pas enfermer
+      // le focus : le navigateur peut sortir du document après le dernier arrêt.
+      const focusableKeys = await page.evaluate(() => {
+        const isVisible = element => {
+          if (!element.getClientRects().length) return false;
+          let current = element;
+          while (current && current !== document.documentElement) {
+            const style = getComputedStyle(current);
+            const rect = current.getBoundingClientRect();
+            if (style.display === 'none' || style.visibility === 'hidden' ||
+                style.visibility === 'collapse' || Number(style.opacity) === 0 ||
+                rect.width <= 0 || rect.height <= 0) return false;
+            current = current.parentElement;
+          }
+          return true;
+        };
+        const keyFor = element => {
           const parts = [];
           let current = element;
           while (current && current.parentElement) {
@@ -3114,56 +3111,84 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             parts.unshift(current.tagName.toLowerCase() + ':nth-child(' + index + ')');
             current = current.parentElement;
           }
-          const style = getComputedStyle(element);
-          const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
-          const shadow = style.boxShadow && style.boxShadow !== 'none';
-          return {
-            key: parts.join('>'),
-            selector: element.tagName.toLowerCase() +
-              (element.id ? '#' + element.id : '') +
-              (typeof element.className === 'string' && element.className.trim()
-                ? '.' + element.className.trim().split(/\s+/).slice(0, 2).join('.')
-                : ''),
-            text: String(element.innerText || element.textContent || element.getAttribute('aria-label') || '')
-              .replace(/\s+/g, ' ').trim().slice(0, 80),
-            focusVisible: element.matches(':focus-visible'),
-            hasIndicator: Boolean(outline || shadow),
-            outline: style.outline,
-            boxShadow: style.boxShadow
-          };
-        });
-        if (!stop) {
-          keyboardTraversal.push({ selector: 'body', focusVisible: false, hasIndicator: false });
-          break;
+          return parts.join('>');
+        };
+        return Array.from(document.body.querySelectorAll('*'))
+          .filter(element => element.tabIndex >= 0 && !element.matches(':disabled') &&
+            !element.closest('[inert]') && isVisible(element))
+          .map(keyFor);
+      });
+      const focusableCount = focusableKeys.length;
+      const maxTabSteps = Math.min(Math.max(focusableCount + 2, 4), 140);
+
+      const readFocusStop = () => page.evaluate(() => {
+        const element = document.activeElement;
+        if (!element || element === document.body || element === document.documentElement) return null;
+        const parts = [];
+        let current = element;
+        while (current && current.parentElement) {
+          const index = Array.prototype.indexOf.call(current.parentElement.children, current) + 1;
+          parts.unshift(current.tagName.toLowerCase() + ':nth-child(' + index + ')');
+          current = current.parentElement;
         }
-        if (step === 0) firstFocusKey = stop.key;
-        else if (stop.key === firstFocusKey) {
-          keyboardCycleCompleted = true;
-          break;
+        const style = getComputedStyle(element);
+        const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
+        const shadow = style.boxShadow && style.boxShadow !== 'none';
+        return {
+          key: parts.join('>'),
+          selector: element.tagName.toLowerCase() +
+            (element.id ? '#' + element.id : '') +
+            (typeof element.className === 'string' && element.className.trim()
+              ? '.' + element.className.trim().split(/\\s+/).slice(0, 2).join('.')
+              : ''),
+          text: String(element.innerText || element.textContent || element.getAttribute('aria-label') || '')
+            .replace(/\\s+/g, ' ').trim().slice(0, 80),
+          focusVisible: element.matches(':focus-visible'),
+          hasIndicator: Boolean(outline || shadow),
+          outline: style.outline,
+          boxShadow: style.boxShadow
+        };
+      });
+
+      const collectKeyboardTraversal = async reverse => {
+        const stops = [];
+        const seen = new Set();
+        for (let step = 0; step < maxTabSteps; step++) {
+          if (reverse) {
+            await page.keyboard.down('Shift');
+            try {
+              await page.keyboard.press('Tab');
+            } finally {
+              await page.keyboard.up('Shift');
+            }
+          } else {
+            await page.keyboard.press('Tab');
+          }
+          const stop = await readFocusStop();
+          if (!stop || seen.has(stop.key)) break;
+          seen.add(stop.key);
+          stops.push(stop);
         }
-        keyboardTraversal.push(stop);
-      }
-      const reverseFocus = await (async () => {
-        await page.keyboard.down('Shift');
-        try {
-          await page.keyboard.press('Tab');
-        } finally {
-          await page.keyboard.up('Shift');
-        }
-        return page.evaluate(() => {
-          const element = document.activeElement;
-          if (!element || element === document.body) return null;
-          const style = getComputedStyle(element);
-          return {
-            focusVisible: element.matches(':focus-visible'),
-            hasIndicator: (style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0) ||
-              Boolean(style.boxShadow && style.boxShadow !== 'none'),
-            id: element.id || '',
-            tag: element.tagName.toLowerCase()
-          };
-        });
-      })();
-      await page.keyboard.press('Tab');
+        return stops;
+      };
+
+      await page.evaluate(() => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active !== document.body) active.blur();
+      });
+      const keyboardTraversal = await collectKeyboardTraversal(false);
+      const forwardVisited = new Set(keyboardTraversal.map(stop => stop.key));
+      const missingForwardKeys = focusableKeys.filter(key => !forwardVisited.has(key));
+
+      await page.evaluate(() => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active !== document.body) active.blur();
+      });
+      const reverseTraversal = await collectKeyboardTraversal(true);
+      const reverseVisited = new Set(reverseTraversal.map(stop => stop.key));
+      const missingReverseKeys = focusableKeys.filter(key => !reverseVisited.has(key));
+      const reverseFocus = reverseTraversal[0] || null;
+
       const metrics = await page.evaluate(() => {
         const isVisible = element => {
           if (!element || !element.getClientRects().length) return false;
@@ -3406,17 +3431,20 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
         pageDefinition.name + ' ne conserve pas le thème ' + theme + ' dans l’audit clavier.');
       assert.equal(metrics.colorScheme, theme,
         pageDefinition.name + ' ne conserve pas color-scheme: ' + theme + ' dans l’audit clavier.');
-      assert.equal(keyboardCycleCompleted, true,
-        pageDefinition.name + ' : le parcours Tab ne boucle pas après tous les contrôles visibles (' +
-        keyboardTraversal.length + '/' + focusableCount + ').');
-      assert.ok(keyboardTraversal.length >= focusableCount,
-        pageDefinition.name + ' : certains contrôles ne sont pas atteignables avec Tab (' +
-        keyboardTraversal.length + '/' + focusableCount + ').');
+      assert.deepEqual(missingForwardKeys, [],
+        pageDefinition.name + ' : certains éléments tabulables ne sont pas atteignables avec Tab : ' +
+        JSON.stringify(missingForwardKeys));
+      assert.deepEqual(missingReverseKeys, [],
+        pageDefinition.name + ' : certains éléments tabulables ne sont pas atteignables avec Maj+Tab : ' +
+        JSON.stringify(missingReverseKeys));
       assert.ok(keyboardTraversal.every(stop => stop.focusVisible && stop.hasIndicator),
-        pageDefinition.name + ' : certains arrêts clavier n’ont pas de focus visible : ' +
+        pageDefinition.name + ' : certains arrêts Tab n’ont pas de focus visible : ' +
         JSON.stringify(keyboardTraversal.filter(stop => !stop.focusVisible || !stop.hasIndicator)));
+      assert.ok(reverseTraversal.every(stop => stop.focusVisible && stop.hasIndicator),
+        pageDefinition.name + ' : certains arrêts Maj+Tab n’ont pas de focus visible : ' +
+        JSON.stringify(reverseTraversal.filter(stop => !stop.focusVisible || !stop.hasIndicator)));
       assert.ok(reverseFocus?.focusVisible && reverseFocus?.hasIndicator,
-        pageDefinition.name + ' : Maj+Tab ne conserve pas un indicateur de focus visible : ' +
+        pageDefinition.name + ' : Maj+Tab ne produit pas un premier focus visible : ' +
         JSON.stringify(reverseFocus));
       assert.deepEqual(pageErrors, [],
         pageDefinition.name + ' a généré des erreurs JavaScript pendant l’audit ' + theme + ' : ' +
@@ -3458,8 +3486,10 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
       metrics.focus = keyboardTraversal[0] || null;
       metrics.keyboard = {
         focusableCount,
-        visitedStops: keyboardTraversal.length,
-        cycleCompleted: keyboardCycleCompleted,
+        forwardVisitedStops: keyboardTraversal.length,
+        reverseVisitedStops: reverseTraversal.length,
+        forwardCoverageComplete: missingForwardKeys.length === 0,
+        reverseCoverageComplete: missingReverseKeys.length === 0,
         reverseFocus
       };
       const screenshot = 'accessibilite-' + theme + '-' + pageDefinition.name + '-1280.png';
