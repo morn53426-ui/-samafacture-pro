@@ -5720,8 +5720,10 @@ a.btn .icon {
    ========================================================================= */
 .invoice-doc {
   box-sizing: border-box;
-  color: #243044;
-  font-size: 14px;
+  color: var(--sf-doc-text-color, #243044);
+  font-family: var(--sf-doc-font-family, var(--font-body, inherit));
+  font-size: calc(14px * var(--sf-doc-font-scale, 1));
+  font-weight: var(--sf-doc-font-weight, 400);
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
@@ -5967,7 +5969,7 @@ a.btn .icon {
     box-shadow: none !important;
     background: #fff !important;
     color: #172033 !important;
-    font-size: 9.5pt !important;
+    font-size: calc(9.5pt * var(--sf-doc-font-scale, 1)) !important;
   }
   .invoice-doc .head {
     break-after: avoid;
