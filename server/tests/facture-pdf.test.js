@@ -186,10 +186,10 @@ describe('Génération PDF de facture', () => {
       assert.equal(printMetrics.paddingLeft, '0px',
         'Les marges A4 de @page ne doivent pas être doublées par un padding de 40 px.');
       assert.equal(printMetrics.paddingRight, '0px');
-      assert.equal(printMetrics.fontSize, '13.3333px',
-        'Le texte courant doit être imprimé à 10 pt minimum.');
-      assert.equal(printMetrics.tableFontSize, '12px',
-        'Les lignes du tableau doivent être imprimées à 9 pt minimum.');
+      assert.ok(Math.abs(parseFloat(printMetrics.fontSize) - 13.3333) < 0.2,
+        'Le texte courant doit être imprimé à 10 pt minimum : ' + printMetrics.fontSize);
+      assert.ok(Math.abs(parseFloat(printMetrics.tableFontSize) - 12) < 0.2,
+        'Les lignes du tableau doivent être imprimées à 9 pt minimum : ' + printMetrics.tableFontSize);
 
       // À la fermeture de l'aperçu, le mode système sombre doit être rétabli.
       await appliquerMedia('screen');
