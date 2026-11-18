@@ -7271,3 +7271,105 @@ a.btn .icon {
 .enterprise-console-brand strong { letter-spacing: -.025em; }
 .lp-header .brand { color: var(--brand-indigo); }
 .auth-form-card::before { background: linear-gradient(90deg, var(--brand-baobab), var(--brand-indigo)); }
+
+
+/* ==========================================================================
+   SUNUPILOT — couche d'identité prioritaire
+   À garder en fin de feuille : elle neutralise les anciens presets visuels qui
+   précèdent cette section, sans toucher aux couleurs des modèles de documents.
+   ========================================================================== */
+:root:not([data-theme="dark"]) {
+  --brand-baobab: #0A7A45;
+  --brand-indigo: #29265E;
+  --brand-baobab-light: #EAF3EC;
+  --brand-offwhite: #F6F7F5;
+  --navy-950: #1B1949;
+  --navy-900: #29265E;
+  --navy-800: #373477;
+  --navy-700: #514D8F;
+  --emerald: #0A7A45;
+  --emerald-light: #EAF3EC;
+  --cream: #F6F7F5;
+  --paper: #FFFFFF;
+  --ink: #171B26;
+  --ink-soft: #5B6172;
+  --line: #E3E5E2;
+  --structural-dark-1: #1B1949;
+  --structural-dark-2: #29265E;
+  --workspace-blue: #0A7A45;
+  --workspace-purple: #29265E;
+  --workspace-cyan: #0A7A45;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --brand-baobab: #0A7A45;
+  --brand-indigo: #29265E;
+  --brand-baobab-light: #173D2B;
+  --brand-offwhite: #F6F7F5;
+  --navy-950: #F5F4FF;
+  --navy-900: #E1DEFF;
+  --navy-800: #C7C1F0;
+  --navy-700: #A9A2DB;
+  --emerald: #0A7A45;
+  --emerald-light: #173D2B;
+  --cream: #111222;
+  --paper: #1A1B2E;
+  --ink: #EDEFF5;
+  --ink-soft: #A6A9BF;
+  --line: #343650;
+  --structural-dark-1: #161638;
+  --structural-dark-2: #24225C;
+  --workspace-blue: #0A7A45;
+  --workspace-purple: #7771C4;
+  --workspace-cyan: #46A9B9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --brand-baobab: #0A7A45;
+    --brand-indigo: #29265E;
+    --brand-baobab-light: #173D2B;
+    --brand-offwhite: #F6F7F5;
+    --navy-950: #F5F4FF;
+    --navy-900: #E1DEFF;
+    --navy-800: #C7C1F0;
+    --navy-700: #A9A2DB;
+    --emerald: #0A7A45;
+    --emerald-light: #173D2B;
+    --cream: #111222;
+    --paper: #1A1B2E;
+    --ink: #EDEFF5;
+    --ink-soft: #A6A9BF;
+    --line: #343650;
+    --structural-dark-1: #161638;
+    --structural-dark-2: #24225C;
+    --workspace-blue: #0A7A45;
+    --workspace-purple: #7771C4;
+    --workspace-cyan: #46A9B9;
+  }
+}
+
+.sidebar {
+  background: linear-gradient(180deg, var(--structural-dark-1) 0%, var(--structural-dark-2) 100%);
+}
+.nav-item.active {
+  background: linear-gradient(105deg, #0A7A45 0%, #14935A 100%);
+  box-shadow: 0 7px 18px rgba(10, 122, 69, .25);
+  color: #fff;
+}
+.nav-item.active:hover {
+  background: linear-gradient(105deg, #086B3D 0%, #0A7A45 100%);
+}
+.btn-primary {
+  border-color: var(--brand-baobab);
+  background: var(--brand-baobab);
+  box-shadow: 0 5px 12px rgba(10, 122, 69, .18);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #086B3D;
+  border-color: #086B3D;
+}
+.lp-header .brand { color: var(--brand-indigo); }
+.auth-form-card::before {
+  background: linear-gradient(90deg, var(--brand-baobab), var(--brand-indigo));
+}
