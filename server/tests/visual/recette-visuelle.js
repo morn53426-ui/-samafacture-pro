@@ -2412,7 +2412,8 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
           const mainRect = main.getBoundingClientRect();
           // Les pages du centre entreprise utilisent le bouton du topbar dédié,
           // tandis que les autres pages utilisent celui intégré à la sidebar.
-          const navToggle = document.querySelector('.enterprise-console-menu-toggle, #mobile-toggle-btn');
+          const navToggle = document.querySelector('.enterprise-console-menu-toggle') ||
+            document.getElementById('mobile-toggle-btn');
           const navToggleStyle = navToggle ? getComputedStyle(navToggle) : null;
           const navToggleRect = navToggle ? navToggle.getBoundingClientRect() : null;
           const navToggleLabel = navToggle?.getAttribute('aria-label')?.trim() || '';
