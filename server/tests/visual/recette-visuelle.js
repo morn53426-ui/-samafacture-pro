@@ -2987,7 +2987,7 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
           colorScheme: getComputedStyle(root).colorScheme,
           bodyBackground: getComputedStyle(body).backgroundColor,
           bodyLuminance: (() => {
-            const match = getComputedStyle(body).backgroundColor.match(/rgba?\\(([^)]+)\\)/i);
+            const match = getComputedStyle(body).backgroundColor.match(/rgba?\(([^)]+)\)/i);
             if (!match) return null;
             const channels = match[1].split(',').slice(0, 3)
               .map(channel => Number.parseFloat(channel.trim()) / 255);
