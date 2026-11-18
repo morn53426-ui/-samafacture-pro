@@ -39,7 +39,7 @@ function createFactureTemplates(helpers) {
     serif: 'Georgia, "Times New Roman", serif',
     mono: '"Courier New", Courier, monospace'
   };
-  const TAILLES_TEXTE = { petit: '92%', normal: '100%', grand: '110%' };
+  const TAILLES_TEXTE = { petit: '0.92', normal: '1', grand: '1.10' };
   const EPAISSEURS_TEXTE = { normal: '400', moyen: '500', gras: '700' };
 
   // Une valeur de couleur ne quitte cette fonction que si elle ressemble strictement à une couleur
@@ -73,13 +73,13 @@ function createFactureTemplates(helpers) {
     if (!personnalisation) return html;
     const decls = [];
     const police = POLICES_AUTORISEES[personnalisation.police];
-    if (police) decls.push(`font-family:${police}`);
+    if (police) decls.push(`--sf-doc-font-family:${police}`);
     const taille = TAILLES_TEXTE[personnalisation.taille_texte];
-    if (taille) decls.push(`font-size:${taille}`);
+    if (taille) decls.push(`--sf-doc-font-scale:${taille}`);
     const epaisseur = EPAISSEURS_TEXTE[personnalisation.epaisseur_texte];
-    if (epaisseur) decls.push(`font-weight:${epaisseur}`);
+    if (epaisseur) decls.push(`--sf-doc-font-weight:${epaisseur}`);
     const couleurTexte = sanitizeCssColor(personnalisation.couleur_texte);
-    if (couleurTexte) decls.push(`color:${couleurTexte}`);
+    if (couleurTexte) decls.push(`--sf-doc-text-color:${couleurTexte}`);
     if (!decls.length) return html;
     return `<div style="${decls.join('; ')};">${html}</div>`;
   }
