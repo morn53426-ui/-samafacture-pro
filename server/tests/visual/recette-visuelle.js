@@ -2263,7 +2263,6 @@ async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
             if (candidateSet.has(parent)) return false;
             parent = parent.parentElement;
           }
-          const rect = element.getBoundingClientRect();
           return true;
         }).slice(0, 20).map(element => {
           const rect = element.getBoundingClientRect();
