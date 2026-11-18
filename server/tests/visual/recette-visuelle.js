@@ -3063,8 +3063,10 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
 async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
   const results = [];
   const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const themes = ['light', 'dark'];
 
-  for (const pageDefinition of pages) {
+  for (const theme of themes) {
+    for (const pageDefinition of pages) {
     const page = await preparePage(browser, baseUrl, fixtures, false);
     const pageErrors = [];
     page.on('pageerror', error => pageErrors.push(error.message));
@@ -3078,14 +3080,84 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           localStorage.setItem('sf_user', JSON.stringify(user));
         }, pageDefinition.plan);
       }
-      await page.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+      await page.evaluate(themeValue => localStorage.setItem('sf_theme', themeValue), theme);
       await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
       await page.evaluate(() => document.fonts && document.fonts.ready);
       await new Promise(resolve => setTimeout(resolve, 80));
 
-      // Vérifier le vrai parcours clavier (pas un focus() programmatique, qui ne
-      // déclenche pas nécessairement :focus-visible).
+      // Parcourir les arrêts de tabulation réels jusqu'au retour au premier arrêt.
+      // Chaque arrêt doit exposer un indicateur visuel, en avant comme en arrière.
+      const focusableCount = await page.evaluate(() => {
+        const selector = 'a[href],area[href],button,input:not([type="hidden"]),select,textarea,iframe,[contenteditable="true"],[tabindex]:not([tabindex="-1"])';
+        return Array.from(document.querySelectorAll(selector)).filter(element => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return element.tabIndex >= 0 && !element.matches(':disabled') &&
+            rect.width > 0 && rect.height > 0 && style.display !== 'none' &&
+            style.visibility !== 'hidden' && Number(style.opacity) > 0;
+        }).length;
+      });
+      const keyboardTraversal = [];
+      const maxTabSteps = Math.min(Math.max(focusableCount + 2, 4), 140);
+      let firstFocusKey = null;
+      let keyboardCycleCompleted = false;
+      for (let step = 0; step < maxTabSteps; step++) {
+        await page.keyboard.press('Tab');
+        const stop = await page.evaluate(() => {
+          const element = document.activeElement;
+          if (!element || element === document.body) return null;
+          const parts = [];
+          let current = element;
+          while (current && current.parentElement) {
+            const index = Array.prototype.indexOf.call(current.parentElement.children, current) + 1;
+            parts.unshift(current.tagName.toLowerCase() + ':nth-child(' + index + ')');
+            current = current.parentElement;
+          }
+          const style = getComputedStyle(element);
+          const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
+          const shadow = style.boxShadow && style.boxShadow !== 'none';
+          return {
+            key: parts.join('>'),
+            selector: element.tagName.toLowerCase() +
+              (element.id ? '#' + element.id : '') +
+              (typeof element.className === 'string' && element.className.trim()
+                ? '.' + element.className.trim().split(/\\s+/).slice(0, 2).join('.')
+                : ''),
+            text: String(element.innerText || element.textContent || element.getAttribute('aria-label') || '')
+              .replace(/\\s+/g, ' ').trim().slice(0, 80),
+            focusVisible: element.matches(':focus-visible'),
+            hasIndicator: Boolean(outline || shadow),
+            outline: style.outline,
+            boxShadow: style.boxShadow
+          };
+        });
+        if (!stop) {
+          keyboardTraversal.push({ selector: 'body', focusVisible: false, hasIndicator: false });
+          break;
+        }
+        if (step === 0) firstFocusKey = stop.key;
+        else if (stop.key === firstFocusKey) {
+          keyboardCycleCompleted = true;
+          break;
+        }
+        keyboardTraversal.push(stop);
+      }
+      const reverseFocus = await (async () => {
+        await page.keyboard.press('Shift+Tab');
+        return page.evaluate(() => {
+          const element = document.activeElement;
+          if (!element || element === document.body) return null;
+          const style = getComputedStyle(element);
+          return {
+            focusVisible: element.matches(':focus-visible'),
+            hasIndicator: (style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0) ||
+              Boolean(style.boxShadow && style.boxShadow !== 'none'),
+            id: element.id || '',
+            tag: element.tagName.toLowerCase()
+          };
+        });
+      })();
       await page.keyboard.press('Tab');
       const metrics = await page.evaluate(() => {
         const isVisible = element => {
@@ -3259,12 +3331,22 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
 
         const gradientSurfaces = Array.from(document.querySelectorAll(
           '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
-        )).map(element => ({
-          className: element.className,
-          backgroundImage: getComputedStyle(element).backgroundImage,
-          labelColor: getComputedStyle(element.querySelector('.stat-label')).color,
-          valueColor: getComputedStyle(element.querySelector('.stat-value')).color
-        }));
+        )).map(element => {
+          const backgroundImage = getComputedStyle(element).backgroundImage;
+          const stops = Array.from(backgroundImage.matchAll(/rgba?\\(([^)]+)\\)/g))
+            .map(match => parseColor('rgb(' + match[1] + ')'))
+            .filter(Boolean);
+          const white = { r: 1, g: 1, b: 1, a: 1 };
+          return {
+            className: element.className,
+            backgroundImage,
+            labelColor: getComputedStyle(element.querySelector('.stat-label')).color,
+            valueColor: getComputedStyle(element.querySelector('.stat-value')).color,
+            minimumWhiteContrast: stops.length
+              ? Number(Math.min(...stops.map(stop => contrastRatio(white, stop))).toFixed(2))
+              : null
+          };
+        });
 
         return {
           viewport: window.innerWidth,
@@ -3292,6 +3374,23 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
         };
       });
 
+      assert.equal(metrics.theme, theme,
+        pageDefinition.name + ' ne conserve pas le thème ' + theme + ' dans l’audit clavier.');
+      assert.equal(keyboardCycleCompleted, true,
+        pageDefinition.name + ' : le parcours Tab ne boucle pas après tous les contrôles visibles (' +
+        keyboardTraversal.length + '/' + focusableCount + ').');
+      assert.ok(keyboardTraversal.length >= focusableCount,
+        pageDefinition.name + ' : certains contrôles ne sont pas atteignables avec Tab (' +
+        keyboardTraversal.length + '/' + focusableCount + ').');
+      assert.ok(keyboardTraversal.every(stop => stop.focusVisible && stop.hasIndicator),
+        pageDefinition.name + ' : certains arrêts clavier n’ont pas de focus visible : ' +
+        JSON.stringify(keyboardTraversal.filter(stop => !stop.focusVisible || !stop.hasIndicator)));
+      assert.ok(reverseFocus?.focusVisible && reverseFocus?.hasIndicator,
+        pageDefinition.name + ' : Maj+Tab ne conserve pas un indicateur de focus visible : ' +
+        JSON.stringify(reverseFocus));
+      assert.deepEqual(pageErrors, [],
+        pageDefinition.name + ' a généré des erreurs JavaScript pendant l’audit ' + theme + ' : ' +
+        pageErrors.join(' | '));
       assert.equal(metrics.unnamedControls.length, 0,
         pageDefinition.name + ' contient des commandes sans nom accessible : ' + JSON.stringify(metrics.unnamedControls));
       assert.equal(metrics.unnamedImages.length, 0,
@@ -3320,13 +3419,24 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             'Les libellés des cartes KPI doivent être blancs à pleine opacité.');
           assert.equal(surface.valueColor, 'rgb(255, 255, 255)',
             'Les valeurs des cartes KPI doivent être blanches.');
+          assert.ok(surface.minimumWhiteContrast !== null && surface.minimumWhiteContrast >= 4.5,
+            'Le texte blanc du dégradé ' + surface.className +
+            ' doit respecter 4,5:1 sur toutes les couleurs du dégradé : ' + surface.minimumWhiteContrast);
         }
       }
 
-      const screenshot = 'accessibilite-' + pageDefinition.name + '-1280.png';
+      metrics.focus = keyboardTraversal[0] || null;
+      metrics.keyboard = {
+        focusableCount,
+        visitedStops: keyboardTraversal.length,
+        cycleCompleted: keyboardCycleCompleted,
+        reverseFocus
+      };
+      const screenshot = 'accessibilite-' + theme + '-' + pageDefinition.name + '-1280.png';
       await page.screenshot({ path: path.join(OUTPUT_DIR, screenshot), fullPage: true });
       results.push({
         page: pageDefinition.name,
+        theme,
         screenshot,
         ...metrics,
         javascriptErrors: pageErrors
@@ -3334,10 +3444,13 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
     } finally {
       await page.close();
     }
+    }
   }
 
   return {
     pageCount: pages.length,
+    themeCount: themes.length,
+    runCount: results.length,
     viewportWidth: 1280,
     pages: results,
     totals: {
@@ -3349,6 +3462,9 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
       pagesWithoutH1: results.filter(page => page.visibleH1 < 1).length,
       pagesWithMultipleH1: results.filter(page => page.visibleH1 > 1).length,
       missingKeyboardFocus: results.filter(page => !page.focus?.focusVisible || !page.focus?.hasIndicator).length,
+      incompleteKeyboardTraversal: results.filter(page => !page.keyboard?.cycleCompleted ||
+        page.keyboard.visitedStops < page.keyboard.focusableCount ||
+        !page.keyboard.reverseFocus?.focusVisible || !page.keyboard.reverseFocus?.hasIndicator).length,
       contrastIssues: results.reduce((sum, page) => sum + page.contrastIssueCount, 0),
       nonSemanticActions: results.reduce((sum, page) => sum + page.nonSemanticActions.length, 0),
       javascriptErrors: results.reduce((sum, page) => sum + page.javascriptErrors.length, 0)
