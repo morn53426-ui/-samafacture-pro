@@ -2785,6 +2785,137 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
 }
 
 
+async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
+  const results = [];
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const viewport = { width: 720, height: 900 };
+
+  for (const pageDefinition of pages) {
+    const page = await preparePage(browser, baseUrl, fixtures, false);
+    const pageErrors = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    try {
+      await page.setViewport({ ...viewport, deviceScaleFactor: 1 });
+      if (pageDefinition.plan) {
+        await page.evaluate(plan => {
+          const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+          user.plan = plan;
+          localStorage.setItem('sf_user', JSON.stringify(user));
+        }, pageDefinition.plan);
+      }
+      await page.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+      await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+      if (pageDefinition.charts?.length) {
+        await page.waitForFunction(chartIds => chartIds.every(id => {
+          const canvas = document.getElementById(id);
+          return canvas?.dataset.sfChartType && canvas.dataset.sfChartAnimation === 'disabled';
+        }), { timeout: 15000 }, pageDefinition.charts);
+      }
+      await page.waitForFunction(() =>
+        document.documentElement.getAttribute('data-theme') === 'light'
+      , { timeout: 10000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+
+      const metrics = await page.evaluate(() => {
+        const root = document.documentElement;
+        const body = document.body;
+        const main = document.querySelector('main.workspace-page, main#main-content, main') || body;
+        const mainRect = main.getBoundingClientRect();
+        const navToggle = document.querySelector('.enterprise-console-menu-toggle') ||
+          document.getElementById('mobile-toggle-btn');
+        const navStyle = navToggle ? getComputedStyle(navToggle) : null;
+        const navRect = navToggle ? navToggle.getBoundingClientRect() : null;
+        const navLabel = navToggle?.getAttribute('aria-label')?.trim() || '';
+        const controls = navToggle?.getAttribute('aria-controls') || '';
+        const responsiveTables = Array.from(document.querySelectorAll('table.table-stack')).map(table => {
+          const tableRect = table.getBoundingClientRect();
+          const row = table.querySelector('tbody tr:not(.row-skeleton)') || table.querySelector('tbody tr');
+          const labeledCells = Array.from(table.querySelectorAll('tbody td[data-label]'));
+          // Les cellules d'actions peuvent volontairement rester en flex ; mesurer une cellule de contenu.
+          const cell = labeledCells.find(candidate =>
+            candidate.parentElement?.lastElementChild !== candidate
+          ) || labeledCells[0] || null;
+          const cellRect = cell?.getBoundingClientRect();
+          return {
+            tableDisplay: getComputedStyle(table).display,
+            rowDisplay: row ? getComputedStyle(row).display : null,
+            cellDisplay: cell ? getComputedStyle(cell).display : null,
+            tableWidth: Math.round(tableRect.width),
+            cellWidth: cellRect ? Math.round(cellRect.width) : 0,
+            hasRows: Boolean(row),
+            hasLabeledCells: labeledCells.length > 0
+          };
+        });
+        return {
+          viewport: window.innerWidth,
+          documentWidth: root.scrollWidth,
+          bodyWidth: body.scrollWidth,
+          theme: root.getAttribute('data-theme'),
+          colorScheme: getComputedStyle(root).colorScheme,
+          mainLeft: Math.round(mainRect.left),
+          mainRight: Math.round(mainRect.right),
+          navigationVisible: Boolean(navToggle && navStyle && navRect &&
+            navStyle.display !== 'none' && navStyle.visibility !== 'hidden' &&
+            Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
+          navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
+            navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          responsiveTables
+        };
+      });
+
+      assert.equal(metrics.viewport, viewport.width,
+        pageDefinition.name + ' : la largeur CSS simulant le zoom 200 % doit être de 720 px.');
+      assert.equal(metrics.theme, 'light',
+        pageDefinition.name + ' doit conserver le thème clair au zoom 200 %.');
+      assert.equal(metrics.colorScheme, 'light',
+        pageDefinition.name + ' doit conserver color-scheme: light au zoom 200 %.');
+      assert.ok(metrics.documentWidth <= viewport.width + 1 && metrics.bodyWidth <= viewport.width + 1,
+        pageDefinition.name + ' déborde horizontalement au zoom 200 % : ' + JSON.stringify(metrics));
+      assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
+        pageDefinition.name + ' sort du viewport utile au zoom 200 % : ' + JSON.stringify(metrics));
+      assert.equal(metrics.navigationVisible, true,
+        pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
+      assert.equal(metrics.navigationAccessible, true,
+        pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      for (const table of metrics.responsiveTables) {
+        assert.equal(table.tableDisplay, 'block',
+          pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
+        assert.equal(table.rowDisplay, 'block',
+          pageDefinition.name + ' : chaque ligne de tableau doit occuper sa propre carte à 720 px.');
+        assert.equal(table.hasRows, true,
+          pageDefinition.name + ' : le tableau doit afficher ses données ou son état vide à 720 px.');
+        if (table.hasLabeledCells) {
+          assert.equal(table.cellDisplay, 'block',
+            pageDefinition.name + ' : les cellules de contenu doivent être affichées verticalement à 720 px.');
+          assert.ok(table.cellWidth >= table.tableWidth * 0.9,
+            pageDefinition.name + ' : les cellules ne doivent pas se compresser à une lettre par ligne : ' +
+            JSON.stringify(table));
+        }
+      }
+
+      const screenshot = 'zoom-200-' + pageDefinition.name + '-720.png';
+      await page.screenshot({
+        path: path.join(OUTPUT_DIR, screenshot),
+        fullPage: true
+      });
+      results.push({ page: pageDefinition.name, screenshot, ...metrics });
+      assert.deepEqual(pageErrors, [],
+        pageDefinition.name + ' a généré des erreurs JavaScript au zoom 200 % : ' + pageErrors.join(' | '));
+    } finally {
+      await page.close();
+    }
+  }
+
+  return {
+    pageCount: pages.length,
+    viewportWidth: viewport.width,
+    screenshots: results.length,
+    pages: results
+  };
+}
+
 async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   if (DATASET === 'empty') return { skipped: 'jeu de données vide' };
   const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -3049,6 +3180,7 @@ async function main() {
     const businessLightThemeDesktop = await verifyBusinessPagesLightThemeDesktop(browser, baseUrl, fixtures);
     const businessDarkThemeMobile = await verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures);
     const businessLightThemeMobile = await verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures);
+    const businessPagesZoom200 = await verifyBusinessPagesZoom200(browser, baseUrl, fixtures);
     const documentFlows = await verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures);
     const report = {
       dataset: DATASET,
@@ -3064,8 +3196,9 @@ async function main() {
       businessLightThemeDesktop,
       businessDarkThemeMobile,
       businessLightThemeMobile,
+      businessPagesZoom200,
       documentFlows,
-      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessLightThemeDesktop.screenshots + businessDarkThemeMobile.screenshots + businessLightThemeMobile.screenshots + (documentFlows.screenshots || 0),
+      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessLightThemeDesktop.screenshots + businessDarkThemeMobile.screenshots + businessLightThemeMobile.screenshots + businessPagesZoom200.screenshots + (documentFlows.screenshots || 0),
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
