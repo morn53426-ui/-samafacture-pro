@@ -4967,17 +4967,17 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
 :root[data-theme="dark"] .dashboard-context,
 :root[data-theme="dark"] thead th,
 :root[data-theme="dark"] .workspace-data-card th {
-  background: #302E27 !important;
-  color: #D6CFC3 !important;
+  background: #171F3A !important;
+  color: #AFB9D1 !important;
   border-color: var(--line) !important;
 }
 :root[data-theme="dark"] .app-topbar-search {
-  background: #201F1A;
+  background: #121A35;
   border-color: var(--line);
 }
 :root[data-theme="dark"] .app-topbar-search .ic { color: #AFB9D1; }
 :root[data-theme="dark"] .app-topbar-avatar {
-  background: #3A372F !important;
+  background: #243675 !important;
   color: #F1F4FC !important;
 }
 :root[data-theme="dark"] .btn-outline,
@@ -5086,7 +5086,7 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
 }
 :root[data-theme="dark"] .app-topbar-quick-actions .theme-toggle-btn:hover,
 :root[data-theme="dark"] .app-topbar-localization:hover {
-  background: #302E27;
+  background: #171F3A;
   border-color: var(--line);
   color: #91CDB0;
 }
@@ -5221,8 +5221,8 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
 :root[data-theme="dark"] .app-topbar-localization,
 :root[data-theme="dark"] .app-topbar-logout {
   border-color: var(--line);
-  background: #302E27;
-  color: #E0DACF;
+  background: #171F3A;
+  color: #AFB9D1;
   box-shadow: none;
 }
 :root[data-theme="dark"] .app-notification-toggle:hover,
@@ -5799,7 +5799,7 @@ a.btn .icon {
   text-transform: uppercase;
 }
 .invoice-doc .sf-doc-meta-value {
-  color: #172033;
+  color: #151F4D;
   font-size: 12px;
   font-weight: 650;
   overflow-wrap: anywhere;
@@ -5836,7 +5836,7 @@ a.btn .icon {
   margin-top: 5px;
   padding-top: 7px;
   border-top: 1px solid #dce2e8;
-  color: #172033;
+  color: #151F4D;
   font-weight: 800;
 }
 .invoice-doc .sf-total-row {
@@ -5855,7 +5855,7 @@ a.btn .icon {
 .invoice-doc .sf-total-row.sf-total-grand {
   margin-top: 5px;
   padding: 11px 0 5px;
-  color: #172033;
+  color: #151F4D;
   font-size: 15px;
   font-weight: 800;
 }
@@ -5885,7 +5885,7 @@ a.btn .icon {
 .invoice-doc .sf-payment-metric { min-width: 0; }
 .invoice-doc .sf-payment-value {
   display: block;
-  color: #172033;
+  color: #151F4D;
   font-size: 14px;
   font-weight: 800;
   overflow-wrap: anywhere;
@@ -5906,7 +5906,7 @@ a.btn .icon {
 }
 .invoice-doc .sf-bank-item strong {
   display: block;
-  color: #172033;
+  color: #151F4D;
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -5971,7 +5971,7 @@ a.btn .icon {
     border-radius: 0 !important;
     box-shadow: none !important;
     background: #fff !important;
-    color: #172033 !important;
+    color: #151F4D !important;
     font-size: 10pt !important;
   }
   .invoice-doc .head {
@@ -6821,7 +6821,7 @@ a.btn .icon {
     min-height: 140px;
     padding: 12px 6px 11px;
     border-bottom: 1px solid rgba(255,255,255,.1);
-    background: linear-gradient(180deg, #172a4b 0%, #20385f 100%);
+    background: linear-gradient(180deg, #18265B 0%, #243675 100%);
   }
 
   body #app-sidebar.sidebar.is-collapsed .sidebar-brand .mark {
@@ -6991,12 +6991,12 @@ a.btn .icon {
   body #app-sidebar.sidebar.is-collapsed .nav-item.active:hover {
     border-color: #e4eaf2;
     background: #f0f3f8;
-    color: #172a4b !important;
+    color: #18265B !important;
     box-shadow: none !important;
   }
 
   body #app-sidebar.sidebar.is-collapsed .nav-item.active .ic {
-    background: #172a4b;
+    background: #18265B;
     color: #fff !important;
     box-shadow: 0 3px 8px rgba(23,42,75,.2);
   }
@@ -7045,7 +7045,7 @@ a.btn .icon {
   body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
     border-color: #e3e9f1;
     background: #f5f7fa;
-    color: #172a4b;
+    color: #18265B;
   }
 }
 
@@ -7109,7 +7109,7 @@ a.btn .icon {
   border-color: var(--line) !important;
   background: var(--structural-dark-1) !important;
   color: var(--ink-soft) !important;
-  scrollbar-color: #625D50 var(--structural-dark-1);
+  scrollbar-color: #526080 var(--structural-dark-1);
 }
 :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-group-label {
   background: var(--line) !important;
@@ -7120,7 +7120,7 @@ a.btn .icon {
   color: var(--ink-soft) !important;
 }
 :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .ic {
-  background: #302E27 !important;
+  background: #171F3A !important;
   color: var(--emerald) !important;
 }
 :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item.active,
@@ -7141,7 +7141,7 @@ a.btn .icon {
   :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout:hover,
   :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
     border-color: var(--line) !important;
-    background: #302E27 !important;
+    background: #171F3A !important;
     color: var(--ink) !important;
   }
 }
@@ -7156,7 +7156,7 @@ a.btn .icon {
     border-color: var(--line) !important;
     background: var(--structural-dark-1) !important;
     color: var(--ink-soft) !important;
-    scrollbar-color: #625D50 var(--structural-dark-1);
+    scrollbar-color: #526080 var(--structural-dark-1);
   }
   :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-group-label {
     background: var(--line) !important;
@@ -7167,7 +7167,7 @@ a.btn .icon {
     color: var(--ink-soft) !important;
   }
   :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .ic {
-    background: #302E27 !important;
+    background: #171F3A !important;
     color: var(--emerald) !important;
   }
   :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item.active,
@@ -7188,7 +7188,7 @@ a.btn .icon {
     :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout:hover,
     :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
       border-color: var(--line) !important;
-      background: #302E27 !important;
+      background: #171F3A !important;
       color: var(--ink) !important;
     }
   }

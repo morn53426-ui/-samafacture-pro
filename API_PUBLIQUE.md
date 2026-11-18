@@ -42,7 +42,7 @@ Exemple :
 ```http
 POST /api/v1/invoices
 Content-Type: application/json
-X-SamaFacture-Key: sf_live_VOTRE_CLE
+X-SunuPilot-Key: sf_live_VOTRE_CLE
 Idempotency-Key: commande-boutique-2026-00042
 ```
 
@@ -96,9 +96,9 @@ En-têtes fournis :
 
 - `X-SunuPilot-Event` : nom de l'événement ;
 - `X-SunuPilot-Delivery` : identifiant de livraison ;
-- `X-SunuPilot-Signature` : signature HMAC-SHA256 sous la forme `sha256=...` ;
-- `X-SunuPilot-Delivery` : identifiant de livraison ;
 - `X-SunuPilot-Signature` : signature HMAC-SHA256 sous la forme `sha256=...`.
+
+Les en-têtes historiques `X-OptiGest-*` et `X-SamaFacture-*` sont également émis pendant la transition pour préserver les intégrations existantes.
 
 Les en-têtes historiques `X-OptiGest-*` et `X-SamaFacture-*` sont également envoyés pendant la période de transition pour ne pas rompre les intégrations existantes.
 

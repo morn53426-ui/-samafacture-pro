@@ -17,7 +17,7 @@ test('the public HTML and vector assets use SunuPilot', () => {
     const content = read(path.join('public', page));
     assert.doesNotMatch(
       content,
-      /Sama\s*Facture(?:\s*Pro)?/i,
+      /Sama\s*Facture(?:\s*Pro)?|OptiGest/i,
       `legacy visible brand found in public/${page}`
     );
   }
@@ -30,6 +30,9 @@ test('the public HTML and vector assets use SunuPilot', () => {
   assert.match(logo, /<title[^>]*>SunuPilot<\/title>/);
   assert.match(logo, /#18265B/);
   assert.match(logo, /#087A3D/);
+  const styles = read('public/css/style.css');
+  assert.match(styles, /--brand-blue:\s*#18265B/i);
+  assert.match(styles, /--brand-green:\s*#087A3D/i);
   assert.match(icon, /<title[^>]*>SunuPilot<\/title>/);
   assert.doesNotMatch(logo + icon, /OptiGest|SamaFacture/i);
 });
@@ -40,6 +43,7 @@ test('PWA metadata and service-worker shell use the SunuPilot assets', () => {
 
   assert.equal(manifest.name, 'SunuPilot');
   assert.equal(manifest.short_name, 'SunuPilot');
+  assert.equal(manifest.theme_color, '#18265B');
   assert.ok(iconSources.includes('images/icon-192.png'));
   assert.ok(iconSources.includes('images/sunupilot-icon.svg'));
 
