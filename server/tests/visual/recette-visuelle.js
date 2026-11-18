@@ -2112,7 +2112,7 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
       valueWidth: valueRect ? valueRect.width : 0,
       canvasWidth: canvasRect ? canvasRect.width : 0,
       accessibleLabel: canvas?.getAttribute('aria-label') || '',
-      sampleFormats: [0, 42, 9999, 10000, 2999997].map(formatDashboardCount)
+      sampleFormats: [0, 42, 9999, 10000, 2999997].map(window.formatDashboardCount)
     };
   });
   const expectedCompactTotal = new Intl.NumberFormat('fr-FR', {
