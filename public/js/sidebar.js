@@ -472,7 +472,9 @@ function submitWorkspaceSearch(event) {
 // -----------------------------------------------------------------------------
 function initRealtime() {
   const token = Api.token();
-  if (!token || window.__samafactureSocketLoading) return;
+  if (!token || window.__optigestSocketLoading || window.__samafactureSocketLoading) return;
+  window.__optigestSocketLoading = true;
+  // Alias conservé pour d’éventuels scripts déjà déployés qui vérifient encore ce marqueur.
   window.__samafactureSocketLoading = true;
 
   const script = document.createElement('script');
@@ -513,6 +515,9 @@ function initRealtime() {
     connecterNotifications();
     window.addEventListener('sf-company-changed', connecterNotifications);
   };
-  script.onerror = () => { window.__samafactureSocketLoading = false; };
+  script.onerror = () => {
+    window.__optigestSocketLoading = false;
+    window.__samafactureSocketLoading = false;
+  };
   document.head.appendChild(script);
 }
