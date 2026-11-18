@@ -9,7 +9,7 @@ const router = express.Router();
 
 async function authenticateApiKey(req, res, next) {
   try {
-    const raw = req.get('X-SamaFacture-Key') || (req.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    const raw = req.get('X-OptiGest-Key') || req.get('X-SamaFacture-Key') || (req.get('Authorization') || '').replace(/^Bearer\s+/i, '');
     if (!raw || !/^sf_live_[a-f0-9]{64}$/i.test(raw)) return res.status(401).json({ error: 'Clé API manquante ou invalide.' });
     const hash = crypto.createHash('sha256').update(raw).digest('hex');
     const [rows] = await pool.query(

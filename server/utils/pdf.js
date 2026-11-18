@@ -122,7 +122,7 @@ async function genererPdfFacture(factureId, user) {
     });
     await page.evaluateOnNewDocument((t, apiUrl) => {
       localStorage.setItem('sf_token', t);
-      window.SAMAFACTURE_API_URL = apiUrl;
+      window.OPTIGEST_API_URL = apiUrl;
     }, token, apiBaseUrl);
 
     await page.goto(`${baseUrl}/facture-detail.html?id=${factureId}`, { waitUntil: 'networkidle0', timeout: 20000 });

@@ -1,4 +1,4 @@
-# API publique SamaFacture Pro — v1
+# API publique OptiGest — v1
 
 Cette API permet à un logiciel externe de lire certaines données du compte et de créer des factures. Elle est distincte de l'API privée utilisée par l'interface web.
 
@@ -9,10 +9,10 @@ L'URL de base est `https://votre-domaine.tld/api/v1`.
 Chaque requête doit utiliser une clé API générée dans **Espace professionnel → API et intégrations** :
 
 ```http
-X-SamaFacture-Key: sf_live_VOTRE_CLE
+X-OptiGest-Key: sf_live_VOTRE_CLE
 ```
 
-Le format `Authorization: Bearer sf_live_VOTRE_CLE` est également accepté. Une clé ne s'affiche qu'au moment de sa création. Conservez-la dans un gestionnaire de secrets et révoquez-la immédiatement en cas de fuite.
+L'en-tête historique `X-SamaFacture-Key` reste accepté pour les intégrations existantes. Le format `Authorization: Bearer sf_live_VOTRE_CLE` est également accepté. Une clé ne s'affiche qu'au moment de sa création. Conservez-la dans un gestionnaire de secrets et révoquez-la immédiatement en cas de fuite.
 
 Les permissions sont attribuées à la clé lors de sa création :
 
@@ -94,9 +94,11 @@ Chaque livraison envoie un JSON de la forme :
 
 En-têtes fournis :
 
-- `X-SamaFacture-Event` : nom de l'événement ;
-- `X-SamaFacture-Delivery` : identifiant de livraison ;
-- `X-SamaFacture-Signature` : signature HMAC-SHA256 sous la forme `sha256=...`.
+- `X-OptiGest-Event` : nom de l'événement ;
+- `X-OptiGest-Delivery` : identifiant de livraison ;
+- `X-OptiGest-Signature` : signature HMAC-SHA256 sous la forme `sha256=...`.
+
+Les en-têtes historiques `X-SamaFacture-Event`, `X-SamaFacture-Delivery` et `X-SamaFacture-Signature` sont également envoyés pendant la période de transition pour ne pas rompre les intégrations existantes.
 
 La signature est calculée sur le corps JSON exact reçu, avec le secret affiché une seule fois à la création du webhook. Le système vérifie la file environ toutes les 30 secondes (réglable avec `WEBHOOK_DELIVERY_INTERVAL_MS`) et effectue jusqu'à cinq tentatives avec délais croissants en cas d'échec. Une réponse HTTP 2xx signifie que la livraison a réussi.
 
