@@ -1685,3 +1685,30 @@ body.enterprise-console-shell #app-sidebar .sidebar-logout {
     color: var(--enterprise-accent) !important;
   }
 }
+
+
+/* Le thème historique du rail utilisait des couleurs prioritaires bleu clair.
+   Cette surcharge plus spécifique garantit le contraste de l'élément actif
+   lorsque le choix sombre est explicite ou hérité du système. */
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-item.active,
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-item.active:hover {
+  border-color: var(--line) !important;
+  background: var(--emerald-light) !important;
+  color: var(--ink) !important;
+}
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-item.active .ic,
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-item.active:hover .ic {
+  color: var(--emerald) !important;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-item.active,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-item.active:hover {
+    border-color: var(--line) !important;
+    background: var(--emerald-light) !important;
+    color: var(--ink) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-item.active .ic,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-item.active:hover .ic {
+    color: var(--emerald) !important;
+  }
+}
