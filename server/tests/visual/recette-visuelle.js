@@ -3454,6 +3454,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       validityLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Validité du devis'),
       dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance')
     }));
+    assert.equal(screenMetrics.title, type === 'devis' ? 'Devis — Sunupilot' : 'Facture — Sunupilot',
+      type + ' : le titre du document et les métadonnées PDF doivent identifier le bon type.');
     assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),
       type + ' : toutes les lignes doivent être rendues avant l’impression : ' + JSON.stringify(screenMetrics));
     assert.ok(screenMetrics.documentWidth <= screenMetrics.viewportWidth + 1,

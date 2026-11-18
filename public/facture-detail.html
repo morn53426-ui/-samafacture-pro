@@ -148,6 +148,7 @@
     });
 
     const isDevis = facture.type === 'devis';
+    document.title = `${isDevis ? 'Devis' : 'Facture'} — Sunupilot`;
     const template = user.facture_template || 'classique';
 
     document.getElementById('doc').innerHTML = templates.renderInvoiceHtml({
