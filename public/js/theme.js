@@ -40,6 +40,24 @@
     synchroniserBoutons();
   }
 
+  // En mode « Système », les graphiques canvas ne peuvent pas suivre les variables CSS
+  // automatiquement : on les avertit aussi lorsque la préférence système change à chaud.
+  const mediaSysteme = window.matchMedia
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null;
+  if (mediaSysteme) {
+    const signalerChangementSysteme = () => {
+      if (themeActuel() === 'auto') {
+        document.dispatchEvent(new CustomEvent('sf:theme-change', { detail: { theme: 'auto' } }));
+      }
+    };
+    if (typeof mediaSysteme.addEventListener === 'function') {
+      mediaSysteme.addEventListener('change', signalerChangementSysteme);
+    } else if (typeof mediaSysteme.addListener === 'function') {
+      mediaSysteme.addListener(signalerChangementSysteme);
+    }
+  }
+
   function suivant() {
     const actuel = themeActuel();
     definir(ORDRE[(ORDRE.indexOf(actuel) + 1) % ORDRE.length]);
