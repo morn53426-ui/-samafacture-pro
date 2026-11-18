@@ -90,8 +90,8 @@ L'audit d'accessibilité s'exécute sur les 17 pages métier en thème clair et 
 - parcours séquentiel avec `Tab` et `Maj+Tab`, en vérifiant que tous les éléments
   tabulables visibles sont atteignables et disposent d'un indicateur de focus ;
 - aucun retour circulaire n'est exigé au niveau de la page entière : le navigateur doit
-  pouvoir quitter le document après le dernier arrêt ; le confinement du focus est
-  vérifié séparément dans les composants modaux lorsqu'ils existent ;
+  pouvoir quitter le document après le dernier arrêt ; les composants modaux, lorsqu'ils
+  existent, doivent faire l'objet d'un contrôle dédié du confinement du focus ;
 - mesure du contraste WCAG AA (4,5:1 texte courant ; 3:1 grand texte), y compris
   aux arrêts de couleur déclarés dans les dégradés CSS ;
 - captures distinctes `accessibilite-light-*.png` et `accessibilite-dark-*.png`.
