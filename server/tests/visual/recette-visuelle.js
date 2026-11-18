@@ -1860,14 +1860,14 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
 
   await groupPage.evaluate(() => window.SamaTheme.definir('dark'));
   await groupPage.waitForFunction(() =>
-    getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(40, 39, 32)'
+    getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(23, 31, 58)'
   );
   const dark = await readGroupTheme();
   assert.equal(dark.theme, 'dark', 'Le centre Entreprise doit appliquer le thème sombre sans rechargement.');
-  assert.equal(dark.page, 'rgb(29, 28, 24)', 'Le fond du centre Entreprise doit suivre le graphite du thème sombre.');
-  assert.equal(dark.panel, 'rgb(40, 39, 32)', 'Les panneaux ne doivent plus rester blancs en thème sombre.');
-  assert.equal(dark.dashboardCard, 'rgb(40, 39, 32)', 'Les cartes de pilotage doivent utiliser la surface sombre.');
-  assert.equal(dark.sidebar, 'rgb(23, 23, 19)', 'Le rail latéral doit devenir sombre avec le reste de l’application.');
+  assert.equal(dark.page, 'rgb(16, 23, 44)', 'Le fond indigo du centre Entreprise doit suivre le thème sombre.');
+  assert.equal(dark.panel, 'rgb(23, 31, 58)', 'Les panneaux doivent adopter la surface indigo du thème sombre.');
+  assert.equal(dark.dashboardCard, 'rgb(23, 31, 58)', 'Les cartes de pilotage doivent utiliser la surface indigo sombre.');
+  assert.equal(dark.sidebar, 'rgb(13, 20, 43)', 'Le rail latéral doit adopter le fond indigo sombre.');
   assert.equal(dark.horizontalOverflow, false, 'Le thème sombre ne doit pas provoquer de débordement.');
   const headingContrast = contrastRatio(dark.heading, dark.page);
   const sidebarActiveContrast = contrastRatio(dark.sidebarText, dark.sidebarActiveBackground);

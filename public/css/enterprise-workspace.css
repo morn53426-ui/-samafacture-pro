@@ -1438,25 +1438,25 @@ body.enterprise-console-shell {
   --enterprise-page-bg: var(--cream);
   --enterprise-page-text: var(--ink);
   --enterprise-surface: var(--paper);
-  --enterprise-surface-alt: #302e27;
+  --enterprise-surface-alt: #202B49;
   --enterprise-text-strong: var(--ink);
   --enterprise-text: var(--ink);
   --enterprise-muted: var(--ink-soft);
-  --enterprise-muted-soft: #c2baad;
+  --enterprise-muted-soft: #AFB9D1;
   --enterprise-border: var(--line);
-  --enterprise-hover-bg: #34372f;
+  --enterprise-hover-bg: #243675;
   --enterprise-active-bg: #173C2A;
   --enterprise-active-text: #E8F4EC;
   --enterprise-accent: #8FC9A8;
   --enterprise-icon-bg: #173C2A;
   --enterprise-icon-text: #20A85A;
-  --enterprise-track: #454238;
+  --enterprise-track: #31416E;
   --enterprise-link: #8FC9A8;
   --enterprise-sidebar-bg: #0D142B;
-  --enterprise-sidebar-text: #d6cfc3;
-  --enterprise-sidebar-muted: #a9a397;
-  --enterprise-sidebar-border: #48443a;
-  --enterprise-sidebar-hover: #302e27;
+  --enterprise-sidebar-text: #E1E7F5;
+  --enterprise-sidebar-muted: #AFB9D1;
+  --enterprise-sidebar-border: #2B3964;
+  --enterprise-sidebar-hover: #202B49;
   --enterprise-sidebar-active: #173C2A;
   --enterprise-sidebar-active-text: #E8F4EC;
   --enterprise-sidebar-icon: #20A85A;
@@ -1466,25 +1466,25 @@ body.enterprise-console-shell {
     --enterprise-page-bg: var(--cream);
     --enterprise-page-text: var(--ink);
     --enterprise-surface: var(--paper);
-    --enterprise-surface-alt: #302e27;
+    --enterprise-surface-alt: #202B49;
     --enterprise-text-strong: var(--ink);
     --enterprise-text: var(--ink);
     --enterprise-muted: var(--ink-soft);
-    --enterprise-muted-soft: #c2baad;
+    --enterprise-muted-soft: #AFB9D1;
     --enterprise-border: var(--line);
-    --enterprise-hover-bg: #34372f;
+    --enterprise-hover-bg: #243675;
     --enterprise-active-bg: #173C2A;
     --enterprise-active-text: #E8F4EC;
     --enterprise-accent: #8FC9A8;
     --enterprise-icon-bg: #173C2A;
     --enterprise-icon-text: #20A85A;
-    --enterprise-track: #454238;
+    --enterprise-track: #31416E;
     --enterprise-link: #8FC9A8;
     --enterprise-sidebar-bg: #0D142B;
-    --enterprise-sidebar-text: #d6cfc3;
-    --enterprise-sidebar-muted: #a9a397;
-    --enterprise-sidebar-border: #48443a;
-    --enterprise-sidebar-hover: #302e27;
+    --enterprise-sidebar-text: #E1E7F5;
+    --enterprise-sidebar-muted: #AFB9D1;
+    --enterprise-sidebar-border: #2B3964;
+    --enterprise-sidebar-hover: #202B49;
     --enterprise-sidebar-active: #173C2A;
     --enterprise-sidebar-active-text: #E8F4EC;
     --enterprise-sidebar-icon: #20A85A;
@@ -1769,7 +1769,7 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
   :root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):hover,
   :root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):focus-visible {
     border-color: var(--line) !important;
-    background: #302e27 !important;
+    background: #202B49 !important;
     color: var(--ink) !important;
   }
 }
@@ -1791,7 +1791,7 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
     :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):hover,
     :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):focus-visible {
       border-color: var(--line) !important;
-      background: #302e27 !important;
+      background: #202B49 !important;
       color: var(--ink) !important;
     }
   }
@@ -1802,7 +1802,7 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
    héritaient encore d'une ancienne couleur bleu-gris définie dans style.css. */
 :root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active),
 :root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .nav-label {
-  color: #D6CFC3 !important;
+  color: #E1E7F5 !important;
 }
 :root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .ic {
   color: #20A85A !important;
@@ -1811,7 +1811,7 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active),
   :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .nav-label {
-    color: #D6CFC3 !important;
+    color: #E1E7F5 !important;
   }
   :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .ic {
     color: #20A85A !important;
