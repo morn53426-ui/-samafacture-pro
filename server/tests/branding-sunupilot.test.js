@@ -31,8 +31,9 @@ test('the public HTML and vector assets use SunuPilot', () => {
   assert.match(logo, /#18265B/);
   assert.match(logo, /#087A3D/);
   const styles = read('public/css/style.css');
-  assert.match(styles, /--brand-blue:\s*#18265B/i);
-  assert.match(styles, /--brand-green:\s*#087A3D/i);
+  assert.match(styles, /--workspace-blue:\s*#087A3D/i);
+  assert.match(styles, /--navy-900:\s*#18265B/i);
+  assert.match(styles, /--emerald:\s*#087A3D/i);
   assert.match(icon, /<title[^>]*>SunuPilot<\/title>/);
   assert.doesNotMatch(logo + icon, /OptiGest|SamaFacture/i);
 });
