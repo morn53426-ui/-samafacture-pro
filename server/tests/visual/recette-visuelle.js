@@ -2005,6 +2005,30 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
     text: getComputedStyle(document.querySelector('.dashboard-welcome h1')).color,
     horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth
   }));
+  const readDashboardChartColors = () => darkPage.$eval('#chart-evolution', canvas => ({
+    tick: canvas.dataset.sfChartTickColor,
+    grid: canvas.dataset.sfChartGridColor
+  }));
+  const darkChartColors = await readDashboardChartColors();
+  await darkPage.evaluate(() => window.SamaTheme.definir('light'));
+  await darkPage.waitForFunction(previous => {
+    const canvas = document.getElementById('chart-evolution');
+    return canvas && canvas.dataset.sfChartTickColor !== previous.tick &&
+      canvas.dataset.sfChartGridColor !== previous.grid;
+  }, { timeout: 10000 }, darkChartColors);
+  const lightChartColors = await readDashboardChartColors();
+  await darkPage.evaluate(() => window.SamaTheme.definir('dark'));
+  await darkPage.waitForFunction(previous => {
+    const canvas = document.getElementById('chart-evolution');
+    return canvas && canvas.dataset.sfChartTickColor !== previous.tick &&
+      canvas.dataset.sfChartGridColor !== previous.grid;
+  }, { timeout: 10000 }, lightChartColors);
+  const refreshedDarkChartColors = await readDashboardChartColors();
+  assert.notEqual(lightChartColors.tick, darkChartColors.tick,
+    'Les axes du tableau de bord doivent suivre le thème clair.');
+  assert.notEqual(refreshedDarkChartColors.tick, lightChartColors.tick,
+    'Les axes du tableau de bord doivent revenir au thème sombre sans rechargement.');
+
   assert.equal(darkMetrics.theme, 'dark', 'Le thème sombre doit être appliqué avant le rendu du tableau de bord.');
   assert.notEqual(darkMetrics.card, 'rgb(255, 255, 255)', 'Les cartes ne doivent pas rester blanches en thème sombre.');
   assert.equal(darkMetrics.background, 'rgb(29, 28, 24)', 'Le thème sombre doit reprendre le fond graphite de la direction Unslop.');
@@ -2036,7 +2060,11 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   await zoomPage.screenshot({ path: path.join(OUTPUT_DIR, 'dashboard-zoom-200-effectif-720.png'), fullPage: true });
   await zoomPage.close();
 
-  return { darkTheme: { ...darkMetrics, contrastRatio: Number(darkContrast.toFixed(2)) }, zoom200EffectiveViewport: zoomMetrics };
+  return {
+    darkTheme: { ...darkMetrics, contrastRatio: Number(darkContrast.toFixed(2)) },
+    dashboardChartThemes: { dark: darkChartColors, light: lightChartColors, refreshedDark: refreshedDarkChartColors },
+    zoom200EffectiveViewport: zoomMetrics
+  };
 }
 
 async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
