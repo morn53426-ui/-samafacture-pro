@@ -1796,3 +1796,25 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
     }
   }
 }
+
+
+/* Dernier niveau du rail Entreprise sombre : les variantes compactes et mobiles
+   héritaient encore d'une ancienne couleur bleu-gris définie dans style.css. */
+:root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active),
+:root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .nav-label {
+  color: #D6CFC3 !important;
+}
+:root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .ic {
+  color: #8ED0B1 !important;
+  background: transparent !important;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active),
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .nav-label {
+    color: #D6CFC3 !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .ic {
+    color: #8ED0B1 !important;
+    background: transparent !important;
+  }
+}
