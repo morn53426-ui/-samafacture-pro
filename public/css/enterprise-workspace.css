@@ -1748,3 +1748,51 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
     color: var(--enterprise-sidebar-active-text) !important;
   }
 }
+
+
+/* Contraste final des liens non actifs du centre Entreprise.
+   Ces sélecteurs plus spécifiques neutralisent les anciennes couleurs fixes du rail,
+   qu'il soit compact sur desktop ou ouvert sur mobile. */
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active),
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active) .nav-label {
+  color: var(--ink-soft) !important;
+}
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active) .ic {
+  color: var(--emerald) !important;
+  background: transparent !important;
+}
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-group-label,
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .sidebar-foot {
+  color: var(--ink-soft) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):hover,
+  :root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):focus-visible {
+    border-color: var(--line) !important;
+    background: #302e27 !important;
+    color: var(--ink) !important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active),
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active) .nav-label {
+    color: var(--ink-soft) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active) .ic {
+    color: var(--emerald) !important;
+    background: transparent !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-group-label,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .sidebar-foot {
+    color: var(--ink-soft) !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):hover,
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):focus-visible {
+      border-color: var(--line) !important;
+      background: #302e27 !important;
+      color: var(--ink) !important;
+    }
+  }
+}
