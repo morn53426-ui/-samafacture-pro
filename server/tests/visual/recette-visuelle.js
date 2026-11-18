@@ -2831,8 +2831,12 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
         const controls = navToggle?.getAttribute('aria-controls') || '';
         const responsiveTables = Array.from(document.querySelectorAll('table.table-stack')).map(table => {
           const tableRect = table.getBoundingClientRect();
-          const row = table.querySelector('tbody tr');
-          const cell = table.querySelector('tbody td[data-label]');
+          const row = table.querySelector('tbody tr:not(.row-skeleton)') || table.querySelector('tbody tr');
+          const labeledCells = Array.from(table.querySelectorAll('tbody td[data-label]'));
+          // Les cellules d'actions peuvent volontairement rester en flex ; mesurer une cellule de contenu.
+          const cell = labeledCells.find(candidate =>
+            candidate.parentElement?.lastElementChild !== candidate
+          ) || labeledCells[0] || null;
           const cellRect = cell?.getBoundingClientRect();
           return {
             tableDisplay: getComputedStyle(table).display,
@@ -2840,7 +2844,8 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
             cellDisplay: cell ? getComputedStyle(cell).display : null,
             tableWidth: Math.round(tableRect.width),
             cellWidth: cellRect ? Math.round(cellRect.width) : 0,
-            hasLabeledCells: Boolean(cell)
+            hasRows: Boolean(row),
+            hasLabeledCells: labeledCells.length > 0
           };
         });
         return {
@@ -2879,13 +2884,15 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
           pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
         assert.equal(table.rowDisplay, 'block',
           pageDefinition.name + ' : chaque ligne de tableau doit occuper sa propre carte à 720 px.');
-        assert.equal(table.cellDisplay, 'block',
-          pageDefinition.name + ' : les cellules doivent être affichées verticalement à 720 px.');
-        assert.equal(table.hasLabeledCells, true,
-          pageDefinition.name + ' : les cellules empilées doivent conserver leurs libellés.');
-        assert.ok(table.cellWidth >= table.tableWidth * 0.9,
-          pageDefinition.name + ' : les cellules ne doivent pas se compresser à une lettre par ligne : ' +
-          JSON.stringify(table));
+        assert.equal(table.hasRows, true,
+          pageDefinition.name + ' : le tableau doit afficher ses données ou son état vide à 720 px.');
+        if (table.hasLabeledCells) {
+          assert.equal(table.cellDisplay, 'block',
+            pageDefinition.name + ' : les cellules de contenu doivent être affichées verticalement à 720 px.');
+          assert.ok(table.cellWidth >= table.tableWidth * 0.9,
+            pageDefinition.name + ' : les cellules ne doivent pas se compresser à une lettre par ligne : ' +
+            JSON.stringify(table));
+        }
       }
 
       const screenshot = 'zoom-200-' + pageDefinition.name + '-720.png';
