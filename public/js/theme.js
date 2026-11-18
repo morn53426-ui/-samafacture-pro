@@ -1,8 +1,7 @@
-// Bascule Clair / Sombre / Système — s'appuie entièrement sur l'infrastructure CSS déjà en
-// place dans style.css (variables --paper/--ink/--ink-soft basculées via l'attribut
-// data-theme sur <html>, voir le bloc "Mode sombre" en tête de ce fichier). Ce script n'ajoute
-// AUCUNE règle CSS : il se contente de poser/retirer cet attribut et de le mémoriser. Rien
-// dans le CSS existant n'est modifié, donc aucun risque de régression sur les 27 pages.
+// Bascule Clair / Sombre / Système — les palettes sont définies dans les feuilles CSS
+// et sélectionnées par l'attribut data-theme sur <html>. Ce script mémorise le choix et
+// notifie les composants canvas lorsqu'ils doivent recalculer leurs couleurs ; il ne définit
+// aucune couleur lui-même.
 //
 // Chargé en tout premier dans <head> (avant même la feuille de style) sur CHAQUE page, pour que
 // le thème mémorisé soit appliqué avant le premier rendu — sans ça, l'utilisateur verrait un
