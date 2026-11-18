@@ -1865,15 +1865,15 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   assert.equal(dark.horizontalOverflow, false, 'Le thème sombre ne doit pas provoquer de débordement.');
   const headingContrast = contrastRatio(dark.heading, dark.page);
   const sidebarActiveContrast = contrastRatio(dark.sidebarText, dark.sidebarActiveBackground);
-  const sidebarDefaultContrast = contrastRatio(dark.sidebarDefaultText, dark.sidebar);
+  const sidebarDefaultContrast = contrastRatio(dark.sidebarDefaultLabelText, dark.sidebar);
   assert.ok(headingContrast >= 4.5,
     'Le titre Entreprise doit garder un contraste de 4,5:1 en thème sombre. Valeur : ' + headingContrast.toFixed(2));
   assert.ok(sidebarActiveContrast >= 4.5,
     'Le lien actif du menu doit contraster avec son propre fond. Valeur : ' +
     sidebarActiveContrast.toFixed(2) + ' (' + dark.sidebarText + ' sur ' + dark.sidebarActiveBackground + ')');
   assert.ok(sidebarDefaultContrast >= 4.5,
-    'Les liens non actifs du menu doivent contraster avec le rail sombre. Valeur : ' +
-    sidebarDefaultContrast.toFixed(2) + ' (' + dark.sidebarDefaultText + ' sur ' + dark.sidebar + '). Diagnostic : ' +
+    'Les libellés visibles des liens non actifs doivent contraster avec le rail sombre. Valeur : ' +
+    sidebarDefaultContrast.toFixed(2) + ' (' + dark.sidebarDefaultLabelText + ' sur ' + dark.sidebar + '). Diagnostic : ' +
     JSON.stringify({
       bodyClass: dark.bodyClass,
       sidebarClass: dark.sidebarClass,
