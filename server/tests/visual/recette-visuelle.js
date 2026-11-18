@@ -1904,10 +1904,43 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
 
   const finances = await verifyChartPage('finances', 'finances.html', '#chart-finances');
   const reports = await verifyChartPage('rapports', 'rapports.html', '#chart-ventes');
+
+  const settingsPage = await preparePage(browser, baseUrl, fixtures, false);
+  await settingsPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await settingsPage.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+  await settingsPage.goto(baseUrl + '/parametres.html', { waitUntil: 'domcontentloaded' });
+  await settingsPage.waitForSelector('[data-open-template-preview="nova"]', { timeout: 15000 });
+  await settingsPage.click('[data-open-template-preview="nova"]');
+  await settingsPage.waitForFunction(() =>
+    getComputedStyle(document.getElementById('invoice-template-preview-modal')).display !== 'none'
+  );
+  const readPreviewTheme = () => settingsPage.evaluate(() => ({
+    stage: getComputedStyle(document.getElementById('invoice-template-preview-stage')).backgroundColor,
+    dialog: getComputedStyle(document.querySelector('.invoice-template-preview-dialog')).backgroundColor,
+    paper: getComputedStyle(document.querySelector('.invoice-template-preview-full-page')).backgroundColor
+  }));
+  const previewLight = await readPreviewTheme();
+  await settingsPage.evaluate(() => window.SamaTheme.definir('dark'));
+  const previewDark = await readPreviewTheme();
+  assert.notEqual(previewDark.stage, previewLight.stage,
+    'La scène de prévisualisation doit suivre le thème sombre.');
+  assert.equal(previewDark.stage, 'rgb(40, 39, 32)',
+    'La scène de prévisualisation doit reprendre une surface sombre cohérente.');
+  assert.equal(previewDark.dialog, 'rgb(40, 39, 32)',
+    'La fenêtre d’aperçu doit suivre le thème sombre.');
+  assert.equal(previewDark.paper, 'rgb(255, 255, 255)',
+    'La feuille A4 doit rester blanche pour refléter le rendu imprimé.');
+  await settingsPage.screenshot({
+    path: path.join(OUTPUT_DIR, 'parametres-apercu-mode-sombre-1440.png'),
+    fullPage: true
+  });
+  await settingsPage.close();
+
   return {
     enterprise: { light, dark, headingContrast: Number(headingContrast.toFixed(2)), sidebarContrast: Number(sidebarContrast.toFixed(2)) },
     charts: { finances, reports },
-    screenshots: 4
+    settingsPreview: { light: previewLight, dark: previewDark },
+    screenshots: 5
   };
 }
 
