@@ -3518,6 +3518,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
     if (type === 'devis') {
       assert.ok(pages >= 2, 'Le devis long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
+      assert.ok(pages <= 3, 'Le devis long ne doit pas créer une quatrième page quasi vide. Pages détectées : ' + pages);
     }
     fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdfBuffer);
     return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
