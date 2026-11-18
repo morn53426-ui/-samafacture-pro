@@ -2,7 +2,20 @@
 
 Plateforme de gestion d’entreprise pour commerçants, freelances, artisans et PME — facturation, CRM, comptabilité OHADA, achats, stocks et automatisations, pensée pour les entreprises d’Afrique.
 
-SunuPilot est une plateforme de gestion d’entreprise destinée aux commerçants, indépendants et PME. Le périmètre principal comprend l'authentification, les clients, le catalogue, les factures/devis, les encaissements, les dépenses et les rapports. Une extension de modules professionnels (commandes, avoirs, acomptes, équipes, établissements, caisses, documents, analyses, automatisations et intégrations API/webhooks) est décrite dans [MODULES_PROFESSIONNELS.md](MODULES_PROFESSIONNELS.md), avec ses limites actuelles.
+SunuPilot est une plateforme de gestion d’entreprise destinée aux commerçants, indépendants et PME.
+
+## Identité de marque SunuPilot
+
+**Signature :** *Pilotez votre entreprise avec clarté.*
+
+L'interface utilise une identité sénégalaise contemporaine, construite autour de deux couleurs de marque :
+
+- **Indigo profond** — `#18265B` : navigation, titres, éléments de structure et repères de confiance.
+- **Vert baobab** — `#087A3D` : actions principales, validation et accents de croissance.
+- Les fonds neutres restent clairs en mode clair et indigo profond en mode sombre afin de préserver le contraste, la lisibilité et l'impression des documents.
+
+Le logo associe un baobab stylisé à un symbole de pilotage et de progression. La marque SunuPilot reste un nom de travail tant que la recherche d'antériorité et la validation juridique auprès de l'OAPI n'ont pas été finalisées.
+ Le périmètre principal comprend l'authentification, les clients, le catalogue, les factures/devis, les encaissements, les dépenses et les rapports. Une extension de modules professionnels (commandes, avoirs, acomptes, équipes, établissements, caisses, documents, analyses, automatisations et intégrations API/webhooks) est décrite dans [MODULES_PROFESSIONNELS.md](MODULES_PROFESSIONNELS.md), avec ses limites actuelles.
 
 Pour l'API publique versionnée, ses permissions, ses exemples de requêtes et la signature des webhooks, consultez [API_PUBLIQUE.md](API_PUBLIQUE.md).
 
