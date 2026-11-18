@@ -937,7 +937,7 @@
             <span class="invoice-template-tier tier-${meta.tier}">${escapeHtml(tierLabel)}</span>
           </div>
           <div class="invoice-template-preview-window" aria-label="Aperçu du modèle ${escapeHtml(meta.name)}">
-            <div class="invoice-template-preview-canvas">
+            <div class="invoice-template-preview-canvas" aria-hidden="true">
               <div class="invoice-doc tpl-${meta.id}">${html}</div>
             </div>
             <button type="button" class="invoice-template-preview-trigger" data-open-template-preview="${meta.id}" aria-label="Ouvrir l’aperçu détaillé du modèle ${escapeHtml(meta.name)}">
