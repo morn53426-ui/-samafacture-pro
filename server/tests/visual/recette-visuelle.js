@@ -2081,6 +2081,9 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
     background: getComputedStyle(document.querySelector('.main-content')).backgroundColor,
     card: getComputedStyle(document.querySelector('.dashboard-panel')).backgroundColor,
     text: getComputedStyle(document.querySelector('.dashboard-welcome h1')).color,
+    sidebar: getComputedStyle(document.getElementById('app-sidebar')).backgroundColor,
+    sidebarNav: getComputedStyle(document.querySelector('#app-sidebar .sidebar-nav')).backgroundColor,
+    sidebarLabel: getComputedStyle(document.querySelector('#app-sidebar .nav-item:not(.active) .nav-label')).color,
     horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth
   }));
   const readDashboardChartColors = () => darkPage.$eval('#chart-evolution', canvas => ({
@@ -2111,6 +2114,11 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   assert.notEqual(darkMetrics.card, 'rgb(255, 255, 255)', 'Les cartes ne doivent pas rester blanches en thème sombre.');
   assert.equal(darkMetrics.background, 'rgb(29, 28, 24)', 'Le thème sombre doit reprendre le fond graphite de la direction Unslop.');
   assert.equal(darkMetrics.card, 'rgb(40, 39, 32)', 'Les cartes sombres doivent utiliser la teinte papier profonde.');
+  assert.equal(darkMetrics.sidebar, 'rgb(23, 23, 19)', 'Le rail compact ne doit pas rester blanc en thème sombre.');
+  assert.equal(darkMetrics.sidebarNav, 'rgb(23, 23, 19)', 'La navigation compacte doit adopter le fond du rail sombre.');
+  const sidebarContrast = contrastRatio(darkMetrics.sidebarLabel, darkMetrics.sidebar);
+  assert.ok(sidebarContrast >= 4.5,
+    'Les libellés du rail compact doivent garder un contraste de 4,5:1. Valeur : ' + sidebarContrast.toFixed(2));
   assert.equal(darkMetrics.horizontalOverflow, false, 'Le thème sombre ne doit pas créer de débordement.');
   const darkContrast = contrastRatio(darkMetrics.text, darkMetrics.background);
   assert.ok(darkContrast >= 4.5, 'Le contraste du titre doit atteindre 4,5:1 en thème sombre. Valeur : ' + darkContrast.toFixed(2));
@@ -2139,7 +2147,11 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   await zoomPage.close();
 
   return {
-    darkTheme: { ...darkMetrics, contrastRatio: Number(darkContrast.toFixed(2)) },
+    darkTheme: {
+      ...darkMetrics,
+      contrastRatio: Number(darkContrast.toFixed(2)),
+      sidebarContrast: Number(sidebarContrast.toFixed(2))
+    },
     dashboardChartThemes: { dark: darkChartColors, light: lightChartColors, refreshedDark: refreshedDarkChartColors },
     zoom200EffectiveViewport: zoomMetrics
   };
