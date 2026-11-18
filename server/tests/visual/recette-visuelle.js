@@ -2178,6 +2178,177 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   };
 }
 
+
+async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
+  const results = [];
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+
+  for (const pageDefinition of pages) {
+    const page = await preparePage(browser, baseUrl, fixtures, false);
+    const pageErrors = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    try {
+      await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+      if (pageDefinition.plan) {
+        await page.evaluate(plan => {
+          const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+          user.plan = plan;
+          localStorage.setItem('sf_user', JSON.stringify(user));
+        }, pageDefinition.plan);
+      }
+      await page.evaluate(() => localStorage.setItem('sf_theme', 'dark'));
+      await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+      if (pageDefinition.charts?.length) {
+        await page.waitForFunction(chartIds => chartIds.every(id => {
+          const canvas = document.getElementById(id);
+          return canvas?.dataset.sfChartType && canvas.dataset.sfChartAnimation === 'disabled';
+        }), { timeout: 15000 }, pageDefinition.charts);
+      }
+      await page.waitForFunction(() =>
+        document.documentElement.getAttribute('data-theme') === 'dark'
+      , { timeout: 10000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const metrics = await page.evaluate(() => {
+        const root = document.documentElement;
+        const body = document.body;
+        const rootStyle = getComputedStyle(root);
+        const bodyStyle = getComputedStyle(body);
+        const main = document.querySelector('main.workspace-page, main#main-content, main') || body;
+        const bodyBackground = bodyStyle.backgroundColor;
+        const rootBackground = rootStyle.backgroundColor;
+        const parseColor = value => {
+          const match = String(value || '').match(/rgba?\(([^)]+)\)/i);
+          if (!match) return null;
+          const channels = match[1].split(',').map(part => Number.parseFloat(part.trim()));
+          if (channels.length < 3 || channels.some(channel => !Number.isFinite(channel))) return null;
+          return {
+            r: channels[0] / 255,
+            g: channels[1] / 255,
+            b: channels[2] / 255,
+            a: channels.length > 3 ? channels[3] : 1
+          };
+        };
+        const luminance = color => {
+          if (!color || color.a < 0.95) return null;
+          const linear = value => value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+          return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
+        };
+        const bodyLuminance = luminance(parseColor(bodyBackground));
+        const surfaceRoot = main;
+        const allElements = Array.from(surfaceRoot.querySelectorAll('*'));
+        const lightCandidates = allElements.filter(element => {
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          if (style.display === 'none' || style.visibility === 'hidden' ||
+              Number.parseFloat(style.opacity) === 0 || rect.width * rect.height < 12000) return false;
+          if (style.backgroundImage && style.backgroundImage !== 'none') return false;
+          if (element.closest('.invoice-doc, .logo-live-preview .lp-mock')) return false;
+          const selector = element.tagName.toLowerCase() +
+            (element.id ? '#' + element.id : '') +
+            (typeof element.className === 'string' && element.className.trim()
+              ? '.' + element.className.trim().split(/\s+/).slice(0, 3).join('.')
+              : '');
+          if (/(invoice-doc|invoice-template-preview|logo|brand|avatar|icon|sidebar|app-topbar|badge|pill|btn|button|input|select|textarea|img|svg|canvas|modal|dialog|tooltip|toast|notification|skeleton)/i.test(selector)) return false;
+          const color = parseColor(style.backgroundColor);
+          const lightness = luminance(color);
+          return lightness !== null && lightness >= 0.88;
+        });
+        const candidateSet = new Set(lightCandidates);
+        const largeLightSurfaces = lightCandidates.filter(element => {
+          let parent = element.parentElement;
+          while (parent && parent !== surfaceRoot) {
+            if (candidateSet.has(parent)) return false;
+            parent = parent.parentElement;
+          }
+          return true;
+        }).slice(0, 20).map(element => {
+          const rect = element.getBoundingClientRect();
+          return {
+            selector: element.tagName.toLowerCase() +
+              (element.id ? '#' + element.id : '') +
+              (typeof element.className === 'string' && element.className.trim()
+                ? '.' + element.className.trim().split(/\s+/).slice(0, 3).join('.')
+                : ''),
+            background: getComputedStyle(element).backgroundColor,
+            width: Math.round(rect.width),
+            height: Math.round(rect.height)
+          };
+        });
+
+        const logoMock = document.querySelector('.logo-live-preview .lp-mock');
+        const readLogoPreviewColor = selector => {
+          const element = logoMock?.querySelector(selector);
+          return element ? getComputedStyle(element).color : null;
+        };
+        const logoPreview = logoMock ? {
+          background: getComputedStyle(logoMock).backgroundColor,
+          companyNameColor: readLogoPreviewColor('.lp-company-name'),
+          companySubColor: readLogoPreviewColor('.lp-company-sub'),
+          totalColor: readLogoPreviewColor('.lp-mock-total')
+        } : null;
+        return {
+          theme: root.getAttribute('data-theme'),
+          colorScheme: rootStyle.colorScheme,
+          creamToken: rootStyle.getPropertyValue('--cream').trim(),
+          bodyBackground,
+          rootBackground,
+          bodyLuminance: bodyLuminance === null ? null : Number(bodyLuminance.toFixed(3)),
+          mainBackground: getComputedStyle(main).backgroundColor,
+          horizontalOverflow: root.scrollWidth > window.innerWidth,
+          logoPreview,
+          largeLightSurfaces
+        };
+      });
+
+      const screenshot = 'theme-sombre-' + pageDefinition.name + '-1440.png';
+      await page.screenshot({
+        path: path.join(OUTPUT_DIR, screenshot),
+        fullPage: true
+      });
+
+      assert.equal(metrics.theme, 'dark',
+        pageDefinition.name + ' doit appliquer le thème sombre sur toute la page.');
+      assert.equal(metrics.colorScheme, 'dark',
+        pageDefinition.name + ' doit déclarer color-scheme: dark.');
+      assert.ok(metrics.bodyLuminance !== null && metrics.bodyLuminance < 0.55,
+        pageDefinition.name + ' conserve un fond de page trop clair en thème sombre : ' +
+        JSON.stringify({ bodyBackground: metrics.bodyBackground, creamToken: metrics.creamToken }));
+      assert.equal(metrics.horizontalOverflow, false,
+        pageDefinition.name + ' ne doit pas déborder horizontalement en thème sombre.');
+      let logoPreviewContrasts = null;
+      if (metrics.logoPreview) {
+        assert.equal(metrics.logoPreview.background, 'rgb(255, 255, 255)',
+          'Le mini-aperçu de facture doit conserver son papier blanc.');
+        logoPreviewContrasts = {
+          companyName: contrastRatio(metrics.logoPreview.companyNameColor, metrics.logoPreview.background),
+          companySub: contrastRatio(metrics.logoPreview.companySubColor, metrics.logoPreview.background),
+          total: contrastRatio(metrics.logoPreview.totalColor, metrics.logoPreview.background)
+        };
+        for (const [label, contrast] of Object.entries(logoPreviewContrasts)) {
+          assert.ok(contrast >= 4.5,
+            'Le texte ' + label + ' du mini-aperçu facture doit garder un contraste de 4,5:1 en thème sombre. Valeur : ' + contrast.toFixed(2));
+        }
+      }
+      assert.deepEqual(pageErrors, [],
+        pageDefinition.name + ' a généré des erreurs JavaScript en thème sombre : ' + pageErrors.join(' | '));
+
+      results.push({ page: pageDefinition.name, screenshot, ...metrics, logoPreviewContrasts });
+    } finally {
+      await page.close();
+    }
+  }
+
+  return {
+    pageCount: results.length,
+    screenshots: results.length,
+    pages: results
+  };
+}
+
 async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   if (DATASET === 'empty') return { skipped: 'jeu de données vide' };
   const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -2438,6 +2609,7 @@ async function main() {
     const motion = await verifyMotion(browser, baseUrl, fixtures);
     const themeConsistency = await verifyThemeConsistency(browser, baseUrl, fixtures);
     const themeAndZoom = await verifyThemeAndZoom(browser, baseUrl, fixtures);
+    const businessDarkTheme = await verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures);
     const documentFlows = await verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures);
     const report = {
       dataset: DATASET,
@@ -2449,8 +2621,9 @@ async function main() {
       workspaceShell: shell,
       themeConsistency,
       themeAndZoom,
+      businessDarkTheme,
       documentFlows,
-      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + (documentFlows.screenshots || 0),
+      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + (documentFlows.screenshots || 0),
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
