@@ -1,24 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Palette premium — identité conservée (navy/émeraude/or), valeurs affinées pour un
-     rendu plus profond et un meilleur contraste. */
+  /* Palette OptiGest — navy, bleu électrique, cyan et vert ; les tons or restent réservés aux accents premium. */
+  --brand-blue: #1769E8;
+  --brand-cyan: #23C5E9;
+  --brand-green: #17C964;
   --navy-950: #0B1526;
   --navy-900: #14213D;
   --navy-800: #1C2B4A;
   --navy-700: #28395E;
-  --emerald: #0EA980;
-  --emerald-light: #E3F6EF;
+  --emerald: #16A66A;
+  --emerald-light: #E6F7EE;
   --gold: #DDA53F;
   --gold-text: #76501E;
   --gold-light: #FBF0DC;
   --clay: #E1484F;
   --clay-light: #FBEAEB;
-  --cream: #F6F4EE;
+  --cream: #F4F8FC;
   --paper: #FFFFFF;
   --ink: #171B26;
   --ink-soft: #5B6172;
-  --line: #E6E2D9;
+  --line: #E2EAF3;
 
   /* Tokens "structurels" fixes : toujours sombres, dans les deux thèmes (barre latérale,
      pied de page, en-têtes de tableau...). Contrairement à --navy-950/900 ci-dessus, ceux-ci
@@ -1283,7 +1285,7 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
 
 
 /* ==========================================================================
-   SamaFacture Pro — finition UI / responsive (2026)
+   OptiGest — finition UI / responsive (2026)
    Couche complémentaire : conserve les composants et la palette existants.
    ========================================================================== */
 
@@ -1563,7 +1565,7 @@ button, a, [role="button"] { touch-action: manipulation; }
   }
 }
 
-/* SamaFacture Pro — système visuel commun à toutes les pages */
+/* OptiGest — système visuel commun à toutes les pages */
 :root {
   --surface-muted: color-mix(in srgb, var(--cream) 72%, var(--paper));
   --border-strong: color-mix(in srgb, var(--line) 78%, var(--ink-soft));
@@ -3268,7 +3270,7 @@ textarea { line-height: 1.55; }
 
 
 /* ==========================================================================
-   SamaFacture Pro — interface workspace inspirée de la référence utilisateur
+   OptiGest — interface workspace inspirée de la référence utilisateur
    Palette : bleu nuit, bleu électrique, émeraude, violet et ambre.
    Les composants métiers réutilisent les mêmes tokens sur toutes les pages.
    ========================================================================== */
@@ -4609,7 +4611,7 @@ body.sidebar-initializing .main-content {
 
 
 /* ==========================================================================
-   SamaFacture Pro — direction Unslop
+   OptiGest — direction Unslop
    Papier, encre, émeraude. Adaptation du workflow Unslop (CC BY 4.0) :
    Damir Sokolovsky — https://github.com/heydamir/unslop
    ========================================================================= */
@@ -7195,4 +7197,43 @@ a.btn .icon {
       color: var(--ink) !important;
     }
   }
+}
+
+
+/* OptiGest brand system — restrained blue/cyan/green accents, compatible with light and dark themes. */
+.sidebar-brand .mark { border-color: rgba(54, 150, 245, .68); box-shadow: 0 7px 20px rgba(20, 91, 180, .22), 0 0 0 3px rgba(255,255,255,.06); }
+.lp-header .brand img { display:block; width:210px; max-width:min(52vw, 210px); height:auto; max-height:58px; object-fit:contain; }
+.auth-form-badge .mark { border-color: rgba(35, 197, 233, .45); }
+
+
+/* OptiGest application accents: blue for primary actions, green remains semantic success. */
+.sidebar-brand .mark {
+  background: #F5F9FF;
+  border: 1px solid rgba(54, 150, 245, .48);
+}
+.btn-primary,
+.app-topbar-search button,
+.workspace-primary-action {
+  background: linear-gradient(105deg, #1769E8 0%, #2385ED 100%) !important;
+  border-color: #1769E8 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 5px 14px rgba(23, 105, 232, .2) !important;
+}
+.btn-primary:hover:not(:disabled),
+.app-topbar-search button:hover,
+.workspace-primary-action:hover {
+  background: #1255CF !important;
+  border-color: #1255CF !important;
+}
+.sidebar .nav-item.active,
+.sidebar .nav-item.active:hover {
+  border-color: rgba(80, 174, 250, .25) !important;
+  background: rgba(23, 105, 232, .2) !important;
+  color: #FFFFFF !important;
+  box-shadow: inset 3px 0 0 #50BAF8 !important;
+}
+.sidebar .nav-item.active .ic { color: #8AD8FF !important; }
+.lp-feature-card .ic {
+  background: rgba(23, 105, 232, .09);
+  color: var(--brand-blue);
 }

@@ -34,7 +34,7 @@ function requireScope(scope) {
 
 router.use(authenticateApiKey);
 
-router.get('/health', (req, res) => res.json({ status: 'ok', api: 'SamaFacture Pro v1' }));
+router.get('/health', (req, res) => res.json({ status: 'ok', api: 'OptiGest API v1' }));
 
 router.get('/clients', requireScope('clients:read'), async (req, res, next) => {
   try {

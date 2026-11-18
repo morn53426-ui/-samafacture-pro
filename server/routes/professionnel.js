@@ -692,8 +692,8 @@ router.post('/team/invitations', async (req, res, next) => {
     );
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
     const inviteUrl = base + '/invitation.html?type=team#token=' + encodeURIComponent(token);
-    const subject = 'Invitation à rejoindre SamaFacture Pro';
-    const text = 'Vous êtes invité à rejoindre un espace SamaFacture Pro. Connectez-vous ou créez un compte avec cette adresse email, puis ouvrez ce lien pour commencer la vérification : ' +
+    const subject = 'Invitation à rejoindre OptiGest';
+    const text = 'Vous êtes invité à rejoindre un espace OptiGest. Connectez-vous ou créez un compte avec cette adresse email, puis ouvrez ce lien pour commencer la vérification : ' +
       inviteUrl + '\n\nLe rattachement à l’équipe ne sera effectué qu’après une confirmation supplémentaire envoyée à cette même adresse email. Ce lien expire dans 7 jours.';
     const payloadEnc = encryptEmailPayload({ to: email, subject, text, invitation_url: inviteUrl });
     const idempotencyKey = crypto.createHash('sha256').update('team-invitation:' + result.insertId).digest('hex');
@@ -796,8 +796,8 @@ router.post('/team/invitations/accept', async (req, res, next) => {
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
     const verificationUrl = base + '/invitation.html?type=team#token=' +
       encodeURIComponent(token) + '&verification_token=' + encodeURIComponent(verificationToken);
-    const subject = 'Confirmez votre adresse email pour rejoindre SamaFacture Pro';
-    const text = 'Une demande a été faite pour rejoindre une équipe SamaFacture Pro. Pour confirmer que vous contrôlez cette adresse email et autoriser le rattachement, ouvrez ce lien valable 20 minutes : ' +
+    const subject = 'Confirmez votre adresse email pour rejoindre OptiGest';
+    const text = 'Une demande a été faite pour rejoindre une équipe OptiGest. Pour confirmer que vous contrôlez cette adresse email et autoriser le rattachement, ouvrez ce lien valable 20 minutes : ' +
       verificationUrl + '\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message. Aucun accès à l’équipe ne sera accordé sans cette confirmation.';
     const payloadEnc = encryptEmailPayload({ to: invite.email, subject, text, verification_url: verificationUrl });
     const idempotencyKey = crypto.createHash('sha256').update('team-invitation-verification:' + proof.id).digest('hex');
@@ -1144,7 +1144,7 @@ router.post('/company-group/invitations', async (req, res, next) => {
     const expires = new Date(Date.now() + 7 * 86400000);
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
     const invitationUrl = base + '/invitation.html?type=company-group&token=' + token;
-    const subject = 'Invitation à rejoindre un groupe de sociétés SamaFacture Pro';
+    const subject = 'Invitation à rejoindre un groupe de sociétés OptiGest';
     const text = 'Le groupe « ' + group.nom + ' » vous invite à rattacher votre société à son espace de gestion. Acceptez uniquement si vous autorisez explicitement le propriétaire du groupe à accéder à votre société : ' + invitationUrl;
 
     const [result] = await conn.query(
@@ -1421,7 +1421,7 @@ router.post('/company-group/invitations/accept', async (req, res, next) => {
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
     const verificationUrl = base + '/invitation.html?type=company-group#token=' +
       encodeURIComponent(token) + '&verification_token=' + encodeURIComponent(verificationToken);
-    const subject = 'Confirmez votre adresse email pour rejoindre le groupe SamaFacture Pro';
+    const subject = 'Confirmez votre adresse email pour rejoindre le groupe OptiGest';
     const text = 'Une demande a été faite pour rattacher votre société au groupe « ' + invite.group_name +
       ' ». Pour confirmer que vous contrôlez cette adresse email et autoriser le rattachement, ouvrez ce lien valable 20 minutes : ' +
       verificationUrl + '\n\nSi vous n’êtes pas à l’origine de cette demande, ignorez ce message. Votre société ne sera pas rattachée sans cette confirmation.';
@@ -1939,7 +1939,7 @@ router.get('/company-group/dashboard', async (req, res, next) => {
       })),
       alertes,
       ...(pagination ? { pagination: paginationMeta } : {}),
-      note: 'Les montants sont regroupés par devise ; les soldes affichés concernent uniquement les caisses actives enregistrées dans SamaFacture. La valorisation du stock utilise les prix d’achat renseignés. Aucune conversion de change ou consolidation comptable OHADA n’est réalisée.'
+      note: 'Les montants sont regroupés par devise ; les soldes affichés concernent uniquement les caisses actives enregistrées dans OptiGest. La valorisation du stock utilise les prix d’achat renseignés. Aucune conversion de change ou consolidation comptable OHADA n’est réalisée.'
     });
   } catch (err) { next(err); }
 });
@@ -2214,7 +2214,7 @@ router.get('/payment-gateways', async (req, res, next) => {
     res.json({
       gateways: rows.map(row => ({ ...row, configured: true })),
       encryption_ready: Boolean(process.env.DATA_ENCRYPTION_KEY),
-      warning: 'Chaque entreprise doit utiliser ses propres identifiants marchands. Les clés d’abonnement SamaFacture ne sont jamais réutilisées pour encaisser les factures clients.'
+      warning: 'Chaque entreprise doit utiliser ses propres identifiants marchands. Les clés d’abonnement OptiGest ne sont jamais réutilisées pour encaisser les factures clients.'
     });
   } catch (err) { next(err); }
 });
@@ -2314,7 +2314,7 @@ router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
           amount: remaining,
           description: 'Facture ' + invoice.numero,
           reference,
-          storeName: invoice.entreprise_nom || 'SamaFacture Pro',
+          storeName: invoice.entreprise_nom || 'OptiGest',
           returnUrl,
           cancelUrl: returnUrl,
           callbackUrl: base + '/api/payment-webhooks/paydunya',
@@ -2967,10 +2967,10 @@ router.post('/clients/:id/portal', async (req, res, next) => {
       try {
         mail = await sendMail({
           to: client.email,
-          subject: 'Votre espace client sécurisé — ' + (company.entreprise_nom || 'SamaFacture Pro'),
-          text: 'Bonjour ' + client.nom + ',\\n\\nVotre entreprise ' + (company.entreprise_nom || '') +
-            ' vous donne accès à un espace sécurisé pour consulter vos factures, devis et paiements :\\n' +
-            url + '\\n\\nCe lien est personnel, valable 30 jours et peut être révoqué par l’entreprise. Ne le transférez pas.\\n',
+          subject: 'Votre espace client sécurisé — ' + (company.entreprise_nom || 'OptiGest'),
+          text: 'Bonjour ' + client.nom + ',\n\nVotre entreprise ' + (company.entreprise_nom || '') +
+            ' vous donne accès à un espace sécurisé pour consulter vos factures, devis et paiements :\n' +
+            url + '\n\nCe lien est personnel, valable 30 jours et peut être révoqué par l’entreprise. Ne le transférez pas.\n',
           html: '<p>Bonjour ' + htmlEscape(client.nom) + ',</p><p>Votre espace client sécurisé est prêt.</p><p><a href="' +
             htmlEscape(url) + '">Consulter mes factures et devis</a></p><p>Ce lien est personnel, valable 30 jours et révocable.</p>'
         });

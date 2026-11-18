@@ -1,9 +1,8 @@
 {
-  "appId": "com.samafacturepro.app",
-  "appName": "SamaFacture Pro",
+  "appId": "com.optigest.app",
+  "appName": "OptiGest",
   "webDir": "../public",
   "bundledWebRuntime": false,
-
   "server": {
     "url": "https://votredomaine.com",
     "cleartext": false

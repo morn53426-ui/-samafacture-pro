@@ -5,7 +5,7 @@
 <script src="js/icons.js"></script>
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
-<title>Tableau de bord financier — SamaFacture Pro</title>
+<title>Tableau de bord financier — OptiGest</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
 <link rel="stylesheet" href="css/style.css" />
@@ -90,7 +90,7 @@
   requireAuthPage();
   renderSidebar('finances');
 
-  const OBJECTIF_STORAGE_KEY = 'samafacture_objectif_mensuel';
+  const OBJECTIF_STORAGE_KEY = 'OptiGest_objectif_mensuel';
 
   async function loadFinances() {
     // Réutilise les deux endpoints existants : /dashboard (trésorerie, évolution des ventes)

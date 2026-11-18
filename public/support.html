@@ -5,20 +5,20 @@
 <script src="js/icons.js"></script>
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
-<title>Support technique — SamaFacture Pro</title>
-<meta name="description" content="Besoin d'aide avec SamaFacture Pro ? Contactez notre équipe par email ou WhatsApp, réponse sous 24h ouvrées en général." />
+<title>Support technique — OptiGest</title>
+<meta name="description" content="Besoin d'aide avec OptiGest ? Contactez notre équipe par email ou WhatsApp, réponse sous 24h ouvrées en général." />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="index, follow" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0F1B33" />
-<link rel="icon" type="image/png" href="images/icon-192.png" />
-<link rel="apple-touch-icon" href="images/icon-192.png" />
+<link rel="icon" type="image/svg+xml" href="images/optigest-icon.svg" />
+
 </head>
 <body>
 
 <header class="lp-header">
-  <div class="brand"><img src="images/icon-192.png" alt="Logo SamaFacture Pro" /> SamaFacture Pro</div>
+  <div class="brand"><img src="images/optigest-icon.svg" alt="Logo OptiGest" /> OptiGest</div>
   <nav>
     <a href="index.html">Accueil</a>
     <a href="login.html">Connexion</a>
@@ -59,7 +59,7 @@
             <div class="stat-icon icon-emerald" style="flex-shrink:0;"><i data-icon="mail"></i></div>
             <div>
               <div style="font-weight:600;">Email</div>
-              <div style="color:var(--ink-soft); font-size:0.88rem;">support@samafacture.pro</div>
+              <div style="color:var(--ink-soft); font-size:0.88rem;">Assistance par e-mail</div>
             </div>
           </div>
           <div style="display:flex; gap:12px; align-items:flex-start;">
@@ -89,7 +89,7 @@
 
 <footer class="lp-footer">
   <div class="lp-footer-inner">
-    <div class="brand" style="color:#fff;"><img src="images/icon-192.png" alt="" style="width:28px;height:28px;border-radius:7px;" /> SamaFacture Pro</div>
+    <div class="brand" style="color:#fff;"><img src="images/optigest-icon.svg" alt="" style="width:28px;height:28px;border-radius:7px;" /> OptiGest</div>
     <div class="lp-footer-links">
       <a href="aide.html">Centre d'aide</a>
       <a href="support.html">Support technique</a>
@@ -97,7 +97,7 @@
       <a href="conditions.html">Conditions d'utilisation</a>
     </div>
   </div>
-  <div class="lp-footer-bottom">© 2026 SamaFacture Pro. Tous droits réservés.</div>
+  <div class="lp-footer-bottom">© 2026 OptiGest. Tous droits réservés.</div>
 </footer>
 
 <script src="js/api.js"></script>
@@ -113,7 +113,7 @@
     const message = document.getElementById('message').value;
 
     const body = `De : ${email}\n\n${message}`;
-    const mailto = `mailto:support@samafacture.pro?subject=${encodeURIComponent('[SamaFacture Pro] ' + sujet)}&body=${encodeURIComponent(body)}`;
+    const mailto = `mailto:support@samafacture.pro?subject=${encodeURIComponent('[OptiGest] ' + sujet)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
 
     document.getElementById('msg').innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:0.85rem;">Votre messagerie va s'ouvrir avec le message pré-rempli ✓</div>`;

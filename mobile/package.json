@@ -1,7 +1,7 @@
 {
-  "name": "samafacture-pro-mobile",
+  "name": "optigest-mobile",
   "version": "1.0.0",
-  "description": "Enveloppe native iOS/Android (Capacitor) pour SamaFacture Pro — charge le site web existant, ne réécrit rien.",
+  "description": "Enveloppe native iOS/Android (Capacitor) pour OptiGest — charge le site web existant, ne réécrit rien.",
   "private": true,
   "scripts": {
     "sync": "npx cap sync",

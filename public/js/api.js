@@ -88,7 +88,7 @@ const Api = {
       // (npm start, port...) aident réellement ; envoyées telles quelles à un vrai client en
       // production après une coupure réseau, elles ne veulent rien dire pour lui.
       throw new Error(estEnLocal()
-        ? "Impossible de contacter le serveur SamaFacture. Vérifiez que le serveur Node est démarré (npm start) " +
+        ? "Impossible de contacter le serveur OptiGest. Vérifiez que le serveur Node est démarré (npm start) " +
           "et que vous accédez au site via http://localhost:4000 (et non via Live Server ou un autre port)."
         : "Impossible de contacter le serveur. Vérifiez votre connexion internet et réessayez dans un instant.");
     }

@@ -1,7 +1,7 @@
 {
-  "name": "samafacture-pro-server",
+  "name": "optigest-server",
   "version": "1.0.0",
-  "description": "Backend API pour SamaFacture Pro (MySQL / WAMPserver)",
+  "description": "Backend API pour OptiGest (MySQL / WAMPserver)",
   "main": "app.js",
   "type": "commonjs",
   "engines": {

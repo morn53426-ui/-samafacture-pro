@@ -5,7 +5,7 @@
 <script src="js/icons.js"></script>
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
-<title>Paramètres — SamaFacture Pro</title>
+<title>Paramètres — OptiGest</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
 <link rel="stylesheet" href="css/style.css" />
@@ -1448,7 +1448,7 @@
     } catch (err) {
       // Visible dans la console navigateur (F12) pour diagnostiquer un futur cas encore non
       // prévu, en plus du message affiché à l'utilisateur.
-      console.error('[SamaFacturePro] Échec de l’enregistrement des paramètres entreprise :', err);
+      console.error('[OptiGest] Échec de l’enregistrement des paramètres entreprise :', err);
       showEntrepriseMessage(err?.message || 'Impossible d’enregistrer les modifications.', 'error');
     } finally {
       restore();

@@ -59,10 +59,10 @@ jobs:
           APP_URL=https://example.invalid
           ALLOWED_ORIGINS=https://example.invalid
           ENV
-          docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml config --format json > /tmp/samafacture-compose.json
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml config --format json > /tmp/optigest-compose.json
           node <<'NODE'
           const fs = require('node:fs');
-          const compose = JSON.parse(fs.readFileSync('/tmp/samafacture-compose.json', 'utf8'));
+          const compose = JSON.parse(fs.readFileSync('/tmp/optigest-compose.json', 'utf8'));
           const dependency = compose.services?.['pdf-worker']?.depends_on?.app;
           if (dependency?.condition !== 'service_healthy') {
             throw new Error('Le worker PDF doit attendre que le service app soit healthy.');
@@ -95,10 +95,10 @@ jobs:
           trap cleanup EXIT
           printf 'CI_SERVER_SECRET_SENTINEL=must-not-enter-image\n' > server/.env
           printf 'CI_ROOT_SECRET_SENTINEL=must-not-enter-image\n' > .env
-          docker build --tag samafacture-pro:ci .
+          docker build --tag optigest:ci .
 
           # Inspecte le contenu réel de l'image, pas seulement les motifs du .dockerignore.
-          docker run --rm --entrypoint /bin/sh samafacture-pro:ci -ec '
+          docker run --rm --entrypoint /bin/sh optigest:ci -ec '
             test ! -e /app/server/.env
             test ! -e /app/.env
             test -f /app/server/.env.example
@@ -189,13 +189,13 @@ jobs:
             --env DB_NAME=samafacture_test \
             --env JWT_SECRET=ci-secret-ne-pas-utiliser-en-production \
             --entrypoint /bin/sh \
-            samafacture-pro:ci \
+            optigest:ci \
             -ec 'command -v mysqldump && command -v mysql && exec node --test tests/restore-backup-roundtrip.test.js'
       - name: Archiver les diagnostics des tests bloqués
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: samafacture-diagnostics-${{ github.run_number }}
+          name: optigest-diagnostics-${{ github.run_number }}
           path: server/tests/diagnostics/
           if-no-files-found: ignore
           retention-days: 7
@@ -217,13 +217,13 @@ jobs:
           APP_URL: http://127.0.0.1:4178
           PORT: 4178
           WEB_CONCURRENCY: 2
-          PDF_JOBS_DIR: /tmp/samafacture-cluster-smoke-pdf
-          BACKUP_DIR: /tmp/samafacture-cluster-smoke-backups
+          PDF_JOBS_DIR: /tmp/optigest-cluster-smoke-pdf
+          BACKUP_DIR: /tmp/optigest-cluster-smoke-backups
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$PDF_JOBS_DIR" "$BACKUP_DIR"
-          node cluster.js > /tmp/samafacture-cluster-smoke.log 2>&1 &
+          node cluster.js > /tmp/optigest-cluster-smoke.log 2>&1 &
           CLUSTER_PID=$!
           cleanup() {
             kill -TERM "$CLUSTER_PID" 2>/dev/null || true
@@ -233,7 +233,7 @@ jobs:
             done
             kill -KILL "$CLUSTER_PID" 2>/dev/null || true
             wait "$CLUSTER_PID" 2>/dev/null || true
-            cat /tmp/samafacture-cluster-smoke.log
+            cat /tmp/optigest-cluster-smoke.log
           }
           trap cleanup EXIT
 
@@ -241,15 +241,15 @@ jobs:
           for attempt in $(seq 1 90); do
             # La préparation initiale du schéma peut être longue ; aucune sonde HTTP ne doit
             # bloquer toute la boucle si le port vient d'ouvrir mais que le worker démarre.
-            if curl --connect-timeout 2 --max-time 4 -fsS http://127.0.0.1:4178/api/ready > /tmp/samafacture-cluster-ready.json; then
-              if grep -q '"redis":"up"' /tmp/samafacture-cluster-ready.json; then
+            if curl --connect-timeout 2 --max-time 4 -fsS http://127.0.0.1:4178/api/ready > /tmp/optigest-cluster-ready.json; then
+              if grep -q '"redis":"up"' /tmp/optigest-cluster-ready.json; then
                 READY=1
                 break
               fi
             fi
             if ! kill -0 "$CLUSTER_PID" 2>/dev/null; then
               echo "Le processus cluster s'est arrêté avant d'être prêt." >&2
-              cat /tmp/samafacture-cluster-smoke.log
+              cat /tmp/optigest-cluster-smoke.log
               exit 1
             fi
             sleep 2
@@ -257,8 +257,8 @@ jobs:
 
           if [ "$READY" -ne 1 ]; then
             echo "Le cluster n'a pas atteint l'état ready avec MySQL et Redis." >&2
-            cat /tmp/samafacture-cluster-smoke.log
-            cat /tmp/samafacture-cluster-ready.json 2>/dev/null || true
+            cat /tmp/optigest-cluster-smoke.log
+            cat /tmp/optigest-cluster-ready.json 2>/dev/null || true
             exit 1
           fi
 
@@ -279,7 +279,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: samafacture-recette-visuelle-${{ github.run_number }}
+          name: optigest-recette-visuelle-${{ github.run_number }}
           path: server/tests/visual/artifacts/
           if-no-files-found: warn
           retention-days: 14

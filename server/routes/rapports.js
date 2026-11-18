@@ -118,7 +118,7 @@ router.get('/export-excel', async (req, res, next) => {
     const venteRows = ventes.map(r => isProduit ? [r.label, r.quantite, r.total] : [r.label, r.nb_factures, r.total]);
 
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'SamaFacture Pro';
+    workbook.creator = 'OptiGest';
     workbook.created = new Date();
 
     const ventesSheet = workbook.addWorksheet('Ventes', {
@@ -161,7 +161,7 @@ router.get('/export-excel', async (req, res, next) => {
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename="rapport-samafacture.xlsx"');
+    res.setHeader('Content-Disposition', 'attachment; filename="rapport-optigest.xlsx"');
     res.send(buffer);
   } catch (err) { next(err); }
 });

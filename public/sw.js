@@ -1,6 +1,6 @@
 // v2 : force la purge du cache v1, qui pouvait contenir des pages HTML avec une CSP obsolète
 // mise en cache par erreur (voir correctif du fetch handler plus bas).
-const CACHE_NAME = 'samafacture-shell-v4';
+const CACHE_NAME = 'optigest-shell-v2';
 
 // Fichiers statiques de l'interface (l'API n'est jamais mise en cache : les données doivent
 // toujours être à jour).
@@ -11,8 +11,8 @@ const SHELL_FILES = [
   '/js/auth-slider.js',
   '/js/landing-slider.js',
   '/manifest.json',
-  '/images/icon-192.png',
-  '/images/icon-512.png'
+  '/images/optigest-logo.svg',
+  '/images/optigest-icon.svg'
 ];
 
 self.addEventListener('install', (event) => {

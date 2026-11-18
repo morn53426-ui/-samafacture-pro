@@ -24,15 +24,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          git archive --format=zip --prefix=SamaFacture-Pro/ HEAD -o dist/SamaFacture-Pro-Complet.zip
-          test -s dist/SamaFacture-Pro-Complet.zip
-          unzip -t dist/SamaFacture-Pro-Complet.zip
-          sha256sum dist/SamaFacture-Pro-Complet.zip
+          git archive --format=zip --prefix=OptiGest/ HEAD -o dist/OptiGest-Complet.zip
+          test -s dist/OptiGest-Complet.zip
+          unzip -t dist/OptiGest-Complet.zip
+          sha256sum dist/OptiGest-Complet.zip
 
       - name: Upload source ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: SamaFacture-Pro-Complet-PR-${{ github.event.pull_request.number }}
-          path: dist/SamaFacture-Pro-Complet.zip
+          name: OptiGest-Complet-PR-${{ github.event.pull_request.number }}
+          path: dist/OptiGest-Complet.zip
           if-no-files-found: error
           retention-days: 14

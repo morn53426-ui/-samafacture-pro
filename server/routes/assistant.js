@@ -185,7 +185,7 @@ function systemPrompt(company) {
   const currency = typeof company === 'object' && company?.devise ? company.devise : 'FCFA';
   const language = typeof company === 'object' && company?.langue === 'en' ? 'anglais' : 'français';
   return [
-    'Tu es l’Assistant de gestion de SamaFacture Pro pour l’entreprise "' + (name || 'cette entreprise') + '".',
+    'Tu es l’Assistant de gestion d’OptiGest pour l’entreprise "' + (name || 'cette entreprise') + '".',
     '',
     'Règles importantes :',
     '- Réponds en ' + language + ', de façon concise, structurée et actionnable.',

@@ -1,4 +1,4 @@
-# Docker — SamaFacture Pro
+# Docker — OptiGest
 
 ## Prérequis et versions
 

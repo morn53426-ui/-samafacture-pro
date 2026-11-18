@@ -1,4 +1,4 @@
-# Plan d’entreprise — SamaFacture Pro
+# Plan d’entreprise — OptiGest
 
 **Version :** 0.2 — 16 novembre 2026  
 **Statut :** document de travail stratégique — hypothèses à valider avec des clients  
@@ -9,7 +9,7 @@
 
 ## 1. Résumé exécutif
 
-SamaFacture Pro est une plateforme web de facturation et de gestion commerciale destinée aux indépendants, commerçants, prestataires de services et petites et moyennes entreprises. Le produit réunit dans un même espace la gestion des clients et produits, les devis, les factures, les paiements enregistrés, les dépenses, les rapports et des fonctions professionnelles.
+OptiGest est une plateforme web de facturation et de gestion commerciale destinée aux indépendants, commerçants, prestataires de services et petites et moyennes entreprises. Le produit réunit dans un même espace la gestion des clients et produits, les devis, les factures, les paiements enregistrés, les dépenses, les rapports et des fonctions professionnelles.
 
 L’opportunité commerciale consiste à simplifier le quotidien des entreprises qui utilisent encore des documents manuels, des feuilles de calcul ou plusieurs outils séparés. La promesse doit rester concrète : **créer un devis, le transformer en facture, suivre les règlements et connaître l’activité sans multiplier les fichiers**.
 
@@ -38,7 +38,7 @@ Aucun nombre de clients, chiffre d'affaires, taux de conversion ou coût d'acqui
 
 ### Proposition de valeur
 
-**SamaFacture Pro aide une entreprise à gérer ses ventes et ses documents commerciaux depuis un seul espace, avec des outils adaptés à son activité et à son pays.**
+**OptiGest aide une entreprise à gérer ses ventes et ses documents commerciaux depuis un seul espace, avec des outils adaptés à son activité et à son pays.**
 
 Messages à tester pendant les démonstrations :
 
@@ -195,7 +195,7 @@ Les réglages techniques constituent une première base, mais ne signifient pas 
 | Devise | Une devise par défaut est enregistrée pour l'entreprise ; les anciens documents conservent leur devise | Le changement de devise de base est refusé dès qu'un historique commercial ou financier existe. Aucune conversion automatique ni consolidation comptable multidevise ne doit être promise sans chantier dédié |
 | Fiscalité | Un paramètre de régime fiscal générique est proposé | Les choix « standard », « simplifié », « franchise » et « autre » ne constituent pas un moteur fiscal national. TVA, numérotation réglementaire, identifiants fiscaux, mentions obligatoires et facturation électronique nécessitent des profils validés pays par pays |
 
-**Conséquence commerciale :** ne pas présenter SamaFacture Pro comme « disponible dans toute l'Afrique et l'Europe » au seul motif que des pays, devises et fuseaux apparaissent dans les paramètres. Le premier marché commercial reste le Sénégal ; chaque extension doit être explicitement activée après validation produit, fiscale, juridique, paiement et support.
+**Conséquence commerciale :** ne pas présenter OptiGest comme « disponible dans toute l'Afrique et l'Europe » au seul motif que des pays, devises et fuseaux apparaissent dans les paramètres. Le premier marché commercial reste le Sénégal ; chaque extension doit être explicitement activée après validation produit, fiscale, juridique, paiement et support.
 
 ### Chantiers produit à ordonner pour l'international
 
@@ -260,7 +260,7 @@ Ces chiffres sont un rythme de prospection à tester, pas une garantie de conver
 
 ### Exemple de premier message
 
-> Bonjour, je vous contacte parce que je développe SamaFacture Pro, un outil qui aide les petites entreprises à créer leurs devis et factures, suivre les paiements et organiser leurs clients.
+> Bonjour, je vous contacte parce que je développe OptiGest, un outil qui aide les petites entreprises à créer leurs devis et factures, suivre les paiements et organiser leurs clients.
 >
 > Je cherche quelques entreprises pour tester la solution et me dire franchement ce qui leur serait utile. Est-ce que je pourrais vous présenter une démonstration de 15 minutes, sans engagement ?
 
@@ -425,4 +425,4 @@ Ce plan a été rédigé à partir des fichiers présents dans le dépôt. Les d
 
 ---
 
-**Conclusion :** la priorité n'est pas de lancer immédiatement dans tous les pays. La priorité est de prouver au Sénégal que des entreprises utilisent SamaFacture Pro, obtiennent un bénéfice concret et paient pour continuer. Une fois ce modèle validé, l'expansion internationale pourra être financée et adaptée pays par pays.
+**Conclusion :** la priorité n'est pas de lancer immédiatement dans tous les pays. La priorité est de prouver au Sénégal que des entreprises utilisent OptiGest, obtiennent un bénéfice concret et paient pour continuer. Une fois ce modèle validé, l'expansion internationale pourra être financée et adaptée pays par pays.
