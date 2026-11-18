@@ -2313,7 +2313,7 @@ async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
       assert.equal(metrics.theme, 'dark',
         pageDefinition.name + ' doit appliquer le thème sombre sur toute la page.');
       assert.equal(metrics.colorScheme, 'dark',
-        pageDefinition.name + ' doit déclarer color-scheme: dark.');
+        pageDefinition.name + ' doit déclarer color-scheme: light.');
       assert.ok(metrics.bodyLuminance !== null && metrics.bodyLuminance < 0.55,
         pageDefinition.name + ' conserve un fond de page trop clair en thème sombre : ' +
         JSON.stringify({ bodyBackground: metrics.bodyBackground, creamToken: metrics.creamToken }));
