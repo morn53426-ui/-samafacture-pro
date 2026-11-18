@@ -1829,6 +1829,8 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
       dashboardCard: color('.enterprise-dashboard-card'),
       sidebar: color('#app-sidebar.sidebar'),
       sidebarText: color('#app-sidebar .nav-item.active', 'color'),
+      sidebarActiveBackground: color('#app-sidebar .nav-item.active'),
+      sidebarDefaultText: color('#app-sidebar .nav-item:not(.active)', 'color'),
       heading: color('.enterprise-dashboard-heading h1', 'color'),
       horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth
     };
@@ -1853,11 +1855,16 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   assert.equal(dark.sidebar, 'rgb(23, 23, 19)', 'Le rail latéral doit devenir sombre avec le reste de l’application.');
   assert.equal(dark.horizontalOverflow, false, 'Le thème sombre ne doit pas provoquer de débordement.');
   const headingContrast = contrastRatio(dark.heading, dark.page);
-  const sidebarContrast = contrastRatio(dark.sidebarText, dark.sidebar);
+  const sidebarActiveContrast = contrastRatio(dark.sidebarText, dark.sidebarActiveBackground);
+  const sidebarDefaultContrast = contrastRatio(dark.sidebarDefaultText, dark.sidebar);
   assert.ok(headingContrast >= 4.5,
     'Le titre Entreprise doit garder un contraste de 4,5:1 en thème sombre. Valeur : ' + headingContrast.toFixed(2));
-  assert.ok(sidebarContrast >= 4.5,
-    'Le menu Entreprise doit garder un contraste de 4,5:1 en thème sombre. Valeur : ' + sidebarContrast.toFixed(2));
+  assert.ok(sidebarActiveContrast >= 4.5,
+    'Le lien actif du menu doit contraster avec son propre fond. Valeur : ' +
+    sidebarActiveContrast.toFixed(2) + ' (' + dark.sidebarText + ' sur ' + dark.sidebarActiveBackground + ')');
+  assert.ok(sidebarDefaultContrast >= 4.5,
+    'Les liens non actifs du menu doivent contraster avec le rail sombre. Valeur : ' +
+    sidebarDefaultContrast.toFixed(2) + ' (' + dark.sidebarDefaultText + ' sur ' + dark.sidebar + ')');
   await groupPage.screenshot({ path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-clair-1440.png'), fullPage: true });
   await groupPage.evaluate(() => window.SamaTheme.definir('dark'));
   await groupPage.screenshot({ path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-sombre-1440.png'), fullPage: true });
@@ -1967,7 +1974,11 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   await settingsPage.close();
 
   return {
-    enterprise: { light, dark, headingContrast: Number(headingContrast.toFixed(2)), sidebarContrast: Number(sidebarContrast.toFixed(2)) },
+    enterprise: {
+      light, dark, headingContrast: Number(headingContrast.toFixed(2)),
+      sidebarActiveContrast: Number(sidebarActiveContrast.toFixed(2)),
+      sidebarDefaultContrast: Number(sidebarDefaultContrast.toFixed(2))
+    },
     charts: { finances, reports },
     settingsPreview: { light: previewLight, dark: previewDark },
     goldBadges: {
