@@ -3487,6 +3487,26 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       fullPage: true
     });
     await page.emulateMediaType('print');
+    // Le média print peut activer des variantes différentes de l’aperçu écran.
+    // Les charger explicitement empêche Chromium d’embarquer Arial/DejaVu en secours.
+    const printFonts = await page.evaluate(async () => {
+      if (!document.fonts) return { sansLoaded: false, monoLoaded: false };
+      const requestedFaces = await Promise.all([
+        document.fonts.load('400 12px "IBM Plex Sans"'),
+        document.fonts.load('500 12px "IBM Plex Sans"'),
+        document.fonts.load('600 12px "IBM Plex Sans"'),
+        document.fonts.load('700 12px "IBM Plex Sans"'),
+        document.fonts.load('400 12px "IBM Plex Mono"'),
+        document.fonts.load('500 12px "IBM Plex Mono"')
+      ]);
+      await document.fonts.ready;
+      return {
+        sansLoaded: requestedFaces.slice(0, 4).every(faces => faces.length > 0),
+        monoLoaded: requestedFaces.slice(4).every(faces => faces.length > 0)
+      };
+    });
+    assert.equal(printFonts.sansLoaded, true, type + ' : IBM Plex Sans doit être chargée pour le média d’impression.');
+    assert.equal(printFonts.monoLoaded, true, type + ' : IBM Plex Mono doit être chargée pour le média d’impression.');
     const printMetrics = await page.evaluate(() => ({
       toolbarDisplay: getComputedStyle(document.querySelector('.toolbar')).display,
       themeToggleDisplay: document.querySelector('.theme-toggle-flottant')
@@ -3514,6 +3534,14 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.equal(pdfBuffer.subarray(0, 5).toString('latin1'), '%PDF-', type + ' : la sortie doit être un vrai fichier PDF.');
     assert.ok(pdfBuffer.length > 5000, type + ' : le PDF doit contenir le document complet.');
     const pdfSource = pdfBuffer.toString('latin1');
+    const embeddedFontNames = Array.from(
+      pdfSource.matchAll(/\/(?:BaseFont|FontName)\s*\/([^\s/]+)/g),
+      match => match[1]
+    );
+    assert.ok(embeddedFontNames.some(name => /IBMPlexSans/i.test(name)),
+      type + ' : le vrai PDF imprimé doit embarquer IBM Plex Sans, polices trouvées : ' + embeddedFontNames.join(', '));
+    assert.ok(embeddedFontNames.some(name => /IBMPlexMono/i.test(name)),
+      type + ' : le vrai PDF imprimé doit embarquer IBM Plex Mono, polices trouvées : ' + embeddedFontNames.join(', '));
     const pages = (pdfSource.match(/\/Type\s*\/Page\b/g) || []).length;
     assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
     if (type === 'devis') {
@@ -3521,7 +3549,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       assert.ok(pages <= 3, 'Le devis long ne doit pas créer une quatrième page quasi vide. Pages détectées : ' + pages);
     }
     fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdfBuffer);
-    return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
+    return { ...screenMetrics, printMetrics, printFonts, embeddedFontNames, pdfBytes: pdf.length, pdfPages: pages };
   }
 
   const invoicePdf = await verifyDocumentPdf(987, 'facture');
