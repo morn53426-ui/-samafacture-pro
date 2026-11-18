@@ -1,4 +1,4 @@
-# Recette visuelle SamaFacture Pro
+# Recette visuelle SunuPilot
 
 Cette recette lance un vrai navigateur Chromium via Puppeteer sur les pages réelles de
 l'interface. Les appels API sont remplacés par des réponses de démonstration injectées

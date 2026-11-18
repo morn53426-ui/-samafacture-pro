@@ -1,14 +1,28 @@
-# SamaFacture Pro
+# SunuPilot
 
-Plateforme de facturation pour commerçants, freelances, artisans et PME — inspirée de Brisk Invoicing, pensée pour l'Afrique (Wave, Orange Money, PayDunya).
+Plateforme de gestion d’entreprise pour commerçants, freelances, artisans et PME — facturation, CRM, comptabilité OHADA, achats, stocks et automatisations, pensée pour les entreprises d’Afrique.
 
-SamaFacture Pro est une plateforme de facturation et de gestion destinée aux commerçants, indépendants et PME. Le périmètre principal comprend l'authentification, les clients, le catalogue, les factures/devis, les encaissements, les dépenses et les rapports. Une extension de modules professionnels (commandes, avoirs, acomptes, équipes, établissements, caisses, documents, analyses, automatisations et intégrations API/webhooks) est décrite dans [MODULES_PROFESSIONNELS.md](MODULES_PROFESSIONNELS.md), avec ses limites actuelles.
+SunuPilot est une plateforme de gestion d’entreprise destinée aux commerçants, indépendants et PME.
+
+## Identité de marque SunuPilot
+
+**Signature :** *Pilotez votre entreprise avec clarté.*
+
+L'interface utilise une identité sénégalaise contemporaine, construite autour de deux couleurs de marque :
+
+- **Indigo profond** — `#18265B` : navigation, titres, éléments de structure et repères de confiance.
+- **Vert baobab** — `#087A3D` : actions principales, validation et accents de croissance.
+- Les fonds neutres restent clairs en mode clair et indigo profond en mode sombre afin de préserver le contraste, la lisibilité et l'impression des documents.
+- Pour les nouveaux composants, réutilisez les variables CSS existantes (`--navy-900`, `--emerald`, `--cream`, `--paper`) au lieu d'introduire des nuances de marque locales.
+
+Le logo associe un baobab stylisé à un symbole de pilotage et de progression. La marque SunuPilot reste un nom de travail tant que la recherche d'antériorité et la validation juridique auprès de l'OAPI n'ont pas été finalisées.
+ Le périmètre principal comprend l'authentification, les clients, le catalogue, les factures/devis, les encaissements, les dépenses et les rapports. Une extension de modules professionnels (commandes, avoirs, acomptes, équipes, établissements, caisses, documents, analyses, automatisations et intégrations API/webhooks) est décrite dans [MODULES_PROFESSIONNELS.md](MODULES_PROFESSIONNELS.md), avec ses limites actuelles.
 
 Pour l'API publique versionnée, ses permissions, ses exemples de requêtes et la signature des webhooks, consultez [API_PUBLIQUE.md](API_PUBLIQUE.md).
 
 Pour configurer et utiliser les modèles complets de factures et devis, consultez [GUIDE_MODELES_FACTURES_DEVIS.md](GUIDE_MODELES_FACTURES_DEVIS.md).
 
-Pour consulter la stratégie commerciale, les offres envisagées, le plan d'acquisition des 100 premiers clients et la feuille de route d'internationalisation, consultez [PLAN_ENTREPRISE_SAMAFACTURE_PRO.md](PLAN_ENTREPRISE_SAMAFACTURE_PRO.md). Pour exécuter le premier test de marché au Sénégal, utilisez le [guide opérationnel du pilote commercial](PLAN_PILOTE_COMMERCIAL_SENEGAL.md).
+Pour consulter la stratégie commerciale, les offres envisagées, le plan d'acquisition des 100 premiers clients et la feuille de route d'internationalisation, consultez [PLAN_ENTREPRISE_SUNUPILOT.md](PLAN_ENTREPRISE_SUNUPILOT.md). Pour exécuter le premier test de marché au Sénégal, utilisez le [guide opérationnel du pilote commercial](PLAN_PILOTE_COMMERCIAL_SENEGAL.md).
 
 ## Ce qui est inclus
 
@@ -89,7 +103,7 @@ Le serveur démarre sur `http://localhost:4000` et sert à la fois l'API (`/api/
 ## Structure du projet
 
 ```
-SamaFacturePro/
+SunuPilot/
 ├── server/
 │   ├── app.js               → point d'entrée Express (connexion MySQL + démarrage)
 │   ├── config/db.js         → pool de connexions MySQL + création auto de la base/schéma
@@ -155,7 +169,7 @@ autonomes de sécurité des webhooks. Le résultat réel (succès ou échec) est
 dans l'onglet **Actions** de GitHub après l'exécution du workflow.
 
 Un contrôle HTTP non destructif de l'instance de staging peut être lancé avec
-`SAMAFACTURE_BASE_URL=https://staging.votre-domaine.tld npm run smoke:staging`
+`SUNUPILOT_BASE_URL=https://staging.votre-domaine.tld npm run smoke:staging`
 depuis le dossier `server/`. Il vérifie la liveness, la readiness MySQL/Redis, la page
 d'accueil et le refus d'une route API sans jeton. Pour les contrôles métier, la recette
 détaillée est documentée dans [RECETTE_PREPRODUCTION.md](RECETTE_PREPRODUCTION.md).

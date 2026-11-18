@@ -106,7 +106,7 @@ router.post('/payer', requireAuth, async (req, res) => {
   }
 
   return res.status(503).json({
-    error: 'Les formules payantes sont prévues au mois avec renouvellement automatique. Le prestataire ne confirme pas encore un mandat de débit récurrent utilisable par SamaFacture Pro ; aucun paiement ponctuel ne sera lancé.',
+    error: 'Les formules payantes sont prévues au mois avec renouvellement automatique. Le prestataire ne confirme pas encore un mandat de débit récurrent utilisable par SunuPilot ; aucun paiement ponctuel ne sera lancé.',
     code: 'PAIEMENT_RECURRENT_NON_CONFIGURE'
   });
 });

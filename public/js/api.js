@@ -6,15 +6,15 @@
 // Dans l'app native (Capacitor, iOS/Android) : le contenu web est chargé depuis un
 // pseudo-domaine local (capacitor://localhost sur iOS, https://localhost sur Android),
 // pas depuis votre vrai serveur — un chemin relatif '/api' irait donc nulle part. C'est
-// pourquoi window.SAMAFACTURE_API_URL peut être défini AVANT le chargement de ce fichier
+// pourquoi window.SUNUPILOT_API_URL peut être défini AVANT le chargement de ce fichier
 // (voir capacitor.config.json → injecté par index native, ou une balise <script> dédiée)
 // pour forcer l'URL complète de votre serveur en production, ex. 'https://votredomaine.com/api'.
-const API_BASE = window.SAMAFACTURE_API_URL || (() => {
+const API_BASE = window.SUNUPILOT_API_URL || window.OPTIGEST_API_URL || window.SAMAFACTURE_API_URL || (() => {
   // En local, l'application peut être ouverte par erreur via Live Server (5500/5501...)
   // alors que l'API Express écoute sur 4000. Dans ce cas, '/api' pointe vers le mauvais
   // serveur et les boutons de sauvegarde semblent « ne rien faire ». On redirige donc
   // automatiquement les appels API vers Express pour localhost/127.0.0.1 lorsque la page
-  // n'est pas elle-même servie par le port API 4000. SAMAFACTURE_API_URL reste prioritaire
+  // n'est pas elle-même servie par le port API 4000. SUNUPILOT_API_URL (puis les alias historiques OPTIGEST_API_URL et SAMAFACTURE_API_URL) reste prioritaire
   // pour Capacitor, un autre port local ou un déploiement avec API séparée.
   const host = window.location.hostname;
   const port = window.location.port;
@@ -45,7 +45,7 @@ const Api = {
     localStorage.removeItem('sf_company_owner');
     // Best-effort : la déconnexion locale reste immédiate. Le jeton est capturé avant
     // effacement du stockage pour que le serveur puisse aussi révoquer les sessions Bearer.
-    const headers = { 'X-Requested-With': 'SamaFacturePro' };
+    const headers = { 'X-Requested-With': 'SunuPilot' };
     if (sessionToken) headers.Authorization = 'Bearer ' + sessionToken;
     fetch(API_BASE + '/auth/logout', { method: 'POST', headers }).catch(() => {});
   },
@@ -68,7 +68,7 @@ const Api = {
       // seconde protection CSRF pour la migration progressive vers un cookie de session, voir
       // server/middleware/auth.js. Sans effet sur le comportement actuel (l'en-tête Authorization
       // ci-dessous reste la source d'authentification utilisée dans tous les cas aujourd'hui).
-      'X-Requested-With': 'SamaFacturePro'
+      'X-Requested-With': 'SunuPilot'
     };
     const token = this.token();
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -88,7 +88,7 @@ const Api = {
       // (npm start, port...) aident réellement ; envoyées telles quelles à un vrai client en
       // production après une coupure réseau, elles ne veulent rien dire pour lui.
       throw new Error(estEnLocal()
-        ? "Impossible de contacter le serveur SamaFacture. Vérifiez que le serveur Node est démarré (npm start) " +
+        ? "Impossible de contacter le serveur SunuPilot. Vérifiez que le serveur Node est démarré (npm start) " +
           "et que vous accédez au site via http://localhost:4000 (et non via Live Server ou un autre port)."
         : "Impossible de contacter le serveur. Vérifiez votre connexion internet et réessayez dans un instant.");
     }

@@ -2,15 +2,15 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mon espace client — SamaFacture Pro</title><meta name="robots" content="noindex,nofollow">
-<meta name="referrer" content="no-referrer"><meta name="theme-color" content="#0F1B33">
-<link rel="stylesheet" href="css/style.css"><link rel="icon" type="image/png" href="images/icon-192.png">
+<title>Mon espace client — SunuPilot</title><meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer"><meta name="theme-color" content="#18265B">
+<link rel="stylesheet" href="css/style.css"><link rel="icon" type="image/svg+xml" href="images/sunupilot-icon.svg">
 <style>
 .portal-shell{max-width:1080px;margin:32px auto;padding:0 18px 48px}
 .portal-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 .portal-brand{display:flex;align-items:center;gap:12px;font-weight:800;color:var(--ink)}
 .portal-brand img{width:42px;height:42px;object-fit:contain;border-radius:12px}
-.portal-hero{background:linear-gradient(135deg,#0F1B33,#183B62);color:#fff;border-radius:20px;padding:26px;margin-bottom:18px}
+.portal-hero{background:linear-gradient(135deg,#18265B,#183B62);color:#fff;border-radius:20px;padding:26px;margin-bottom:18px}
 .portal-hero h1{margin:0 0 8px;color:#fff}
 .portal-hero p{margin:0;color:#d8e2f1}
 .portal-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}
@@ -30,11 +30,11 @@
 <body>
 <main class="portal-shell">
   <header class="portal-head">
-    <div class="portal-brand"><img id="company-logo" src="images/icon-192.png" alt=""><span id="company-name">SamaFacture Pro</span></div>
+    <div class="portal-brand"><img id="company-logo" src="images/sunupilot-icon.svg" alt=""><span id="company-name">SunuPilot</span></div>
     <span class="portal-meta">Espace client sécurisé</span>
   </header>
   <div id="portal-content"><section class="portal-error"><h2>Chargement de votre espace…</h2><p>Vérification de votre lien personnel.</p></section></div>
-  <footer class="portal-meta" style="text-align:center;margin-top:28px">Lien personnel et temporaire · SamaFacture Pro</footer>
+  <footer class="portal-meta" style="text-align:center;margin-top:28px">Lien personnel et temporaire · SunuPilot</footer>
 </main>
 <script>
 const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
@@ -47,8 +47,8 @@ const money = (value,currency,locale) => {
 const date = value => value ? new Date(String(value).slice(0,10)+'T12:00:00').toLocaleDateString('fr-FR') : '—';
 function render(data){
   const company=data.entreprise||{},client=data.client||{},summary=data.resume||{};
-  document.title='Espace client — '+(company.nom||'SamaFacture Pro');
-  document.getElementById('company-name').textContent=company.nom||'SamaFacture Pro';
+  document.title='Espace client — '+(company.nom||'SunuPilot');
+  document.getElementById('company-name').textContent=company.nom||'SunuPilot';
   if(company.logo && /^data:image\/(png|jpe?g|webp|svg\+xml);base64,|^https:\/\//i.test(company.logo)) document.getElementById('company-logo').src=company.logo;
   const docs=(data.documents||[]);
   root.innerHTML='<section class="portal-hero"><h1>Bonjour '+safe(client.nom||'')+'</h1><p>Consultez ici vos factures, devis, échéances et décisions commerciales.</p></section>'+

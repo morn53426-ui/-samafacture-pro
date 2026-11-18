@@ -10,7 +10,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const definition = {
   openapi: '3.0.3',
   info: {
-    title: 'SamaFacture Pro API',
+    title: 'SunuPilot API',
     version: '1.0.0',
     description: "API de facturation multi-tenant pour commerçants, artisans et PME d'Afrique de l'Ouest. " +
       "Toutes les routes (sauf mention contraire) exigent un jeton JWT obtenu via /auth/login ou /auth/register, " +

@@ -1,4 +1,4 @@
-# SamaFacture Pro — App iOS / Android (Capacitor)
+# SunuPilot — App iOS / Android (Capacitor)
 
 Ce dossier enveloppe votre site web existant (`public/`) dans une vraie app native, sans
 réécrire le code. Le principe : l'app installée sur le téléphone ouvre directement votre
@@ -19,7 +19,7 @@ republier sur les stores à chaque changement de contenu).
 
 Avant toute commande, ouvrez `capacitor.config.json` dans ce dossier et modifiez :
 
-- `"appId"` : un identifiant unique inversé, ex. `com.votresociete.samafacture` (ne le
+- `"appId"` : un identifiant unique inversé, ex. `com.votresociete.sunupilot` (ne le
   changez plus une fois l'app publiée — c'est son identité permanente sur les stores).
 - `"server.url"` : remplacez `https://votredomaine.com` par le vrai domaine où votre
   serveur est déployé (voir la Phase 10 de `RAPPORT_AUDIT.md` pour le déploiement Docker).

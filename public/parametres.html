@@ -5,13 +5,13 @@
 <script src="js/icons.js"></script>
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
-<title>Paramètres — SamaFacture Pro</title>
+<title>Paramètres — SunuPilot</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="stylesheet" href="css/workspace-polish.css" />
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0F1B33" />
+<meta name="theme-color" content="#18265B" />
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 <style>
@@ -125,7 +125,7 @@
     border-radius: var(--radius-sm);
     padding: 16px;
     background: #fff;
-    color: #24211D;
+    color: #151F4D;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -141,8 +141,8 @@
     font-size: 1.1rem; color: var(--ink-soft);
   }
   .lp-mock-logo img { width: 100%; height: 100%; object-fit: contain; }
-  .lp-mock-head .lp-company-name { font-weight: 700; font-size: 0.88rem; color: #24211D; }
-  .lp-mock-head .lp-company-sub { font-size: 0.72rem; color: #655E55; }
+  .lp-mock-head .lp-company-name { font-weight: 700; font-size: 0.88rem; color: #151F4D; }
+  .lp-mock-head .lp-company-sub { font-size: 0.72rem; color: #526080; }
   .lp-mock-lines { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
   .lp-mock-lines .lp-line { height: 7px; border-radius: 4px; background: var(--line); }
   .lp-mock-lines .lp-line.short { width: 45%; }
@@ -324,7 +324,7 @@
     display: inline-flex; align-items: center; gap: 7px;
     padding: 8px 12px; border: 1px solid rgba(15,27,51,.12);
     border-radius: 999px; background: rgba(255,255,255,.96);
-    color: #17314e; font-size: .72rem; font-weight: 800;
+    color: #18265B; font-size: .72rem; font-weight: 800;
     box-shadow: 0 4px 14px rgba(15,27,51,.14);
   }
   .invoice-template-preview-trigger:hover span,
@@ -341,7 +341,7 @@
   .invoice-template-preview-canvas .invoice-doc {
     width: 794px; min-height: 1123px; box-sizing: border-box; padding: 40px;
     overflow: hidden; border: 1px solid #e3e7ec; border-radius: 0;
-    background: #fff; color: #243044;
+    background: #fff; color: #243675;
     box-shadow: 0 8px 25px rgba(15, 27, 51, .13);
     font-size: 14px; line-height: 1.5;
   }
@@ -465,7 +465,7 @@
     position: absolute; top: 0; left: 0;
     width: 794px; min-height: 1123px; box-sizing: border-box;
     padding: 40px; overflow: hidden; border: 1px solid #dfe3e9;
-    border-radius: 0; background: #fff; color: #243044;
+    border-radius: 0; background: #fff; color: #243675;
     box-shadow: 0 12px 35px rgba(15,27,51,.18);
     transform-origin: top left; font-size: 14px; line-height: 1.5;
   }
@@ -650,7 +650,7 @@
                 Couleur principale (filet des totaux)
               </label>
               <div class="perso-color-row">
-                <input type="color" id="perso_couleur_principale" aria-label="Couleur principale du document" value="#0F1B33" disabled onchange="updatePersoColorValue('couleur_principale')" />
+                <input type="color" id="perso_couleur_principale" aria-label="Couleur principale du document" value="#18265B" disabled onchange="updatePersoColorValue('couleur_principale')" />
                 <span class="perso-color-value" id="perso_couleur_principale_value">Par défaut</span>
               </div>
             </div>
@@ -660,7 +660,7 @@
                 Couleur secondaire (tampon de statut)
               </label>
               <div class="perso-color-row">
-                <input type="color" id="perso_couleur_secondaire" aria-label="Couleur secondaire du document" value="#0F1B33" disabled onchange="updatePersoColorValue('couleur_secondaire')" />
+                <input type="color" id="perso_couleur_secondaire" aria-label="Couleur secondaire du document" value="#18265B" disabled onchange="updatePersoColorValue('couleur_secondaire')" />
                 <span class="perso-color-value" id="perso_couleur_secondaire_value">Par défaut</span>
               </div>
             </div>
@@ -1448,7 +1448,7 @@
     } catch (err) {
       // Visible dans la console navigateur (F12) pour diagnostiquer un futur cas encore non
       // prévu, en plus du message affiché à l'utilisateur.
-      console.error('[SamaFacturePro] Échec de l’enregistrement des paramètres entreprise :', err);
+      console.error('[SunuPilot] Échec de l’enregistrement des paramètres entreprise :', err);
       showEntrepriseMessage(err?.message || 'Impossible d’enregistrer les modifications.', 'error');
     } finally {
       restore();

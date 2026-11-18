@@ -1280,7 +1280,7 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
 
 
 /* ==========================================================================
-   SamaFacture Pro — finition UI / responsive (2026)
+   SunuPilot — finition UI / responsive (2026)
    Couche complémentaire : conserve les composants et la palette existants.
    ========================================================================== */
 
@@ -1560,7 +1560,7 @@ button, a, [role="button"] { touch-action: manipulation; }
   }
 }
 
-/* SamaFacture Pro — système visuel commun à toutes les pages */
+/* SunuPilot — système visuel commun à toutes les pages */
 :root {
   --surface-muted: color-mix(in srgb, var(--cream) 72%, var(--paper));
   --border-strong: color-mix(in srgb, var(--line) 78%, var(--ink-soft));
@@ -3265,7 +3265,7 @@ textarea { line-height: 1.55; }
 
 
 /* ==========================================================================
-   SamaFacture Pro — interface workspace inspirée de la référence utilisateur
+   SunuPilot — interface workspace inspirée de la référence utilisateur
    Palette : bleu nuit, bleu électrique, émeraude, violet et ambre.
    Les composants métiers réutilisent les mêmes tokens sur toutes les pages.
    ========================================================================== */
@@ -3284,7 +3284,7 @@ textarea { line-height: 1.55; }
   --structural-dark-1: #101D3A;
   --structural-dark-2: #1A2C53;
   --sidebar-w: 248px;
-  --workspace-blue: #1769F5;
+  --workspace-blue: #18265B;
   --workspace-purple: #7739E9;
   --workspace-amber: #F5A623;
   --workspace-cyan: #09A7C6;
@@ -3361,11 +3361,11 @@ textarea { line-height: 1.55; }
 }
 .nav-item .ic { width: 22px; font-size: 1.14rem; }
 .nav-item.active {
-  background: linear-gradient(105deg, #1769F5 0%, #267DF9 100%);
+  background: linear-gradient(105deg, #18265B 0%, #243675 100%);
   box-shadow: 0 7px 18px rgba(16, 102, 245, .28);
   color: #fff;
 }
-.nav-item.active:hover { background: linear-gradient(105deg, #125DE0 0%, #2073EB 100%); }
+.nav-item.active:hover { background: linear-gradient(105deg, #151F4D 0%, #243675 100%); }
 .sidebar-promo {
   margin: 8px 14px 14px;
   padding: 16px 15px;
@@ -3564,7 +3564,7 @@ thead th { background: #F2F6FD; color: #52627D; }
 }
 .dashboard-action .ic { font-size:1.3rem; }
 .dashboard-action:hover { transform:translateY(-2px); filter:brightness(1.04); }
-.dashboard-action.blue { background:linear-gradient(135deg,#1769F5,#287CF7); }
+.dashboard-action.blue { background:linear-gradient(135deg,#18265B,#243675); }
 .dashboard-action.green { background:linear-gradient(135deg,#0BAA7D,#10BF90); }
 .dashboard-action.purple { background:linear-gradient(135deg,#7138E8,#8B38F1); }
 .dashboard-action.amber { background:linear-gradient(135deg,#ED9508,#FFB322); }
@@ -3641,7 +3641,7 @@ thead th { background: #F2F6FD; color: #52627D; }
 /* Finition du bandeau de marque et du comportement mobile du menu */
 .sidebar-brand .brand-pro {
   display:inline-block; margin-left:2px; padding:1px 6px 2px;
-  border-radius:6px; background:#1769F5; color:#fff;
+  border-radius:6px; background:#18265B; color:#fff;
   font-size:.72rem; font-weight:800; vertical-align:2px;
 }
 @media (max-width: 900px) {
@@ -3748,27 +3748,27 @@ thead th { background: #F2F6FD; color: #52627D; }
 
 
 /* Palette de la référence appliquée aux cartes de la facturation. */
-.tone-blue { background:rgba(23,105,245,.12); color:#1769F5; }
+.tone-blue { background:rgba(23,105,245,.12); color:#18265B; }
 .tone-green { background:rgba(13,175,131,.13); color:#0DAF83; }
 .tone-purple { background:rgba(119,57,233,.12); color:#7739E9; }
 .tone-amber { background:rgba(245,166,35,.16); color:#B87509; }
-.billing-filter:hover { border-color:#1769F5; color:#1769F5; }
+.billing-filter:hover { border-color:#18265B; color:#18265B; }
 .billing-filter.is-active {
-  border-color:#1769F5;
+  border-color:#18265B;
   background:rgba(23,105,245,.1);
-  color:#1769F5;
+  color:#18265B;
 }
-.billing-list-hint .ic { color:#1769F5; }
+.billing-list-hint .ic { color:#18265B; }
 .billing-table-card .billing-table tbody tr:hover { background:rgba(23,105,245,.035); }
 .billing-icon-action.is-primary {
   border-color:rgba(23,105,245,.28);
   background:rgba(23,105,245,.09);
-  color:#1769F5;
+  color:#18265B;
 }
 .billing-icon-action:hover {
-  border-color:#1769F5;
+  border-color:#18265B;
   background:rgba(23,105,245,.1);
-  color:#1769F5;
+  color:#18265B;
 }
 
 
@@ -3792,7 +3792,7 @@ thead th { background: #F2F6FD; color: #52627D; }
 }
 
 /* Résumé de rapports : quatre accents colorés cohérents avec le tableau de bord. */
-.reports-kpi-blue { background:linear-gradient(125deg,#1769F5,#287CF7); border:0; color:#fff; }
+.reports-kpi-blue { background:linear-gradient(125deg,#18265B,#243675); border:0; color:#fff; }
 .reports-kpi-green { background:linear-gradient(125deg,#0BAA7D,#10BF90); border:0; color:#fff; }
 .reports-kpi-purple { background:linear-gradient(125deg,#7138E8,#8B38F1); border:0; color:#fff; }
 .reports-kpi-amber { background:linear-gradient(125deg,#ED9508,#FFB322); border:0; color:#fff; }
@@ -4273,7 +4273,7 @@ button .icon { vertical-align: -.14em; }
 }
 .workspace-page-kicker {
   margin: 0 0 7px;
-  color: var(--workspace-blue, #1769F5);
+  color: var(--workspace-blue, #18265B);
   font-size: .68rem;
   font-weight: 800;
   letter-spacing: .12em;
@@ -4332,8 +4332,8 @@ button .icon { vertical-align: -.14em; }
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: color-mix(in srgb, var(--workspace-blue, #1769F5) 10%, var(--paper));
-  color: var(--workspace-blue, #1769F5);
+  background: color-mix(in srgb, var(--workspace-blue, #18265B) 10%, var(--paper));
+  color: var(--workspace-blue, #18265B);
   font-size: 1.05rem;
 }
 .workspace-filter-title strong,
@@ -4369,10 +4369,10 @@ button .icon { vertical-align: -.14em; }
   color: var(--ink-soft);
 }
 .workspace-search-control:focus-within {
-  border-color: var(--workspace-blue, #1769F5);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-blue, #1769F5) 12%, transparent);
+  border-color: var(--workspace-blue, #18265B);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-blue, #18265B) 12%, transparent);
 }
-.workspace-search-control > .ic { flex: 0 0 auto; color: var(--workspace-blue, #1769F5); }
+.workspace-search-control > .ic { flex: 0 0 auto; color: var(--workspace-blue, #18265B); }
 .workspace-search-control input {
   flex: 1 1 auto;
   width: 100%;
@@ -4423,7 +4423,7 @@ button .icon { vertical-align: -.14em; }
   font-weight: 650;
   white-space: nowrap;
 }
-.workspace-data-type .ic { color: var(--workspace-blue, #1769F5); }
+.workspace-data-type .ic { color: var(--workspace-blue, #18265B); }
 .workspace-data-card > table {
   margin: 0;
   border-collapse: separate;
@@ -4444,7 +4444,7 @@ button .icon { vertical-align: -.14em; }
   font-size: .84rem;
 }
 .workspace-data-card > table tbody tr:last-child td { border-bottom: 0; }
-.workspace-data-card > table tbody tr:hover { background: color-mix(in srgb, var(--workspace-blue, #1769F5) 3%, var(--paper)); }
+.workspace-data-card > table tbody tr:hover { background: color-mix(in srgb, var(--workspace-blue, #18265B) 3%, var(--paper)); }
 .workspace-data-card .empty-state {
   min-height: 140px;
   display: flex;
@@ -4463,8 +4463,8 @@ button .icon { vertical-align: -.14em; }
   width: 46px;
   height: 46px;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--workspace-blue, #1769F5) 9%, var(--paper));
-  color: var(--workspace-blue, #1769F5);
+  background: color-mix(in srgb, var(--workspace-blue, #18265B) 9%, var(--paper));
+  color: var(--workspace-blue, #18265B);
   font-size: 1.25rem;
 }
 .workspace-page #pagination {
@@ -4606,25 +4606,25 @@ body.sidebar-initializing .main-content {
 
 
 /* ==========================================================================
-   SamaFacture Pro — direction Unslop
+   SunuPilot — direction Unslop
    Papier, encre, émeraude. Adaptation du workflow Unslop (CC BY 4.0) :
    Damir Sokolovsky — https://github.com/heydamir/unslop
    ========================================================================= */
 
 :root:not([data-theme="dark"]) {
   color-scheme: light;
-  --navy-950: #24211D; --navy-900: #302C26; --navy-800: #403A32; --navy-700: #514A40;
-  --emerald: #087A57; --emerald-light: #E5F1E9;
-  --gold: #96713E; --gold-light: #F1EBDD;
+  --navy-950: #151F4D; --navy-900: #18265B; --navy-800: #243675; --navy-700: #31468A;
+  --emerald: #087A3D; --emerald-light: #E8F4EC;
+  --gold: #087A3D; --gold-light: #E8F4EC;
   --clay: #B64D48; --clay-light: #F6E9E5;
-  --cream: #F7F4EE; --paper: #FFFEFC;
-  --ink: #24211D; --ink-soft: #655E55; --line: #E6DED2;
-  --structural-dark-1: #272722; --structural-dark-2: #302F29;
+  --cream: #F8FAFC; --paper: #FFFFFF;
+  --ink: #151F4D; --ink-soft: #526080; --line: #DCE3F0;
+  --structural-dark-1: #151F4D; --structural-dark-2: #18265B;
   --font-display: 'IBM Plex Sans', sans-serif;
   --font-body: 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
-  --workspace-blue: #087A57; --workspace-purple: #087A57;
-  --workspace-cyan: #087A57; --workspace-amber: #96713E;
+  --workspace-blue: #087A3D; --workspace-purple: #087A3D;
+  --workspace-cyan: #087A3D; --workspace-amber: #087A3D;
   --shadow-xs: 0 1px 2px rgba(36,33,29,.035);
   --shadow-sm: 0 1px 3px rgba(36,33,29,.05);
   --shadow-md: 0 5px 18px rgba(36,33,29,.055);
@@ -4669,10 +4669,10 @@ input:focus, select:focus, textarea:focus {
 }
 .nav-item .ic { width: 18px; font-size: 18px; color: #BDB7AC; }
 .nav-item.active, .nav-item.active:hover {
-  color: #D7F0E3 !important; background: rgba(8,122,87,.19) !important;
+  color: #E8F4EC !important; background: rgba(8,122,87,.19) !important;
   box-shadow: inset 2px 0 0 #38A77E !important;
 }
-.nav-item.active .ic { color: #8ED0B1 !important; background: transparent !important; }
+.nav-item.active .ic { color: #20A85A !important; background: transparent !important; }
 .sidebar-promo {
   background: rgba(255,255,255,.045) !important; border: 1px solid rgba(255,255,255,.11);
   border-radius: 8px; box-shadow: none;
@@ -4904,26 +4904,26 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --cream: #1D1C18;
-    --paper: #282720;
-    --ink: #F3EFE6;
-    --ink-soft: #C2BAAD;
-    --line: #48443A;
-    --navy-950: #F3EFE6;
+    --cream: #10172C;
+    --paper: #171F3A;
+    --ink: #F1F4FC;
+    --ink-soft: #AFB9D1;
+    --line: #2B3964;
+    --navy-950: #F1F4FC;
     --navy-900: #E6E0D5;
-    --navy-800: #D3CABC;
-    --structural-dark-1: #171713;
-    --structural-dark-2: #211F1A;
-    --emerald: #087A57;
-    --emerald-light: #18382D;
-    --gold: #E7BD6D;
-    --gold-text: #E7BD6D;
-    --gold-light: #3A3020;
+    --navy-800: #D5DCF0;
+    --structural-dark-1: #0D142B;
+    --structural-dark-2: #121A35;
+    --emerald: #087A3D;
+    --emerald-light: #173C2A;
+    --gold: #20A85A;
+    --gold-text: #20A85A;
+    --gold-light: #173C2A;
     --clay-light: #3D2523;
-    --workspace-blue: #087A57;
-    --workspace-purple: #087A57;
-    --workspace-cyan: #087A57;
-    --workspace-amber: #96713E;
+    --workspace-blue: #087A3D;
+    --workspace-purple: #087A3D;
+    --workspace-cyan: #087A3D;
+    --workspace-amber: #087A3D;
     --shadow-xs: 0 1px 2px rgba(0,0,0,.22);
     --shadow-sm: 0 1px 3px rgba(0,0,0,.24);
     --shadow-md: 0 5px 18px rgba(0,0,0,.24);
@@ -4934,26 +4934,26 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --cream: #1D1C18;
-  --paper: #282720;
-  --ink: #F3EFE6;
-  --ink-soft: #C2BAAD;
-  --line: #48443A;
-  --navy-950: #F3EFE6;
+  --cream: #10172C;
+  --paper: #171F3A;
+  --ink: #F1F4FC;
+  --ink-soft: #AFB9D1;
+  --line: #2B3964;
+  --navy-950: #F1F4FC;
   --navy-900: #E6E0D5;
-  --navy-800: #D3CABC;
-  --structural-dark-1: #171713;
-  --structural-dark-2: #211F1A;
-  --emerald: #087A57;
-  --emerald-light: #18382D;
-  --gold: #E7BD6D;
-    --gold-text: #E7BD6D;
-    --gold-light: #3A3020;
+  --navy-800: #D5DCF0;
+  --structural-dark-1: #0D142B;
+  --structural-dark-2: #121A35;
+  --emerald: #087A3D;
+  --emerald-light: #173C2A;
+  --gold: #20A85A;
+    --gold-text: #20A85A;
+    --gold-light: #173C2A;
   --clay-light: #3D2523;
-  --workspace-blue: #087A57;
-  --workspace-purple: #087A57;
-  --workspace-cyan: #087A57;
-  --workspace-amber: #96713E;
+  --workspace-blue: #087A3D;
+  --workspace-purple: #087A3D;
+  --workspace-cyan: #087A3D;
+  --workspace-amber: #087A3D;
   --shadow-xs: 0 1px 2px rgba(0,0,0,.22);
   --shadow-sm: 0 1px 3px rgba(0,0,0,.24);
   --shadow-md: 0 5px 18px rgba(0,0,0,.24);
@@ -4967,18 +4967,18 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
 :root[data-theme="dark"] .dashboard-context,
 :root[data-theme="dark"] thead th,
 :root[data-theme="dark"] .workspace-data-card th {
-  background: #302E27 !important;
-  color: #D6CFC3 !important;
+  background: #171F3A !important;
+  color: #AFB9D1 !important;
   border-color: var(--line) !important;
 }
 :root[data-theme="dark"] .app-topbar-search {
-  background: #201F1A;
+  background: #121A35;
   border-color: var(--line);
 }
-:root[data-theme="dark"] .app-topbar-search .ic { color: #C2BAAD; }
+:root[data-theme="dark"] .app-topbar-search .ic { color: #AFB9D1; }
 :root[data-theme="dark"] .app-topbar-avatar {
-  background: #3A372F !important;
-  color: #F3EFE6 !important;
+  background: #243675 !important;
+  color: #F1F4FC !important;
 }
 :root[data-theme="dark"] .btn-outline,
 :root[data-theme="dark"] .btn-secondary {
@@ -5086,7 +5086,7 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
 }
 :root[data-theme="dark"] .app-topbar-quick-actions .theme-toggle-btn:hover,
 :root[data-theme="dark"] .app-topbar-localization:hover {
-  background: #302E27;
+  background: #171F3A;
   border-color: var(--line);
   color: #91CDB0;
 }
@@ -5221,8 +5221,8 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
 :root[data-theme="dark"] .app-topbar-localization,
 :root[data-theme="dark"] .app-topbar-logout {
   border-color: var(--line);
-  background: #302E27;
-  color: #E0DACF;
+  background: #171F3A;
+  color: #AFB9D1;
   box-shadow: none;
 }
 :root[data-theme="dark"] .app-notification-toggle:hover,
@@ -5799,7 +5799,7 @@ a.btn .icon {
   text-transform: uppercase;
 }
 .invoice-doc .sf-doc-meta-value {
-  color: #172033;
+  color: #151F4D;
   font-size: 12px;
   font-weight: 650;
   overflow-wrap: anywhere;
@@ -5836,7 +5836,7 @@ a.btn .icon {
   margin-top: 5px;
   padding-top: 7px;
   border-top: 1px solid #dce2e8;
-  color: #172033;
+  color: #151F4D;
   font-weight: 800;
 }
 .invoice-doc .sf-total-row {
@@ -5855,7 +5855,7 @@ a.btn .icon {
 .invoice-doc .sf-total-row.sf-total-grand {
   margin-top: 5px;
   padding: 11px 0 5px;
-  color: #172033;
+  color: #151F4D;
   font-size: 15px;
   font-weight: 800;
 }
@@ -5885,7 +5885,7 @@ a.btn .icon {
 .invoice-doc .sf-payment-metric { min-width: 0; }
 .invoice-doc .sf-payment-value {
   display: block;
-  color: #172033;
+  color: #151F4D;
   font-size: 14px;
   font-weight: 800;
   overflow-wrap: anywhere;
@@ -5906,7 +5906,7 @@ a.btn .icon {
 }
 .invoice-doc .sf-bank-item strong {
   display: block;
-  color: #172033;
+  color: #151F4D;
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -5970,8 +5970,8 @@ a.btn .icon {
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    background: #fff !important;
-    color: #172033 !important;
+    background: #FFFEFC !important;
+    color: #151F4D !important;
     font-size: 10pt !important;
   }
   .invoice-doc .head {
@@ -6092,25 +6092,25 @@ a.btn .icon {
   html, body { color-scheme: light !important; }
   .invoice-doc {
     color-scheme: light !important;
-    --navy-950: #24211D;
-    --navy-900: #302C26;
-    --navy-800: #403A32;
-    --navy-700: #514A40;
-    --emerald: #087A57;
-    --emerald-light: #E5F1E9;
-    --gold: #96713E;
-    --gold-light: #F1EBDD;
+    --navy-950: #151F4D;
+    --navy-900: #18265B;
+    --navy-800: #243675;
+    --navy-700: #31468A;
+    --emerald: #087A3D;
+    --emerald-light: #E8F4EC;
+    --gold: #087A3D;
+    --gold-light: #E8F4EC;
     --clay: #B64D48;
     --clay-light: #F6E9E5;
-    --cream: #F7F4EE;
+    --cream: #F8FAFC;
     --paper: #FFFEFC;
-    --ink: #24211D;
-    --ink-soft: #655E55;
-    --line: #E6DED2;
-    --structural-dark-1: #272722;
-    --structural-dark-2: #302F29;
+    --ink: #151F4D;
+    --ink-soft: #526080;
+    --line: #DCE3F0;
+    --structural-dark-1: #151F4D;
+    --structural-dark-2: #18265B;
     background: #FFFEFC !important;
-    color: #24211D !important;
+    color: #151F4D !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -6168,26 +6168,26 @@ a.btn .icon {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --cream: #1D1C18;
-    --paper: #282720;
-    --ink: #F3EFE6;
-    --ink-soft: #C2BAAD;
-    --line: #48443A;
-    --navy-950: #F3EFE6;
+    --cream: #10172C;
+    --paper: #171F3A;
+    --ink: #F1F4FC;
+    --ink-soft: #AFB9D1;
+    --line: #2B3964;
+    --navy-950: #F1F4FC;
     --navy-900: #E6E0D5;
-    --navy-800: #D3CABC;
-    --structural-dark-1: #171713;
-    --structural-dark-2: #211F1A;
-    --emerald: #087A57;
-    --emerald-light: #18382D;
-    --gold: #E7BD6D;
-    --gold-text: #E7BD6D;
-    --gold-light: #3A3020;
+    --navy-800: #D5DCF0;
+    --structural-dark-1: #0D142B;
+    --structural-dark-2: #121A35;
+    --emerald: #087A3D;
+    --emerald-light: #173C2A;
+    --gold: #20A85A;
+    --gold-text: #20A85A;
+    --gold-light: #173C2A;
     --clay-light: #3D2523;
-    --workspace-blue: #087A57;
-    --workspace-purple: #087A57;
-    --workspace-cyan: #087A57;
-    --workspace-amber: #96713E;
+    --workspace-blue: #087A3D;
+    --workspace-purple: #087A3D;
+    --workspace-cyan: #087A3D;
+    --workspace-amber: #087A3D;
     --shadow-xs: 0 1px 2px rgba(0,0,0,.22);
     --shadow-sm: 0 1px 3px rgba(0,0,0,.24);
     --shadow-md: 0 5px 18px rgba(0,0,0,.24);
@@ -6821,7 +6821,7 @@ a.btn .icon {
     min-height: 140px;
     padding: 12px 6px 11px;
     border-bottom: 1px solid rgba(255,255,255,.1);
-    background: linear-gradient(180deg, #172a4b 0%, #20385f 100%);
+    background: linear-gradient(180deg, #18265B 0%, #243675 100%);
   }
 
   body #app-sidebar.sidebar.is-collapsed .sidebar-brand .mark {
@@ -6991,12 +6991,12 @@ a.btn .icon {
   body #app-sidebar.sidebar.is-collapsed .nav-item.active:hover {
     border-color: #e4eaf2;
     background: #f0f3f8;
-    color: #172a4b !important;
+    color: #18265B !important;
     box-shadow: none !important;
   }
 
   body #app-sidebar.sidebar.is-collapsed .nav-item.active .ic {
-    background: #172a4b;
+    background: #18265B;
     color: #fff !important;
     box-shadow: 0 3px 8px rgba(23,42,75,.2);
   }
@@ -7045,7 +7045,7 @@ a.btn .icon {
   body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
     border-color: #e3e9f1;
     background: #f5f7fa;
-    color: #172a4b;
+    color: #18265B;
   }
 }
 
@@ -7109,7 +7109,7 @@ a.btn .icon {
   border-color: var(--line) !important;
   background: var(--structural-dark-1) !important;
   color: var(--ink-soft) !important;
-  scrollbar-color: #625D50 var(--structural-dark-1);
+  scrollbar-color: #526080 var(--structural-dark-1);
 }
 :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-group-label {
   background: var(--line) !important;
@@ -7120,7 +7120,7 @@ a.btn .icon {
   color: var(--ink-soft) !important;
 }
 :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .ic {
-  background: #302E27 !important;
+  background: #171F3A !important;
   color: var(--emerald) !important;
 }
 :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item.active,
@@ -7141,7 +7141,7 @@ a.btn .icon {
   :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout:hover,
   :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
     border-color: var(--line) !important;
-    background: #302E27 !important;
+    background: #171F3A !important;
     color: var(--ink) !important;
   }
 }
@@ -7156,7 +7156,7 @@ a.btn .icon {
     border-color: var(--line) !important;
     background: var(--structural-dark-1) !important;
     color: var(--ink-soft) !important;
-    scrollbar-color: #625D50 var(--structural-dark-1);
+    scrollbar-color: #526080 var(--structural-dark-1);
   }
   :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-group-label {
     background: var(--line) !important;
@@ -7167,7 +7167,7 @@ a.btn .icon {
     color: var(--ink-soft) !important;
   }
   :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .ic {
-    background: #302E27 !important;
+    background: #171F3A !important;
     color: var(--emerald) !important;
   }
   :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item.active,
@@ -7188,7 +7188,7 @@ a.btn .icon {
     :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout:hover,
     :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
       border-color: var(--line) !important;
-      background: #302E27 !important;
+      background: #171F3A !important;
       color: var(--ink) !important;
     }
   }

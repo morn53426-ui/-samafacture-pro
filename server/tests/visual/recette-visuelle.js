@@ -209,7 +209,7 @@ const CHART_STUB = [
   '      if (config.type === "doughnut") {',
   '        const dataset = config.data.datasets[0] || {};',
   '        const values = (dataset.data || []).map(value => Math.max(0, Number(value) || 0));',
-  '        const colors = Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor : [dataset.backgroundColor || "#1769F5"];',
+  '        const colors = Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor : [dataset.backgroundColor || "#18265B"];',
   '        const total = values.reduce((sum, value) => sum + value, 0);',
   '        const radius = Math.max(12, Math.min(width, height) * 0.32);',
   '        const lineWidth = Math.max(16, Math.min(width, height) * 0.16);',
@@ -228,7 +228,7 @@ const CHART_STUB = [
   '      } else {',
   '        context.strokeStyle = "rgba(105,125,160,.16)"; context.lineWidth = 1;',
   '        for (let row = 1; row < 5; row++) { context.beginPath(); context.moveTo(0, row * height / 5); context.lineTo(width, row * height / 5); context.stroke(); }',
-  '        context.strokeStyle = "#087A57"; context.lineWidth = 3; context.beginPath();',
+  '        context.strokeStyle = "#087A3D"; context.lineWidth = 3; context.beginPath();',
   '        const points = [0.85, 0.72, 0.77, 0.55, 0.62, 0.39, 0.48, 0.28, 0.34, 0.12];',
   '        points.forEach((point, index) => { const x = 10 + index * (width - 20) / (points.length - 1); const y = point * (height - 18) + 9; if (index === 0) context.moveTo(x, y); else context.lineTo(x, y); });',
   '        context.stroke();',
@@ -322,7 +322,7 @@ function fixtureFor(pathname, fixtures) {
   if (pathname === '/api/pro/company-group') return {
     groupe: { id: 1, nom: 'Groupe de démonstration', actif: true },
     societes: [
-      { id: 1, entreprise_nom: 'SamaFacture Société principale', contact_nom: 'Compte principal', is_primary: true, pays_code: 'SN', devise: 'FCFA', email: 'direction@principal.example', entreprise_ninea: 'SN-DKR-2026-A001' },
+      { id: 1, entreprise_nom: 'SunuPilot Société principale', contact_nom: 'Compte principal', is_primary: true, pays_code: 'SN', devise: 'FCFA', email: 'direction@principal.example', entreprise_ninea: 'SN-DKR-2026-A001' },
       { id: 2, entreprise_nom: 'Filiale de démonstration', contact_nom: 'Compte filiale', is_primary: false, pays_code: 'SN', devise: 'FCFA', email: 'contact@filiale.example', entreprise_ninea: 'SN-DKR-2026-B002' }
     ],
     invitations: [
@@ -352,7 +352,7 @@ function fixtureFor(pathname, fixtures) {
   };
   if (pathname === '/api/auth/me') return {
     user: {
-      id: 1, nom: 'Compte de recette SamaFacture', entreprise_nom: 'SamaFacture — Société de test',
+      id: 1, nom: 'Compte de recette SunuPilot', entreprise_nom: 'SunuPilot — Société de test',
       entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro'
     }
   };
@@ -394,7 +394,7 @@ function fixtureFor(pathname, fixtures) {
   };
   if (pathname === '/api/portal/') return {
     client: { nom: fixtures.clients[0]?.nom || 'Client de recette', email: fixtures.clients[0]?.email || 'client@example.test' },
-    entreprise: { nom: 'SamaFacture — Société de test', logo: null, email: 'support@example.test', telephone: '+221 77 000 00 00', site_web: 'https://example.test', devise: 'FCFA', langue: 'fr', locale: 'fr-SN' },
+    entreprise: { nom: 'SunuPilot — Société de test', logo: null, email: 'support@example.test', telephone: '+221 77 000 00 00', site_web: 'https://example.test', devise: 'FCFA', langue: 'fr', locale: 'fr-SN' },
     resume: { nb_factures: DATASET === 'empty' ? 0 : 3, nb_devis: DATASET === 'empty' ? 0 : 2, solde_du: DATASET === 'empty' ? 0 : 250000 },
     documents: DATASET === 'empty' ? [] : [
       { id: 1, numero: 'FAC-2026-0001', type: 'facture', date_emission: '2026-11-10', date_echeance: '2026-11-20', statut: 'en_attente', total: 250000, montant_paye: 50000, solde: 200000, devise: 'FCFA', lignes: [{ designation: 'Prestation de conseil', quantite: 2, prix_unitaire: 125000, tva: 18, total_ligne: 250000 }] },
@@ -459,8 +459,8 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
     localStorage.setItem('sf_token', 'visual-recette-token');
     localStorage.setItem('sf_user', JSON.stringify({
       id: 1,
-      nom: 'SamaFacture — Compte de recette',
-      entreprise_nom: 'SamaFacture — Société de test',
+      nom: 'SunuPilot — Compte de recette',
+      entreprise_nom: 'SunuPilot — Société de test',
       devise: 'FCFA',
       plan: 'pro'
     }));
@@ -469,7 +469,8 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
   // Le global est réinitialisé lorsque Puppeteer navigue vers chaque page métier.
   // Le réinjecter sur chaque nouveau document évite une API cross-origin et son préflight CORS.
   await page.evaluateOnNewDocument(() => {
-    window.SAMAFACTURE_API_URL = location.origin + '/api';
+    window.SUNUPILOT_API_URL = location.origin + '/api';
+    window.SAMAFACTURE_API_URL = window.SUNUPILOT_API_URL;
   });
   return page;
 }
@@ -494,7 +495,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     const diagnostic = await page.evaluate(() => ({
       title: document.title,
       url: location.href,
-      apiBase: window.SAMAFACTURE_API_URL || null,
+      apiBase: window.SUNUPILOT_API_URL || window.SAMAFACTURE_API_URL || null,
       hasToken: Boolean(localStorage.getItem('sf_token')),
       bodyText: (document.body?.innerText || '').slice(0, 900),
       loadingRows: document.querySelectorAll('.row-skeleton').length
@@ -1859,14 +1860,14 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
 
   await groupPage.evaluate(() => window.SamaTheme.definir('dark'));
   await groupPage.waitForFunction(() =>
-    getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(40, 39, 32)'
+    getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(23, 31, 58)'
   );
   const dark = await readGroupTheme();
   assert.equal(dark.theme, 'dark', 'Le centre Entreprise doit appliquer le thème sombre sans rechargement.');
-  assert.equal(dark.page, 'rgb(29, 28, 24)', 'Le fond du centre Entreprise doit suivre le graphite du thème sombre.');
-  assert.equal(dark.panel, 'rgb(40, 39, 32)', 'Les panneaux ne doivent plus rester blancs en thème sombre.');
-  assert.equal(dark.dashboardCard, 'rgb(40, 39, 32)', 'Les cartes de pilotage doivent utiliser la surface sombre.');
-  assert.equal(dark.sidebar, 'rgb(23, 23, 19)', 'Le rail latéral doit devenir sombre avec le reste de l’application.');
+  assert.equal(dark.page, 'rgb(16, 23, 44)', 'Le fond indigo du centre Entreprise doit suivre le thème sombre.');
+  assert.equal(dark.panel, 'rgb(23, 31, 58)', 'Les panneaux doivent adopter la surface indigo du thème sombre.');
+  assert.equal(dark.dashboardCard, 'rgb(23, 31, 58)', 'Les cartes de pilotage doivent utiliser la surface indigo sombre.');
+  assert.equal(dark.sidebar, 'rgb(13, 20, 43)', 'Le rail latéral doit adopter le fond indigo sombre.');
   assert.equal(dark.horizontalOverflow, false, 'Le thème sombre ne doit pas provoquer de débordement.');
   const headingContrast = contrastRatio(dark.heading, dark.page);
   const sidebarActiveContrast = contrastRatio(dark.sidebarText, dark.sidebarActiveBackground);

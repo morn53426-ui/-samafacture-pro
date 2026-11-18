@@ -1,4 +1,4 @@
-# Instructions pour les agents — Sama Facture Pro
+# Instructions pour les agents — SunuPilot
 
 Ces instructions s'appliquent à tout agent qui modifie ce dépôt. Les skills référencés ci-dessous sont versionnés dans `.agents/skills/` et doivent être lus avant d'intervenir sur l'interface concernée.
 

@@ -1,7 +1,7 @@
 {
-  "name": "samafacture-pro-server",
+  "name": "sunupilot-server",
   "version": "1.0.0",
-  "description": "Backend API pour SamaFacture Pro (MySQL / WAMPserver)",
+  "description": "Backend API pour SunuPilot (MySQL / WAMPserver)",
   "main": "app.js",
   "type": "commonjs",
   "engines": {

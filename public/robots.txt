@@ -1,4 +1,4 @@
-# SamaFacture Pro — robots.txt
+# SunuPilot — robots.txt
 # ⚠️ Remplacez "votredomaine.com" ci-dessous par votre vrai nom de domaine une fois en ligne
 # (voir le README : pensez aussi à configurer APP_URL dans .env).
 

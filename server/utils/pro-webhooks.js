@@ -173,6 +173,12 @@ async function deliverPendingWebhooks() {
           const signature = crypto.createHmac('sha256', secret).update(body).digest('hex');
           const response = await sendWebhookRequest(target, {
             'Content-Type': 'application/json',
+            'X-SunuPilot-Event': row.evenement,
+            'X-SunuPilot-Delivery': String(row.id),
+            'X-SunuPilot-Signature': 'sha256=' + signature,
+            'X-OptiGest-Event': row.evenement,
+            'X-OptiGest-Delivery': String(row.id),
+            'X-OptiGest-Signature': 'sha256=' + signature,
             'X-SamaFacture-Event': row.evenement,
             'X-SamaFacture-Delivery': String(row.id),
             'X-SamaFacture-Signature': 'sha256=' + signature
