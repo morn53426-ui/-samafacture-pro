@@ -102,6 +102,11 @@ describe('Génération PDF de facture', () => {
       const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
       assert.ok(pageCount >= 1 && pageCount <= 2,
         modele + ' ne doit pas créer de pagination excessive pour une facture simple (pages=' + pageCount + ')');
+      const nomsPolicesPdf = Array.from(pdfLatin1.matchAll(/\/BaseFont\s*\/([^\s/]+)/g), match => match[1]);
+      assert.ok(nomsPolicesPdf.some(name => /IBMPlexSans/i.test(name)),
+        modele + ' doit intégrer IBM Plex Sans dans le vrai PDF, polices trouvées : ' + nomsPolicesPdf.join(', '));
+      assert.ok(nomsPolicesPdf.some(name => /IBMPlexMono/i.test(name)),
+        modele + ' doit intégrer IBM Plex Mono dans le vrai PDF, polices trouvées : ' + nomsPolicesPdf.join(', '));
     }
   });
 
@@ -145,14 +150,20 @@ describe('Génération PDF de facture', () => {
           headingFont: getComputedStyle(headingNode).fontFamily,
           tableFont: getComputedStyle(tableNode).fontFamily,
           fontSize: getComputedStyle(documentNode).fontSize,
-          documentFontLoaded: document.fonts ? document.fonts.check('12px "IBM Plex Sans"') : false
+          loadedFontFaces: document.fonts
+            ? Array.from(document.fonts)
+              .filter(face => face.status === 'loaded')
+              .map(face => face.family.replace(/^["']|["']$/g, ''))
+            : []
         };
       });
       assert.match(typographie.documentFont, /IBM Plex Sans/);
       assert.match(typographie.headingFont, /IBM Plex Sans/);
       assert.match(typographie.tableFont, /IBM Plex Sans/);
-      assert.ok(typographie.documentFontLoaded,
-        'IBM Plex Sans doit être disponible avant la capture PDF.');
+      assert.ok(typographie.loadedFontFaces.includes('IBM Plex Sans'),
+        'IBM Plex Sans doit réellement être chargé, pas seulement déclaré en CSS.');
+      assert.ok(typographie.loadedFontFaces.includes('IBM Plex Mono'),
+        'IBM Plex Mono doit réellement être chargé pour les montants et références.');
 
       const lireEtatTheme = () => page.evaluate(() => ({
         theme: document.documentElement.getAttribute('data-theme'),
