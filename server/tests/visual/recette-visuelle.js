@@ -2097,6 +2097,42 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   await darkPage.waitForFunction(() =>
     document.getElementById('chart-repartition')?.dataset.sfChartType === 'doughnut'
   );
+  const expectedInvoiceTotal = [
+    fixtures.dashboard.factures_payees?.n,
+    fixtures.dashboard.factures_en_attente?.n,
+    fixtures.dashboard.factures_en_retard?.n
+  ].reduce((sum, value) => sum + Number(value || 0), 0);
+  const donutCountMetrics = await darkPage.evaluate(() => {
+    const value = document.getElementById('invoice-total');
+    const canvas = document.getElementById('chart-repartition');
+    const valueRect = value?.getBoundingClientRect();
+    const canvasRect = canvas?.getBoundingClientRect();
+    return {
+      display: value?.textContent?.trim() || '',
+      valueWidth: valueRect ? valueRect.width : 0,
+      canvasWidth: canvasRect ? canvasRect.width : 0,
+      accessibleLabel: canvas?.getAttribute('aria-label') || '',
+      sampleFormats: [0, 42, 9999, 10000, 2999997].map(window.formatDashboardCount)
+    };
+  });
+  const expectedCompactTotal = new Intl.NumberFormat('fr-FR', {
+    notation: 'compact',
+    maximumFractionDigits: 1
+  }).format(expectedInvoiceTotal);
+  assert.equal(donutCountMetrics.display, expectedCompactTotal,
+    'Le total central du graphique doit être compact pour les grands volumes.');
+  assert.ok(donutCountMetrics.valueWidth > 0 &&
+    donutCountMetrics.valueWidth <= donutCountMetrics.canvasWidth * 0.69,
+  'Le total compact doit tenir dans l’ouverture du graphique : ' + JSON.stringify(donutCountMetrics));
+  assert.ok(donutCountMetrics.accessibleLabel.includes(String(expectedInvoiceTotal)),
+    'Le libellé accessible du graphique doit conserver le total exact.');
+  assert.deepEqual(donutCountMetrics.sampleFormats, [
+    '0', '42', '9 999', '10 k', '3 M'
+  ], 'Le formateur doit préserver les petits nombres et compacter les grands volumes en français.');
+  await darkPage.screenshot({
+    path: path.join(OUTPUT_DIR, 'dashboard-donut-volumes-eleves-1440.png'),
+    fullPage: true
+  });
   const darkMetrics = await darkPage.evaluate(() => ({
     theme: document.documentElement.getAttribute('data-theme'),
     background: getComputedStyle(document.querySelector('.main-content')).backgroundColor,

@@ -278,6 +278,15 @@
     canvas.setAttribute('aria-label', titleByPeriod[period] + '. Les montants détaillés sont disponibles dans les rapports.');
   }
 
+  function formatDashboardCount(value) {
+    const count = Number.isFinite(Number(value)) ? Math.max(0, Math.round(Number(value))) : 0;
+    if (count < 10000) return count.toLocaleString('fr-FR');
+    return new Intl.NumberFormat('fr-FR', {
+      notation: 'compact',
+      maximumFractionDigits: 1
+    }).format(count);
+  }
+
   async function renderStatusChart(stats) {
     const rows = [
       { label: 'Payées', value: Number(stats.factures_payees?.n || 0), color: dashboardThemeColor('--emerald', '#087A57') },
@@ -285,7 +294,7 @@
       { label: 'En retard', value: Number(stats.factures_en_retard?.n || 0), color: dashboardThemeColor('--clay', '#B64D48') }
     ];
     const total = rows.reduce((sum, row) => sum + row.value, 0);
-    document.getElementById('invoice-total').textContent = total.toLocaleString('fr-FR');
+    document.getElementById('invoice-total').textContent = formatDashboardCount(total);
     document.getElementById('invoice-legend').innerHTML = rows.map(row => `
       <div class="dashboard-legend-item">
         <span class="dashboard-legend-dot" style="background:${row.color};"></span>
