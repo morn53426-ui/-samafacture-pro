@@ -2349,6 +2349,128 @@ async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
   };
 }
 
+
+async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
+  const results = [];
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const viewports = [
+    { name: 'mobile-320', width: 320, height: 812 },
+    { name: 'mobile-390', width: 390, height: 844 }
+  ];
+
+  for (const pageDefinition of pages) {
+    const page = await preparePage(browser, baseUrl, fixtures, false);
+    const pageErrors = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    try {
+      await page.setViewport({ width: viewports[0].width, height: viewports[0].height, deviceScaleFactor: 1 });
+      if (pageDefinition.plan) {
+        await page.evaluate(plan => {
+          const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+          user.plan = plan;
+          localStorage.setItem('sf_user', JSON.stringify(user));
+        }, pageDefinition.plan);
+      }
+      await page.evaluate(() => localStorage.setItem('sf_theme', 'dark'));
+      await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+      if (pageDefinition.charts?.length) {
+        await page.waitForFunction(chartIds => chartIds.every(id => {
+          const canvas = document.getElementById(id);
+          return canvas?.dataset.sfChartType && canvas.dataset.sfChartAnimation === 'disabled';
+        }), { timeout: 15000 }, pageDefinition.charts);
+      }
+      await page.waitForFunction(() =>
+        document.documentElement.getAttribute('data-theme') === 'dark'
+      , { timeout: 10000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+
+      for (const viewport of viewports) {
+        await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
+        await new Promise(resolve => setTimeout(resolve, 80));
+        const metrics = await page.evaluate(() => {
+          const root = document.documentElement;
+          const body = document.body;
+          const rootStyle = getComputedStyle(root);
+          const bodyStyle = getComputedStyle(body);
+          const main = document.querySelector('main.workspace-page, main#main-content, main') || body;
+          const parseColor = value => {
+            const match = String(value || '').match(/rgba?\(([^)]+)\)/i);
+            if (!match) return null;
+            const channels = match[1].split(',').map(part => Number.parseFloat(part.trim()));
+            if (channels.length < 3 || channels.some(channel => !Number.isFinite(channel))) return null;
+            return { r: channels[0] / 255, g: channels[1] / 255, b: channels[2] / 255 };
+          };
+          const luminance = color => {
+            if (!color) return null;
+            const linear = value => value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+            return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
+          };
+          const bodyBackground = bodyStyle.backgroundColor;
+          const bodyLuminance = luminance(parseColor(bodyBackground));
+          const mainRect = main.getBoundingClientRect();
+          const navToggle = document.getElementById('mobile-toggle-btn');
+          return {
+            viewport: window.innerWidth,
+            documentWidth: root.scrollWidth,
+            bodyWidth: body.scrollWidth,
+            theme: root.getAttribute('data-theme'),
+            colorScheme: rootStyle.colorScheme,
+            bodyBackground,
+            bodyLuminance: bodyLuminance === null ? null : Number(bodyLuminance.toFixed(3)),
+            mainBackground: getComputedStyle(main).backgroundColor,
+            mainLeft: Math.round(mainRect.left),
+            mainRight: Math.round(mainRect.right),
+            mobileToggleExists: Boolean(navToggle),
+            mobileToggleVisible: navToggle ? getComputedStyle(navToggle).display !== 'none' &&
+              navToggle.getClientRects().length > 0 : false
+          };
+        });
+
+        assert.equal(metrics.viewport, viewport.width,
+          pageDefinition.name + ' : le viewport mobile doit être appliqué.');
+        assert.equal(metrics.theme, 'dark',
+          pageDefinition.name + ' doit conserver le thème sombre à ' + viewport.width + 'px.');
+        assert.equal(metrics.colorScheme, 'dark',
+          pageDefinition.name + ' doit conserver color-scheme: dark à ' + viewport.width + 'px.');
+        assert.ok(metrics.bodyLuminance !== null && metrics.bodyLuminance < 0.55,
+          pageDefinition.name + ' conserve un fond trop clair à ' + viewport.width + 'px : ' +
+          JSON.stringify(metrics));
+        assert.ok(metrics.documentWidth <= viewport.width + 1 && metrics.bodyWidth <= viewport.width + 1,
+          pageDefinition.name + ' déborde horizontalement en thème sombre à ' + viewport.width + 'px : ' +
+          JSON.stringify(metrics));
+        assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
+          pageDefinition.name + ' : la zone métier doit rester dans le viewport à ' + viewport.width + 'px : ' +
+          JSON.stringify(metrics));
+        if (viewport.width <= 390 && metrics.mobileToggleExists) {
+          assert.equal(metrics.mobileToggleVisible, true,
+            pageDefinition.name + ' doit garder la commande de navigation mobile accessible.');
+        }
+
+        const screenshot = 'theme-sombre-' + pageDefinition.name + '-' + viewport.name + '.png';
+        await page.screenshot({
+          path: path.join(OUTPUT_DIR, screenshot),
+          fullPage: true
+        });
+        results.push({ page: pageDefinition.name, screenshot, ...metrics });
+      }
+
+      assert.deepEqual(pageErrors, [],
+        pageDefinition.name + ' a généré des erreurs JavaScript en thème sombre mobile : ' + pageErrors.join(' | '));
+    } finally {
+      await page.close();
+    }
+  }
+
+  return {
+    pageCount: pages.length,
+    viewportCount: viewports.length,
+    screenshots: results.length,
+    pages: results
+  };
+}
+
 async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   if (DATASET === 'empty') return { skipped: 'jeu de données vide' };
   const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -2610,6 +2732,7 @@ async function main() {
     const themeConsistency = await verifyThemeConsistency(browser, baseUrl, fixtures);
     const themeAndZoom = await verifyThemeAndZoom(browser, baseUrl, fixtures);
     const businessDarkTheme = await verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures);
+    const businessDarkThemeMobile = await verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures);
     const documentFlows = await verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures);
     const report = {
       dataset: DATASET,
@@ -2622,8 +2745,9 @@ async function main() {
       themeConsistency,
       themeAndZoom,
       businessDarkTheme,
+      businessDarkThemeMobile,
       documentFlows,
-      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + (documentFlows.screenshots || 0),
+      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessDarkThemeMobile.screenshots + (documentFlows.screenshots || 0),
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
