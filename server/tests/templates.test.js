@@ -291,6 +291,44 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     assert.match(html, /Payée/, 'une facture dont le montant reçu couvre le total doit être estampillée Payée');
   });
 
+  test('les personnalisations typographiques utilisent des piles autorisées et restent rendues', () => {
+    const presets = [
+      ['sans', 'Arial, Helvetica, sans-serif'],
+      ['serif', 'Georgia, "Times New Roman", serif'],
+      ['mono', '"Courier New", Courier, monospace']
+    ];
+
+    for (const [police, pile] of presets) {
+      const html = templates.renderInvoiceHtml({
+        user: userDeTest(),
+        facture: factureDeTest(),
+        lignes: lignesDeTest,
+        isDevis: false,
+        qrCode: null,
+        template: 'classique',
+        personnalisation: { police, taille_texte: 'grand', epaisseur_texte: 'gras' }
+      });
+      assert.ok(html.includes('font-family:' + pile),
+        'La police ' + police + ' doit être appliquée avec sa pile autorisée.');
+      assert.match(html, /font-size:110%/,
+        'Le réglage de taille doit rester présent dans le rendu.');
+      assert.match(html, /font-weight:700/,
+        'Le réglage de graisse doit rester présent dans le rendu.');
+    }
+
+    const invalid = templates.renderInvoiceHtml({
+      user: userDeTest(),
+      facture: factureDeTest(),
+      lignes: lignesDeTest,
+      isDevis: false,
+      qrCode: null,
+      template: 'classique',
+      personnalisation: { police: 'url(https://example.invalid/font)', taille_texte: 'inconnue' }
+    });
+    assert.doesNotMatch(invalid, /url\(https:\/\/example\.invalid\/font\)/,
+      'Une police arbitraire ne doit jamais être injectée dans le document.');
+  });
+
   test('un identifiant de modèle inconnu retombe sur le modèle "classique" (comportement déjà existant, non modifié)', () => {
     const html = templates.renderInvoiceHtml({
       user: userDeTest(), facture: factureDeTest(), lignes: lignesDeTest,
