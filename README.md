@@ -1,8 +1,8 @@
-# SamaFacture Pro
+# SUNUPILOT
 
-Plateforme de facturation pour commerçants, freelances, artisans et PME — inspirée de Brisk Invoicing, pensée pour l'Afrique (Wave, Orange Money, PayDunya).
+Votre entreprise, mieux pilotée. SUNUPILOT est une solution de facturation et de gestion pour commerçants, freelances, artisans et PME, pensée pour le contexte des entreprises sénégalaises et africaines.
 
-SamaFacture Pro est une plateforme de facturation et de gestion destinée aux commerçants, indépendants et PME. Le périmètre principal comprend l'authentification, les clients, le catalogue, les factures/devis, les encaissements, les dépenses et les rapports. Une extension de modules professionnels (commandes, avoirs, acomptes, équipes, établissements, caisses, documents, analyses, automatisations et intégrations API/webhooks) est décrite dans [MODULES_PROFESSIONNELS.md](MODULES_PROFESSIONNELS.md), avec ses limites actuelles.
+SUNUPILOT est une plateforme de facturation et de gestion destinée aux commerçants, indépendants et PME. Le périmètre principal comprend l'authentification, les clients, le catalogue, les factures/devis, les encaissements, les dépenses et les rapports. Une extension de modules professionnels (commandes, avoirs, acomptes, équipes, établissements, caisses, documents, analyses, automatisations et intégrations API/webhooks) est décrite dans [MODULES_PROFESSIONNELS.md](MODULES_PROFESSIONNELS.md), avec ses limites actuelles.
 
 Pour l'API publique versionnée, ses permissions, ses exemples de requêtes et la signature des webhooks, consultez [API_PUBLIQUE.md](API_PUBLIQUE.md).
 

@@ -1286,7 +1286,7 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
 
 
 /* ==========================================================================
-   SamaFacture Pro — finition UI / responsive (2026)
+   SUNUPILOT — finition UI / responsive (2026)
    Couche complémentaire : conserve les composants et la palette existants.
    ========================================================================== */
 
@@ -1566,7 +1566,7 @@ button, a, [role="button"] { touch-action: manipulation; }
   }
 }
 
-/* SamaFacture Pro — système visuel commun à toutes les pages */
+/* SUNUPILOT — système visuel commun à toutes les pages */
 :root {
   --surface-muted: color-mix(in srgb, var(--cream) 72%, var(--paper));
   --border-strong: color-mix(in srgb, var(--line) 78%, var(--ink-soft));
@@ -4612,7 +4612,7 @@ body.sidebar-initializing .main-content {
 
 
 /* ==========================================================================
-   SamaFacture Pro — direction Unslop
+   SUNUPILOT — direction visuelle
    Papier, encre, émeraude. Adaptation du workflow Unslop (CC BY 4.0) :
    Damir Sokolovsky — https://github.com/heydamir/unslop
    ========================================================================= */

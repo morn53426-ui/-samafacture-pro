@@ -1,4 +1,4 @@
-# Docker — SamaFacture Pro
+# Docker — SUNUPILOT
 
 ## Prérequis et versions
 

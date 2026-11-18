@@ -3,7 +3,7 @@
 **Version :** 1.0 — 16 novembre 2026  
 **Statut :** guide de travail à valider avant utilisation avec des entreprises réelles  
 **Périmètre :** pilote exploratoire de 10 entreprises maximum  
-**Document associé :** [Plan d’entreprise SamaFacture Pro](PLAN_ENTREPRISE_SAMAFACTURE_PRO.md)
+**Document associé :** [Plan d’entreprise SUNUPILOT](PLAN_ENTREPRISE_SAMAFACTURE_PRO.md)
 
 ---
 
@@ -11,7 +11,7 @@
 
 Le pilote doit répondre à quatre questions avant d'investir dans une acquisition à grande échelle :
 
-1. Les entreprises ciblées ont-elles un problème concret que SamaFacture Pro résout ?
+1. Les entreprises ciblées ont-elles un problème concret que SUNUPILOT résout ?
 2. Peuvent-elles créer et retrouver leurs devis/factures sans aide permanente ?
 3. Reviennent-elles utiliser le produit après leur première facture ?
 4. Comprennent-elles l'offre et sont-elles prêtes à payer dans des conditions clairement annoncées ?
@@ -208,7 +208,7 @@ Classer les retours par fréquence, gravité et impact sur l'activation. Corrige
 
 ### Invitation personnalisée
 
-> Bonjour, je développe SamaFacture Pro, un outil de gestion des devis, factures et suivis clients destiné aux petites entreprises. Je cherche quelques entreprises au Sénégal pour tester un parcours concret et recueillir des retours francs. Seriez-vous disponible pour un échange de 20 minutes et, si cela correspond à vos besoins, une démonstration sans engagement ?
+> Bonjour, je développe SUNUPILOT, un outil de gestion des devis, factures et suivis clients destiné aux petites entreprises. Je cherche quelques entreprises au Sénégal pour tester un parcours concret et recueillir des retours francs. Seriez-vous disponible pour un échange de 20 minutes et, si cela correspond à vos besoins, une démonstration sans engagement ?
 
 ### Après la démonstration
 
@@ -216,7 +216,7 @@ Classer les retours par fréquence, gravité et impact sur l'activation. Corrige
 
 ### Demande de témoignage
 
-> Votre retour nous serait utile. Accepteriez-vous que nous citions votre commentaire au sujet de SamaFacture Pro ? Nous vous montrerons le texte exact et demanderons votre accord avant toute publication. Vous pouvez refuser sans conséquence sur votre participation.
+> Votre retour nous serait utile. Accepteriez-vous que nous citions votre commentaire au sujet de SUNUPILOT ? Nous vous montrerons le texte exact et demanderons votre accord avant toute publication. Vous pouvez refuser sans conséquence sur votre participation.
 
 Personnaliser les messages, respecter tout refus et ne pas envoyer de relances répétées à une personne qui ne souhaite plus être contactée.
 
