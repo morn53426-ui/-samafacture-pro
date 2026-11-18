@@ -1,6 +1,6 @@
 // v2 : force la purge du cache v1, qui pouvait contenir des pages HTML avec une CSP obsolète
 // mise en cache par erreur (voir correctif du fetch handler plus bas).
-const CACHE_NAME = 'optigest-shell-v2';
+const CACHE_NAME = 'optigest-shell-v3';
 
 // Fichiers statiques de l'interface (l'API n'est jamais mise en cache : les données doivent
 // toujours être à jour).
@@ -10,9 +10,11 @@ const SHELL_FILES = [
   '/js/sidebar.js',
   '/js/auth-slider.js',
   '/js/landing-slider.js',
+  '/js/brand-config.js',
   '/manifest.json',
   '/images/optigest-logo.svg',
-  '/images/optigest-icon.svg'
+  '/images/optigest-icon.svg',
+  '/images/icon-192.png'
 ];
 
 self.addEventListener('install', (event) => {
