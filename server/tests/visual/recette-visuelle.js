@@ -3060,6 +3060,253 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
   };
 }
 
+async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
+  const results = [];
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+
+  for (const pageDefinition of pages) {
+    const page = await preparePage(browser, baseUrl, fixtures, false);
+    const pageErrors = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    try {
+      await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+      if (pageDefinition.plan) {
+        await page.evaluate(plan => {
+          const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+          user.plan = plan;
+          localStorage.setItem('sf_user', JSON.stringify(user));
+        }, pageDefinition.plan);
+      }
+      await page.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+      await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+      await new Promise(resolve => setTimeout(resolve, 80));
+
+      // Vérifier le vrai parcours clavier (pas un focus() programmatique, qui ne
+      // déclenche pas nécessairement :focus-visible).
+      await page.keyboard.press('Tab');
+      const metrics = await page.evaluate(() => {
+        const isVisible = element => {
+          if (!element || !element.getClientRects().length) return false;
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return style.display !== 'none' && style.visibility !== 'hidden' &&
+            Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0;
+        };
+        const textOf = element => String(element?.innerText || element?.textContent || '')
+          .replace(/\s+/g, ' ').trim();
+        const accessibleName = element => {
+          const ariaLabel = element.getAttribute('aria-label')?.trim();
+          if (ariaLabel) return ariaLabel;
+          const labelledBy = element.getAttribute('aria-labelledby');
+          if (labelledBy) {
+            const value = labelledBy.split(/\s+/)
+              .map(id => document.getElementById(id))
+              .filter(Boolean)
+              .map(textOf)
+              .filter(Boolean)
+              .join(' ');
+            if (value) return value;
+          }
+          if ('labels' in element && element.labels?.length) {
+            const value = Array.from(element.labels).map(textOf).filter(Boolean).join(' ');
+            if (value) return value;
+          }
+          if (element.tagName === 'IMG') return element.getAttribute('alt')?.trim() || '';
+          const imageAlt = Array.from(element.querySelectorAll('img[alt]'))
+            .map(image => image.getAttribute('alt')?.trim() || '').filter(Boolean).join(' ');
+          const text = textOf(element);
+          if (text) return text;
+          if (imageAlt) return imageAlt;
+          const title = element.getAttribute('title')?.trim();
+          if (title) return title;
+          if (/^(INPUT)$/.test(element.tagName) && /^(button|submit|reset|image)$/i.test(element.type)) {
+            return element.value?.trim() || '';
+          }
+          return '';
+        };
+        const selectorFor = element => {
+          const parts = [element.tagName.toLowerCase()];
+          if (element.id) parts.push('#' + element.id);
+          if (typeof element.className === 'string' && element.className.trim()) {
+            parts.push('.' + element.className.trim().split(/\s+/).slice(0, 2).join('.'));
+          }
+          return parts.join('');
+        };
+        const controls = Array.from(document.querySelectorAll(
+          'a[href], button, input:not([type="hidden"]), select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])'
+        )).filter(isVisible);
+        const unnamedControls = controls.filter(element => !accessibleName(element))
+          .slice(0, 50)
+          .map(element => ({ selector: selectorFor(element), type: element.type || element.getAttribute('role') || '',
+            placeholder: element.getAttribute('placeholder') || '' }));
+        const unnamedImages = Array.from(document.querySelectorAll('img:not([alt])'))
+          .filter(isVisible)
+          .slice(0, 30)
+          .map(selectorFor);
+        const unnamedFrames = Array.from(document.querySelectorAll('iframe:not([title])'))
+          .filter(isVisible)
+          .slice(0, 20)
+          .map(selectorFor);
+        const mainLandmarks = document.querySelectorAll('main, [role="main"]').length;
+        const navigationLandmarks = Array.from(document.querySelectorAll('nav, [role="navigation"]'))
+          .filter(isVisible)
+          .map(element => ({ label: element.getAttribute('aria-label') || '',
+            labelledBy: element.getAttribute('aria-labelledby') || '', text: textOf(element).slice(0, 100) }));
+        const headings = Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6'))
+          .filter(isVisible)
+          .map(element => ({ level: Number(element.tagName.slice(1)), text: textOf(element).slice(0, 100) }));
+        const visibleH1 = headings.filter(heading => heading.level === 1).length;
+        const focus = document.activeElement;
+        const focusStyle = focus && focus !== document.body ? getComputedStyle(focus) : null;
+        const focusVisible = Boolean(focus && focus !== document.body && focus.matches(':focus-visible'));
+        const focusHasIndicator = Boolean(focusStyle && (
+          (focusStyle.outlineStyle !== 'none' && Number.parseFloat(focusStyle.outlineWidth) > 0) ||
+          (focusStyle.boxShadow && focusStyle.boxShadow !== 'none')
+        ));
+
+        const parseColor = value => {
+          const match = String(value || '').match(/rgba?\(([^)]+)\)/i);
+          if (!match) return null;
+          const channels = match[1].split(',').map(part => Number.parseFloat(part.trim()));
+          if (channels.length < 3 || channels.some(channel => !Number.isFinite(channel))) return null;
+          return { r: channels[0] / 255, g: channels[1] / 255, b: channels[2] / 255,
+            a: channels.length > 3 ? channels[3] : 1 };
+        };
+        const luminance = color => {
+          const linear = value => value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+          return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
+        };
+        const composite = (foreground, background) => {
+          const alpha = foreground.a ?? 1;
+          return {
+            r: foreground.r * alpha + background.r * (1 - alpha),
+            g: foreground.g * alpha + background.g * (1 - alpha),
+            b: foreground.b * alpha + background.b * (1 - alpha),
+            a: 1
+          };
+        };
+        const contrastRatio = (first, second) => {
+          const values = [luminance(first), luminance(second)].sort((a, b) => b - a);
+          return (values[0] + 0.05) / (values[1] + 0.05);
+        };
+        const textCandidates = Array.from(document.querySelectorAll(
+          'h1,h2,h3,h4,h5,h6,p,label,a,button,td,th,caption,legend,.stat-value,.nav-item,.field-label'
+        )).filter(element => isVisible(element) && textOf(element) &&
+          !element.closest('svg,[aria-hidden="true"],.ic,.icon'));
+        const contrastIssues = [];
+        const unmeasurableContrast = [];
+        for (const element of textCandidates) {
+          const ownStyle = getComputedStyle(element);
+          const foreground = parseColor(ownStyle.color);
+          if (!foreground || foreground.a < 0.95) continue;
+          let ancestor = element;
+          let background = null;
+          let gradient = false;
+          while (ancestor) {
+            const style = getComputedStyle(ancestor);
+            if (style.backgroundImage && style.backgroundImage !== 'none') {
+              gradient = true;
+              break;
+            }
+            const color = parseColor(style.backgroundColor);
+            if (color && color.a >= 0.95) {
+              background = color;
+              break;
+            }
+            ancestor = ancestor.parentElement;
+          }
+          if (gradient) {
+            unmeasurableContrast.push(selectorFor(element));
+            continue;
+          }
+          if (!background) background = parseColor(getComputedStyle(document.body).backgroundColor);
+          if (!background) continue;
+          const renderedForeground = foreground.a < 1 ? composite(foreground, background) : foreground;
+          const ratio = contrastRatio(renderedForeground, background);
+          const fontSize = Number.parseFloat(ownStyle.fontSize) || 15;
+          const fontWeight = Number.parseInt(ownStyle.fontWeight, 10) || 400;
+          const largeText = fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
+          const required = largeText ? 3 : 4.5;
+          if (ratio + 0.01 < required) {
+            contrastIssues.push({
+              selector: selectorFor(element),
+              text: textOf(element).slice(0, 80),
+              foreground: ownStyle.color,
+              background: ownStyle.backgroundColor,
+              ratio: Number(ratio.toFixed(2)),
+              required
+            });
+          }
+        }
+
+        const nonSemanticActions = Array.from(document.querySelectorAll('[onclick]'))
+          .filter(isVisible)
+          .filter(element => !/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(element.tagName) &&
+            !element.hasAttribute('role') && !element.hasAttribute('tabindex'))
+          .slice(0, 30)
+          .map(selectorFor);
+
+        return {
+          viewport: window.innerWidth,
+          theme: document.documentElement.getAttribute('data-theme'),
+          visibleControlCount: controls.length,
+          unnamedControls,
+          unnamedImages,
+          unnamedFrames,
+          mainLandmarks,
+          navigationLandmarks,
+          headings,
+          visibleH1,
+          focus: focus && focus !== document.body ? {
+            selector: selectorFor(focus),
+            focusVisible,
+            hasIndicator: focusHasIndicator,
+            outline: focusStyle?.outline || '',
+            boxShadow: focusStyle?.boxShadow || ''
+          } : null,
+          contrastIssues: contrastIssues.slice(0, 50),
+          contrastIssueCount: contrastIssues.length,
+          unmeasurableContrastCount: unmeasurableContrast.length,
+          nonSemanticActions
+        };
+      });
+
+      const screenshot = 'accessibilite-' + pageDefinition.name + '-1280.png';
+      await page.screenshot({ path: path.join(OUTPUT_DIR, screenshot), fullPage: true });
+      results.push({
+        page: pageDefinition.name,
+        screenshot,
+        ...metrics,
+        javascriptErrors: pageErrors
+      });
+    } finally {
+      await page.close();
+    }
+  }
+
+  return {
+    pageCount: pages.length,
+    viewportWidth: 1280,
+    pages: results,
+    totals: {
+      unnamedControls: results.reduce((sum, page) => sum + page.unnamedControls.length, 0),
+      unnamedImages: results.reduce((sum, page) => sum + page.unnamedImages.length, 0),
+      unnamedFrames: results.reduce((sum, page) => sum + page.unnamedFrames.length, 0),
+      invalidMainLandmarks: results.filter(page => page.mainLandmarks !== 1).length,
+      missingNavigationLabels: results.filter(page => page.navigationLandmarks.some(nav => !nav.label && !nav.labelledBy)).length,
+      pagesWithoutH1: results.filter(page => page.visibleH1 < 1).length,
+      pagesWithMultipleH1: results.filter(page => page.visibleH1 > 1).length,
+      missingKeyboardFocus: results.filter(page => !page.focus?.focusVisible || !page.focus?.hasIndicator).length,
+      contrastIssues: results.reduce((sum, page) => sum + page.contrastIssueCount, 0),
+      nonSemanticActions: results.reduce((sum, page) => sum + page.nonSemanticActions.length, 0),
+      javascriptErrors: results.reduce((sum, page) => sum + page.javascriptErrors.length, 0)
+    }
+  };
+}
+
 async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   if (DATASET === 'empty') return { skipped: 'jeu de données vide' };
   const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -3326,6 +3573,7 @@ async function main() {
     const businessLightThemeMobile = await verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures);
     const businessPagesZoom200 = await verifyBusinessPagesZoom200(browser, baseUrl, fixtures);
     const businessPagesDarkThemeZoom200 = await verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures);
+    const accessibility = await verifyBusinessPagesAccessibility(browser, baseUrl, fixtures);
     const documentFlows = await verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures);
     const report = {
       dataset: DATASET,
@@ -3343,8 +3591,9 @@ async function main() {
       businessLightThemeMobile,
       businessPagesZoom200,
       businessPagesDarkThemeZoom200,
+      accessibility,
       documentFlows,
-      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessLightThemeDesktop.screenshots + businessDarkThemeMobile.screenshots + businessLightThemeMobile.screenshots + businessPagesZoom200.screenshots + businessPagesDarkThemeZoom200.screenshots + (documentFlows.screenshots || 0),
+      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessLightThemeDesktop.screenshots + businessDarkThemeMobile.screenshots + businessLightThemeMobile.screenshots + businessPagesZoom200.screenshots + businessPagesDarkThemeZoom200.screenshots + accessibility.pageCount + (documentFlows.screenshots || 0),
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
