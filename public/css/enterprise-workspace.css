@@ -1545,8 +1545,7 @@ body.enterprise-console-shell .group-section-nav {
 body.enterprise-console-shell .group-section-nav a {
   color: var(--enterprise-muted) !important;
 }
-body.enterprise-console-shell .group-section-nav a:focus-visible,
-body.enterprise-console-shell .group-section-nav a:hover {
+body.enterprise-console-shell .group-section-nav a:focus-visible {
   background: var(--enterprise-hover-bg) !important;
   color: var(--enterprise-accent) !important;
 }
@@ -1680,5 +1679,9 @@ body.enterprise-console-shell #app-sidebar .sidebar-logout {
   body.enterprise-console-shell .enterprise-create-actions-list a:hover {
     border-color: var(--enterprise-border) !important;
     background: var(--enterprise-hover-bg) !important;
+  }
+  body.enterprise-console-shell .group-section-nav a:hover {
+    background: var(--enterprise-hover-bg) !important;
+    color: var(--enterprise-accent) !important;
   }
 }
