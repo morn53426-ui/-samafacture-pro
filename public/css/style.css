@@ -5720,9 +5720,18 @@ a.btn .icon {
 .invoice-doc {
   box-sizing: border-box;
   color: #243044;
+  /* Déclarer explicitement la police du document, indépendamment de l'héritage
+     du body, afin que l'aperçu et Chromium en média print utilisent la même famille. */
+  font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
+}
+.invoice-doc h1,
+.invoice-doc h2,
+.invoice-doc h3,
+.invoice-doc h4 {
+  font-family: var(--font-display);
 }
 .invoice-doc .sf-document-table {
   width: 100%;

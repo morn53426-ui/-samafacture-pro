@@ -304,6 +304,7 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
 describe('Impression et génération PDF', () => {
   const pageSource = fs.readFileSync(path.resolve(__dirname, '../../public/facture-detail.html'), 'utf8');
   const pdfSource = fs.readFileSync(path.resolve(__dirname, '../utils/pdf.js'), 'utf8');
+  const visualSource = fs.readFileSync(path.resolve(__dirname, 'visual/recette-visuelle.js'), 'utf8');
   const cssSource = fs.readFileSync(path.resolve(__dirname, '../../public/css/style.css'), 'utf8');
   const rendererSource = fs.readFileSync(path.resolve(__dirname, '../../public/js/facture-templates.js'), 'utf8');
 
@@ -322,6 +323,10 @@ describe('Impression et génération PDF', () => {
     assert.match(cssSource, /--font-display:\s*'IBM Plex Sans', Arial, sans-serif/);
     assert.match(cssSource, /--font-body:\s*'IBM Plex Sans', Arial, sans-serif/);
     assert.match(cssSource, /--font-mono:\s*'IBM Plex Mono', 'Courier New', monospace/);
+    assert.match(cssSource, /\.invoice-doc\s*\{[^}]*font-family:\s*var\(--font-body\)/s,
+      'Le document doit déclarer explicitement sa famille de texte, sans dépendre de body.');
+    assert.match(cssSource, /\.invoice-doc h1,[\s\S]*?font-family:\s*var\(--font-display\)/,
+      'Les titres imprimés doivent utiliser explicitement la police display.');
     assert.doesNotMatch(cssSource, /--font-(?:display|body|mono):\s*'(?:Manrope|Inter|JetBrains Mono)'/,
       'Les variables ne doivent pas demander des polices qui ne sont pas chargées.');
   });
@@ -359,7 +364,10 @@ describe('Impression et génération PDF', () => {
       'Les grilles ordinaires ne doivent plus être forcées à rester indivisibles sur une page.');
     assert.doesNotMatch(pdfSource, /margin:\s*\{\s*top:/,
       'Puppeteer ne doit pas redéfinir des marges déjà fixées par @page.');
+    assert.doesNotMatch(visualSource, /margin:\s*\{\s*top:/,
+      'La recette PDF visuelle ne doit pas redéfinir les marges déjà fixées par @page.');
     assert.match(pdfSource, /preferCSSPageSize:\s*true/);
+    assert.match(visualSource, /preferCSSPageSize:\s*true/);
     assert.match(rendererSource, /class="sf-doc-footer"/,
       'Le pied de facture doit rester groupé lors des sauts de page.');
   });

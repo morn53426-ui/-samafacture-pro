@@ -1,5 +1,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const request = require('supertest');
 const puppeteer = require('puppeteer');
 const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
@@ -102,6 +104,22 @@ describe('Génération PDF de facture', () => {
       const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
       assert.ok(pageCount >= 1 && pageCount <= 2,
         modele + ' ne doit pas créer de pagination excessive pour une facture simple (pages=' + pageCount + ')');
+      const nomsPolicesPdf = Array.from(
+        pdfLatin1.matchAll(/\/(?:BaseFont|FontName)\s*\/([^\s/]+)/g),
+        match => match[1]
+      );
+      const sansIntegree = nomsPolicesPdf.some(name => /IBMPlexSans/i.test(name));
+      if (!sansIntegree) {
+        // Conserver le vrai PDF fautif dans l'artefact de diagnostic CI pour analyser
+        // les ressources de police avec pdffonts/PDFium, sans affaiblir l'assertion.
+        const diagnosticDir = path.resolve(__dirname, 'diagnostics');
+        fs.mkdirSync(diagnosticDir, { recursive: true });
+        fs.writeFileSync(path.join(diagnosticDir, 'police-manquante-' + modele + '.pdf'), res.body);
+      }
+      assert.ok(sansIntegree,
+        modele + ' doit intégrer IBM Plex Sans dans le vrai PDF, polices trouvées : ' + nomsPolicesPdf.join(', '));
+      assert.ok(nomsPolicesPdf.some(name => /IBMPlexMono/i.test(name)),
+        modele + ' doit intégrer IBM Plex Mono dans le vrai PDF, polices trouvées : ' + nomsPolicesPdf.join(', '));
     }
   });
 
@@ -145,14 +163,20 @@ describe('Génération PDF de facture', () => {
           headingFont: getComputedStyle(headingNode).fontFamily,
           tableFont: getComputedStyle(tableNode).fontFamily,
           fontSize: getComputedStyle(documentNode).fontSize,
-          documentFontLoaded: document.fonts ? document.fonts.check('12px "IBM Plex Sans"') : false
+          loadedFontFaces: document.fonts
+            ? Array.from(document.fonts)
+              .filter(face => face.status === 'loaded')
+              .map(face => face.family.replace(/^["']|["']$/g, ''))
+            : []
         };
       });
       assert.match(typographie.documentFont, /IBM Plex Sans/);
       assert.match(typographie.headingFont, /IBM Plex Sans/);
       assert.match(typographie.tableFont, /IBM Plex Sans/);
-      assert.ok(typographie.documentFontLoaded,
-        'IBM Plex Sans doit être disponible avant la capture PDF.');
+      assert.ok(typographie.loadedFontFaces.includes('IBM Plex Sans'),
+        'IBM Plex Sans doit réellement être chargé, pas seulement déclaré en CSS.');
+      assert.ok(typographie.loadedFontFaces.includes('IBM Plex Mono'),
+        'IBM Plex Mono doit réellement être chargé pour les montants et références.');
 
       const lireEtatTheme = () => page.evaluate(() => ({
         theme: document.documentElement.getAttribute('data-theme'),
