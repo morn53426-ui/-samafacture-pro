@@ -3257,9 +3257,19 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           .slice(0, 30)
           .map(selectorFor);
 
+        const gradientSurfaces = Array.from(document.querySelectorAll(
+          '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
+        )).map(element => ({
+          className: element.className,
+          backgroundImage: getComputedStyle(element).backgroundImage,
+          labelColor: getComputedStyle(element.querySelector('.stat-label')).color,
+          valueColor: getComputedStyle(element.querySelector('.stat-value')).color
+        }));
+
         return {
           viewport: window.innerWidth,
           theme: document.documentElement.getAttribute('data-theme'),
+          gradientSurfaces,
           visibleControlCount: controls.length,
           unnamedControls,
           unnamedImages,
@@ -3281,6 +3291,37 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           nonSemanticActions
         };
       });
+
+      assert.equal(metrics.unnamedControls.length, 0,
+        pageDefinition.name + ' contient des commandes sans nom accessible : ' + JSON.stringify(metrics.unnamedControls));
+      assert.equal(metrics.unnamedImages.length, 0,
+        pageDefinition.name + ' contient des images sans alternative textuelle : ' + JSON.stringify(metrics.unnamedImages));
+      assert.equal(metrics.unnamedFrames.length, 0,
+        pageDefinition.name + ' contient des cadres sans titre : ' + JSON.stringify(metrics.unnamedFrames));
+      assert.equal(metrics.mainLandmarks, 1,
+        pageDefinition.name + ' doit contenir exactement un repère principal.');
+      assert.ok(metrics.navigationLandmarks.every(nav => nav.label || nav.labelledBy),
+        pageDefinition.name + ' contient une navigation sans nom accessible.');
+      assert.equal(metrics.visibleH1, 1,
+        pageDefinition.name + ' doit exposer un seul titre principal, hors aperçus décoratifs.');
+      assert.ok(metrics.focus?.focusVisible && metrics.focus?.hasIndicator,
+        pageDefinition.name + ' doit afficher un indicateur au premier focus clavier : ' + JSON.stringify(metrics.focus));
+      assert.equal(metrics.contrastIssueCount, 0,
+        pageDefinition.name + ' contient des textes sous le contraste requis : ' + JSON.stringify(metrics.contrastIssues));
+      assert.equal(metrics.nonSemanticActions.length, 0,
+        pageDefinition.name + ' contient des actions non sémantiques : ' + JSON.stringify(metrics.nonSemanticActions));
+      if (pageDefinition.name === 'rapports') {
+        assert.equal(metrics.gradientSurfaces.length, 4,
+          'Les quatre cartes KPI doivent être présentes sur la page Rapports.');
+        for (const surface of metrics.gradientSurfaces) {
+          assert.match(surface.backgroundImage, /gradient/i,
+            'Le dégradé de ' + surface.className + ' doit être effectivement rendu.');
+          assert.equal(surface.labelColor, 'rgb(255, 255, 255)',
+            'Les libellés des cartes KPI doivent être blancs à pleine opacité.');
+          assert.equal(surface.valueColor, 'rgb(255, 255, 255)',
+            'Les valeurs des cartes KPI doivent être blanches.');
+        }
+      }
 
       const screenshot = 'accessibilite-' + pageDefinition.name + '-1280.png';
       await page.screenshot({ path: path.join(OUTPUT_DIR, screenshot), fullPage: true });
