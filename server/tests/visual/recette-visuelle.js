@@ -2829,6 +2829,20 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
         const navRect = navToggle ? navToggle.getBoundingClientRect() : null;
         const navLabel = navToggle?.getAttribute('aria-label')?.trim() || '';
         const controls = navToggle?.getAttribute('aria-controls') || '';
+        const responsiveTables = Array.from(document.querySelectorAll('table.table-stack')).map(table => {
+          const tableRect = table.getBoundingClientRect();
+          const row = table.querySelector('tbody tr');
+          const cell = table.querySelector('tbody td[data-label]');
+          const cellRect = cell?.getBoundingClientRect();
+          return {
+            tableDisplay: getComputedStyle(table).display,
+            rowDisplay: row ? getComputedStyle(row).display : null,
+            cellDisplay: cell ? getComputedStyle(cell).display : null,
+            tableWidth: Math.round(tableRect.width),
+            cellWidth: cellRect ? Math.round(cellRect.width) : 0,
+            hasLabeledCells: Boolean(cell)
+          };
+        });
         return {
           viewport: window.innerWidth,
           documentWidth: root.scrollWidth,
@@ -2841,7 +2855,8 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
             navStyle.display !== 'none' && navStyle.visibility !== 'hidden' &&
             Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
           navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
-            navLabel && controls === 'app-navigation' && document.getElementById(controls))
+            navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          responsiveTables
         };
       });
 
@@ -2859,6 +2874,19 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
         pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
       assert.equal(metrics.navigationAccessible, true,
         pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      for (const table of metrics.responsiveTables) {
+        assert.equal(table.tableDisplay, 'block',
+          pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
+        assert.equal(table.rowDisplay, 'block',
+          pageDefinition.name + ' : chaque ligne de tableau doit occuper sa propre carte à 720 px.');
+        assert.equal(table.cellDisplay, 'block',
+          pageDefinition.name + ' : les cellules doivent être affichées verticalement à 720 px.');
+        assert.equal(table.hasLabeledCells, true,
+          pageDefinition.name + ' : les cellules empilées doivent conserver leurs libellés.');
+        assert.ok(table.cellWidth >= table.tableWidth * 0.9,
+          pageDefinition.name + ' : les cellules ne doivent pas se compresser à une lettre par ligne : ' +
+          JSON.stringify(table));
+      }
 
       const screenshot = 'zoom-200-' + pageDefinition.name + '-720.png';
       await page.screenshot({
