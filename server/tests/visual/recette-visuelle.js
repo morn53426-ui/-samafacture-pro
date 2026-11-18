@@ -2484,6 +2484,141 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
   };
 }
 
+async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
+  const results = [];
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const viewports = [
+    { name: 'mobile-320', width: 320, height: 812 },
+    { name: 'mobile-390', width: 390, height: 844 }
+  ];
+
+  for (const pageDefinition of pages) {
+    const page = await preparePage(browser, baseUrl, fixtures, false);
+    const pageErrors = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    try {
+      await page.setViewport({ width: viewports[0].width, height: viewports[0].height, deviceScaleFactor: 1 });
+      if (pageDefinition.plan) {
+        await page.evaluate(plan => {
+          const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+          user.plan = plan;
+          localStorage.setItem('sf_user', JSON.stringify(user));
+        }, pageDefinition.plan);
+      }
+      await page.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+      await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+      if (pageDefinition.charts?.length) {
+        await page.waitForFunction(chartIds => chartIds.every(id => {
+          const canvas = document.getElementById(id);
+          return canvas?.dataset.sfChartType && canvas.dataset.sfChartAnimation === 'disabled';
+        }), { timeout: 15000 }, pageDefinition.charts);
+      }
+      await page.waitForFunction(() =>
+        document.documentElement.getAttribute('data-theme') === 'light'
+      , { timeout: 10000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+
+      for (const viewport of viewports) {
+        await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
+        await new Promise(resolve => setTimeout(resolve, 80));
+        const metrics = await page.evaluate(() => {
+          const root = document.documentElement;
+          const body = document.body;
+          const rootStyle = getComputedStyle(root);
+          const bodyStyle = getComputedStyle(body);
+          const main = document.querySelector('main.workspace-page, main#main-content, main') || body;
+          const parseColor = value => {
+            const match = String(value || '').match(/rgba?\(([^)]+)\)/i);
+            if (!match) return null;
+            const channels = match[1].split(',').map(part => Number.parseFloat(part.trim()));
+            if (channels.length < 3 || channels.some(channel => !Number.isFinite(channel))) return null;
+            return { r: channels[0] / 255, g: channels[1] / 255, b: channels[2] / 255 };
+          };
+          const luminance = color => {
+            if (!color) return null;
+            const linear = value => value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+            return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
+          };
+          const bodyBackground = bodyStyle.backgroundColor;
+          const bodyLuminance = luminance(parseColor(bodyBackground));
+          const mainRect = main.getBoundingClientRect();
+          // Les pages du centre entreprise utilisent le bouton du topbar dédié,
+          // tandis que les autres pages utilisent celui intégré à la sidebar.
+          const navToggle = document.querySelector('.enterprise-console-menu-toggle') ||
+            document.getElementById('mobile-toggle-btn');
+          const navToggleStyle = navToggle ? getComputedStyle(navToggle) : null;
+          const navToggleRect = navToggle ? navToggle.getBoundingClientRect() : null;
+          const navToggleLabel = navToggle?.getAttribute('aria-label')?.trim() || '';
+          const navToggleControls = navToggle?.getAttribute('aria-controls') || '';
+          return {
+            viewport: window.innerWidth,
+            documentWidth: root.scrollWidth,
+            bodyWidth: body.scrollWidth,
+            theme: root.getAttribute('data-theme'),
+            colorScheme: rootStyle.colorScheme,
+            bodyBackground,
+            bodyLuminance: bodyLuminance === null ? null : Number(bodyLuminance.toFixed(3)),
+            mainBackground: getComputedStyle(main).backgroundColor,
+            mainLeft: Math.round(mainRect.left),
+            mainRight: Math.round(mainRect.right),
+            mobileToggleExists: Boolean(navToggle),
+            mobileToggleVisible: Boolean(navToggle && navToggleStyle && navToggleRect &&
+              navToggleStyle.display !== 'none' && navToggleStyle.visibility !== 'hidden' &&
+              Number(navToggleStyle.opacity) > 0 && navToggleRect.width >= 32 && navToggleRect.height >= 32),
+            mobileToggleAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
+              navToggleLabel && navToggleControls === 'app-navigation' &&
+              document.getElementById(navToggleControls))
+          };
+        });
+
+        assert.equal(metrics.viewport, viewport.width,
+          pageDefinition.name + ' : le viewport mobile doit être appliqué.');
+        assert.equal(metrics.theme, 'light',
+          pageDefinition.name + ' doit conserver le thème clair à ' + viewport.width + 'px.');
+        assert.equal(metrics.colorScheme, 'light',
+          pageDefinition.name + ' doit conserver color-scheme: light à ' + viewport.width + 'px.');
+        assert.ok(metrics.bodyLuminance !== null && metrics.bodyLuminance > 0.55,
+          pageDefinition.name + ' conserve un fond trop clair à ' + viewport.width + 'px : ' +
+          JSON.stringify(metrics));
+        assert.ok(metrics.documentWidth <= viewport.width + 1 && metrics.bodyWidth <= viewport.width + 1,
+          pageDefinition.name + ' déborde horizontalement en thème clair à ' + viewport.width + 'px : ' +
+          JSON.stringify(metrics));
+        assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
+          pageDefinition.name + ' : la zone métier doit rester dans le viewport à ' + viewport.width + 'px : ' +
+          JSON.stringify(metrics));
+        assert.equal(metrics.mobileToggleExists, true,
+          pageDefinition.name + ' doit exposer une commande de navigation mobile.');
+        assert.equal(metrics.mobileToggleVisible, true,
+          pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
+        assert.equal(metrics.mobileToggleAccessible, true,
+          pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+
+        const screenshot = 'theme-clair-' + pageDefinition.name + '-' + viewport.name + '.png';
+        await page.screenshot({
+          path: path.join(OUTPUT_DIR, screenshot),
+          fullPage: true
+        });
+        results.push({ page: pageDefinition.name, screenshot, ...metrics });
+      }
+
+      assert.deepEqual(pageErrors, [],
+        pageDefinition.name + ' a généré des erreurs JavaScript en thème clair mobile : ' + pageErrors.join(' | '));
+    } finally {
+      await page.close();
+    }
+  }
+
+  return {
+    pageCount: pages.length,
+    viewportCount: viewports.length,
+    screenshots: results.length,
+    pages: results
+  };
+}
+
+
 async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   if (DATASET === 'empty') return { skipped: 'jeu de données vide' };
   const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -2746,6 +2881,7 @@ async function main() {
     const themeAndZoom = await verifyThemeAndZoom(browser, baseUrl, fixtures);
     const businessDarkTheme = await verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures);
     const businessDarkThemeMobile = await verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures);
+    const businessLightThemeMobile = await verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures);
     const documentFlows = await verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures);
     const report = {
       dataset: DATASET,
@@ -2759,8 +2895,9 @@ async function main() {
       themeAndZoom,
       businessDarkTheme,
       businessDarkThemeMobile,
+      businessLightThemeMobile,
       documentFlows,
-      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessDarkThemeMobile.screenshots + (documentFlows.screenshots || 0),
+      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessDarkThemeMobile.screenshots + businessLightThemeMobile.screenshots + (documentFlows.screenshots || 0),
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
