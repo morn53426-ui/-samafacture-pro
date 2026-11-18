@@ -33,7 +33,7 @@
   <div class="grid grid-2">
     <div class="card">
       <h3>Décrivez votre problème</h3>
-      <p style="color:var(--ink-soft);">Ce formulaire ouvre votre messagerie avec le message pré-rempli, prêt à être envoyé à notre équipe.</p>
+      <p style="color:var(--ink-soft);">Préparez votre demande. L’envoi par e-mail sera activé dès qu’une adresse officielle OptiGest sera configurée.</p>
       <div id="msg"></div>
       <form id="support-form">
         <div class="field"><label>Sujet</label>
@@ -47,7 +47,7 @@
         </div>
         <div class="field"><label>Votre email de contact</label><input type="email" id="email" required /></div>
         <div class="field"><label>Description</label><textarea id="message" required placeholder="Expliquez le plus précisément possible ce que vous rencontrez (étapes suivies, message d'erreur affiché, etc.)"></textarea></div>
-        <button type="submit" class="btn btn-primary">Envoyer par email</button>
+        <button id="support-submit" type="submit" class="btn btn-primary">Envoyer par e-mail</button>
       </form>
     </div>
 
@@ -66,7 +66,7 @@
             <div class="stat-icon icon-emerald" style="flex-shrink:0;"><i data-icon="message-circle"></i></div>
             <div>
               <div style="font-weight:600;">WhatsApp</div>
-              <div style="color:var(--ink-soft); font-size:0.88rem;">Lun–Sam, 9h–19h (GMT)</div>
+              <div style="color:var(--ink-soft); font-size:0.88rem;">Coordonnées de contact à configurer</div>
             </div>
           </div>
           <div style="display:flex; gap:12px; align-items:flex-start;">
@@ -106,6 +106,15 @@
 <script>
   const user = Api.currentUser();
   if (user?.entreprise_email) document.getElementById('email').value = user.entreprise_email;
+
+  const configuredSupportEmail = String(window.OPTIGEST_CONFIG?.supportEmail || '').trim();
+  const supportSubmit = document.getElementById('support-submit');
+  if (!configuredSupportEmail) {
+    supportSubmit.disabled = true;
+    supportSubmit.textContent = 'E-mail support à configurer';
+    supportSubmit.title = 'Renseignez une adresse de support vérifiée dans js/brand-config.js.';
+    document.getElementById('support-email-status').setAttribute('role', 'status');
+  }
 
   document.getElementById('support-form').addEventListener('submit', (e) => {
     e.preventDefault();
