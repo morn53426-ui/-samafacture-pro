@@ -308,11 +308,11 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
         template: 'classique',
         personnalisation: { police, taille_texte: 'grand', epaisseur_texte: 'gras' }
       });
-      assert.ok(html.includes('font-family:' + pile),
+      assert.ok(html.includes('--sf-doc-font-family:' + pile),
         'La police ' + police + ' doit être appliquée avec sa pile autorisée.');
-      assert.match(html, /font-size:110%/,
+      assert.match(html, /--sf-doc-font-scale:1\.10/,
         'Le réglage de taille doit rester présent dans le rendu.');
-      assert.match(html, /font-weight:700/,
+      assert.match(html, /--sf-doc-font-weight:700/,
         'Le réglage de graisse doit rester présent dans le rendu.');
     }
 
@@ -327,6 +327,18 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     });
     assert.doesNotMatch(invalid, /url\(https:\/\/example\.invalid\/font\)/,
       'Une police arbitraire ne doit jamais être injectée dans le document.');
+
+    const customColor = templates.renderInvoiceHtml({
+      user: userDeTest(),
+      facture: factureDeTest(),
+      lignes: lignesDeTest,
+      isDevis: false,
+      qrCode: null,
+      template: 'classique',
+      personnalisation: { couleur_texte: '#123456' }
+    });
+    assert.match(customColor, /--sf-doc-text-color:#123456/,
+      'La couleur de texte personnalisée doit parvenir au conteneur de la facture.');
   });
 
   test('un identifiant de modèle inconnu retombe sur le modèle "classique" (comportement déjà existant, non modifié)', () => {
@@ -355,7 +367,9 @@ describe('Impression et génération PDF', () => {
       'La génération PDF serveur doit aussi ignorer le thème sombre mémorisé.');
   });
 
-  test("l'impression conserve les couleurs des modèles et évite de couper le pied de page", () => {
+  test("l'impression conserve les couleurs des modèles, la personnalisation et le pied de page", () => {
+    assert.match(cssSource, /font-size:\s*calc\(14px \* var\(--sf-doc-font-scale, 1\)\)/);
+    assert.match(cssSource, /font-size:\s*calc\(9\.5pt \* var\(--sf-doc-font-scale, 1\)\) !important/);
     assert.match(cssSource, /@media print[\s\S]*?\.invoice-doc[\s\S]*?--navy-950:\s*#24211D/);
     assert.match(cssSource, /print-color-adjust:\s*exact !important/);
     assert.match(cssSource, /\.invoice-doc \.sf-document-table thead\s*\{\s*display:\s*table-header-group !important;/);
