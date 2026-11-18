@@ -8,7 +8,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '../..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
-test('the public HTML uses SunuPilot and no longer exposes the previous product name', () => {
+test('the public HTML and vector assets use SunuPilot', () => {
   const publicDir = path.join(root, 'public');
   const pages = fs.readdirSync(publicDir).filter((name) => name.endsWith('.html'));
 
@@ -25,6 +25,13 @@ test('the public HTML uses SunuPilot and no longer exposes the previous product 
   const home = read('public/index.html');
   assert.match(home, /SunuPilot/);
   assert.match(home, /images\/sunupilot-logo\.svg/);
+  const logo = read('public/images/sunupilot-logo.svg');
+  const icon = read('public/images/sunupilot-icon.svg');
+  assert.match(logo, /<title[^>]*>SunuPilot<\/title>/);
+  assert.match(logo, /#18265B/);
+  assert.match(logo, /#087A3D/);
+  assert.match(icon, /<title[^>]*>SunuPilot<\/title>/);
+  assert.doesNotMatch(logo + icon, /OptiGest|SamaFacture/i);
 });
 
 test('PWA metadata and service-worker shell use the SunuPilot assets', () => {
@@ -37,7 +44,7 @@ test('PWA metadata and service-worker shell use the SunuPilot assets', () => {
   assert.ok(iconSources.includes('images/sunupilot-icon.svg'));
 
   const serviceWorker = read('public/sw.js');
-  assert.match(serviceWorker, /sunupilot-shell-v\d+/);
+  assert.match(serviceWorker, /sunupilot-shell-v4/);
   assert.match(serviceWorker, /\/js\/brand-config\.js/);
   assert.match(serviceWorker, /\/images\/sunupilot-logo\.svg/);
   assert.match(serviceWorker, /\/images\/sunupilot-icon\.svg/);
