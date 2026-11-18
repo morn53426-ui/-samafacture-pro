@@ -1910,6 +1910,60 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   const finances = await verifyChartPage('finances', 'finances.html', '#chart-finances');
   const reports = await verifyChartPage('rapports', 'rapports.html', '#chart-ventes');
 
+  const assistantPage = await preparePage(browser, baseUrl, fixtures, false);
+  await assistantPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await assistantPage.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+  await assistantPage.goto(baseUrl + '/assistant-ia.html', { waitUntil: 'domcontentloaded' });
+  await assistantPage.waitForSelector('.ia-shell', { timeout: 15000 });
+  await assistantPage.evaluate(() => {
+    const host = document.querySelector('.page-assistant-ia');
+    const user = document.createElement('div');
+    user.className = 'ia-msg user';
+    user.innerHTML = '<div class="ia-bubble">Message de test</div>';
+    host.appendChild(user);
+    const assistant = document.createElement('div');
+    assistant.className = 'ia-msg assistant';
+    assistant.innerHTML = '<div class="ia-avatar-sm">IA</div>';
+    host.appendChild(assistant);
+  });
+  const readAssistantTheme = () => assistantPage.evaluate(() => {
+    const userBubble = document.querySelector('.page-assistant-ia .ia-msg.user .ia-bubble');
+    const assistantAvatar = document.querySelector('.page-assistant-ia .ia-msg.assistant .ia-avatar-sm');
+    const headerAvatar = document.querySelector('.page-assistant-ia .ia-avatar-bot');
+    const firstGradientStop = (element) => {
+      const match = getComputedStyle(element).backgroundImage.match(/rgb\\([^)]+\\)/);
+      return match ? match[0] : null;
+    };
+    return {
+      theme: document.documentElement.getAttribute('data-theme'),
+      userText: getComputedStyle(userBubble).color,
+      userBackground: getComputedStyle(userBubble).backgroundColor,
+      assistantAvatarText: getComputedStyle(assistantAvatar).color,
+      assistantAvatarGradient: firstGradientStop(assistantAvatar),
+      headerAvatarText: getComputedStyle(headerAvatar).color,
+      headerAvatarGradient: firstGradientStop(headerAvatar)
+    };
+  });
+  const assistantLight = await readAssistantTheme();
+  await assistantPage.evaluate(() => window.SamaTheme.definir('dark'));
+  const assistantDark = await readAssistantTheme();
+  for (const [label, metrics] of [['clair', assistantLight], ['sombre', assistantDark]]) {
+    const userContrast = contrastRatio(metrics.userText, metrics.userBackground);
+    const avatarContrast = contrastRatio(metrics.assistantAvatarText, metrics.assistantAvatarGradient);
+    const headerContrast = contrastRatio(metrics.headerAvatarText, metrics.headerAvatarGradient);
+    assert.ok(userContrast >= 4.5,
+      'La bulle utilisateur de l’Assistant IA doit rester lisible en thème ' + label + '. Contraste : ' + userContrast.toFixed(2));
+    assert.ok(avatarContrast >= 4.5,
+      'L’avatar de réponse doit rester lisible en thème ' + label + '. Contraste : ' + avatarContrast.toFixed(2));
+    assert.ok(headerContrast >= 4.5,
+      'L’avatar d’en-tête doit rester lisible en thème ' + label + '. Contraste : ' + headerContrast.toFixed(2));
+  }
+  await assistantPage.screenshot({
+    path: path.join(OUTPUT_DIR, 'assistant-ia-theme-sombre-1440.png'),
+    fullPage: true
+  });
+  await assistantPage.close();
+
   const settingsPage = await preparePage(browser, baseUrl, fixtures, false);
   await settingsPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
   await settingsPage.evaluate(() => localStorage.setItem('sf_theme', 'light'));
@@ -1985,7 +2039,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
       light: { colors: goldBadgeColorsLight, soonContrast: Number(soonBadgeLightContrast.toFixed(2)), proContrast: Number(proBadgeLightContrast.toFixed(2)) },
       dark: { colors: goldBadgeColorsDark, soonContrast: Number(soonBadgeDarkContrast.toFixed(2)), proContrast: Number(proBadgeDarkContrast.toFixed(2)) }
     },
-    screenshots: 5
+    screenshots: 6
   };
 }
 
