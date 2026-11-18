@@ -57,7 +57,7 @@ test('the application sends the new CSRF header while the backend keeps legacy c
   const api = read('public/js/api.js');
   const middleware = read('server/middleware/auth.js');
 
-  assert.match(api, /window\\.OPTIGEST_API_URL \\|\\| window\\.SAMAFACTURE_API_URL/);
+  assert.ok(api.includes('window.OPTIGEST_API_URL || window.SAMAFACTURE_API_URL'));
   assert.match(api, /'X-Requested-With': 'OptiGest'/);
   assert.ok(middleware.includes("new Set(['OptiGest', 'SamaFacturePro'])"));
 });
