@@ -333,13 +333,10 @@ button, input, select, textarea { font-family: var(--font-body); font-size: 0.95
   .card { padding: 14px; }
 }
 
-/* Tableau "Factures récurrentes" (7 colonnes) : sur mobile, bascule en cartes empilées
-   plutôt que de forcer un défilement horizontal. Mêmes informations et actions,
-   simplement réorganisées verticalement. Scopé à .table-stack (ajouté uniquement sur
-   cette table) pour ne pas affecter les autres tableaux de l'app — revus en Phase 9 et
-   déjà adaptés au défilement horizontal, qui reste approprié pour eux (moins de colonnes,
-   ou usage plus proche d'un tableur consulté par des utilisateurs habitués). */
-@media (max-width: 640px) {
+/* Les tableaux .table-stack passent en cartes dès 760 px : cela couvre les écrans
+   étroits et le zoom navigateur à 200 % (720 px CSS sur un écran 1440 px). Les cellules
+   restent lisibles sans compresser leurs colonnes jusqu'à une lettre par ligne. */
+@media (max-width: 760px) {
   .table-stack { min-width: 0 !important; }
   .table-stack thead { display: none; }
   .table-stack, .table-stack tbody, .table-stack tr, .table-stack td { display: block; width: 100%; }
