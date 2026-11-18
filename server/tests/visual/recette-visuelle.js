@@ -3250,7 +3250,7 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             const handler = (element.getAttribute('onclick') || '').trim();
             // Un onclick qui ne fait qu'arrêter la propagation d'un clic n'est
             // pas une action interactive (ex. cellule Actions dans une ligne cliquable).
-            if (/^event\\.stopPropagation\\(\\);?$/.test(handler)) return false;
+            if (/^event\.stopPropagation\(\);?$/.test(handler)) return false;
             return !/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(element.tagName) &&
               !element.hasAttribute('role') && !element.hasAttribute('tabindex');
           })
