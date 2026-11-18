@@ -1712,3 +1712,39 @@ body.enterprise-console-shell #app-sidebar .sidebar-logout {
     color: var(--emerald) !important;
   }
 }
+
+
+/* Le rail compact desktop possède des règles plus spécifiques dans style.css.
+   Les reprendre ici garantit que le thème Entreprise garde le bon contraste. */
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--enterprise-sidebar-text) !important;
+}
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item .nav-label {
+  color: inherit !important;
+}
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item .ic {
+  background: transparent !important;
+  color: var(--enterprise-sidebar-icon) !important;
+}
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active,
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active:hover {
+  border-color: var(--enterprise-sidebar-border) !important;
+  background: var(--enterprise-sidebar-active) !important;
+  color: var(--enterprise-sidebar-active-text) !important;
+  box-shadow: none !important;
+}
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active .ic {
+  background: transparent !important;
+  color: var(--enterprise-sidebar-icon) !important;
+  box-shadow: none !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):hover,
+  body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):focus-visible {
+    border-color: var(--enterprise-sidebar-border) !important;
+    background: var(--enterprise-sidebar-hover) !important;
+    color: var(--enterprise-sidebar-active-text) !important;
+  }
+}
