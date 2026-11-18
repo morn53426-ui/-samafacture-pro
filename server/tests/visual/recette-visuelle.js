@@ -195,6 +195,8 @@ const CHART_STUB = [
   '      canvas.dataset.sfChartAnimation = config.options && config.options.animation === false ? "disabled" : "enabled";',
   '      canvas.dataset.sfChartResponsive = String(config.options && config.options.responsive === true);',
   '      canvas.dataset.sfChartType = config.type || "unknown";',
+  '      canvas.dataset.sfChartTickColor = config.options && config.options.scales && config.options.scales.y && config.options.scales.y.ticks ? String(config.options.scales.y.ticks.color || "") : "";',
+  '      canvas.dataset.sfChartGridColor = config.options && config.options.scales && config.options.scales.y && config.options.scales.y.grid ? String(config.options.scales.y.grid.color || "") : "";',
   '      const context = canvas.getContext("2d");',
   '      const rect = canvas.getBoundingClientRect();',
   '      const width = Math.max(1, Math.floor(rect.width));',
@@ -1802,6 +1804,290 @@ function contrastRatio(foreground, background) {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
+async function verifyThemeConsistency(browser, baseUrl, fixtures) {
+  const groupPage = await preparePage(browser, baseUrl, fixtures, false);
+  await groupPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await groupPage.evaluate(() => {
+    const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+    user.plan = 'entreprise';
+    localStorage.setItem('sf_user', JSON.stringify(user));
+    localStorage.setItem('sf_theme', 'light');
+  });
+  await groupPage.goto(baseUrl + '/groupe-entreprise.html', { waitUntil: 'domcontentloaded' });
+  await groupPage.waitForSelector('#invite-company-form', { timeout: 15000 });
+  await groupPage.waitForSelector('body.enterprise-console-shell .enterprise-console-topbar', { timeout: 10000 });
+
+  const readGroupTheme = () => groupPage.evaluate(() => {
+    const color = (selector, property) => {
+      const element = document.querySelector(selector);
+      return element ? getComputedStyle(element).getPropertyValue(property || 'background-color').trim() : null;
+    };
+    const defaultNav = document.querySelector('#app-sidebar .nav-item:not(.active)');
+    const activeNav = document.querySelector('#app-sidebar .nav-item.active');
+    return {
+      theme: document.documentElement.getAttribute('data-theme'),
+      bodyClass: document.body.className,
+      sidebarClass: document.getElementById('app-sidebar')?.className || '',
+      defaultNavClass: defaultNav?.className || '',
+      defaultNavMatches: Boolean(defaultNav?.matches('body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active)')),
+      enterpriseSidebarTextToken: getComputedStyle(document.body).getPropertyValue('--enterprise-sidebar-text').trim(),
+      inkSoftToken: getComputedStyle(document.documentElement).getPropertyValue('--ink-soft').trim(),
+      page: color('.main-content.enterprise-console-main'),
+      panel: color('.group-panel'),
+      dashboardCard: color('.enterprise-dashboard-card'),
+      sidebar: color('#app-sidebar.sidebar'),
+      sidebarText: activeNav ? getComputedStyle(activeNav).color : null,
+      sidebarActiveBackground: activeNav ? getComputedStyle(activeNav).backgroundColor : null,
+      sidebarDefaultText: defaultNav ? getComputedStyle(defaultNav).color : null,
+      sidebarDefaultLabelText: defaultNav?.querySelector('.nav-label') ? getComputedStyle(defaultNav.querySelector('.nav-label')).color : null,
+      heading: color('.enterprise-dashboard-heading h1', 'color'),
+      horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth
+    };
+  });
+
+  await groupPage.evaluate(() => window.SamaTheme.definir('light'));
+  const light = await readGroupTheme();
+  assert.equal(light.theme, 'light', 'Le centre Entreprise doit respecter le thème clair explicite.');
+  assert.equal(light.page, 'rgb(245, 247, 250)', 'Le fond clair Entreprise doit rester gris très léger.');
+  assert.equal(light.panel, 'rgb(255, 255, 255)', 'Les panneaux Entreprise doivent rester blancs en thème clair.');
+  assert.equal(light.sidebar, 'rgb(255, 255, 255)', 'Le rail Entreprise doit rester blanc en thème clair.');
+
+  await groupPage.screenshot({
+    path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-clair-1440.png'),
+    fullPage: true
+  });
+
+  await groupPage.evaluate(() => window.SamaTheme.definir('dark'));
+  await groupPage.waitForFunction(() =>
+    getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(40, 39, 32)'
+  );
+  const dark = await readGroupTheme();
+  assert.equal(dark.theme, 'dark', 'Le centre Entreprise doit appliquer le thème sombre sans rechargement.');
+  assert.equal(dark.page, 'rgb(29, 28, 24)', 'Le fond du centre Entreprise doit suivre le graphite du thème sombre.');
+  assert.equal(dark.panel, 'rgb(40, 39, 32)', 'Les panneaux ne doivent plus rester blancs en thème sombre.');
+  assert.equal(dark.dashboardCard, 'rgb(40, 39, 32)', 'Les cartes de pilotage doivent utiliser la surface sombre.');
+  assert.equal(dark.sidebar, 'rgb(23, 23, 19)', 'Le rail latéral doit devenir sombre avec le reste de l’application.');
+  assert.equal(dark.horizontalOverflow, false, 'Le thème sombre ne doit pas provoquer de débordement.');
+  const headingContrast = contrastRatio(dark.heading, dark.page);
+  const sidebarActiveContrast = contrastRatio(dark.sidebarText, dark.sidebarActiveBackground);
+  const sidebarDefaultContrast = contrastRatio(dark.sidebarDefaultLabelText, dark.sidebar);
+  assert.ok(headingContrast >= 4.5,
+    'Le titre Entreprise doit garder un contraste de 4,5:1 en thème sombre. Valeur : ' + headingContrast.toFixed(2));
+  assert.ok(sidebarActiveContrast >= 4.5,
+    'Le lien actif du menu doit contraster avec son propre fond. Valeur : ' +
+    sidebarActiveContrast.toFixed(2) + ' (' + dark.sidebarText + ' sur ' + dark.sidebarActiveBackground + ')');
+  assert.ok(sidebarDefaultContrast >= 4.5,
+    'Les libellés visibles des liens non actifs doivent contraster avec le rail sombre. Valeur : ' +
+    sidebarDefaultContrast.toFixed(2) + ' (' + dark.sidebarDefaultLabelText + ' sur ' + dark.sidebar + '). Diagnostic : ' +
+    JSON.stringify({
+      bodyClass: dark.bodyClass,
+      sidebarClass: dark.sidebarClass,
+      defaultNavClass: dark.defaultNavClass,
+      defaultNavMatches: dark.defaultNavMatches,
+      enterpriseSidebarTextToken: dark.enterpriseSidebarTextToken,
+      inkSoftToken: dark.inkSoftToken,
+      defaultNavLabel: dark.sidebarDefaultLabelText
+    }));
+  await groupPage.screenshot({
+    path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-sombre-1440.png'),
+    fullPage: true
+  });
+  await groupPage.close();
+
+  async function verifyChartPage(name, file, canvasSelector) {
+    const page = await preparePage(browser, baseUrl, fixtures, false);
+    await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+    await page.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+    await page.goto(baseUrl + '/' + file, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction((selector) => {
+      const canvas = document.querySelector(selector);
+      return canvas && canvas.dataset.sfChartType === 'bar' && canvas.dataset.sfChartGridColor;
+    }, { timeout: 15000 }, canvasSelector);
+    const readColors = () => page.$eval(canvasSelector, canvas => ({
+      tick: canvas.dataset.sfChartTickColor,
+      grid: canvas.dataset.sfChartGridColor
+    }));
+    const lightColors = await readColors();
+    await page.evaluate(() => window.SamaTheme.definir('dark'));
+    await page.waitForFunction((selector, previous) => {
+      const canvas = document.querySelector(selector);
+      return canvas && canvas.dataset.sfChartGridColor &&
+        canvas.dataset.sfChartGridColor !== previous.grid &&
+        canvas.dataset.sfChartTickColor !== previous.tick;
+    }, { timeout: 10000 }, canvasSelector, lightColors);
+    const darkColors = await readColors();
+    assert.notEqual(darkColors.grid, lightColors.grid,
+      name + ' doit assombrir les lignes de grille avec le thème sombre.');
+    assert.notEqual(darkColors.tick, lightColors.tick,
+      name + ' doit adapter les libellés du graphique avec le thème sombre.');
+    const contrast = contrastRatio(darkColors.tick, 'rgb(40, 39, 32)');
+    assert.ok(contrast >= 4.5,
+      name + ' : les libellés du graphique doivent rester lisibles en thème sombre. Contraste : ' + contrast.toFixed(2));
+    await page.screenshot({
+      path: path.join(OUTPUT_DIR, name + '-theme-sombre-1440.png'),
+      fullPage: true
+    });
+    await page.close();
+    return { light: lightColors, dark: darkColors, contrastRatio: Number(contrast.toFixed(2)) };
+  }
+
+  const finances = await verifyChartPage('finances', 'finances.html', '#chart-finances');
+  const reports = await verifyChartPage('rapports', 'rapports.html', '#chart-ventes');
+
+  const assistantPage = await preparePage(browser, baseUrl, fixtures, false);
+  await assistantPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await assistantPage.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+  await assistantPage.goto(baseUrl + '/assistant-ia.html', { waitUntil: 'domcontentloaded' });
+  await assistantPage.waitForSelector('.ia-shell', { timeout: 15000 });
+  await assistantPage.evaluate(() => {
+    const host = document.querySelector('.page-assistant-ia');
+    const user = document.createElement('div');
+    user.className = 'ia-msg user';
+    user.innerHTML = '<div class="ia-bubble">Message de test</div>';
+    host.appendChild(user);
+    const assistant = document.createElement('div');
+    assistant.className = 'ia-msg assistant';
+    assistant.innerHTML = '<div class="ia-avatar-sm">IA</div>';
+    host.appendChild(assistant);
+  });
+  const readAssistantTheme = () => assistantPage.evaluate(() => {
+    const userBubble = document.querySelector('.page-assistant-ia .ia-msg.user .ia-bubble');
+    const assistantAvatar = document.querySelector('.page-assistant-ia .ia-msg.assistant .ia-avatar-sm');
+    const headerAvatar = document.querySelector('.page-assistant-ia .ia-avatar-bot');
+    const firstGradientStop = (element) => {
+      const match = getComputedStyle(element).backgroundImage.match(/rgb\([^)]+\)/);
+      return match ? match[0] : null;
+    };
+    return {
+      theme: document.documentElement.getAttribute('data-theme'),
+      userText: getComputedStyle(userBubble).color,
+      userBackground: getComputedStyle(userBubble).backgroundColor,
+      assistantAvatarText: getComputedStyle(assistantAvatar).color,
+      assistantAvatarGradient: firstGradientStop(assistantAvatar),
+      headerAvatarText: getComputedStyle(headerAvatar).color,
+      headerAvatarGradient: firstGradientStop(headerAvatar),
+      historyBackground: getComputedStyle(document.querySelector('.ia-history')).backgroundColor,
+      chatBackground: getComputedStyle(document.querySelector('.ia-chat')).backgroundColor,
+      historyHeading: getComputedStyle(document.querySelector('.ia-history-head h3')).color,
+      chatHeading: getComputedStyle(document.querySelector('.ia-chat-head .name')).color,
+      newButtonText: getComputedStyle(document.querySelector('.ia-new-btn')).color,
+      newButtonBackground: getComputedStyle(document.querySelector('.ia-new-btn')).backgroundColor
+    };
+  });
+  const assistantLight = await readAssistantTheme();
+  await assistantPage.evaluate(() => window.SamaTheme.definir('dark'));
+  const assistantDark = await readAssistantTheme();
+  for (const [label, metrics] of [['clair', assistantLight], ['sombre', assistantDark]]) {
+    const userContrast = contrastRatio(metrics.userText, metrics.userBackground);
+    const avatarContrast = contrastRatio(metrics.assistantAvatarText, metrics.assistantAvatarGradient);
+    const headerContrast = contrastRatio(metrics.headerAvatarText, metrics.headerAvatarGradient);
+    const historyContrast = contrastRatio(metrics.historyHeading, metrics.historyBackground);
+    const chatContrast = contrastRatio(metrics.chatHeading, metrics.chatBackground);
+    const newButtonContrast = contrastRatio(metrics.newButtonText, metrics.newButtonBackground);
+    assert.ok(historyContrast >= 4.5,
+      'Le titre de l’historique doit rester lisible en thème ' + label + '. Contraste : ' + historyContrast.toFixed(2));
+    assert.ok(chatContrast >= 4.5,
+      'Le titre du chat doit rester lisible en thème ' + label + '. Contraste : ' + chatContrast.toFixed(2));
+    assert.ok(newButtonContrast >= 4.5,
+      'Le bouton de nouvelle conversation doit rester lisible en thème ' + label + '. Contraste : ' + newButtonContrast.toFixed(2));
+    if (label === 'sombre') {
+      assert.notEqual(metrics.historyBackground, 'rgb(255, 255, 255)',
+        'Le panneau Historique ne doit pas rester blanc en thème sombre.');
+      assert.notEqual(metrics.chatBackground, 'rgb(255, 255, 255)',
+        'Le panneau de conversation ne doit pas rester blanc en thème sombre.');
+    }
+    assert.ok(userContrast >= 4.5,
+      'La bulle utilisateur de l’Assistant IA doit rester lisible en thème ' + label + '. Contraste : ' + userContrast.toFixed(2));
+    assert.ok(avatarContrast >= 4.5,
+      'L’avatar de réponse doit rester lisible en thème ' + label + '. Contraste : ' + avatarContrast.toFixed(2));
+    assert.ok(headerContrast >= 4.5,
+      'L’avatar d’en-tête doit rester lisible en thème ' + label + '. Contraste : ' + headerContrast.toFixed(2));
+  }
+  await assistantPage.screenshot({
+    path: path.join(OUTPUT_DIR, 'assistant-ia-theme-sombre-1440.png'),
+    fullPage: true
+  });
+  await assistantPage.close();
+
+  const settingsPage = await preparePage(browser, baseUrl, fixtures, false);
+  await settingsPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
+  await settingsPage.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+  await settingsPage.goto(baseUrl + '/parametres.html', { waitUntil: 'domcontentloaded' });
+  await settingsPage.waitForSelector('[data-open-template-preview="nova"]', { timeout: 15000 });
+  await settingsPage.click('[data-open-template-preview="nova"]');
+  await settingsPage.waitForFunction(() =>
+    getComputedStyle(document.getElementById('invoice-template-preview-modal')).display !== 'none'
+  );
+  const readPreviewTheme = () => settingsPage.evaluate(() => ({
+    stage: getComputedStyle(document.getElementById('invoice-template-preview-stage')).backgroundColor,
+    dialog: getComputedStyle(document.querySelector('.invoice-template-preview-dialog')).backgroundColor,
+    paper: getComputedStyle(document.querySelector('.invoice-template-preview-full-page')).backgroundColor
+  }));
+  const readGoldBadgeColors = () => settingsPage.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.className = 'plan-soon-badge';
+    probe.textContent = 'Bientôt';
+    document.body.appendChild(probe);
+    const soon = getComputedStyle(probe);
+    const proBadge = document.querySelector('.invoice-template-tier.tier-pro');
+    const pro = proBadge ? getComputedStyle(proBadge) : null;
+    const result = {
+      soonText: soon.color,
+      soonBackground: soon.backgroundColor,
+      proText: pro ? pro.color : null,
+      proBackground: pro ? pro.backgroundColor : null
+    };
+    probe.remove();
+    return result;
+  });
+  const previewLight = await readPreviewTheme();
+  const goldBadgeColorsLight = await readGoldBadgeColors();
+  await settingsPage.evaluate(() => window.SamaTheme.definir('dark'));
+  const previewDark = await readPreviewTheme();
+  const goldBadgeColorsDark = await readGoldBadgeColors();
+  const soonBadgeLightContrast = contrastRatio(goldBadgeColorsLight.soonText, goldBadgeColorsLight.soonBackground);
+  const proBadgeLightContrast = contrastRatio(goldBadgeColorsLight.proText, goldBadgeColorsLight.proBackground);
+  const soonBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.soonText, goldBadgeColorsDark.soonBackground);
+  const proBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.proText, goldBadgeColorsDark.proBackground);
+  for (const [label, contrast] of [
+    ['Disponibilité clair', soonBadgeLightContrast],
+    ['Modèle Pro clair', proBadgeLightContrast],
+    ['Disponibilité sombre', soonBadgeDarkContrast],
+    ['Modèle Pro sombre', proBadgeDarkContrast]
+  ]) {
+    assert.ok(contrast >= 4.5,
+      label + ' doit conserver un contraste de 4,5:1. Valeur : ' + contrast.toFixed(2));
+  }
+  assert.notEqual(previewDark.stage, previewLight.stage,
+    'La scène de prévisualisation doit suivre le thème sombre.');
+  assert.notEqual(previewDark.stage, 'rgb(233, 237, 242)',
+    'La scène de prévisualisation ne doit pas conserver son ancien fond gris clair en thème sombre.');
+  assert.equal(previewDark.dialog, 'rgb(40, 39, 32)',
+    'La fenêtre d’aperçu doit suivre le thème sombre.');
+  assert.equal(previewDark.paper, 'rgb(255, 255, 255)',
+    'La feuille A4 doit rester blanche pour refléter le rendu imprimé.');
+  await settingsPage.screenshot({
+    path: path.join(OUTPUT_DIR, 'parametres-apercu-mode-sombre-1440.png'),
+    fullPage: true
+  });
+  await settingsPage.close();
+
+  return {
+    enterprise: {
+      light, dark, headingContrast: Number(headingContrast.toFixed(2)),
+      sidebarActiveContrast: Number(sidebarActiveContrast.toFixed(2)),
+      sidebarDefaultContrast: Number(sidebarDefaultContrast.toFixed(2))
+    },
+    charts: { finances, reports },
+    settingsPreview: { light: previewLight, dark: previewDark },
+    goldBadges: {
+      light: { colors: goldBadgeColorsLight, soonContrast: Number(soonBadgeLightContrast.toFixed(2)), proContrast: Number(proBadgeLightContrast.toFixed(2)) },
+      dark: { colors: goldBadgeColorsDark, soonContrast: Number(soonBadgeDarkContrast.toFixed(2)), proContrast: Number(proBadgeDarkContrast.toFixed(2)) }
+    },
+    screenshots: 6
+  };
+}
+
 async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   const darkPage = await preparePage(browser, baseUrl, fixtures, false);
   await darkPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
@@ -1816,12 +2102,44 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
     background: getComputedStyle(document.querySelector('.main-content')).backgroundColor,
     card: getComputedStyle(document.querySelector('.dashboard-panel')).backgroundColor,
     text: getComputedStyle(document.querySelector('.dashboard-welcome h1')).color,
+    sidebar: getComputedStyle(document.getElementById('app-sidebar')).backgroundColor,
+    sidebarNav: getComputedStyle(document.querySelector('#app-sidebar .sidebar-nav')).backgroundColor,
+    sidebarLabel: getComputedStyle(document.querySelector('#app-sidebar .nav-item:not(.active) .nav-label')).color,
     horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth
   }));
+  const readDashboardChartColors = () => darkPage.$eval('#chart-evolution', canvas => ({
+    tick: canvas.dataset.sfChartTickColor,
+    grid: canvas.dataset.sfChartGridColor
+  }));
+  const darkChartColors = await readDashboardChartColors();
+  await darkPage.evaluate(() => window.SamaTheme.definir('light'));
+  await darkPage.waitForFunction(previous => {
+    const canvas = document.getElementById('chart-evolution');
+    return canvas && canvas.dataset.sfChartTickColor !== previous.tick &&
+      canvas.dataset.sfChartGridColor !== previous.grid;
+  }, { timeout: 10000 }, darkChartColors);
+  const lightChartColors = await readDashboardChartColors();
+  await darkPage.evaluate(() => window.SamaTheme.definir('dark'));
+  await darkPage.waitForFunction(previous => {
+    const canvas = document.getElementById('chart-evolution');
+    return canvas && canvas.dataset.sfChartTickColor !== previous.tick &&
+      canvas.dataset.sfChartGridColor !== previous.grid;
+  }, { timeout: 10000 }, lightChartColors);
+  const refreshedDarkChartColors = await readDashboardChartColors();
+  assert.notEqual(lightChartColors.tick, darkChartColors.tick,
+    'Les axes du tableau de bord doivent suivre le thème clair.');
+  assert.notEqual(refreshedDarkChartColors.tick, lightChartColors.tick,
+    'Les axes du tableau de bord doivent revenir au thème sombre sans rechargement.');
+
   assert.equal(darkMetrics.theme, 'dark', 'Le thème sombre doit être appliqué avant le rendu du tableau de bord.');
   assert.notEqual(darkMetrics.card, 'rgb(255, 255, 255)', 'Les cartes ne doivent pas rester blanches en thème sombre.');
   assert.equal(darkMetrics.background, 'rgb(29, 28, 24)', 'Le thème sombre doit reprendre le fond graphite de la direction Unslop.');
   assert.equal(darkMetrics.card, 'rgb(40, 39, 32)', 'Les cartes sombres doivent utiliser la teinte papier profonde.');
+  assert.equal(darkMetrics.sidebar, 'rgb(23, 23, 19)', 'Le rail compact ne doit pas rester blanc en thème sombre.');
+  assert.equal(darkMetrics.sidebarNav, 'rgb(23, 23, 19)', 'La navigation compacte doit adopter le fond du rail sombre.');
+  const sidebarContrast = contrastRatio(darkMetrics.sidebarLabel, darkMetrics.sidebar);
+  assert.ok(sidebarContrast >= 4.5,
+    'Les libellés du rail compact doivent garder un contraste de 4,5:1. Valeur : ' + sidebarContrast.toFixed(2));
   assert.equal(darkMetrics.horizontalOverflow, false, 'Le thème sombre ne doit pas créer de débordement.');
   const darkContrast = contrastRatio(darkMetrics.text, darkMetrics.background);
   assert.ok(darkContrast >= 4.5, 'Le contraste du titre doit atteindre 4,5:1 en thème sombre. Valeur : ' + darkContrast.toFixed(2));
@@ -1849,7 +2167,15 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   await zoomPage.screenshot({ path: path.join(OUTPUT_DIR, 'dashboard-zoom-200-effectif-720.png'), fullPage: true });
   await zoomPage.close();
 
-  return { darkTheme: { ...darkMetrics, contrastRatio: Number(darkContrast.toFixed(2)) }, zoom200EffectiveViewport: zoomMetrics };
+  return {
+    darkTheme: {
+      ...darkMetrics,
+      contrastRatio: Number(darkContrast.toFixed(2)),
+      sidebarContrast: Number(sidebarContrast.toFixed(2))
+    },
+    dashboardChartThemes: { dark: darkChartColors, light: lightChartColors, refreshedDark: refreshedDarkChartColors },
+    zoom200EffectiveViewport: zoomMetrics
+  };
 }
 
 async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
@@ -2111,6 +2437,7 @@ async function main() {
     const compactSidebar = await verifyCompactSidebar(browser, baseUrl, fixtures);
     const shell = await verifyWorkspaceShell(browser, baseUrl, fixtures);
     const motion = await verifyMotion(browser, baseUrl, fixtures);
+    const themeConsistency = await verifyThemeConsistency(browser, baseUrl, fixtures);
     const themeAndZoom = await verifyThemeAndZoom(browser, baseUrl, fixtures);
     const documentFlows = await verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures);
     const report = {
@@ -2121,9 +2448,10 @@ async function main() {
       motion,
       compactSidebar,
       workspaceShell: shell,
+      themeConsistency,
       themeAndZoom,
       documentFlows,
-      screenshots: results.length + 2 + publicPages.length + (documentFlows.screenshots || 0),
+      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + (documentFlows.screenshots || 0),
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));

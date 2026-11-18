@@ -1399,3 +1399,422 @@ body.enterprise-console-shell #app-sidebar .nav-item.active .ic {
     display: none;
   }
 }
+
+
+
+/* --------------------------------------------------------------------------
+   Thèmes clair/sombre — centre de pilotage Entreprise.
+   Le bandeau supérieur conserve le bleu nuit de la marque ; le contenu et
+   le rail latéral suivent en revanche exactement le thème de l'application.
+   -------------------------------------------------------------------------- */
+body.enterprise-console-shell {
+  --enterprise-page-bg: #f5f7fa;
+  --enterprise-page-text: #182333;
+  --enterprise-surface: #ffffff;
+  --enterprise-surface-alt: #f4f9fd;
+  --enterprise-text-strong: #18344f;
+  --enterprise-text: #263a50;
+  --enterprise-muted: #637185;
+  --enterprise-muted-soft: #788596;
+  --enterprise-border: #e1e7ed;
+  --enterprise-hover-bg: #f4f9fd;
+  --enterprise-active-bg: #eaf2fb;
+  --enterprise-active-text: #123d67;
+  --enterprise-accent: #187a9c;
+  --enterprise-icon-bg: #eaf3fa;
+  --enterprise-icon-text: #125d92;
+  --enterprise-track: #e8edf2;
+  --enterprise-link: #176991;
+  --enterprise-sidebar-bg: #ffffff;
+  --enterprise-sidebar-text: #526174;
+  --enterprise-sidebar-muted: #697789;
+  --enterprise-sidebar-border: #e1e6ed;
+  --enterprise-sidebar-hover: #f5f8fc;
+  --enterprise-sidebar-active: #eaf2fb;
+  --enterprise-sidebar-active-text: #123d67;
+  --enterprise-sidebar-icon: #526579;
+}
+:root[data-theme="dark"] body.enterprise-console-shell {
+  --enterprise-page-bg: var(--cream);
+  --enterprise-page-text: var(--ink);
+  --enterprise-surface: var(--paper);
+  --enterprise-surface-alt: #302e27;
+  --enterprise-text-strong: var(--ink);
+  --enterprise-text: var(--ink);
+  --enterprise-muted: var(--ink-soft);
+  --enterprise-muted-soft: #c2baad;
+  --enterprise-border: var(--line);
+  --enterprise-hover-bg: #34372f;
+  --enterprise-active-bg: #18382d;
+  --enterprise-active-text: #d7f0e3;
+  --enterprise-accent: #8cbfd8;
+  --enterprise-icon-bg: #18382d;
+  --enterprise-icon-text: #8ed0b1;
+  --enterprise-track: #454238;
+  --enterprise-link: #8cbfd8;
+  --enterprise-sidebar-bg: #171713;
+  --enterprise-sidebar-text: #d6cfc3;
+  --enterprise-sidebar-muted: #a9a397;
+  --enterprise-sidebar-border: #48443a;
+  --enterprise-sidebar-hover: #302e27;
+  --enterprise-sidebar-active: #18382d;
+  --enterprise-sidebar-active-text: #d7f0e3;
+  --enterprise-sidebar-icon: #8ed0b1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body.enterprise-console-shell {
+    --enterprise-page-bg: var(--cream);
+    --enterprise-page-text: var(--ink);
+    --enterprise-surface: var(--paper);
+    --enterprise-surface-alt: #302e27;
+    --enterprise-text-strong: var(--ink);
+    --enterprise-text: var(--ink);
+    --enterprise-muted: var(--ink-soft);
+    --enterprise-muted-soft: #c2baad;
+    --enterprise-border: var(--line);
+    --enterprise-hover-bg: #34372f;
+    --enterprise-active-bg: #18382d;
+    --enterprise-active-text: #d7f0e3;
+    --enterprise-accent: #8cbfd8;
+    --enterprise-icon-bg: #18382d;
+    --enterprise-icon-text: #8ed0b1;
+    --enterprise-track: #454238;
+    --enterprise-link: #8cbfd8;
+    --enterprise-sidebar-bg: #171713;
+    --enterprise-sidebar-text: #d6cfc3;
+    --enterprise-sidebar-muted: #a9a397;
+    --enterprise-sidebar-border: #48443a;
+    --enterprise-sidebar-hover: #302e27;
+    --enterprise-sidebar-active: #18382d;
+    --enterprise-sidebar-active-text: #d7f0e3;
+    --enterprise-sidebar-icon: #8ed0b1;
+  }
+}
+body.enterprise-console-shell {
+  background: var(--enterprise-page-bg) !important;
+  color: var(--enterprise-page-text) !important;
+}
+body.enterprise-console-shell .main-content.enterprise-console-main {
+  background: var(--enterprise-page-bg) !important;
+  color: var(--enterprise-page-text) !important;
+}
+body.enterprise-console-shell .enterprise-dashboard-heading h1,
+body.enterprise-console-shell .group-overview-heading h2,
+body.enterprise-console-shell .enterprise-currency-breakdown-heading h3 {
+  color: var(--enterprise-text-strong) !important;
+}
+body.enterprise-console-shell .enterprise-dashboard-heading p,
+body.enterprise-console-shell .group-overview-heading p,
+body.enterprise-console-shell .enterprise-currency-breakdown-heading p,
+body.enterprise-console-shell .group-disclaimer {
+  color: var(--enterprise-muted) !important;
+}
+body.enterprise-console-shell .enterprise-dashboard-heading .subscription-eyebrow,
+body.enterprise-console-shell .group-section-eyebrow {
+  color: var(--enterprise-accent) !important;
+}
+body.enterprise-console-shell .enterprise-dashboard-heading > button {
+  border-color: var(--enterprise-border) !important;
+  background: var(--enterprise-surface) !important;
+  color: var(--enterprise-text) !important;
+}
+body.enterprise-console-shell .enterprise-module-chip {
+  border-color: var(--enterprise-border) !important;
+  background: var(--enterprise-surface) !important;
+  color: var(--enterprise-text) !important;
+  box-shadow: var(--shadow-xs);
+}
+body.enterprise-console-shell .enterprise-module-chip > span {
+  background: var(--enterprise-icon-bg) !important;
+  color: var(--enterprise-icon-text) !important;
+}
+body.enterprise-console-shell .enterprise-create-actions {
+  border-bottom-color: var(--enterprise-border) !important;
+}
+body.enterprise-console-shell .enterprise-create-actions > strong {
+  color: var(--enterprise-text-strong) !important;
+}
+body.enterprise-console-shell .enterprise-create-actions-list a {
+  border-color: var(--enterprise-border) !important;
+  background: var(--enterprise-surface) !important;
+  color: var(--enterprise-text) !important;
+}
+body.enterprise-console-shell .group-section-nav {
+  border-bottom-color: var(--enterprise-border) !important;
+}
+body.enterprise-console-shell .group-section-nav a {
+  color: var(--enterprise-muted) !important;
+}
+body.enterprise-console-shell .group-section-nav a:focus-visible {
+  background: var(--enterprise-hover-bg) !important;
+  color: var(--enterprise-accent) !important;
+}
+body.enterprise-console-shell .group-panel,
+body.enterprise-console-shell .group-currency-card,
+body.enterprise-console-shell .group-overview-kpi,
+body.enterprise-console-shell .enterprise-dashboard-card,
+body.enterprise-console-shell .enterprise-currency-breakdown .group-currency-card {
+  border-color: var(--enterprise-border) !important;
+  background: var(--enterprise-surface) !important;
+  color: var(--enterprise-text) !important;
+}
+body.enterprise-console-shell .group-overview-kpi span,
+body.enterprise-console-shell .enterprise-dashboard-card-heading p,
+body.enterprise-console-shell .enterprise-dashboard-metric-heading span,
+body.enterprise-console-shell .enterprise-receivable-row > div:first-child span,
+body.enterprise-console-shell .enterprise-dashboard-card .group-performance-row > span,
+body.enterprise-console-shell .enterprise-collection-copy strong,
+body.enterprise-console-shell .enterprise-collection-copy small,
+body.enterprise-console-shell .enterprise-stock-cash-row > div span,
+body.enterprise-console-shell .enterprise-stock-cash-row small {
+  color: var(--enterprise-muted) !important;
+}
+body.enterprise-console-shell .group-overview-kpi strong,
+body.enterprise-console-shell .enterprise-dashboard-card-heading h3,
+body.enterprise-console-shell .enterprise-dashboard-metric-heading strong,
+body.enterprise-console-shell .enterprise-receivable-row > div:first-child strong,
+body.enterprise-console-shell .enterprise-dashboard-card .group-performance-row strong,
+body.enterprise-console-shell .enterprise-collection-copy b,
+body.enterprise-console-shell .enterprise-stock-cash-row > div b,
+body.enterprise-console-shell .enterprise-currency-breakdown-heading h3 {
+  color: var(--enterprise-text-strong) !important;
+}
+body.enterprise-console-shell .group-overview-kpi small,
+body.enterprise-console-shell .enterprise-dashboard-card-body small {
+  color: var(--enterprise-muted-soft) !important;
+}
+body.enterprise-console-shell .group-status-chip {
+  border-color: var(--enterprise-border) !important;
+  background: var(--enterprise-icon-bg) !important;
+  color: var(--enterprise-icon-text) !important;
+}
+body.enterprise-console-shell .enterprise-dashboard-card-icon {
+  background: var(--enterprise-icon-bg) !important;
+  color: var(--enterprise-icon-text) !important;
+}
+body.enterprise-console-shell .enterprise-dashboard-track,
+body.enterprise-console-shell .group-performance-track {
+  background: var(--enterprise-track) !important;
+}
+body.enterprise-console-shell .enterprise-collection-donut {
+  background: conic-gradient(#18ae91 0 var(--ratio), var(--enterprise-track) var(--ratio) 100%) !important;
+}
+body.enterprise-console-shell .enterprise-collection-donut::before {
+  background: var(--enterprise-surface) !important;
+}
+body.enterprise-console-shell .enterprise-collection-donut span {
+  color: var(--enterprise-text-strong) !important;
+}
+body.enterprise-console-shell .enterprise-stock-cash-row,
+body.enterprise-console-shell .enterprise-dashboard-card-link,
+body.enterprise-console-shell .enterprise-currency-breakdown {
+  border-color: var(--enterprise-border) !important;
+}
+body.enterprise-console-shell .enterprise-stock-cash-row > strong,
+body.enterprise-console-shell .enterprise-dashboard-card .group-performance-currency h3 {
+  color: var(--enterprise-accent) !important;
+}
+body.enterprise-console-shell .enterprise-dashboard-card-link {
+  color: var(--enterprise-link) !important;
+}
+body.enterprise-console-shell .group-danger {
+  color: #b33c3c;
+}
+
+/* Le rail latéral est lui aussi synchronisé avec le thème, sur ordinateur et mobile. */
+body.enterprise-console-shell #app-sidebar.sidebar {
+  border-right-color: var(--enterprise-sidebar-border) !important;
+  background: var(--enterprise-sidebar-bg) !important;
+  color: var(--enterprise-sidebar-text) !important;
+}
+body.enterprise-console-shell #app-sidebar .sidebar-brand,
+body.enterprise-console-shell #app-sidebar .sidebar-nav,
+body.enterprise-console-shell #app-sidebar .sidebar-foot {
+  border-color: var(--enterprise-sidebar-border) !important;
+  background: var(--enterprise-sidebar-bg) !important;
+  color: var(--enterprise-sidebar-text) !important;
+}
+body.enterprise-console-shell #app-sidebar .sidebar-brand .name {
+  color: var(--enterprise-text-strong) !important;
+}
+body.enterprise-console-shell #app-sidebar .sidebar-brand .sub,
+body.enterprise-console-shell #app-sidebar .nav-group-label,
+body.enterprise-console-shell #app-sidebar .sidebar-foot {
+  color: var(--enterprise-sidebar-muted) !important;
+}
+body.enterprise-console-shell #app-sidebar .sidebar-brand .mark {
+  border-color: var(--enterprise-sidebar-border) !important;
+  background: var(--enterprise-surface) !important;
+}
+body.enterprise-console-shell #app-sidebar .nav-group-label {
+  background: transparent !important;
+}
+body.enterprise-console-shell #app-sidebar .nav-item {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--enterprise-sidebar-text) !important;
+}
+body.enterprise-console-shell #app-sidebar .nav-item .ic {
+  color: var(--enterprise-sidebar-icon) !important;
+}
+body.enterprise-console-shell #app-sidebar .nav-item.active {
+  border-color: var(--enterprise-sidebar-border) !important;
+  background: var(--enterprise-sidebar-active) !important;
+  color: var(--enterprise-sidebar-active-text) !important;
+}
+body.enterprise-console-shell #app-sidebar .nav-item.active .ic {
+  color: var(--enterprise-sidebar-icon) !important;
+}
+body.enterprise-console-shell #app-sidebar .sidebar-logout {
+  color: var(--enterprise-sidebar-text) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  body.enterprise-console-shell #app-sidebar .nav-item:hover,
+  body.enterprise-console-shell #app-sidebar .sidebar-logout:hover {
+    border-color: var(--enterprise-sidebar-border) !important;
+    background: var(--enterprise-sidebar-hover) !important;
+    color: var(--enterprise-sidebar-active-text) !important;
+  }
+  body.enterprise-console-shell .enterprise-module-chip:hover,
+  body.enterprise-console-shell .enterprise-create-actions-list a:hover {
+    border-color: var(--enterprise-border) !important;
+    background: var(--enterprise-hover-bg) !important;
+  }
+  body.enterprise-console-shell .group-section-nav a:hover {
+    background: var(--enterprise-hover-bg) !important;
+    color: var(--enterprise-accent) !important;
+  }
+}
+
+
+/* Le thème historique du rail utilisait des couleurs prioritaires bleu clair.
+   Cette surcharge plus spécifique garantit le contraste de l'élément actif
+   lorsque le choix sombre est explicite ou hérité du système. */
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-item.active,
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-item.active:hover {
+  border-color: var(--line) !important;
+  background: var(--emerald-light) !important;
+  color: var(--ink) !important;
+}
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-item.active .ic,
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-item.active:hover .ic {
+  color: var(--emerald) !important;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-item.active,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-item.active:hover {
+    border-color: var(--line) !important;
+    background: var(--emerald-light) !important;
+    color: var(--ink) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-item.active .ic,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-item.active:hover .ic {
+    color: var(--emerald) !important;
+  }
+}
+
+
+/* Le rail compact desktop possède des règles plus spécifiques dans style.css.
+   Les reprendre ici garantit que le thème Entreprise garde le bon contraste. */
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--enterprise-sidebar-text) !important;
+}
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item .nav-label {
+  color: inherit !important;
+}
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item .ic {
+  background: transparent !important;
+  color: var(--enterprise-sidebar-icon) !important;
+}
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active,
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active:hover {
+  border-color: var(--enterprise-sidebar-border) !important;
+  background: var(--enterprise-sidebar-active) !important;
+  color: var(--enterprise-sidebar-active-text) !important;
+  box-shadow: none !important;
+}
+body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active .ic {
+  background: transparent !important;
+  color: var(--enterprise-sidebar-icon) !important;
+  box-shadow: none !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):hover,
+  body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):focus-visible {
+    border-color: var(--enterprise-sidebar-border) !important;
+    background: var(--enterprise-sidebar-hover) !important;
+    color: var(--enterprise-sidebar-active-text) !important;
+  }
+}
+
+
+/* Contraste final des liens non actifs du centre Entreprise.
+   Ces sélecteurs plus spécifiques neutralisent les anciennes couleurs fixes du rail,
+   qu'il soit compact sur desktop ou ouvert sur mobile. */
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active),
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active) .nav-label {
+  color: var(--ink-soft) !important;
+}
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active) .ic {
+  color: var(--emerald) !important;
+  background: transparent !important;
+}
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .nav-group-label,
+:root[data-theme="dark"] body.enterprise-console-shell #app-sidebar .sidebar-foot {
+  color: var(--ink-soft) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):hover,
+  :root[data-theme="dark"] body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):focus-visible {
+    border-color: var(--line) !important;
+    background: #302e27 !important;
+    color: var(--ink) !important;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active),
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active) .nav-label {
+    color: var(--ink-soft) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active) .ic {
+    color: var(--emerald) !important;
+    background: transparent !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .nav-group-label,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar .sidebar-foot {
+    color: var(--ink-soft) !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):hover,
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell #app-sidebar.sidebar .nav-item:not(.active):focus-visible {
+      border-color: var(--line) !important;
+      background: #302e27 !important;
+      color: var(--ink) !important;
+    }
+  }
+}
+
+
+/* Dernier niveau du rail Entreprise sombre : les variantes compactes et mobiles
+   héritaient encore d'une ancienne couleur bleu-gris définie dans style.css. */
+:root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active),
+:root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .nav-label {
+  color: #D6CFC3 !important;
+}
+:root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .ic {
+  color: #8ED0B1 !important;
+  background: transparent !important;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active),
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .nav-label {
+    color: #D6CFC3 !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .ic {
+    color: #8ED0B1 !important;
+    background: transparent !important;
+  }
+}

@@ -15,6 +15,37 @@
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 <style>
+  /* Les bulles et avatars gardent un premier plan lisible dans les deux thèmes. */
+  .page-assistant-ia {
+    --ia-contrast-text: #ffffff;
+    --ia-panel-bg: var(--paper);
+    --ia-panel-text: var(--ink);
+    --ia-accent-text: #08694E;
+    --ia-input-bg: transparent;
+    --ia-user-bubble-bg: var(--navy-900);
+    --ia-avatar-gradient: linear-gradient(135deg, var(--navy-900), var(--emerald));
+  }
+  :root[data-theme="dark"] .page-assistant-ia {
+    --ia-contrast-text: #F3EFE6;
+    --ia-panel-bg: #282720;
+    --ia-panel-text: #F3EFE6;
+    --ia-accent-text: #91CDB0;
+    --ia-input-bg: #1D1C18;
+    --ia-user-bubble-bg: #26334D;
+    --ia-avatar-gradient: linear-gradient(135deg, #26334D, #087A57);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) .page-assistant-ia {
+      --ia-contrast-text: #F3EFE6;
+      --ia-panel-bg: #282720;
+      --ia-panel-text: #F3EFE6;
+      --ia-accent-text: #91CDB0;
+      --ia-input-bg: #1D1C18;
+      --ia-user-bubble-bg: #26334D;
+      --ia-avatar-gradient: linear-gradient(135deg, #26334D, #087A57);
+    }
+  }
+
   /* --- Styles spécifiques à l'Assistant IA (connecté à /api/assistant, voir server/routes/assistant.js) --- */
   .ia-shell {
     display: grid;
@@ -33,7 +64,8 @@
   .ia-history {
     display: flex;
     flex-direction: column;
-    background: var(--card-bg, #fff);
+    background: var(--ia-panel-bg);
+    color: var(--ia-panel-text);
     border: 1px solid var(--line);
     border-radius: var(--radius);
     overflow: hidden;
@@ -49,7 +81,7 @@
     border-radius: var(--radius-sm);
     border: 1px dashed var(--emerald);
     background: var(--emerald-light);
-    color: var(--emerald);
+    color: var(--ia-accent-text);
     font-weight: 600;
     cursor: pointer;
     font-size: 0.85rem;
@@ -97,7 +129,8 @@
   .ia-chat {
     display: flex;
     flex-direction: column;
-    background: var(--card-bg, #fff);
+    background: var(--ia-panel-bg);
+    color: var(--ia-panel-text);
     border: 1px solid var(--line);
     border-radius: var(--radius);
     overflow: hidden;
@@ -113,7 +146,8 @@
   .ia-chat-head .who { display: flex; align-items: center; gap: 10px; }
   .ia-avatar-bot {
     width: 36px; height: 36px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--navy-900), var(--emerald));
+    background: var(--ia-avatar-gradient);
+    color: var(--ia-contrast-text);
     display: flex; align-items: center; justify-content: center;
     font-size: 1.05rem; flex-shrink: 0;
   }
@@ -141,8 +175,8 @@
     background: var(--line); color: var(--ink);
   }
   .ia-msg.assistant .ia-avatar-sm {
-    background: linear-gradient(135deg, var(--navy-900), var(--emerald));
-    color: #fff;
+    background: var(--ia-avatar-gradient);
+    color: var(--ia-contrast-text);
   }
   .ia-bubble {
     padding: 11px 14px;
@@ -157,8 +191,8 @@
     border-bottom-left-radius: 4px;
   }
   .ia-msg.user .ia-bubble {
-    background: var(--navy-900);
-    color: #fff;
+    background: var(--ia-user-bubble-bg);
+    color: var(--ia-contrast-text);
     border-bottom-right-radius: 4px;
   }
   .ia-msg-time {
@@ -205,7 +239,7 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  .ia-chip:hover { background: var(--emerald-light); border-color: var(--emerald); color: var(--emerald); }
+  .ia-chip:hover { background: var(--emerald-light); border-color: var(--emerald); color: var(--ia-accent-text); }
 
   .ia-input-bar {
     display: flex;
@@ -223,8 +257,8 @@
     padding: 10px 12px;
     font-family: inherit;
     font-size: 0.9rem;
-    background: transparent;
-    color: var(--ink);
+    background: var(--ia-input-bg);
+    color: var(--ia-panel-text);
   }
   .ia-input-bar textarea:focus { outline: none; border-color: var(--emerald); }
   .ia-send-btn {

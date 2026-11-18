@@ -10,6 +10,7 @@
   --emerald: #0EA980;
   --emerald-light: #E3F6EF;
   --gold: #DDA53F;
+  --gold-text: #76501E;
   --gold-light: #FBF0DC;
   --clay: #E1484F;
   --clay-light: #FBEAEB;
@@ -499,7 +500,7 @@ button, input, select, textarea { font-family: var(--font-body); font-size: 0.95
 .stat-card .stat-delta { font-size: 0.78rem; }
 
 .icon-emerald { background: var(--emerald-light); color: var(--emerald); }
-.icon-gold { background: var(--gold-light); color: #B87415; }
+.icon-gold { background: var(--gold-light); color: var(--gold-text); }
 .icon-clay { background: var(--clay-light); color: var(--clay); }
 .icon-navy { background: #E8ECF7; color: var(--navy-800); }
 
@@ -557,7 +558,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--ink) 3%, var(--paper)); }
 }
 
 .badge-payee { background: var(--emerald-light); color: var(--emerald); }
-.badge-attente { background: var(--gold-light); color: #B87415; }
+.badge-attente { background: var(--gold-light); color: var(--gold); }
 .badge-retard { background: var(--clay-light); color: var(--clay); }
 /* Utilisait auparavant des couleurs fixes (#EFEFEF/#7A7A7A) qui ne s'adaptaient pas au
    mode sombre — remplacées par les tokens du thème. */
@@ -1995,7 +1996,7 @@ textarea { line-height: 1.55; }
 }
 .plan-soon-badge {
   background: var(--gold-light);
-  color: #A66A14;
+  color: var(--gold-text);
 }
 .subscription-plan-card h3 {
   margin: 0 0 5px;
@@ -2173,7 +2174,7 @@ textarea { line-height: 1.55; }
 }
 .subscription-test-heading > .ic {
   display: inline-flex;
-  color: #A66A14;
+  color: var(--gold-text);
   font-size: 1.3rem;
 }
 .subscription-test-heading strong { font-size: 0.85rem; }
@@ -2241,7 +2242,7 @@ textarea { line-height: 1.55; }
 }
 .billing-stat-icon .icon { width: 20px; height: 20px; }
 .tone-emerald { background: var(--emerald-light); color: var(--emerald); }
-.tone-gold { background: var(--gold-light); color: #A66A14; }
+.tone-gold { background: var(--gold-light); color: var(--gold-text); }
 .tone-clay { background: var(--clay-light); color: var(--clay); }
 .billing-stat-label {
   color: var(--ink-soft);
@@ -4916,6 +4917,8 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
     --structural-dark-2: #211F1A;
     --emerald: #087A57;
     --emerald-light: #18382D;
+    --gold: #E7BD6D;
+    --gold-text: #E7BD6D;
     --gold-light: #3A3020;
     --clay-light: #3D2523;
     --workspace-blue: #087A57;
@@ -4944,7 +4947,9 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
   --structural-dark-2: #211F1A;
   --emerald: #087A57;
   --emerald-light: #18382D;
-  --gold-light: #3A3020;
+  --gold: #E7BD6D;
+    --gold-text: #E7BD6D;
+    --gold-light: #3A3020;
   --clay-light: #3D2523;
   --workspace-blue: #087A57;
   --workspace-purple: #087A57;
@@ -6165,6 +6170,8 @@ a.btn .icon {
     --structural-dark-2: #211F1A;
     --emerald: #087A57;
     --emerald-light: #18382D;
+    --gold: #E7BD6D;
+    --gold-text: #E7BD6D;
     --gold-light: #3A3020;
     --clay-light: #3D2523;
     --workspace-blue: #087A57;
@@ -7075,5 +7082,104 @@ a.btn .icon {
   body #app-sidebar.sidebar.is-collapsed .sidebar-nav {
     padding-right: 5px;
     padding-left: 5px;
+  }
+}
+
+
+/* Le rail compact avait conservé un fond blanc historique alors que le reste
+   de l'espace suivait le thème sombre. La bande de marque reste bleue ; la
+   navigation, les libellés, les icônes et le pied suivent maintenant le thème. */
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed {
+  border-right-color: var(--line) !important;
+  background: var(--structural-dark-1) !important;
+  color: var(--ink) !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-nav,
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-foot {
+  border-color: var(--line) !important;
+  background: var(--structural-dark-1) !important;
+  color: var(--ink-soft) !important;
+  scrollbar-color: #625D50 var(--structural-dark-1);
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-group-label {
+  background: var(--line) !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active),
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .nav-label,
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout {
+  color: var(--ink-soft) !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .ic {
+  background: #302E27 !important;
+  color: var(--emerald) !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item.active,
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item.active:hover {
+  border-color: var(--line) !important;
+  background: var(--emerald-light) !important;
+  color: var(--ink) !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item.active .ic {
+  background: transparent !important;
+  color: var(--emerald) !important;
+  box-shadow: none !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):hover,
+  :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):focus-visible,
+  :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout:hover,
+  :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
+    border-color: var(--line) !important;
+    background: #302E27 !important;
+    color: var(--ink) !important;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed {
+    border-right-color: var(--line) !important;
+    background: var(--structural-dark-1) !important;
+    color: var(--ink) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-nav,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-foot {
+    border-color: var(--line) !important;
+    background: var(--structural-dark-1) !important;
+    color: var(--ink-soft) !important;
+    scrollbar-color: #625D50 var(--structural-dark-1);
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-group-label {
+    background: var(--line) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active),
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .nav-label,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout {
+    color: var(--ink-soft) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .ic {
+    background: #302E27 !important;
+    color: var(--emerald) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item.active,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item.active:hover {
+    border-color: var(--line) !important;
+    background: var(--emerald-light) !important;
+    color: var(--ink) !important;
+    box-shadow: none !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item.active .ic {
+    background: transparent !important;
+    color: var(--emerald) !important;
+    box-shadow: none !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):hover,
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):focus-visible,
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout:hover,
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
+      border-color: var(--line) !important;
+      background: #302E27 !important;
+      color: var(--ink) !important;
+    }
   }
 }

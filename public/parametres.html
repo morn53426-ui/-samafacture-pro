@@ -280,7 +280,7 @@
     background: linear-gradient(180deg, color-mix(in srgb, var(--emerald-light) 38%, var(--paper)), var(--paper) 58%);
     box-shadow: 0 10px 27px color-mix(in srgb, var(--emerald) 12%, transparent);
   }
-  .invoice-template-card.is-locked .invoice-template-preview-window { background-color: #e8e9ec; }
+  .invoice-template-card.is-locked .invoice-template-preview-window { background-color: var(--surface-muted); }
   .invoice-template-card-heading {
     display: flex; align-items: flex-start; justify-content: space-between;
     gap: 8px; min-height: 62px; margin-bottom: 11px;
@@ -300,7 +300,7 @@
   }
   .invoice-template-tier.tier-pro {
     border-color: color-mix(in srgb, var(--gold) 35%, var(--line));
-    background: var(--gold-light); color: #8b5b13;
+    background: var(--gold-light); color: var(--gold-text);
   }
   .invoice-template-tier.tier-enterprise {
     border-color: color-mix(in srgb, var(--emerald) 30%, var(--line));
@@ -308,8 +308,8 @@
   }
   .invoice-template-preview-window {
     position: relative; width: 100%; min-height: 300px; overflow: hidden;
-    border: 1px solid #dfe3e9; border-radius: 12px;
-    background: #eef1f4; isolation: isolate;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--surface-muted); isolation: isolate;
   }
   .invoice-template-preview-trigger {
     position: absolute; inset: 0; z-index: 2;
@@ -454,7 +454,7 @@
   }
   .invoice-template-preview-stage {
     flex: 1 1 auto; min-height: 200px; overflow: auto;
-    padding: 18px; background: #e9edf2;
+    padding: 18px; background: var(--surface-muted);
     overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   }
   .invoice-template-preview-scaled {

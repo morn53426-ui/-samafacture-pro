@@ -52,14 +52,14 @@
       <div class="card">
         <h3 style="margin-top:0;">Évolution &amp; prévision (6 derniers mois + 1 mois estimé)</h3>
         <canvas id="chart-finances" height="130" role="img" aria-label="Évolution des recettes et estimation de la prochaine période."></canvas>
-        <p style="margin:10px 0 0; font-size:0.78rem; color:var(--muted, #7A8296);">
+        <p style="margin:10px 0 0; font-size:0.78rem; color:var(--ink-soft);">
           La prévision est une estimation simple basée sur la moyenne des 3 derniers mois de chiffre d'affaires. Ce n'est pas un engagement comptable.
         </p>
       </div>
 
       <div class="card">
         <h3 style="margin-top:0;">Objectif mensuel</h3>
-        <p style="font-size:0.85rem; color:var(--muted, #7A8296); margin-top:0;">
+        <p style="font-size:0.85rem; color:var(--ink-soft); margin-top:0;">
           Fixez un objectif de chiffre d'affaires pour le mois en cours. <i data-icon="alert-triangle" style="color:var(--gold); vertical-align:-0.15em;"></i> Fonctionnalité en aperçu : l'objectif est enregistré uniquement sur cet appareil (aucune synchronisation serveur pour le moment).
         </p>
         <div class="field">
@@ -73,10 +73,10 @@
             <span>Progression</span>
             <span id="objectif-progress-label" class="mono">0 %</span>
           </div>
-          <div style="background:#EDEAE2; border-radius:8px; height:10px; overflow:hidden;">
-            <div id="objectif-progress-bar" style="background:#0FA980; height:100%; width:0%; transition:width .3s;"></div>
+          <div class="finance-goal-track" style="background:var(--line); border-radius:8px; height:10px; overflow:hidden;">
+            <div id="objectif-progress-bar" style="background:var(--emerald); height:100%; width:0%; transition:width .3s;"></div>
           </div>
-          <p style="font-size:0.78rem; color:var(--muted, #7A8296); margin-top:8px;" id="objectif-detail"></p>
+          <p style="font-size:0.78rem; color:var(--ink-soft); margin-top:8px;" id="objectif-detail"></p>
         </div>
       </div>
     </div>
@@ -130,18 +130,31 @@
   }
 
   let chart;
+  let lastChartData = null;
+
+  function financeThemeColor(token, fallback) {
+    return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || fallback;
+  }
+
   async function renderChart(labels, values, previsionLabel) {
+    lastChartData = { labels: labels.slice(), values: values.slice(), previsionLabel };
     await window.chartReady;
     const ctx = document.getElementById('chart-finances');
     if (chart) chart.destroy();
+    const inkSoft = financeThemeColor('--ink-soft', '#655E55');
+    const line = financeThemeColor('--line', '#E6DED2');
+    const salesColor = financeThemeColor('--workspace-blue', financeThemeColor('--emerald', '#087A57'));
+    const forecastColor = financeThemeColor('--gold', '#96713E');
+    const surface = financeThemeColor('--paper', '#FFFEFC');
+    const text = financeThemeColor('--ink', '#24211D');
     chart = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels.length ? labels : ['—'],
         datasets: [{
-          label: 'Chiffre d\'affaires',
+          label: "Chiffre d'affaires",
           data: values.length ? values : [0],
-          backgroundColor: labels.map(l => l === previsionLabel ? '#F5A623' : '#1769F5'),
+          backgroundColor: labels.map(l => l === previsionLabel ? forecastColor : salesColor),
           borderRadius: 6,
           maxBarThickness: 44
         }]
@@ -155,11 +168,24 @@
           show: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } },
           hide: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } }
         },
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, grid: { color: '#EDEAE2' } }, x: { grid: { display: false } } }
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: surface, titleColor: text, bodyColor: text, borderColor: line, borderWidth: 1 }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: line }, ticks: { color: inkSoft } },
+          x: { grid: { display: false }, ticks: { color: inkSoft } }
+        }
       }
     });
   }
+
+  document.addEventListener('sf:theme-change', () => {
+    if (lastChartData) {
+      renderChart(lastChartData.labels, lastChartData.values, lastChartData.previsionLabel)
+        .catch(error => showFatalError(error.message));
+    }
+  });
 
   function renderObjectif(recettesMoisEnCours) {
     const devise = (Api.currentUser() && Api.currentUser().devise) || 'FCFA';

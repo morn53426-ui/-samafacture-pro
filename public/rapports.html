@@ -95,6 +95,49 @@
   let currentRows = [];
   let currentGroupBy = 'month';
 
+  function reportsThemeColor(token, fallback) {
+    return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || fallback;
+  }
+
+  async function renderSalesChart(rows) {
+    await window.chartReady;
+    if (chart) chart.destroy();
+    const inkSoft = reportsThemeColor('--ink-soft', '#655E55');
+    const line = reportsThemeColor('--line', '#E6DED2');
+    const surface = reportsThemeColor('--paper', '#FFFEFC');
+    const text = reportsThemeColor('--ink', '#24211D');
+    const salesColor = reportsThemeColor('--workspace-blue', reportsThemeColor('--emerald', '#087A57'));
+    chart = new Chart(document.getElementById('chart-ventes'), {
+      type: 'bar',
+      data: {
+        labels: rows.length ? rows.map(r => r.label) : ['—'],
+        datasets: [{ label: 'Total', data: rows.length ? rows.map(r => r.total) : [0], backgroundColor: salesColor, borderRadius: 6, maxBarThickness: 44 }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        transitions: {
+          active: { animation: { duration: 0 } },
+          resize: { animation: { duration: 0 } },
+          show: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } },
+          hide: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: surface, titleColor: text, bodyColor: text, borderColor: line, borderWidth: 1 }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: line }, ticks: { color: inkSoft } },
+          x: { grid: { display: false }, ticks: { color: inkSoft } }
+        }
+      }
+    });
+  }
+
+  document.addEventListener('sf:theme-change', () => {
+    renderSalesChart(currentRows).catch(error => showFatalError(error.message));
+  });
+
   async function loadComptabilite() {
     const from = document.getElementById('from').value;
     const to = document.getElementById('to').value;
@@ -123,27 +166,7 @@
     const labels = { day: 'jour', week: 'semaine', month: 'mois', year: 'année', client: 'client', produit: 'produit' };
     document.getElementById('chart-title').textContent = `Ventes par ${labels[group_by]}`;
 
-    await window.chartReady;
-    if (chart) chart.destroy();
-    chart = new Chart(document.getElementById('chart-ventes'), {
-      type: 'bar',
-      data: {
-        labels: rows.length ? rows.map(r => r.label) : ['—'],
-        datasets: [{ label: 'Total', data: rows.length ? rows.map(r => r.total) : [0], backgroundColor: '#1769F5', borderRadius: 6, maxBarThickness: 44 }]
-      },
-      options: {
-        responsive: true,
-        animation: false,
-        transitions: {
-          active: { animation: { duration: 0 } },
-          resize: { animation: { duration: 0 } },
-          show: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } },
-          hide: { animations: { colors: { duration: 0 }, x: { duration: 0 }, y: { duration: 0 } } }
-        },
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, grid: { color: '#EDEAE2' } }, x: { grid: { display: false } } }
-      }
-    });
+    renderSalesChart(rows).catch(error => showFatalError(error.message));
 
     const isProduit = group_by === 'produit';
     const firstColumnLabel = isProduit
