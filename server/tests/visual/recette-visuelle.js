@@ -2261,6 +2261,41 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         typeof image.decode === 'function' ? image.decode().catch(() => {}) : Promise.resolve()
       ));
     });
+
+    const lireTypographie = () => page.evaluate(() => {
+      const documentNode = document.querySelector('.invoice-doc');
+      const displayNode = document.querySelector('.invoice-doc h1, .invoice-doc h2, .invoice-doc h3') || documentNode;
+      const monoNode = document.querySelector('.invoice-doc .mono') || documentNode;
+      const rootStyle = getComputedStyle(document.documentElement);
+      return {
+        bodyFamily: getComputedStyle(documentNode).fontFamily,
+        displayFamily: getComputedStyle(displayNode).fontFamily,
+        monoFamily: getComputedStyle(monoNode).fontFamily,
+        bodyToken: rootStyle.getPropertyValue('--font-body').trim(),
+        displayToken: rootStyle.getPropertyValue('--font-display').trim(),
+        monoToken: rootStyle.getPropertyValue('--font-mono').trim(),
+        fontStatus: document.fonts ? document.fonts.status : 'unsupported'
+      };
+    });
+    await page.evaluate(() => window.SamaTheme.definir('light'));
+    await page.evaluate(async () => { if (document.fonts?.ready) await document.fonts.ready; });
+    const typographyLight = await lireTypographie();
+    await page.evaluate(() => window.SamaTheme.definir('dark'));
+    await page.evaluate(async () => { if (document.fonts?.ready) await document.fonts.ready; });
+    const typographyDark = await lireTypographie();
+    assert.equal(typographyDark.bodyToken, typographyLight.bodyToken,
+      type + ' : la police de corps doit rester identique en thème clair et sombre.');
+    assert.equal(typographyDark.displayToken, typographyLight.displayToken,
+      type + ' : la police des titres doit rester identique en thème clair et sombre.');
+    assert.equal(typographyDark.monoToken, typographyLight.monoToken,
+      type + ' : la police des montants doit rester identique en thème clair et sombre.');
+    assert.ok(typographyLight.bodyFamily.includes('IBM Plex Sans'),
+      type + ' : la facture doit utiliser la pile de police de corps prévue.');
+    assert.ok(typographyLight.monoFamily.includes('IBM Plex Mono'),
+      type + ' : les montants et références doivent utiliser la pile monospace prévue.');
+    await page.evaluate(() => window.SamaTheme.definir('light'));
+    await page.evaluate(async () => { if (document.fonts?.ready) await document.fonts.ready; });
+
     const screenMetrics = await page.evaluate(() => ({
       title: document.title,
       lineCount: document.querySelectorAll('.invoice-doc .sf-document-table tbody tr').length,
@@ -2276,6 +2311,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       validityLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Validité du devis'),
       dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance')
     }));
+    screenMetrics.typography = { light: typographyLight, dark: typographyDark };
     assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),
       type + ' : toutes les lignes doivent être rendues avant l’impression : ' + JSON.stringify(screenMetrics));
     assert.ok(screenMetrics.documentWidth <= screenMetrics.viewportWidth + 1,
@@ -2314,19 +2350,29 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         : 'none',
       tableHeaderDisplay: getComputedStyle(document.querySelector('.sf-document-table thead')).display,
       pageRule: getComputedStyle(document.querySelector('.invoice-doc')).breakInside,
-      overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX
+      overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX,
+      bodyFont: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily,
+      monoFont: getComputedStyle(document.querySelector('.invoice-doc .mono')).fontFamily,
+      fontStatus: document.fonts ? document.fonts.status : 'unsupported',
+      documentPadding: getComputedStyle(document.querySelector('.invoice-doc')).padding
     }));
     assert.equal(printMetrics.toolbarDisplay, 'none', type + ' : la barre d’outils ne doit jamais être imprimée.');
     assert.equal(printMetrics.themeToggleDisplay, 'none', type + ' : le sélecteur de thème ne doit jamais recouvrir le document imprimé.');
     assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
       type + ' : l’en-tête du tableau doit être répété lorsque le document passe sur une nouvelle page.');
     assert.equal(printMetrics.overflowX, 'visible', type + ' : le document ne doit pas être coupé horizontalement à l’impression.');
+    assert.equal(printMetrics.bodyFont, typographyLight.bodyFamily,
+      type + ' : le document imprimé doit conserver la police de corps de l’aperçu papier.');
+    assert.equal(printMetrics.monoFont, typographyLight.monoFamily,
+      type + ' : les montants imprimés doivent conserver leur police monospace.');
+    assert.equal(printMetrics.fontStatus, 'loaded',
+      type + ' : les polices doivent avoir fini de se charger avant l’impression.');
 
     const pdf = await page.pdf({
       format: 'A4',
+      // Les dimensions et marges sont centralisées dans @page de facture-detail.html.
       preferCSSPageSize: true,
       printBackground: true,
-      margin: { top: '12mm', bottom: '14mm', left: '12mm', right: '12mm' },
       scale: 1
     });
     // Puppeteer 25 peut renvoyer un Uint8Array plutôt qu'un Buffer : normaliser
@@ -2337,11 +2383,20 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     const pdfSource = pdfBuffer.toString('latin1');
     const pages = (pdfSource.match(/\/Type\s*\/Page\b/g) || []).length;
     assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
+    const mediaBox = pdfSource.match(/\/MediaBox\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]/);
+    assert.ok(mediaBox, type + ' : le PDF doit déclarer une zone de page.');
+    const pdfPageSize = {
+      widthPt: Number(mediaBox[3]) - Number(mediaBox[1]),
+      heightPt: Number(mediaBox[4]) - Number(mediaBox[2])
+    };
+    assert.ok(Math.abs(pdfPageSize.widthPt - 595.28) <= 2 &&
+      Math.abs(pdfPageSize.heightPt - 841.89) <= 2,
+      type + ' : chaque document doit être généré au vrai format A4 portrait : ' + JSON.stringify(pdfPageSize));
     if (type === 'devis') {
       assert.ok(pages >= 2, 'Le devis long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
     }
     fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdfBuffer);
-    return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
+    return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages, pdfPageSize };
   }
 
   const invoicePdf = await verifyDocumentPdf(987, 'facture');
