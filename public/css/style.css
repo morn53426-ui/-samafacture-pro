@@ -4907,6 +4907,9 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
     color-scheme: dark;
     --cream: #1D1C18;
     --paper: #282720;
+    --font-display: 'IBM Plex Sans', sans-serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
     --ink: #F3EFE6;
     --ink-soft: #C2BAAD;
     --line: #48443A;
