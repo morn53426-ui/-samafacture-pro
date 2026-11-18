@@ -1931,7 +1931,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     const assistantAvatar = document.querySelector('.page-assistant-ia .ia-msg.assistant .ia-avatar-sm');
     const headerAvatar = document.querySelector('.page-assistant-ia .ia-avatar-bot');
     const firstGradientStop = (element) => {
-      const match = getComputedStyle(element).backgroundImage.match(/rgb\\([^)]+\\)/);
+      const match = getComputedStyle(element).backgroundImage.match(/rgb\([^)]+\)/);
       return match ? match[0] : null;
     };
     return {
