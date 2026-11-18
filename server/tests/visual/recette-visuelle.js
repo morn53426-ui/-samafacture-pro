@@ -3398,6 +3398,8 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
 
       assert.equal(metrics.theme, theme,
         pageDefinition.name + ' ne conserve pas le thème ' + theme + ' dans l’audit clavier.');
+      assert.equal(metrics.colorScheme, theme,
+        pageDefinition.name + ' ne conserve pas color-scheme: ' + theme + ' dans l’audit clavier.');
       assert.equal(keyboardCycleCompleted, true,
         pageDefinition.name + ' : le parcours Tab ne boucle pas après tous les contrôles visibles (' +
         keyboardTraversal.length + '/' + focusableCount + ').');
@@ -3780,7 +3782,7 @@ async function main() {
       businessPagesDarkThemeZoom200,
       accessibility,
       documentFlows,
-      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessLightThemeDesktop.screenshots + businessDarkThemeMobile.screenshots + businessLightThemeMobile.screenshots + businessPagesZoom200.screenshots + businessPagesDarkThemeZoom200.screenshots + accessibility.pageCount + (documentFlows.screenshots || 0),
+      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessLightThemeDesktop.screenshots + businessDarkThemeMobile.screenshots + businessLightThemeMobile.screenshots + businessPagesZoom200.screenshots + businessPagesDarkThemeZoom200.screenshots + accessibility.runCount + (documentFlows.screenshots || 0),
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
