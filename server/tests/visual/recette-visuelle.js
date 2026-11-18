@@ -194,11 +194,9 @@ const CHART_STUB = [
   '    constructor(canvas, config) {',
   '      canvas.dataset.sfChartAnimation = config.options && config.options.animation === false ? "disabled" : "enabled";',
   '      canvas.dataset.sfChartResponsive = String(config.options && config.options.responsive === true);',
-  '      canvas.dataset.sfChartType = config.type || "unknown";
-      canvas.dataset.sfChartTickColor = config.options && config.options.scales && config.options.scales.y && config.options.scales.y.ticks
-        ? String(config.options.scales.y.ticks.color || '') : '';
-      canvas.dataset.sfChartGridColor = config.options && config.options.scales && config.options.scales.y && config.options.scales.y.grid
-        ? String(config.options.scales.y.grid.color || '') : '';',
+  '      canvas.dataset.sfChartType = config.type || "unknown";',
+  '      canvas.dataset.sfChartTickColor = config.options && config.options.scales && config.options.scales.y && config.options.scales.y.ticks ? String(config.options.scales.y.ticks.color || "") : "";',
+  '      canvas.dataset.sfChartGridColor = config.options && config.options.scales && config.options.scales.y && config.options.scales.y.grid ? String(config.options.scales.y.grid.color || "") : "";',
   '      const context = canvas.getContext("2d");',
   '      const rect = canvas.getBoundingClientRect();',
   '      const width = Math.max(1, Math.floor(rect.width));',
