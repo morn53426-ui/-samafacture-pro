@@ -317,10 +317,46 @@ describe('Impression et génération PDF', () => {
       'La génération PDF serveur doit aussi ignorer le thème sombre mémorisé.');
   });
 
-  test("l'impression conserve les couleurs des modèles et évite de couper le pied de page", () => {
-    assert.match(cssSource, /@media print[\s\S]*?\.invoice-doc[\s\S]*?--navy-950:\s*#24211D/);
-    assert.match(cssSource, /print-color-adjust:\s*exact !important/);
+  test("les polices écran et PDF utilisent les familles réellement chargées", () => {
+    assert.match(cssSource, /@import url\('https:\/\/fonts\.googleapis\.com\/css2\?family=IBM\+Plex\+Mono/);
+    assert.match(cssSource, /--font-display:\s*'IBM Plex Sans', Arial, sans-serif/);
+    assert.match(cssSource, /--font-body:\s*'IBM Plex Sans', Arial, sans-serif/);
+    assert.match(cssSource, /--font-mono:\s*'IBM Plex Mono', 'Courier New', monospace/);
+    assert.doesNotMatch(cssSource, /--font-(?:display|body|mono):\s*'(?:Manrope|Inter|JetBrains Mono)'/,
+      'Les variables ne doivent pas demander des polices qui ne sont pas chargées.');
+  });
+
+  test("la police personnalisée pilote également les titres qui utilisent les variables du modèle", () => {
+    const model = createFactureTemplates({
+      escapeHtml: (s) => String(s ?? ''),
+      formatMontant: (n) => String(n ?? 0) + ' FCFA',
+      formatDate: (d) => String(d ?? ''),
+      statutBadge: () => '<span class="badge">Test</span>'
+    });
+    const html = model.renderInvoiceHtml({
+      user: { nom: 'Entreprise', entreprise_nom: 'Entreprise' },
+      facture: { numero: 'FA-TEST', sous_total: 100, total_tva: 18, total: 118, statut: 'en_attente' },
+      lignes: [{ designation: 'Prestation', quantite: 1, prix_unitaire: 100, tva: 18, total_ligne: 118 }],
+      isDevis: false,
+      template: 'classique',
+      personnalisation: { police: 'serif' }
+    });
+    assert.match(html, /--font-display:Georgia, "Times New Roman", serif/);
+    assert.match(html, /--font-body:Georgia, "Times New Roman", serif/);
+    assert.match(html, /font-family:Georgia, "Times New Roman", serif/);
+  });
+
+  test("l'impression A4 utilise une seule marge, une taille lisible et une pagination ciblée", () => {
+    assert.match(pageSource, /@page\s*\{\s*size:\s*A4 portrait;\s*margin:\s*12mm 12mm 14mm;/);
+    assert.match(pageSource, /padding:\s*0 !important/);
+    assert.match(cssSource, /@media print[\s\S]*?\.invoice-doc[\s\S]*?font-size:\s*10pt !important/);
+    assert.match(cssSource, /font-size:\s*9pt !important/);
     assert.match(cssSource, /\.invoice-doc \.sf-document-table thead\s*\{\s*display:\s*table-header-group !important;/);
+    assert.doesNotMatch(cssSource, /\.invoice-doc \.grid,\s*\.invoice-doc \.sf-totals/,
+      'Les grilles ordinaires ne doivent plus être forcées à rester indivisibles sur une page.');
+    assert.doesNotMatch(pdfSource, /margin:\s*\{\s*top:/,
+      'Puppeteer ne doit pas redéfinir des marges déjà fixées par @page.');
+    assert.match(pdfSource, /preferCSSPageSize:\s*true/);
     assert.match(rendererSource, /class="sf-doc-footer"/,
       'Le pied de facture doit rester groupé lors des sauts de page.');
   });
