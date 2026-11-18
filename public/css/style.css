@@ -10,6 +10,7 @@
   --emerald: #0EA980;
   --emerald-light: #E3F6EF;
   --gold: #DDA53F;
+  --gold-text: #76501E;
   --gold-light: #FBF0DC;
   --clay: #E1484F;
   --clay-light: #FBEAEB;
@@ -499,7 +500,7 @@ button, input, select, textarea { font-family: var(--font-body); font-size: 0.95
 .stat-card .stat-delta { font-size: 0.78rem; }
 
 .icon-emerald { background: var(--emerald-light); color: var(--emerald); }
-.icon-gold { background: var(--gold-light); color: var(--gold); }
+.icon-gold { background: var(--gold-light); color: var(--gold-text); }
 .icon-clay { background: var(--clay-light); color: var(--clay); }
 .icon-navy { background: #E8ECF7; color: var(--navy-800); }
 
@@ -1995,7 +1996,7 @@ textarea { line-height: 1.55; }
 }
 .plan-soon-badge {
   background: var(--gold-light);
-  color: var(--gold);
+  color: var(--gold-text);
 }
 .subscription-plan-card h3 {
   margin: 0 0 5px;
@@ -2173,7 +2174,7 @@ textarea { line-height: 1.55; }
 }
 .subscription-test-heading > .ic {
   display: inline-flex;
-  color: var(--gold);
+  color: var(--gold-text);
   font-size: 1.3rem;
 }
 .subscription-test-heading strong { font-size: 0.85rem; }
@@ -2241,7 +2242,7 @@ textarea { line-height: 1.55; }
 }
 .billing-stat-icon .icon { width: 20px; height: 20px; }
 .tone-emerald { background: var(--emerald-light); color: var(--emerald); }
-.tone-gold { background: var(--gold-light); color: var(--gold); }
+.tone-gold { background: var(--gold-light); color: var(--gold-text); }
 .tone-clay { background: var(--clay-light); color: var(--clay); }
 .billing-stat-label {
   color: var(--ink-soft);
@@ -4917,6 +4918,7 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
     --emerald: #087A57;
     --emerald-light: #18382D;
     --gold: #E7BD6D;
+    --gold-text: #E7BD6D;
     --gold-light: #3A3020;
     --clay-light: #3D2523;
     --workspace-blue: #087A57;
@@ -4946,6 +4948,7 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
   --emerald: #087A57;
   --emerald-light: #18382D;
   --gold: #E7BD6D;
+    --gold-text: #E7BD6D;
     --gold-light: #3A3020;
   --clay-light: #3D2523;
   --workspace-blue: #087A57;
@@ -6168,6 +6171,7 @@ a.btn .icon {
     --emerald: #087A57;
     --emerald-light: #18382D;
     --gold: #E7BD6D;
+    --gold-text: #E7BD6D;
     --gold-light: #3A3020;
     --clay-light: #3D2523;
     --workspace-blue: #087A57;
