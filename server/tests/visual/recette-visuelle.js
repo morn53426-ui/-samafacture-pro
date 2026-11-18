@@ -3273,14 +3273,18 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
         for (const element of textCandidates) {
           const ownStyle = getComputedStyle(element);
           const foreground = parseColor(ownStyle.color);
-          if (!foreground || foreground.a < 0.95) continue;
+          if (!foreground || foreground.a <= 0) continue;
+          const fontSize = Number.parseFloat(ownStyle.fontSize) || 15;
+          const fontWeight = Number.parseInt(ownStyle.fontWeight, 10) || 400;
+          const largeText = fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
+          const required = largeText ? 3 : 4.5;
           let ancestor = element;
           let background = null;
-          let gradient = false;
+          let gradientImage = null;
           while (ancestor) {
             const style = getComputedStyle(ancestor);
             if (style.backgroundImage && style.backgroundImage !== 'none') {
-              gradient = true;
+              gradientImage = style.backgroundImage;
               break;
             }
             const color = parseColor(style.backgroundColor);
@@ -3290,20 +3294,38 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             }
             ancestor = ancestor.parentElement;
           }
-          if (gradient || element.closest(
-            '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
-          )) {
-            unmeasurableContrast.push(selectorFor(element));
+          if (gradientImage) {
+            const gradientStops = Array.from(gradientImage.matchAll(/rgba?\\(([^)]+)\\)/g))
+              .map(match => parseColor('rgb(' + match[1] + ')'))
+              .filter(Boolean);
+            if (!gradientStops.length) {
+              unmeasurableContrast.push(selectorFor(element));
+              continue;
+            }
+            const ratios = gradientStops.map(stop => {
+              const renderedForeground = foreground.a < 1 ? composite(foreground, stop) : foreground;
+              return contrastRatio(renderedForeground, stop);
+            });
+            const ratio = Math.min(...ratios);
+            if (ratio + 0.01 < required) {
+              contrastIssues.push({
+                selector: selectorFor(element),
+                text: textOf(element).slice(0, 80),
+                foreground: ownStyle.color,
+                background: gradientImage,
+                ratio: Number(ratio.toFixed(2)),
+                required
+              });
+            }
             continue;
           }
           if (!background) background = parseColor(getComputedStyle(document.body).backgroundColor);
-          if (!background) continue;
+          if (!background) {
+            unmeasurableContrast.push(selectorFor(element));
+            continue;
+          }
           const renderedForeground = foreground.a < 1 ? composite(foreground, background) : foreground;
           const ratio = contrastRatio(renderedForeground, background);
-          const fontSize = Number.parseFloat(ownStyle.fontSize) || 15;
-          const fontWeight = Number.parseInt(ownStyle.fontWeight, 10) || 400;
-          const largeText = fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
-          const required = largeText ? 3 : 4.5;
           if (ratio + 0.01 < required) {
             contrastIssues.push({
               selector: selectorFor(element),
