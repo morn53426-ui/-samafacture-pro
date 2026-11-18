@@ -5989,7 +5989,9 @@ a.btn .icon {
   .invoice-doc .sf-document-table th,
   .invoice-doc .sf-document-table td {
     padding: 6px 6px !important;
-    font-size: 8.5pt !important;
+    /* Taille proportionnelle : conserve le niveau de lecture A4 (8,5 pt par défaut)
+       tout en respectant le réglage petit / normal / grand du document. */
+    font-size: .895em !important;
     line-height: 1.35 !important;
     overflow-wrap: anywhere !important;
   }
