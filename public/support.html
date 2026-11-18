@@ -6,7 +6,7 @@
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
 <title>Support technique — OptiGest</title>
-<meta name="description" content="Besoin d'aide avec OptiGest ? Contactez notre équipe par email ou WhatsApp, réponse sous 24h ouvrées en général." />
+<meta name="description" content="Besoin d’aide avec OptiGest ? Consultez le centre d’aide et préparez une demande au support technique." />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="index, follow" />
 <link rel="stylesheet" href="css/style.css" />
@@ -59,7 +59,7 @@
             <div class="stat-icon icon-emerald" style="flex-shrink:0;"><i data-icon="mail"></i></div>
             <div>
               <div style="font-weight:600;">Email</div>
-              <div style="color:var(--ink-soft); font-size:0.88rem;">Assistance par e-mail</div>
+              <div style="color:var(--ink-soft); font-size:0.88rem;">Adresse officielle en cours de configuration</div>
             </div>
           </div>
           <div style="display:flex; gap:12px; align-items:flex-start;">
@@ -100,6 +100,7 @@
   <div class="lp-footer-bottom">© 2026 OptiGest. Tous droits réservés.</div>
 </footer>
 
+<script src="js/brand-config.js"></script>
 <script src="js/api.js"></script>
 <script src="js/pwa.js"></script>
 <script>
@@ -108,15 +109,20 @@
 
   document.getElementById('support-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const sujet = document.getElementById('sujet').value;
-    const email = document.getElementById('email').value;
-    const message = document.getElementById('message').value;
+    const supportEmail = String(window.OPTIGEST_CONFIG?.supportEmail || '').trim();
+    if (!supportEmail) {
+      document.getElementById('msg').innerHTML = `<div class="error-box" role="alert">Le support par e-mail n’est pas encore configuré. Consultez le centre d’aide ou contactez l’administrateur de votre espace.</div>`;
+      return;
+    }
 
-    const body = `De : ${email}\n\n${message}`;
-    const mailto = `mailto:support@samafacture.pro?subject=${encodeURIComponent('[OptiGest] ' + sujet)}&body=${encodeURIComponent(body)}`;
+    const sujet = document.getElementById('sujet').value;
+    const email = document.getElementById('email').value.trim();
+    const message = document.getElementById('message').value.trim();
+    const body = `De : ${email}\\n\\n${message}`;
+    const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent('[OptiGest] ' + sujet)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
 
-    document.getElementById('msg').innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:0.85rem;">Votre messagerie va s'ouvrir avec le message pré-rempli ✓</div>`;
+    document.getElementById('msg').innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:0.85rem;">Votre messagerie va s’ouvrir avec le message pré-rempli.</div>`;
   });
 </script>
 </body>
