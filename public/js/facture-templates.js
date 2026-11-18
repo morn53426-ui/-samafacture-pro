@@ -73,7 +73,14 @@ function createFactureTemplates(helpers) {
     if (!personnalisation) return html;
     const decls = [];
     const police = POLICES_AUTORISEES[personnalisation.police];
-    if (police) decls.push(`font-family:${police}`);
+    if (police) {
+      // Les modèles utilisent parfois var(--font-display) dans leurs titres inline.
+      // Poser les variables sur le conteneur fait suivre le choix de police à ces titres
+      // comme au texte courant, au lieu de ne changer que les éléments qui héritent.
+      decls.push(`--font-display:${police}`);
+      decls.push(`--font-body:${police}`);
+      decls.push(`font-family:${police}`);
+    }
     const taille = TAILLES_TEXTE[personnalisation.taille_texte];
     if (taille) decls.push(`font-size:${taille}`);
     const epaisseur = EPAISSEURS_TEXTE[personnalisation.epaisseur_texte];
