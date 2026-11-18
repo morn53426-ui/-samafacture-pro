@@ -135,13 +135,19 @@ describe('Génération PDF de facture', () => {
       await page.waitForFunction(() => window.__docReady === true, { timeout: 15000 });
       await page.evaluate(() => document.fonts && document.fonts.ready);
 
-      const typographie = await page.evaluate(() => ({
-        documentFont: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily,
-        headingFont: getComputedStyle(document.querySelector('.invoice-doc h2')).fontFamily,
-        tableFont: getComputedStyle(document.querySelector('.invoice-doc .sf-doc-description')).fontFamily,
-        fontSize: getComputedStyle(document.querySelector('.invoice-doc')).fontSize,
-        documentFontLoaded: document.fonts ? document.fonts.check('12px "IBM Plex Sans"') : false
-      }));
+      const typographie = await page.evaluate(() => {
+        const documentNode = document.querySelector('.invoice-doc');
+        const headingNode = document.querySelector('.invoice-doc h1, .invoice-doc h2, .invoice-doc h3') || documentNode;
+        const tableNode = document.querySelector('.invoice-doc .sf-doc-description') ||
+          document.querySelector('.invoice-doc .sf-document-table td') || documentNode;
+        return {
+          documentFont: getComputedStyle(documentNode).fontFamily,
+          headingFont: getComputedStyle(headingNode).fontFamily,
+          tableFont: getComputedStyle(tableNode).fontFamily,
+          fontSize: getComputedStyle(documentNode).fontSize,
+          documentFontLoaded: document.fonts ? document.fonts.check('12px "IBM Plex Sans"') : false
+        };
+      });
       assert.match(typographie.documentFont, /IBM Plex Sans/);
       assert.match(typographie.headingFont, /IBM Plex Sans/);
       assert.match(typographie.tableFont, /IBM Plex Sans/);

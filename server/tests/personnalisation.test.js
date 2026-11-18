@@ -100,7 +100,7 @@ describe('Personnalisation des modèles (couleurs / logo / police)', () => {
     const html = rendre('classique', {
       police: 'serif', taille_texte: 'grand', epaisseur_texte: 'gras', couleur_texte: '#222222'
     });
-    assert.match(html, /<div style="font-family:Georgia.*font-size:110%.*font-weight:700.*color:#222222;">/);
+    assert.match(html, /<div style="--font-display:Georgia, 'Times New Roman', serif; --font-body:Georgia, 'Times New Roman', serif; font-family:Georgia, 'Times New Roman', serif; font-size:110%; font-weight:700; color:#222222;">/);
   });
 
   test('tous les modèles se rendent sans erreur avec une personnalisation complète', () => {

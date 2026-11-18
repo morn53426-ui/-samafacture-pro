@@ -36,8 +36,8 @@ function createFactureTemplates(helpers) {
   const POLICES_AUTORISEES = {
     defaut: null,
     sans: 'Arial, Helvetica, sans-serif',
-    serif: 'Georgia, "Times New Roman", serif',
-    mono: '"Courier New", Courier, monospace'
+    serif: "Georgia, 'Times New Roman', serif",
+    mono: "'Courier New', Courier, monospace"
   };
   const TAILLES_TEXTE = { petit: '92%', normal: '100%', grand: '110%' };
   const EPAISSEURS_TEXTE = { normal: '400', moyen: '500', gras: '700' };

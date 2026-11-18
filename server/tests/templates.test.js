@@ -341,9 +341,12 @@ describe('Impression et génération PDF', () => {
       template: 'classique',
       personnalisation: { police: 'serif' }
     });
-    assert.match(html, /--font-display:Georgia, "Times New Roman", serif/);
-    assert.match(html, /--font-body:Georgia, "Times New Roman", serif/);
-    assert.match(html, /font-family:Georgia, "Times New Roman", serif/);
+    assert.match(html, /--font-display:Georgia, 'Times New Roman', serif/);
+    assert.match(html, /--font-body:Georgia, 'Times New Roman', serif/);
+    assert.match(html, /font-family:Georgia, 'Times New Roman', serif/);
+    const wrapperOpeningTag = html.slice(0, html.indexOf('>') + 1);
+    assert.equal((wrapperOpeningTag.match(/"/g) || []).length, 2,
+      'Les piles de polices ne doivent pas casser les guillemets de l’attribut style HTML.');
   });
 
   test("l'impression A4 utilise une seule marge, une taille lisible et une pagination ciblée", () => {
