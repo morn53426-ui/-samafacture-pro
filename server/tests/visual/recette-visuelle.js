@@ -1965,7 +1965,13 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
       assistantAvatarText: getComputedStyle(assistantAvatar).color,
       assistantAvatarGradient: firstGradientStop(assistantAvatar),
       headerAvatarText: getComputedStyle(headerAvatar).color,
-      headerAvatarGradient: firstGradientStop(headerAvatar)
+      headerAvatarGradient: firstGradientStop(headerAvatar),
+      historyBackground: getComputedStyle(document.querySelector('.ia-history')).backgroundColor,
+      chatBackground: getComputedStyle(document.querySelector('.ia-chat')).backgroundColor,
+      historyHeading: getComputedStyle(document.querySelector('.ia-history-head h3')).color,
+      chatHeading: getComputedStyle(document.querySelector('.ia-chat-head .name')).color,
+      newButtonText: getComputedStyle(document.querySelector('.ia-new-btn')).color,
+      newButtonBackground: getComputedStyle(document.querySelector('.ia-new-btn')).backgroundColor
     };
   });
   const assistantLight = await readAssistantTheme();
@@ -1975,6 +1981,21 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     const userContrast = contrastRatio(metrics.userText, metrics.userBackground);
     const avatarContrast = contrastRatio(metrics.assistantAvatarText, metrics.assistantAvatarGradient);
     const headerContrast = contrastRatio(metrics.headerAvatarText, metrics.headerAvatarGradient);
+    const historyContrast = contrastRatio(metrics.historyHeading, metrics.historyBackground);
+    const chatContrast = contrastRatio(metrics.chatHeading, metrics.chatBackground);
+    const newButtonContrast = contrastRatio(metrics.newButtonText, metrics.newButtonBackground);
+    assert.ok(historyContrast >= 4.5,
+      'Le titre de l’historique doit rester lisible en thème ' + label + '. Contraste : ' + historyContrast.toFixed(2));
+    assert.ok(chatContrast >= 4.5,
+      'Le titre du chat doit rester lisible en thème ' + label + '. Contraste : ' + chatContrast.toFixed(2));
+    assert.ok(newButtonContrast >= 4.5,
+      'Le bouton de nouvelle conversation doit rester lisible en thème ' + label + '. Contraste : ' + newButtonContrast.toFixed(2));
+    if (label === 'sombre') {
+      assert.notEqual(metrics.historyBackground, 'rgb(255, 255, 255)',
+        'Le panneau Historique ne doit pas rester blanc en thème sombre.');
+      assert.notEqual(metrics.chatBackground, 'rgb(255, 255, 255)',
+        'Le panneau de conversation ne doit pas rester blanc en thème sombre.');
+    }
     assert.ok(userContrast >= 4.5,
       'La bulle utilisateur de l’Assistant IA doit rester lisible en thème ' + label + '. Contraste : ' + userContrast.toFixed(2));
     assert.ok(avatarContrast >= 4.5,
