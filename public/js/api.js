@@ -6,15 +6,15 @@
 // Dans l'app native (Capacitor, iOS/Android) : le contenu web est chargé depuis un
 // pseudo-domaine local (capacitor://localhost sur iOS, https://localhost sur Android),
 // pas depuis votre vrai serveur — un chemin relatif '/api' irait donc nulle part. C'est
-// pourquoi window.SAMAFACTURE_API_URL peut être défini AVANT le chargement de ce fichier
+// pourquoi window.OPTIGEST_API_URL peut être défini AVANT le chargement de ce fichier
 // (voir capacitor.config.json → injecté par index native, ou une balise <script> dédiée)
 // pour forcer l'URL complète de votre serveur en production, ex. 'https://votredomaine.com/api'.
-const API_BASE = window.SAMAFACTURE_API_URL || (() => {
+const API_BASE = window.OPTIGEST_API_URL || window.SAMAFACTURE_API_URL || (() => {
   // En local, l'application peut être ouverte par erreur via Live Server (5500/5501...)
   // alors que l'API Express écoute sur 4000. Dans ce cas, '/api' pointe vers le mauvais
   // serveur et les boutons de sauvegarde semblent « ne rien faire ». On redirige donc
   // automatiquement les appels API vers Express pour localhost/127.0.0.1 lorsque la page
-  // n'est pas elle-même servie par le port API 4000. SAMAFACTURE_API_URL reste prioritaire
+  // n'est pas elle-même servie par le port API 4000. OPTIGEST_API_URL (puis l'alias historique SAMAFACTURE_API_URL) reste prioritaire
   // pour Capacitor, un autre port local ou un déploiement avec API séparée.
   const host = window.location.hostname;
   const port = window.location.port;
