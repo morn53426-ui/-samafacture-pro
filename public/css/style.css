@@ -7084,3 +7084,102 @@ a.btn .icon {
     padding-left: 5px;
   }
 }
+
+
+/* Le rail compact avait conservé un fond blanc historique alors que le reste
+   de l'espace suivait le thème sombre. La bande de marque reste bleue ; la
+   navigation, les libellés, les icônes et le pied suivent maintenant le thème. */
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed {
+  border-right-color: var(--line) !important;
+  background: var(--structural-dark-1) !important;
+  color: var(--ink) !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-nav,
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-foot {
+  border-color: var(--line) !important;
+  background: var(--structural-dark-1) !important;
+  color: var(--ink-soft) !important;
+  scrollbar-color: #625D50 var(--structural-dark-1);
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-group-label {
+  background: var(--line) !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active),
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .nav-label,
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout {
+  color: var(--ink-soft) !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .ic {
+  background: #302E27 !important;
+  color: var(--emerald) !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item.active,
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item.active:hover {
+  border-color: var(--line) !important;
+  background: var(--emerald-light) !important;
+  color: var(--ink) !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item.active .ic {
+  background: transparent !important;
+  color: var(--emerald) !important;
+  box-shadow: none !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):hover,
+  :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):focus-visible,
+  :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout:hover,
+  :root[data-theme="dark"] body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
+    border-color: var(--line) !important;
+    background: #302E27 !important;
+    color: var(--ink) !important;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed {
+    border-right-color: var(--line) !important;
+    background: var(--structural-dark-1) !important;
+    color: var(--ink) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-nav,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-foot {
+    border-color: var(--line) !important;
+    background: var(--structural-dark-1) !important;
+    color: var(--ink-soft) !important;
+    scrollbar-color: #625D50 var(--structural-dark-1);
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-group-label {
+    background: var(--line) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active),
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .nav-label,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout {
+    color: var(--ink-soft) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active) .ic {
+    background: #302E27 !important;
+    color: var(--emerald) !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item.active,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item.active:hover {
+    border-color: var(--line) !important;
+    background: var(--emerald-light) !important;
+    color: var(--ink) !important;
+    box-shadow: none !important;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item.active .ic {
+    background: transparent !important;
+    color: var(--emerald) !important;
+    box-shadow: none !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):hover,
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .nav-item:not(.active):focus-visible,
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout:hover,
+    :root:not([data-theme="light"]):not([data-theme="dark"]) body #app-sidebar.sidebar.is-collapsed .sidebar-logout:focus-visible {
+      border-color: var(--line) !important;
+      background: #302E27 !important;
+      color: var(--ink) !important;
+    }
+  }
+}
