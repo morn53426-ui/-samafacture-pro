@@ -39,7 +39,9 @@
     .wrap { width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
     .invoice-doc {
       min-height: 0 !important;
-      padding: 40px !important;
+      /* Les marges A4 sont déjà définies par @page ; ne pas ajouter un second
+         retrait de 40 px qui rétrécit inutilement la zone imprimable. */
+      padding: 0 !important;
       border: none !important;
       border-radius: 0 !important;
       box-shadow: none !important;

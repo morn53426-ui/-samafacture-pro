@@ -134,9 +134,9 @@ async function genererPdfFacture(factureId, user) {
       () => window.__docReady === true,
       { timeout: 15000 }
     );
-    // Réutilise le bloc @media print déjà présent dans facture-detail.html (masque la
-    // barre d'outils "Fermer / Imprimer", ajuste les marges) — même mécanisme que le
-    // bouton "Imprimer / Exporter en PDF" existant, pas de style dupliqué ici.
+    // Réutilise le bloc @media print et le @page A4 de facture-detail.html (masque la
+    // barre d'outils et définit une seule source de vérité pour les marges) — même mécanisme
+    // que le bouton "Imprimer / Exporter en PDF", pas de style dupliqué ici.
     // Capturer le document dans son état final : polices, logo, QR code et autres images
     // doivent être décodés avant l'impression pour éviter les blocs vides ou les sauts tardifs.
     // Le PDF doit conserver la palette papier, indépendamment du thème de l'interface.
@@ -164,7 +164,6 @@ async function genererPdfFacture(factureId, user) {
       format: 'A4',
       preferCSSPageSize: true,
       printBackground: true,
-      margin: { top: '12mm', bottom: '14mm', left: '12mm', right: '12mm' },
       scale: 1
     });
     // Puppeteer récent renvoie un Uint8Array. Express traite un Uint8Array simple

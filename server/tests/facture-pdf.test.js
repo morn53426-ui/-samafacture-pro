@@ -59,10 +59,16 @@ describe('Génération PDF de facture', () => {
     assert.equal(res.body.slice(0, 5).toString('latin1'), '%PDF-');
   });
 
-  test('les cinq nouveaux modèles produisent chacun un vrai PDF avec Puppeteer', async () => {
-    const nouveauxModeles = ['nova', 'nordique', 'luxe', 'tech', 'horizon'];
+  test('les trente et un modèles produisent un vrai PDF A4 avec Puppeteer', async () => {
+    const tousModeles = [
+      'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
+      'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
+      'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs',
+      'nova', 'nordique', 'luxe', 'tech', 'horizon',
+      'eclipse', 'saphir', 'conseil', 'imperial', 'panorama', 'groupe', 'majeste'
+    ];
 
-    for (const modele of nouveauxModeles) {
+    for (const modele of tousModeles) {
       await pool.query(
         'UPDATE users SET facture_template = ? WHERE id = ?',
         [modele, userIdA]
@@ -85,8 +91,17 @@ describe('Génération PDF de facture', () => {
         modele + ' doit produire une signature PDF valide');
       assert.ok(res.body.length > 1500,
         modele + ' ne doit pas produire un PDF vide ou tronqué');
-      assert.match(res.body.toString('latin1'), /\/Type\s*\/Page\b/,
+      const pdfLatin1 = res.body.toString('latin1');
+      assert.match(pdfLatin1, /\/Type\s*\/Page\b/,
         modele + ' doit contenir au moins une page PDF');
+      const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
+      assert.ok(mediaBox, modele + ' doit déclarer une zone de page PDF.');
+      assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
+        Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
+        modele + ' doit être au vrai format A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
+      const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
+      assert.ok(pageCount >= 1 && pageCount <= 2,
+        modele + ' ne doit pas créer de pagination excessive pour une facture simple (pages=' + pageCount + ')');
     }
   });
 
@@ -118,6 +133,26 @@ describe('Génération PDF de facture', () => {
         timeout: 20000
       });
       await page.waitForFunction(() => window.__docReady === true, { timeout: 15000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+
+      const typographie = await page.evaluate(() => {
+        const documentNode = document.querySelector('.invoice-doc');
+        const headingNode = document.querySelector('.invoice-doc h1, .invoice-doc h2, .invoice-doc h3') || documentNode;
+        const tableNode = document.querySelector('.invoice-doc .sf-doc-description') ||
+          document.querySelector('.invoice-doc .sf-document-table td') || documentNode;
+        return {
+          documentFont: getComputedStyle(documentNode).fontFamily,
+          headingFont: getComputedStyle(headingNode).fontFamily,
+          tableFont: getComputedStyle(tableNode).fontFamily,
+          fontSize: getComputedStyle(documentNode).fontSize,
+          documentFontLoaded: document.fonts ? document.fonts.check('12px "IBM Plex Sans"') : false
+        };
+      });
+      assert.match(typographie.documentFont, /IBM Plex Sans/);
+      assert.match(typographie.headingFont, /IBM Plex Sans/);
+      assert.match(typographie.tableFont, /IBM Plex Sans/);
+      assert.ok(typographie.documentFontLoaded,
+        'IBM Plex Sans doit être disponible avant la capture PDF.');
 
       const lireEtatTheme = () => page.evaluate(() => ({
         theme: document.documentElement.getAttribute('data-theme'),
@@ -148,6 +183,19 @@ describe('Génération PDF de facture', () => {
       assert.equal(etat.couleurFondApp, couleurPaletteClaire);
       assert.equal(etat.toolbar, 'none');
       assert.equal(etat.fondDocument, 'rgb(255, 254, 252)', 'le fond papier doit rester blanc cassé en impression');
+      const printMetrics = await page.evaluate(() => ({
+        paddingLeft: getComputedStyle(document.querySelector('.invoice-doc')).paddingLeft,
+        paddingRight: getComputedStyle(document.querySelector('.invoice-doc')).paddingRight,
+        fontSize: getComputedStyle(document.querySelector('.invoice-doc')).fontSize,
+        tableFontSize: getComputedStyle(document.querySelector('.sf-document-table td')).fontSize
+      }));
+      assert.equal(printMetrics.paddingLeft, '0px',
+        'Les marges A4 de @page ne doivent pas être doublées par un padding de 40 px.');
+      assert.equal(printMetrics.paddingRight, '0px');
+      assert.ok(Math.abs(parseFloat(printMetrics.fontSize) - 13.3333) < 0.2,
+        'Le texte courant doit être imprimé à 10 pt minimum : ' + printMetrics.fontSize);
+      assert.ok(Math.abs(parseFloat(printMetrics.tableFontSize) - 12) < 0.2,
+        'Les lignes du tableau doivent être imprimées à 9 pt minimum : ' + printMetrics.tableFontSize);
 
       // À la fermeture de l'aperçu, le mode système sombre doit être rétabli.
       await appliquerMedia('screen');

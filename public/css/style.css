@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
 :root {
   /* Palette premium — identité conservée (navy/émeraude/or), valeurs affinées pour un
@@ -27,9 +27,11 @@
   --structural-dark-1: #0B1526;
   --structural-dark-2: #14213D;
 
-  --font-display: 'Manrope', sans-serif;
-  --font-body: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Utiliser les familles réellement chargées ci-dessus : pas de substitution silencieuse
+     vers une police système différente entre l'aperçu navigateur et Chromium/PDF. */
+  --font-display: 'IBM Plex Sans', Arial, sans-serif;
+  --font-body: 'IBM Plex Sans', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
 
   --radius: 12px;
   --radius-sm: 8px;
@@ -5964,7 +5966,7 @@ a.btn .icon {
     box-shadow: none !important;
     background: #fff !important;
     color: #172033 !important;
-    font-size: 9.5pt !important;
+    font-size: 10pt !important;
   }
   .invoice-doc .head {
     break-after: avoid;
@@ -5986,7 +5988,7 @@ a.btn .icon {
   .invoice-doc .sf-document-table th,
   .invoice-doc .sf-document-table td {
     padding: 6px 6px !important;
-    font-size: 8.5pt !important;
+    font-size: 9pt !important;
     line-height: 1.35 !important;
     overflow-wrap: anywhere !important;
   }
@@ -6034,8 +6036,10 @@ a.btn .icon {
 }
 
 @media print {
+  /* Conserver l'en-tête et le bloc des totaux, mais laisser les grilles ordinaires
+     se répartir sur plusieurs pages si elles sont trop hautes. Les panneaux sensibles
+     (métadonnées, signatures, compléments) gardent leurs règles ciblées ci-dessus. */
   .invoice-doc > div:first-child,
-  .invoice-doc .grid,
   .invoice-doc .sf-totals {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
