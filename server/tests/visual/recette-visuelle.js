@@ -3144,7 +3144,12 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
         keyboardTraversal.push(stop);
       }
       const reverseFocus = await (async () => {
-        await page.keyboard.press('Shift+Tab');
+        await page.keyboard.down('Shift');
+        try {
+          await page.keyboard.press('Tab');
+        } finally {
+          await page.keyboard.up('Shift');
+        }
         return page.evaluate(() => {
           const element = document.activeElement;
           if (!element || element === document.body) return null;
