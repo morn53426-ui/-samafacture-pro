@@ -140,6 +140,11 @@
   let chart;
   let statusChart;
   let periode = 'week';
+  let lastDashboardStats = null;
+
+  function dashboardThemeColor(token, fallback) {
+    return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || fallback;
+  }
 
   const user = Api.currentUser() || {};
   document.getElementById('dashboard-greeting').textContent = 'Tableau de bord';
@@ -192,6 +197,7 @@
 
   async function load() {
     const stats = await Api.get('/dashboard');
+    lastDashboardStats = stats;
     renderKpis(stats);
     renderRecentPayments(stats.derniers_paiements || []);
     renderRecentClients(stats.derniers_clients || []);
@@ -220,6 +226,11 @@
     }
 
     if (chart) chart.destroy();
+    const inkSoft = dashboardThemeColor('--ink-soft', '#655E55');
+    const line = dashboardThemeColor('--line', '#E6DED2');
+    const surface = dashboardThemeColor('--paper', '#FFFEFC');
+    const text = dashboardThemeColor('--ink', '#24211D');
+    const accent = dashboardThemeColor('--emerald', '#087A57');
     const ctx = canvas.getContext('2d');
     const gradient = ctx.createLinearGradient(0, 0, 0, 250);
     gradient.addColorStop(0, 'rgba(8,122,87,.18)');
@@ -231,15 +242,15 @@
         datasets: [{
           label: 'Ventes',
           data: rows?.length ? rows.map(row => Number(row.total || 0)) : [0],
-          borderColor: '#087A57',
+          borderColor: accent,
           backgroundColor: gradient,
           borderWidth: 3,
           fill: true,
           tension: 0.35,
           pointRadius: rows?.length ? 3 : 0,
           pointHoverRadius: 5,
-          pointBackgroundColor: '#FFFFFF',
-          pointBorderColor: '#087A57',
+          pointBackgroundColor: surface,
+          pointBorderColor: accent,
           pointBorderWidth: 2
         }]
       },
@@ -256,11 +267,11 @@
         interaction: { intersect: false, mode: 'index' },
         plugins: {
           legend: { display: false },
-          tooltip: { displayColors: false, backgroundColor: '#292822', padding: 11 }
+          tooltip: { displayColors: false, backgroundColor: surface, titleColor: text, bodyColor: text, borderColor: line, borderWidth: 1, padding: 11 }
         },
         scales: {
-          y: { beginAtZero: true, grid: { color: 'rgba(105,125,160,.14)' }, ticks: { color: '#8290A8', callback: value => Number(value).toLocaleString('fr-FR') } },
-          x: { grid: { display: false }, ticks: { color: '#8290A8', maxRotation: 0, autoSkip: true, maxTicksLimit: 7 } }
+          y: { beginAtZero: true, grid: { color: line }, ticks: { color: inkSoft, callback: value => Number(value).toLocaleString('fr-FR') } },
+          x: { grid: { display: false }, ticks: { color: inkSoft, maxRotation: 0, autoSkip: true, maxTicksLimit: 7 } }
         }
       }
     });
@@ -269,9 +280,9 @@
 
   async function renderStatusChart(stats) {
     const rows = [
-      { label: 'Payées', value: Number(stats.factures_payees?.n || 0), color: '#087A57' },
-      { label: 'En attente', value: Number(stats.factures_en_attente?.n || 0), color: '#96713E' },
-      { label: 'En retard', value: Number(stats.factures_en_retard?.n || 0), color: '#B64D48' }
+      { label: 'Payées', value: Number(stats.factures_payees?.n || 0), color: dashboardThemeColor('--emerald', '#087A57') },
+      { label: 'En attente', value: Number(stats.factures_en_attente?.n || 0), color: dashboardThemeColor('--gold', '#96713E') },
+      { label: 'En retard', value: Number(stats.factures_en_retard?.n || 0), color: dashboardThemeColor('--clay', '#B64D48') }
     ];
     const total = rows.reduce((sum, row) => sum + row.value, 0);
     document.getElementById('invoice-total').textContent = total.toLocaleString('fr-FR');
@@ -295,7 +306,7 @@
         labels: rows.map(row => row.label),
         datasets: [{
           data: total ? rows.map(row => row.value) : [1],
-          backgroundColor: total ? rows.map(row => row.color) : ['#DCE3EF'],
+          backgroundColor: total ? rows.map(row => row.color) : [dashboardThemeColor('--line', '#E6DED2')],
           borderWidth: 0,
           hoverOffset: 4
         }]
@@ -306,7 +317,17 @@
         cutout: '69%',
         animation: false,
         transitions: { active: { animation: { duration: 0 } }, resize: { animation: { duration: 0 } } },
-        plugins: { legend: { display: false }, tooltip: { enabled: total > 0 } }
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: total > 0,
+            backgroundColor: dashboardThemeColor('--paper', '#FFFEFC'),
+            titleColor: dashboardThemeColor('--ink', '#24211D'),
+            bodyColor: dashboardThemeColor('--ink', '#24211D'),
+            borderColor: dashboardThemeColor('--line', '#E6DED2'),
+            borderWidth: 1
+          }
+        }
       }
     });
     canvas.setAttribute('aria-label', total
@@ -317,6 +338,13 @@
   function setPeriode(period) {
     loadChart(period).catch(error => showFatalError(error.message));
   }
+
+  document.addEventListener('sf:theme-change', () => {
+    loadChart(periode).catch(error => showFatalError(error.message));
+    if (lastDashboardStats) {
+      renderStatusChart(lastDashboardStats).catch(error => showFatalError(error.message));
+    }
+  });
 
   load().catch(error => showFatalError(error.message));
 </script>
