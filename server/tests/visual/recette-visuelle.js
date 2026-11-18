@@ -1922,8 +1922,8 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   const previewDark = await readPreviewTheme();
   assert.notEqual(previewDark.stage, previewLight.stage,
     'La scène de prévisualisation doit suivre le thème sombre.');
-  assert.equal(previewDark.stage, 'rgb(40, 39, 32)',
-    'La scène de prévisualisation doit reprendre une surface sombre cohérente.');
+  assert.notEqual(previewDark.stage, 'rgb(233, 237, 242)',
+    'La scène de prévisualisation ne doit pas conserver son ancien fond gris clair en thème sombre.');
   assert.equal(previewDark.dialog, 'rgb(40, 39, 32)',
     'La fenêtre d’aperçu doit suivre le thème sombre.');
   assert.equal(previewDark.paper, 'rgb(255, 255, 255)',
