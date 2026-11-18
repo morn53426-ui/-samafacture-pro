@@ -1852,6 +1852,11 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   assert.equal(light.panel, 'rgb(255, 255, 255)', 'Les panneaux Entreprise doivent rester blancs en thème clair.');
   assert.equal(light.sidebar, 'rgb(255, 255, 255)', 'Le rail Entreprise doit rester blanc en thème clair.');
 
+  await groupPage.screenshot({
+    path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-clair-1440.png'),
+    fullPage: true
+  });
+
   await groupPage.evaluate(() => window.SamaTheme.definir('dark'));
   await groupPage.waitForFunction(() =>
     getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(40, 39, 32)'
@@ -1883,9 +1888,10 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
       inkSoftToken: dark.inkSoftToken,
       defaultNavLabel: dark.sidebarDefaultLabelText
     }));
-  await groupPage.screenshot({ path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-clair-1440.png'), fullPage: true });
-  await groupPage.evaluate(() => window.SamaTheme.definir('dark'));
-  await groupPage.screenshot({ path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-sombre-1440.png'), fullPage: true });
+  await groupPage.screenshot({
+    path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-sombre-1440.png'),
+    fullPage: true
+  });
   await groupPage.close();
 
   async function verifyChartPage(name, file, canvasSelector) {
