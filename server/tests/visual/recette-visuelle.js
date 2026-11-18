@@ -3378,6 +3378,7 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
         return {
           viewport: window.innerWidth,
           theme: document.documentElement.getAttribute('data-theme'),
+          colorScheme: getComputedStyle(document.documentElement).colorScheme,
           gradientSurfaces,
           visibleControlCount: controls.length,
           unnamedControls,
