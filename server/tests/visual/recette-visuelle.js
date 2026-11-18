@@ -1866,7 +1866,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   assert.equal(dark.page, 'rgb(17, 18, 34)', 'Le fond du centre Entreprise doit suivre l’indigo profond du thème sombre SUNUPILOT.');
   assert.equal(dark.panel, 'rgb(26, 27, 46)', 'Les panneaux ne doivent plus rester blancs en thème sombre.');
   assert.equal(dark.dashboardCard, 'rgb(26, 27, 46)', 'Les cartes de pilotage doivent utiliser la surface sombre.');
-  assert.equal(dark.sidebar, 'rgb(23, 23, 19)', 'Le rail latéral doit devenir sombre avec le reste de l’application.');
+  assert.equal(dark.sidebar, 'rgb(22, 22, 56)', 'Le rail latéral doit devenir sombre avec le reste de l’application.');
   assert.equal(dark.horizontalOverflow, false, 'Le thème sombre ne doit pas provoquer de débordement.');
   const headingContrast = contrastRatio(dark.heading, dark.page);
   const sidebarActiveContrast = contrastRatio(dark.sidebarText, dark.sidebarActiveBackground);
@@ -2171,8 +2171,8 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   assert.notEqual(darkMetrics.card, 'rgb(255, 255, 255)', 'Les cartes ne doivent pas rester blanches en thème sombre.');
   assert.equal(darkMetrics.background, 'rgb(17, 18, 34)', 'Le thème sombre doit reprendre le fond indigo profond de l’identité SUNUPILOT.');
   assert.equal(darkMetrics.card, 'rgb(26, 27, 46)', 'Les cartes sombres doivent utiliser la teinte papier profonde.');
-  assert.equal(darkMetrics.sidebar, 'rgb(23, 23, 19)', 'Le rail compact ne doit pas rester blanc en thème sombre.');
-  assert.equal(darkMetrics.sidebarNav, 'rgb(23, 23, 19)', 'La navigation compacte doit adopter le fond du rail sombre.');
+  assert.equal(darkMetrics.sidebar, 'rgb(22, 22, 56)', 'Le rail compact ne doit pas rester blanc en thème sombre.');
+  assert.equal(darkMetrics.sidebarNav, 'rgb(22, 22, 56)', 'La navigation compacte doit adopter le fond du rail sombre.');
   const sidebarContrast = contrastRatio(darkMetrics.sidebarLabel, darkMetrics.sidebar);
   assert.ok(sidebarContrast >= 4.5,
     'Les libellés du rail compact doivent garder un contraste de 4,5:1. Valeur : ' + sidebarContrast.toFixed(2));

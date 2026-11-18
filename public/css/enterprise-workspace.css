@@ -1452,7 +1452,7 @@ body.enterprise-console-shell {
   --enterprise-icon-text: #8ed0b1;
   --enterprise-track: #454238;
   --enterprise-link: #8cbfd8;
-  --enterprise-sidebar-bg: #171713;
+  --enterprise-sidebar-bg: #161638;
   --enterprise-sidebar-text: #d6cfc3;
   --enterprise-sidebar-muted: #a9a397;
   --enterprise-sidebar-border: #48443a;
@@ -1480,7 +1480,7 @@ body.enterprise-console-shell {
     --enterprise-icon-text: #8ed0b1;
     --enterprise-track: #454238;
     --enterprise-link: #8cbfd8;
-    --enterprise-sidebar-bg: #171713;
+    --enterprise-sidebar-bg: #161638;
     --enterprise-sidebar-text: #d6cfc3;
     --enterprise-sidebar-muted: #a9a397;
     --enterprise-sidebar-border: #48443a;
@@ -1833,4 +1833,3 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout .ico
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization .icon {
   color: #082B50;
 }
-
