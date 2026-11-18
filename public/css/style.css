@@ -3,18 +3,24 @@
 :root {
   /* Palette premium — identité conservée (navy/émeraude/or), valeurs affinées pour un
      rendu plus profond et un meilleur contraste. */
-  --navy-950: #0B1526;
-  --navy-900: #14213D;
-  --navy-800: #1C2B4A;
-  --navy-700: #28395E;
-  --emerald: #0EA980;
-  --emerald-light: #E3F6EF;
+  /* Identité SUNUPILOT — vert baobab et indigo. */
+  --brand-baobab: #0A7A45;
+  --brand-indigo: #29265E;
+  --brand-baobab-light: #EAF3EC;
+  --brand-offwhite: #F6F7F5;
+
+  --navy-950: #1B1949;
+  --navy-900: var(--brand-indigo);
+  --navy-800: #373477;
+  --navy-700: #514D8F;
+  --emerald: var(--brand-baobab);
+  --emerald-light: var(--brand-baobab-light);
   --gold: #DDA53F;
   --gold-text: #76501E;
   --gold-light: #FBF0DC;
   --clay: #E1484F;
   --clay-light: #FBEAEB;
-  --cream: #F6F4EE;
+  --cream: var(--brand-offwhite);
   --paper: #FFFFFF;
   --ink: #171B26;
   --ink-soft: #5B6172;
@@ -24,8 +30,8 @@
      pied de page, en-têtes de tableau...). Contrairement à --navy-950/900 ci-dessus, ceux-ci
      ne s'inversent jamais en mode sombre — c'est ce qui permet aux titres (qui utilisent
      --navy-950 comme couleur de texte) de rester lisibles sans casser la barre latérale. */
-  --structural-dark-1: #0B1526;
-  --structural-dark-2: #14213D;
+  --structural-dark-1: #1B1949;
+  --structural-dark-2: var(--brand-indigo);
 
   /* Utiliser les familles réellement chargées ci-dessus : pas de substitution silencieuse
      vers une police système différente entre l'aperçu navigateur et Chromium/PDF. */
@@ -3318,7 +3324,7 @@ textarea { line-height: 1.55; }
 }
 .sidebar {
   width: var(--sidebar-w);
-  background: linear-gradient(180deg, #101D3A 0%, #1B2D54 100%);
+  background: linear-gradient(180deg, var(--structural-dark-1) 0%, var(--structural-dark-2) 100%);
   box-shadow: 8px 0 30px rgba(12, 27, 54, .08);
 }
 .sidebar-brand {
@@ -7252,3 +7258,16 @@ a.btn .icon {
 .reports-kpi-purple .stat-label,
 .reports-kpi-amber .stat-label { color: #fff; }
 
+
+
+/* SUNUPILOT — accents de marque pour les surfaces partagées.
+   Les couleurs fonctionnelles (succès, avertissement, erreur) restent distinctes. */
+.sidebar-brand .mark {
+  background: #F6F7F5;
+  border: 1px solid rgba(255,255,255,.16);
+}
+.sidebar-brand .mark img { object-fit: contain; }
+.sidebar-brand .brand-pro { color: #8DD0A7; }
+.enterprise-console-brand strong { letter-spacing: -.025em; }
+.lp-header .brand { color: var(--brand-indigo); }
+.auth-form-card::before { background: linear-gradient(90deg, var(--brand-baobab), var(--brand-indigo)); }
