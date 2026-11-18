@@ -5970,7 +5970,7 @@ a.btn .icon {
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    background: #fff !important;
+    background: #FFFEFC !important;
     color: #151F4D !important;
     font-size: 10pt !important;
   }
@@ -6103,13 +6103,13 @@ a.btn .icon {
     --clay: #B64D48;
     --clay-light: #F6E9E5;
     --cream: #F8FAFC;
-    --paper: #FFFFFF;
+    --paper: #FFFEFC;
     --ink: #151F4D;
     --ink-soft: #526080;
     --line: #DCE3F0;
     --structural-dark-1: #151F4D;
     --structural-dark-2: #18265B;
-    background: #FFFFFF !important;
+    background: #FFFEFC !important;
     color: #151F4D !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
