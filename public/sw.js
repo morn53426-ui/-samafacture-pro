@@ -1,6 +1,5 @@
-// v2 : force la purge du cache v1, qui pouvait contenir des pages HTML avec une CSP obsolète
-// mise en cache par erreur (voir correctif du fetch handler plus bas).
-const CACHE_NAME = 'samafacture-shell-v4';
+// v5 : invalide le cache de l'ancienne identité visuelle et charge le nouveau kit de marque.
+const CACHE_NAME = 'sunupilot-shell-v5';
 
 // Fichiers statiques de l'interface (l'API n'est jamais mise en cache : les données doivent
 // toujours être à jour).
@@ -12,7 +11,9 @@ const SHELL_FILES = [
   '/js/landing-slider.js',
   '/manifest.json',
   '/images/icon-192.png',
-  '/images/icon-512.png'
+  '/images/icon-512.png',
+  '/images/icon-maskable-512.png',
+  '/images/sunupilot-mark.svg'
 ];
 
 self.addEventListener('install', (event) => {
