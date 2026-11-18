@@ -4,6 +4,21 @@
 **Référence :** `main` au commit `12716c760a0874b393b235587028ba78970bb0b8`  
 **Nature :** dossier d'architecture et de préparation. Ce document ne met en place aucun prélèvement, n'active aucun fournisseur et ne remplace pas la validation commerciale, juridique ou technique du prestataire.
 
+## Addendum — vérification du 18 novembre 2026
+
+Une seconde vérification a été effectuée sur `main` au commit `e7d447fcd5034a16abb96f214ffb88cb59c6c1cf`, après l'audit initial. Les fichiers concernés ont été relus ; leur état confirme que le présent dossier reste préparatoire :
+
+- `GET /api/abonnement/moyens-disponibles` garde `wave: false`, `paydunya: false`, `tarifs: {}` et `facturation.disponible: false`. Le champ `renouvellement_automatique: true` décrit l'objectif mensuel dans la réponse API ; il ne constitue ni un mandat ni une autorisation de débit.
+- `POST /api/abonnement/payer` renvoie toujours HTTP `503` avec `PAIEMENT_RECURRENT_NON_CONFIGURE` et ne lance aucun checkout.
+- `PUT /api/auth/plan` refuse toujours l'activation directe d'un plan payant avec `403 PAIEMENT_REQUIS` ; seul le retour au plan Gratuit est permis.
+- Le schéma conserve `abonnement_paiements` comme historique des tentatives ; aucun ensemble de tables de mandat, périodes et consentements récurrents n'a été ajouté.
+- Le scheduler expire les tentatives en attente et traite les factures récurrentes émises par les entreprises ; il n'exécute aucun renouvellement des plans SaaS.
+- La page Abonnement indique que le renouvellement automatique est facultatif, décoché par défaut, et qu'aucun paiement ne sera lancé tant que les mandats ne sont pas validés.
+
+**Conclusion de cette vérification :** aucun paiement réel, mandat, prélèvement automatique ou renouvellement SaaS n'est activé. Le blocage HTTP 503 et les moyens indisponibles doivent rester en place tant que les conditions de validation fournisseur, consentement, sécurité et tests décrites ci-dessous ne sont pas satisfaites.
+
+Fichiers relus sur le commit indiqué : `server/routes/abonnement.js`, `server/routes/auth.js`, `server/database/schema.sql`, `server/config/scheduler.js` et `public/abonnement.html`.
+
 ## 1. Objectif et règles non négociables
 
 SamaFacture Pro vise des formules Starter, Pro et Entreprise facturées au mois. Le renouvellement mensuel automatique ne peut avoir lieu que si le client a donné un consentement explicite, traçable et révocable et si un prestataire a effectivement autorisé un mandat réutilisable pour le compte marchand concerné.
