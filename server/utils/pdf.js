@@ -162,9 +162,10 @@ async function genererPdfFacture(factureId, user) {
 
     const pdfData = await page.pdf({
       format: 'A4',
+      // Les dimensions et marges A4 sont définies une seule fois dans @page,
+      // partagé avec le bouton Imprimer de facture-detail.html.
       preferCSSPageSize: true,
       printBackground: true,
-      margin: { top: '12mm', bottom: '14mm', left: '12mm', right: '12mm' },
       scale: 1
     });
     // Puppeteer récent renvoie un Uint8Array. Express traite un Uint8Array simple
