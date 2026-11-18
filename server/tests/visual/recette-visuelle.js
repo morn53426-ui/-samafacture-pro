@@ -1822,15 +1822,24 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
       const element = document.querySelector(selector);
       return element ? getComputedStyle(element).getPropertyValue(property || 'background-color').trim() : null;
     };
+    const defaultNav = document.querySelector('#app-sidebar .nav-item:not(.active)');
+    const activeNav = document.querySelector('#app-sidebar .nav-item.active');
     return {
       theme: document.documentElement.getAttribute('data-theme'),
+      bodyClass: document.body.className,
+      sidebarClass: document.getElementById('app-sidebar')?.className || '',
+      defaultNavClass: defaultNav?.className || '',
+      defaultNavMatches: Boolean(defaultNav?.matches('body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active)')),
+      enterpriseSidebarTextToken: getComputedStyle(document.body).getPropertyValue('--enterprise-sidebar-text').trim(),
+      inkSoftToken: getComputedStyle(document.documentElement).getPropertyValue('--ink-soft').trim(),
       page: color('.main-content.enterprise-console-main'),
       panel: color('.group-panel'),
       dashboardCard: color('.enterprise-dashboard-card'),
       sidebar: color('#app-sidebar.sidebar'),
-      sidebarText: color('#app-sidebar .nav-item.active', 'color'),
-      sidebarActiveBackground: color('#app-sidebar .nav-item.active'),
-      sidebarDefaultText: color('#app-sidebar .nav-item:not(.active)', 'color'),
+      sidebarText: activeNav ? getComputedStyle(activeNav).color : null,
+      sidebarActiveBackground: activeNav ? getComputedStyle(activeNav).backgroundColor : null,
+      sidebarDefaultText: defaultNav ? getComputedStyle(defaultNav).color : null,
+      sidebarDefaultLabelText: defaultNav?.querySelector('.nav-label') ? getComputedStyle(defaultNav.querySelector('.nav-label')).color : null,
       heading: color('.enterprise-dashboard-heading h1', 'color'),
       horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth
     };
@@ -1864,7 +1873,16 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     sidebarActiveContrast.toFixed(2) + ' (' + dark.sidebarText + ' sur ' + dark.sidebarActiveBackground + ')');
   assert.ok(sidebarDefaultContrast >= 4.5,
     'Les liens non actifs du menu doivent contraster avec le rail sombre. Valeur : ' +
-    sidebarDefaultContrast.toFixed(2) + ' (' + dark.sidebarDefaultText + ' sur ' + dark.sidebar + ')');
+    sidebarDefaultContrast.toFixed(2) + ' (' + dark.sidebarDefaultText + ' sur ' + dark.sidebar + '). Diagnostic : ' +
+    JSON.stringify({
+      bodyClass: dark.bodyClass,
+      sidebarClass: dark.sidebarClass,
+      defaultNavClass: dark.defaultNavClass,
+      defaultNavMatches: dark.defaultNavMatches,
+      enterpriseSidebarTextToken: dark.enterpriseSidebarTextToken,
+      inkSoftToken: dark.inkSoftToken,
+      defaultNavLabel: dark.sidebarDefaultLabelText
+    }));
   await groupPage.screenshot({ path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-clair-1440.png'), fullPage: true });
   await groupPage.evaluate(() => window.SamaTheme.definir('dark'));
   await groupPage.screenshot({ path: path.join(OUTPUT_DIR, 'groupe-entreprise-theme-sombre-1440.png'), fullPage: true });
