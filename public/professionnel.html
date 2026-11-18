@@ -528,7 +528,7 @@ async function testWebhook(id) {
 }
 async function downloadDocument(id) {
   try {
-    const headers = { 'Authorization': 'Bearer ' + Api.token(), 'X-Requested-With': 'SamaFacturePro' };
+    const headers = { 'Authorization': 'Bearer ' + Api.token(), 'X-Requested-With': 'OptiGest' };
     const companyOwner = localStorage.getItem('sf_company_owner');
     if (companyOwner) headers['X-SF-Company-Owner'] = companyOwner;
     const response = await fetch(API_BASE + '/pro/documents/' + id + '/download', { headers });

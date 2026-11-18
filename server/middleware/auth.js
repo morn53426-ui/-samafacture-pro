@@ -11,7 +11,8 @@ const METHODES_SENSIBLES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 // protection CSRF pour les requêtes authentifiées uniquement par cookie — voir plus bas et
 // public/js/api.js (Api.request() l'envoie systématiquement).
 const EN_TETE_ANTI_CSRF = 'x-requested-with';
-const VALEUR_ANTI_CSRF = 'SamaFacturePro';
+// Accepte temporairement l'en-tête historique pour les anciens clients déjà déployés.
+const VALEURS_ANTI_CSRF = new Set(['OptiGest', 'SamaFacturePro']);
 
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
@@ -36,7 +37,7 @@ async function requireAuth(req, res, next) {
   // ce domaine — y compris déclenchée depuis un site tiers. SameSite=Lax (voir
   // definirCookieSession) bloque déjà la plupart des cas ; ceci ajoute une seconde couche pour
   // les requêtes qui modifient des données et ne sont authentifiées que par ce cookie.
-  if (viaCookie && METHODES_SENSIBLES.has(req.method) && req.headers[EN_TETE_ANTI_CSRF] !== VALEUR_ANTI_CSRF) {
+  if (viaCookie && METHODES_SENSIBLES.has(req.method) && !VALEURS_ANTI_CSRF.has(req.headers[EN_TETE_ANTI_CSRF])) {
     return res.status(403).json({ error: 'Requête refusée (protection CSRF) — en-tête requis manquant.' });
   }
 

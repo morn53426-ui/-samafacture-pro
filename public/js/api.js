@@ -45,7 +45,7 @@ const Api = {
     localStorage.removeItem('sf_company_owner');
     // Best-effort : la déconnexion locale reste immédiate. Le jeton est capturé avant
     // effacement du stockage pour que le serveur puisse aussi révoquer les sessions Bearer.
-    const headers = { 'X-Requested-With': 'SamaFacturePro' };
+    const headers = { 'X-Requested-With': 'OptiGest' };
     if (sessionToken) headers.Authorization = 'Bearer ' + sessionToken;
     fetch(API_BASE + '/auth/logout', { method: 'POST', headers }).catch(() => {});
   },
@@ -68,7 +68,7 @@ const Api = {
       // seconde protection CSRF pour la migration progressive vers un cookie de session, voir
       // server/middleware/auth.js. Sans effet sur le comportement actuel (l'en-tête Authorization
       // ci-dessous reste la source d'authentification utilisée dans tous les cas aujourd'hui).
-      'X-Requested-With': 'SamaFacturePro'
+      'X-Requested-With': 'OptiGest'
     };
     const token = this.token();
     if (token) headers['Authorization'] = `Bearer ${token}`;

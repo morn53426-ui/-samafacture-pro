@@ -53,6 +53,14 @@ test('the support form never routes to the former brand mailbox', () => {
   assert.match(brandConfig, /supportEmail:\s*''/);
 });
 
+test('the application sends the new CSRF header while the backend keeps legacy compatibility', () => {
+  const api = read('public/js/api.js');
+  const middleware = read('server/middleware/auth.js');
+
+  assert.match(api, /'X-Requested-With': 'OptiGest'/);
+  assert.match(middleware, /new Set\\(\\['OptiGest', 'SamaFacturePro'\\]\\)/);
+});
+
 test('mobile and backend package metadata consistently use OptiGest', () => {
   const capacitor = JSON.parse(read('mobile/capacitor.config.json'));
   const mobilePackage = JSON.parse(read('mobile/package.json'));

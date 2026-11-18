@@ -90,6 +90,14 @@ describe('requireAuth — repli sur le cookie sf_token (migration progressive)',
     assert.equal(appele, true);
   });
 
+  test("POST via cookie avec le nouvel en-tête OptiGest est autorisé", async () => {
+    const req = fauxeRequete({ method: 'POST', cookies: { sf_token: jetonValide() }, xRequestedWith: 'OptiGest' });
+    const res = fauxeReponse();
+    let appele = false;
+    await requireAuth(req, res, () => { appele = true; });
+    assert.equal(appele, true);
+  });
+
   test("un en-tête Authorization présent est TOUJOURS prioritaire sur le cookie (pas de vérif CSRF dans ce cas)", async () => {
     // Si jamais le cookie contenait un jeton invalide/périmé mais que Authorization est valide,
     // le comportement actuel (celui de tout le frontend aujourd'hui) doit continuer à passer.
