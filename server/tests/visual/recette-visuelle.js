@@ -585,7 +585,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       const hasName = element => {
         if (hasText(element.getAttribute('aria-label'))) return true;
         const labelledBy = (element.getAttribute('aria-labelledby') || '')
-          .split(/\\s+/).filter(Boolean);
+          .split(/\s+/).filter(Boolean);
         if (labelledBy.some(id => hasText(document.getElementById(id)?.textContent))) return true;
         if (hasText(element.getAttribute('title'))) return true;
         if (element.matches('input, select, textarea')) {
@@ -616,7 +616,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
         visibleH1: Array.from(document.querySelectorAll('h1')).filter(visible).length,
         unlabeledControls: interactive.filter(element => !hasName(element))
           .map(element => element.tagName.toLowerCase() + (element.id ? '#' + element.id : '') +
-            (element.className && typeof element.className === 'string' ? '.' + element.className.trim().split(/\\s+/).slice(0, 2).join('.') : ''))
+            (element.className && typeof element.className === 'string' ? '.' + element.className.trim().split(/\s+/).slice(0, 2).join('.') : ''))
           .slice(0, 30),
         imagesMissingAlt,
         positiveTabIndex
@@ -3122,10 +3122,10 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             selector: element.tagName.toLowerCase() +
               (element.id ? '#' + element.id : '') +
               (typeof element.className === 'string' && element.className.trim()
-                ? '.' + element.className.trim().split(/\\s+/).slice(0, 2).join('.')
+                ? '.' + element.className.trim().split(/\s+/).slice(0, 2).join('.')
                 : ''),
             text: String(element.innerText || element.textContent || element.getAttribute('aria-label') || '')
-              .replace(/\\s+/g, ' ').trim().slice(0, 80),
+              .replace(/\s+/g, ' ').trim().slice(0, 80),
             focusVisible: element.matches(':focus-visible'),
             hasIndicator: Boolean(outline || shadow),
             outline: style.outline,
@@ -3333,7 +3333,7 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
         )).map(element => {
           const backgroundImage = getComputedStyle(element).backgroundImage;
-          const stops = Array.from(backgroundImage.matchAll(/rgba?\\(([^)]+)\\)/g))
+          const stops = Array.from(backgroundImage.matchAll(/rgba?\(([^)]+)\)/g))
             .map(match => parseColor('rgb(' + match[1] + ')'))
             .filter(Boolean);
           const white = { r: 1, g: 1, b: 1, a: 1 };
