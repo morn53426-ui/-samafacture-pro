@@ -125,7 +125,7 @@
     border-radius: var(--radius-sm);
     padding: 16px;
     background: #fff;
-    color: #24211D;
+    color: #151F4D;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -141,8 +141,8 @@
     font-size: 1.1rem; color: var(--ink-soft);
   }
   .lp-mock-logo img { width: 100%; height: 100%; object-fit: contain; }
-  .lp-mock-head .lp-company-name { font-weight: 700; font-size: 0.88rem; color: #24211D; }
-  .lp-mock-head .lp-company-sub { font-size: 0.72rem; color: #655E55; }
+  .lp-mock-head .lp-company-name { font-weight: 700; font-size: 0.88rem; color: #151F4D; }
+  .lp-mock-head .lp-company-sub { font-size: 0.72rem; color: #526080; }
   .lp-mock-lines { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
   .lp-mock-lines .lp-line { height: 7px; border-radius: 4px; background: var(--line); }
   .lp-mock-lines .lp-line.short { width: 45%; }
@@ -324,7 +324,7 @@
     display: inline-flex; align-items: center; gap: 7px;
     padding: 8px 12px; border: 1px solid rgba(15,27,51,.12);
     border-radius: 999px; background: rgba(255,255,255,.96);
-    color: #17314e; font-size: .72rem; font-weight: 800;
+    color: #18265B; font-size: .72rem; font-weight: 800;
     box-shadow: 0 4px 14px rgba(15,27,51,.14);
   }
   .invoice-template-preview-trigger:hover span,
@@ -341,7 +341,7 @@
   .invoice-template-preview-canvas .invoice-doc {
     width: 794px; min-height: 1123px; box-sizing: border-box; padding: 40px;
     overflow: hidden; border: 1px solid #e3e7ec; border-radius: 0;
-    background: #fff; color: #243044;
+    background: #fff; color: #243675;
     box-shadow: 0 8px 25px rgba(15, 27, 51, .13);
     font-size: 14px; line-height: 1.5;
   }
@@ -465,7 +465,7 @@
     position: absolute; top: 0; left: 0;
     width: 794px; min-height: 1123px; box-sizing: border-box;
     padding: 40px; overflow: hidden; border: 1px solid #dfe3e9;
-    border-radius: 0; background: #fff; color: #243044;
+    border-radius: 0; background: #fff; color: #243675;
     box-shadow: 0 12px 35px rgba(15,27,51,.18);
     transform-origin: top left; font-size: 14px; line-height: 1.5;
   }
@@ -937,7 +937,7 @@
             <span class="invoice-template-tier tier-${meta.tier}">${escapeHtml(tierLabel)}</span>
           </div>
           <div class="invoice-template-preview-window" aria-label="Aperçu du modèle ${escapeHtml(meta.name)}">
-            <div class="invoice-template-preview-canvas">
+            <div class="invoice-template-preview-canvas" aria-hidden="true">
               <div class="invoice-doc tpl-${meta.id}">${html}</div>
             </div>
             <button type="button" class="invoice-template-preview-trigger" data-open-template-preview="${meta.id}" aria-label="Ouvrir l’aperçu détaillé du modèle ${escapeHtml(meta.name)}">

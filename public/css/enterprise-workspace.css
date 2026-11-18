@@ -167,7 +167,7 @@
    -------------------------------------------------------------------------- */
 body.enterprise-console-shell {
   background: #f5f7fa;
-  color: #182333;
+  color: #151F4D;
 }
 body.enterprise-console-shell .enterprise-console-topbar {
   position: fixed;
@@ -1409,7 +1409,7 @@ body.enterprise-console-shell #app-sidebar .nav-item.active .ic {
    -------------------------------------------------------------------------- */
 body.enterprise-console-shell {
   --enterprise-page-bg: #f5f7fa;
-  --enterprise-page-text: #182333;
+  --enterprise-page-text: #151F4D;
   --enterprise-surface: #ffffff;
   --enterprise-surface-alt: #f4f9fd;
   --enterprise-text-strong: #18344f;
@@ -1452,7 +1452,7 @@ body.enterprise-console-shell {
   --enterprise-icon-text: #8ed0b1;
   --enterprise-track: #454238;
   --enterprise-link: #8cbfd8;
-  --enterprise-sidebar-bg: #171713;
+  --enterprise-sidebar-bg: #0D142B;
   --enterprise-sidebar-text: #d6cfc3;
   --enterprise-sidebar-muted: #a9a397;
   --enterprise-sidebar-border: #48443a;
@@ -1480,7 +1480,7 @@ body.enterprise-console-shell {
     --enterprise-icon-text: #8ed0b1;
     --enterprise-track: #454238;
     --enterprise-link: #8cbfd8;
-    --enterprise-sidebar-bg: #171713;
+    --enterprise-sidebar-bg: #0D142B;
     --enterprise-sidebar-text: #d6cfc3;
     --enterprise-sidebar-muted: #a9a397;
     --enterprise-sidebar-border: #48443a;
@@ -1805,7 +1805,7 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
   color: #D6CFC3 !important;
 }
 :root[data-theme="dark"] body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .ic {
-  color: #8ED0B1 !important;
+  color: #20A85A !important;
   background: transparent !important;
 }
 @media (prefers-color-scheme: dark) {
@@ -1814,7 +1814,23 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
     color: #D6CFC3 !important;
   }
   :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell aside#app-sidebar.sidebar nav#app-navigation a.nav-item:not(.active) .ic {
-    color: #8ED0B1 !important;
+    color: #20A85A !important;
     background: transparent !important;
   }
 }
+
+/* Accessibilité : les commandes du bandeau Entreprise ont une surface claire.
+   Utiliser un texte et des icônes navy sur ces boutons, pas le bleu pâle réservé
+   au texte placé directement sur le fond navy du bandeau. */
+body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle,
+body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout,
+body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization {
+  color: #18265B;
+}
+body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle .icon,
+body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle svg,
+body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout .icon,
+body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization .icon {
+  color: #18265B;
+}
+

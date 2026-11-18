@@ -1,33 +1,31 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Palette SunuPilot — indigo profond et vert baobab, avec des surfaces neutres pour la lisibilité. */
-  --brand-blue: #18265B;
-  --brand-cyan: #087A3D;
-  --brand-green: #087A3D;
-  --navy-950: #151F4D;
-  --navy-900: #18265B;
-  --navy-800: #243675;
-  --navy-700: #31468A;
-  --emerald: #087A3D;
-  --emerald-light: #E8F4EC;
-  --gold: #087A3D;
-  --gold-text: #075B31;
-  --gold-light: #E8F4EC;
+  /* Palette premium — identité conservée (navy/émeraude/or), valeurs affinées pour un
+     rendu plus profond et un meilleur contraste. */
+  --navy-950: #0B1526;
+  --navy-900: #14213D;
+  --navy-800: #1C2B4A;
+  --navy-700: #28395E;
+  --emerald: #0EA980;
+  --emerald-light: #E3F6EF;
+  --gold: #DDA53F;
+  --gold-text: #76501E;
+  --gold-light: #FBF0DC;
   --clay: #E1484F;
   --clay-light: #FBEAEB;
-  --cream: #F4F8FC;
+  --cream: #F6F4EE;
   --paper: #FFFFFF;
   --ink: #171B26;
   --ink-soft: #5B6172;
-  --line: #E2EAF3;
+  --line: #E6E2D9;
 
   /* Tokens "structurels" fixes : toujours sombres, dans les deux thèmes (barre latérale,
      pied de page, en-têtes de tableau...). Contrairement à --navy-950/900 ci-dessus, ceux-ci
      ne s'inversent jamais en mode sombre — c'est ce qui permet aux titres (qui utilisent
      --navy-950 comme couleur de texte) de rester lisibles sans casser la barre latérale. */
-  --structural-dark-1: #151F4D;
-  --structural-dark-2: #18265B;
+  --structural-dark-1: #0B1526;
+  --structural-dark-2: #14213D;
 
   /* Utiliser les familles réellement chargées ci-dessus : pas de substitution silencieuse
      vers une police système différente entre l'aperçu navigateur et Chromium/PDF. */
@@ -335,13 +333,10 @@ button, input, select, textarea { font-family: var(--font-body); font-size: 0.95
   .card { padding: 14px; }
 }
 
-/* Tableau "Factures récurrentes" (7 colonnes) : sur mobile, bascule en cartes empilées
-   plutôt que de forcer un défilement horizontal. Mêmes informations et actions,
-   simplement réorganisées verticalement. Scopé à .table-stack (ajouté uniquement sur
-   cette table) pour ne pas affecter les autres tableaux de l'app — revus en Phase 9 et
-   déjà adaptés au défilement horizontal, qui reste approprié pour eux (moins de colonnes,
-   ou usage plus proche d'un tableur consulté par des utilisateurs habitués). */
-@media (max-width: 640px) {
+/* Les tableaux .table-stack passent en cartes dès 760 px : cela couvre les écrans
+   étroits et le zoom navigateur à 200 % (720 px CSS sur un écran 1440 px). Les cellules
+   restent lisibles sans compresser leurs colonnes jusqu'à une lettre par ligne. */
+@media (max-width: 760px) {
   .table-stack { min-width: 0 !important; }
   .table-stack thead { display: none; }
   .table-stack, .table-stack tbody, .table-stack tr, .table-stack td { display: block; width: 100%; }
@@ -3380,7 +3375,7 @@ textarea { line-height: 1.55; }
   color: #DCE6F8;
   text-align: center;
 }
-.sidebar-promo .promo-icon { color: #20A85A; font-size: 1.5rem; margin-bottom: 6px; }
+.sidebar-promo .promo-icon { color: #F7C65A; font-size: 1.5rem; margin-bottom: 6px; }
 .sidebar-promo strong { display: block; color: #fff; font-size: .88rem; }
 .sidebar-promo p { margin: 5px 0 10px; color: #B8C6DF; font-size: .73rem; line-height: 1.5; }
 .sidebar-promo a {
@@ -3390,7 +3385,7 @@ textarea { line-height: 1.55; }
 }
 .sidebar-foot { padding: 13px 18px 18px; color: #A8B6D0; }
 .sidebar-foot > div:last-child { color: #CCD7EA !important; }
-.plan-badge { background: rgba(247,198,90,.13); color: #20A85A; }
+.plan-badge { background: rgba(247,198,90,.13); color: #F7C65A; }
 
 #topbar-root { min-width: 0; }
 .app-topbar {
@@ -4674,10 +4669,10 @@ input:focus, select:focus, textarea:focus {
 }
 .nav-item .ic { width: 18px; font-size: 18px; color: #BDB7AC; }
 .nav-item.active, .nav-item.active:hover {
-  color: #D7F0E3 !important; background: rgba(8,122,87,.19) !important;
+  color: #E8F4EC !important; background: rgba(8,122,87,.19) !important;
   box-shadow: inset 2px 0 0 #38A77E !important;
 }
-.nav-item.active .ic { color: #8ED0B1 !important; background: transparent !important; }
+.nav-item.active .ic { color: #20A85A !important; background: transparent !important; }
 .sidebar-promo {
   background: rgba(255,255,255,.045) !important; border: 1px solid rgba(255,255,255,.11);
   border-radius: 8px; box-shadow: none;
@@ -4904,8 +4899,8 @@ label, .form-label { color: var(--ink-soft); font-weight: 500; }
 }
 
 
-/* Thème sombre cohérent avec la même direction : indigo profond, surfaces profondes,
-   contraste élevé et même accent vert baobab. */
+/* Thème sombre cohérent avec la même direction : encre graphite, papier profond,
+   contraste élevé et même accent émeraude (pas de retour au bleu nuit). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
@@ -7199,41 +7194,61 @@ a.btn .icon {
   }
 }
 
+/* --------------------------------------------------------------------------
+   Accessibilité WCAG — contrastes des actions et indicateurs de rapports.
+   Les teintes restent cohérentes avec la palette existante, avec un ratio
+   supérieur ou égal à 4,5:1 pour le texte courant sur les surfaces concernées.
+   -------------------------------------------------------------------------- */
+.btn-danger { color: #A8322D; }
+.btn-danger:hover:not(:disabled) {
+  background: #A8322D;
+  color: #fff;
+}
+:root[data-theme="dark"] .btn-danger { color: #FF9A95; }
+:root[data-theme="dark"] .btn-danger:hover:not(:disabled) {
+  background: #A8322D;
+  color: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .btn-danger { color: #FF9A95; }
+  :root:not([data-theme="light"]) .btn-danger:hover:not(:disabled) {
+    background: #A8322D;
+    color: #fff;
+  }
+}
 
-/* SunuPilot brand system — restrained blue/cyan/green accents, compatible with light and dark themes. */
-.sidebar-brand .mark { border-color: rgba(54, 150, 245, .68); box-shadow: 0 7px 20px rgba(20, 91, 180, .22), 0 0 0 3px rgba(255,255,255,.06); }
-.lp-header .brand img { display:block; width:210px; max-width:min(52vw, 210px); height:auto; max-height:58px; object-fit:contain; }
-.auth-form-badge .mark { border-color: rgba(35, 197, 233, .45); }
+.billing-filter.is-active { color: #1456C0; }
+:root[data-theme="dark"] .billing-filter.is-active { color: #8AB8FF; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .billing-filter.is-active { color: #8AB8FF; }
+}
 
+.billing-icon-action.is-whatsapp,
+.btn.is-whatsapp { color: #0B6D32; }
+.billing-icon-action.is-whatsapp:hover,
+.btn.is-whatsapp:hover {
+  color: #0B6D32;
+  border-color: #0B6D32;
+}
 
-/* SunuPilot application accents: blue for primary actions, green remains semantic success. */
-.sidebar-brand .mark {
-  background: #F5F9FF;
-  border: 1px solid rgba(54, 150, 245, .48);
+/* Les chiffres restent blancs sur les dégradés, désormais assez sombres
+   sur toute leur plage pour conserver le contraste, y compris les accents
+   vert et ambre. Le fond explicite empêche une règle générique de carte
+   d'effacer ces accents sur les pages de rapports. */
+.reports-kpi-blue {
+  background: linear-gradient(125deg, #1355B5, #1A62CA) !important;
 }
-.btn-primary,
-.app-topbar-search button,
-.workspace-primary-action {
-  background: linear-gradient(105deg, #1769E8 0%, #2385ED 100%) !important;
-  border-color: #1769E8 !important;
-  color: #FFFFFF !important;
-  box-shadow: 0 5px 14px rgba(23, 105, 232, .2) !important;
+.reports-kpi-green {
+  background: linear-gradient(125deg, #08724F, #0A7F59) !important;
 }
-.btn-primary:hover:not(:disabled),
-.app-topbar-search button:hover,
-.workspace-primary-action:hover {
-  background: #1255CF !important;
-  border-color: #1255CF !important;
+.reports-kpi-purple {
+  background: linear-gradient(125deg, #7138E8, #8B38F1) !important;
 }
-.sidebar .nav-item.active,
-.sidebar .nav-item.active:hover {
-  border-color: rgba(80, 174, 250, .25) !important;
-  background: rgba(23, 105, 232, .2) !important;
-  color: #FFFFFF !important;
-  box-shadow: inset 3px 0 0 #50BAF8 !important;
+.reports-kpi-amber {
+  background: linear-gradient(125deg, #905700, #A86500) !important;
 }
-.sidebar .nav-item.active .ic { color: #8AD8FF !important; }
-.lp-feature-card .ic {
-  background: rgba(23, 105, 232, .09);
-  color: var(--brand-blue);
-}
+.reports-kpi-blue .stat-label,
+.reports-kpi-green .stat-label,
+.reports-kpi-purple .stat-label,
+.reports-kpi-amber .stat-label { color: #fff; }
+

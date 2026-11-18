@@ -209,7 +209,7 @@ const CHART_STUB = [
   '      if (config.type === "doughnut") {',
   '        const dataset = config.data.datasets[0] || {};',
   '        const values = (dataset.data || []).map(value => Math.max(0, Number(value) || 0));',
-  '        const colors = Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor : [dataset.backgroundColor || "#1769F5"];',
+  '        const colors = Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor : [dataset.backgroundColor || "#18265B"];',
   '        const total = values.reduce((sum, value) => sum + value, 0);',
   '        const radius = Math.max(12, Math.min(width, height) * 0.32);',
   '        const lineWidth = Math.max(16, Math.min(width, height) * 0.16);',
@@ -228,7 +228,7 @@ const CHART_STUB = [
   '      } else {',
   '        context.strokeStyle = "rgba(105,125,160,.16)"; context.lineWidth = 1;',
   '        for (let row = 1; row < 5; row++) { context.beginPath(); context.moveTo(0, row * height / 5); context.lineTo(width, row * height / 5); context.stroke(); }',
-  '        context.strokeStyle = "#087A57"; context.lineWidth = 3; context.beginPath();',
+  '        context.strokeStyle = "#087A3D"; context.lineWidth = 3; context.beginPath();',
   '        const points = [0.85, 0.72, 0.77, 0.55, 0.62, 0.39, 0.48, 0.28, 0.34, 0.12];',
   '        points.forEach((point, index) => { const x = 10 + index * (width - 20) / (points.length - 1); const y = point * (height - 18) + 9; if (index === 0) context.moveTo(x, y); else context.lineTo(x, y); });',
   '        context.stroke();',
@@ -322,7 +322,7 @@ function fixtureFor(pathname, fixtures) {
   if (pathname === '/api/pro/company-group') return {
     groupe: { id: 1, nom: 'Groupe de démonstration', actif: true },
     societes: [
-      { id: 1, entreprise_nom: 'SamaFacture Société principale', contact_nom: 'Compte principal', is_primary: true, pays_code: 'SN', devise: 'FCFA', email: 'direction@principal.example', entreprise_ninea: 'SN-DKR-2026-A001' },
+      { id: 1, entreprise_nom: 'SunuPilot Société principale', contact_nom: 'Compte principal', is_primary: true, pays_code: 'SN', devise: 'FCFA', email: 'direction@principal.example', entreprise_ninea: 'SN-DKR-2026-A001' },
       { id: 2, entreprise_nom: 'Filiale de démonstration', contact_nom: 'Compte filiale', is_primary: false, pays_code: 'SN', devise: 'FCFA', email: 'contact@filiale.example', entreprise_ninea: 'SN-DKR-2026-B002' }
     ],
     invitations: [
@@ -352,7 +352,7 @@ function fixtureFor(pathname, fixtures) {
   };
   if (pathname === '/api/auth/me') return {
     user: {
-      id: 1, nom: 'Compte de recette SamaFacture', entreprise_nom: 'SamaFacture — Société de test',
+      id: 1, nom: 'Compte de recette SunuPilot', entreprise_nom: 'SunuPilot — Société de test',
       entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro'
     }
   };
@@ -394,7 +394,7 @@ function fixtureFor(pathname, fixtures) {
   };
   if (pathname === '/api/portal/') return {
     client: { nom: fixtures.clients[0]?.nom || 'Client de recette', email: fixtures.clients[0]?.email || 'client@example.test' },
-    entreprise: { nom: 'SamaFacture — Société de test', logo: null, email: 'support@example.test', telephone: '+221 77 000 00 00', site_web: 'https://example.test', devise: 'FCFA', langue: 'fr', locale: 'fr-SN' },
+    entreprise: { nom: 'SunuPilot — Société de test', logo: null, email: 'support@example.test', telephone: '+221 77 000 00 00', site_web: 'https://example.test', devise: 'FCFA', langue: 'fr', locale: 'fr-SN' },
     resume: { nb_factures: DATASET === 'empty' ? 0 : 3, nb_devis: DATASET === 'empty' ? 0 : 2, solde_du: DATASET === 'empty' ? 0 : 250000 },
     documents: DATASET === 'empty' ? [] : [
       { id: 1, numero: 'FAC-2026-0001', type: 'facture', date_emission: '2026-11-10', date_echeance: '2026-11-20', statut: 'en_attente', total: 250000, montant_paye: 50000, solde: 200000, devise: 'FCFA', lignes: [{ designation: 'Prestation de conseil', quantite: 2, prix_unitaire: 125000, tva: 18, total_ligne: 250000 }] },
@@ -459,8 +459,8 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
     localStorage.setItem('sf_token', 'visual-recette-token');
     localStorage.setItem('sf_user', JSON.stringify({
       id: 1,
-      nom: 'SamaFacture — Compte de recette',
-      entreprise_nom: 'SamaFacture — Société de test',
+      nom: 'SunuPilot — Compte de recette',
+      entreprise_nom: 'SunuPilot — Société de test',
       devise: 'FCFA',
       plan: 'pro'
     }));
@@ -469,7 +469,8 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
   // Le global est réinitialisé lorsque Puppeteer navigue vers chaque page métier.
   // Le réinjecter sur chaque nouveau document évite une API cross-origin et son préflight CORS.
   await page.evaluateOnNewDocument(() => {
-    window.SAMAFACTURE_API_URL = location.origin + '/api';
+    window.SUNUPILOT_API_URL = location.origin + '/api';
+    window.SAMAFACTURE_API_URL = window.SUNUPILOT_API_URL;
   });
   return page;
 }
@@ -494,7 +495,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     const diagnostic = await page.evaluate(() => ({
       title: document.title,
       url: location.href,
-      apiBase: window.SAMAFACTURE_API_URL || null,
+      apiBase: window.SUNUPILOT_API_URL || window.SAMAFACTURE_API_URL || null,
       hasToken: Boolean(localStorage.getItem('sf_token')),
       bodyText: (document.body?.innerText || '').slice(0, 900),
       loadingRows: document.querySelectorAll('.row-skeleton').length
@@ -2785,6 +2786,577 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
 }
 
 
+async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
+  const results = [];
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const viewport = { width: 720, height: 900 };
+
+  for (const pageDefinition of pages) {
+    const page = await preparePage(browser, baseUrl, fixtures, false);
+    const pageErrors = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    try {
+      await page.setViewport({ ...viewport, deviceScaleFactor: 1 });
+      if (pageDefinition.plan) {
+        await page.evaluate(plan => {
+          const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+          user.plan = plan;
+          localStorage.setItem('sf_user', JSON.stringify(user));
+        }, pageDefinition.plan);
+      }
+      await page.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+      await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+      if (pageDefinition.charts?.length) {
+        await page.waitForFunction(chartIds => chartIds.every(id => {
+          const canvas = document.getElementById(id);
+          return canvas?.dataset.sfChartType && canvas.dataset.sfChartAnimation === 'disabled';
+        }), { timeout: 15000 }, pageDefinition.charts);
+      }
+      await page.waitForFunction(() =>
+        document.documentElement.getAttribute('data-theme') === 'light'
+      , { timeout: 10000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+
+      const metrics = await page.evaluate(() => {
+        const root = document.documentElement;
+        const body = document.body;
+        const main = document.querySelector('main.workspace-page, main#main-content, main') || body;
+        const mainRect = main.getBoundingClientRect();
+        const navToggle = document.querySelector('.enterprise-console-menu-toggle') ||
+          document.getElementById('mobile-toggle-btn');
+        const navStyle = navToggle ? getComputedStyle(navToggle) : null;
+        const navRect = navToggle ? navToggle.getBoundingClientRect() : null;
+        const navLabel = navToggle?.getAttribute('aria-label')?.trim() || '';
+        const controls = navToggle?.getAttribute('aria-controls') || '';
+        const responsiveTables = Array.from(document.querySelectorAll('table.table-stack')).map(table => {
+          const tableRect = table.getBoundingClientRect();
+          const row = table.querySelector('tbody tr:not(.row-skeleton)') || table.querySelector('tbody tr');
+          const labeledCells = Array.from(table.querySelectorAll('tbody td[data-label]'));
+          // Les cellules d'actions peuvent volontairement rester en flex ; mesurer une cellule de contenu.
+          const cell = labeledCells.find(candidate =>
+            candidate.parentElement?.lastElementChild !== candidate
+          ) || labeledCells[0] || null;
+          const cellRect = cell?.getBoundingClientRect();
+          return {
+            tableDisplay: getComputedStyle(table).display,
+            rowDisplay: row ? getComputedStyle(row).display : null,
+            cellDisplay: cell ? getComputedStyle(cell).display : null,
+            tableWidth: Math.round(tableRect.width),
+            cellWidth: cellRect ? Math.round(cellRect.width) : 0,
+            hasRows: Boolean(row),
+            hasLabeledCells: labeledCells.length > 0
+          };
+        });
+        return {
+          viewport: window.innerWidth,
+          documentWidth: root.scrollWidth,
+          bodyWidth: body.scrollWidth,
+          theme: root.getAttribute('data-theme'),
+          colorScheme: getComputedStyle(root).colorScheme,
+          mainLeft: Math.round(mainRect.left),
+          mainRight: Math.round(mainRect.right),
+          navigationVisible: Boolean(navToggle && navStyle && navRect &&
+            navStyle.display !== 'none' && navStyle.visibility !== 'hidden' &&
+            Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
+          navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
+            navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          responsiveTables
+        };
+      });
+
+      assert.equal(metrics.viewport, viewport.width,
+        pageDefinition.name + ' : la largeur CSS simulant le zoom 200 % doit être de 720 px.');
+      assert.equal(metrics.theme, 'light',
+        pageDefinition.name + ' doit conserver le thème clair au zoom 200 %.');
+      assert.equal(metrics.colorScheme, 'light',
+        pageDefinition.name + ' doit conserver color-scheme: light au zoom 200 %.');
+      assert.ok(metrics.documentWidth <= viewport.width + 1 && metrics.bodyWidth <= viewport.width + 1,
+        pageDefinition.name + ' déborde horizontalement au zoom 200 % : ' + JSON.stringify(metrics));
+      assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
+        pageDefinition.name + ' sort du viewport utile au zoom 200 % : ' + JSON.stringify(metrics));
+      assert.equal(metrics.navigationVisible, true,
+        pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
+      assert.equal(metrics.navigationAccessible, true,
+        pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      for (const table of metrics.responsiveTables) {
+        assert.equal(table.tableDisplay, 'block',
+          pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
+        assert.equal(table.rowDisplay, 'block',
+          pageDefinition.name + ' : chaque ligne de tableau doit occuper sa propre carte à 720 px.');
+        assert.equal(table.hasRows, true,
+          pageDefinition.name + ' : le tableau doit afficher ses données ou son état vide à 720 px.');
+        if (table.hasLabeledCells) {
+          assert.equal(table.cellDisplay, 'block',
+            pageDefinition.name + ' : les cellules de contenu doivent être affichées verticalement à 720 px.');
+          assert.ok(table.cellWidth >= table.tableWidth * 0.9,
+            pageDefinition.name + ' : les cellules ne doivent pas se compresser à une lettre par ligne : ' +
+            JSON.stringify(table));
+        }
+      }
+
+      const screenshot = 'zoom-200-' + pageDefinition.name + '-720.png';
+      await page.screenshot({
+        path: path.join(OUTPUT_DIR, screenshot),
+        fullPage: true
+      });
+      results.push({ page: pageDefinition.name, screenshot, ...metrics });
+      assert.deepEqual(pageErrors, [],
+        pageDefinition.name + ' a généré des erreurs JavaScript au zoom 200 % : ' + pageErrors.join(' | '));
+    } finally {
+      await page.close();
+    }
+  }
+
+  return {
+    pageCount: pages.length,
+    viewportWidth: viewport.width,
+    screenshots: results.length,
+    pages: results
+  };
+}
+
+async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
+  const results = [];
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const viewport = { width: 720, height: 900 };
+
+  for (const pageDefinition of pages) {
+    const page = await preparePage(browser, baseUrl, fixtures, false);
+    const pageErrors = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    try {
+      await page.setViewport({ ...viewport, deviceScaleFactor: 1 });
+      if (pageDefinition.plan) {
+        await page.evaluate(plan => {
+          const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+          user.plan = plan;
+          localStorage.setItem('sf_user', JSON.stringify(user));
+        }, pageDefinition.plan);
+      }
+      await page.evaluate(() => localStorage.setItem('sf_theme', 'dark'));
+      await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+      if (pageDefinition.charts?.length) {
+        await page.waitForFunction(chartIds => chartIds.every(id => {
+          const canvas = document.getElementById(id);
+          return canvas?.dataset.sfChartType && canvas.dataset.sfChartAnimation === 'disabled';
+        }), { timeout: 15000 }, pageDefinition.charts);
+      }
+      await page.waitForFunction(() =>
+        document.documentElement.getAttribute('data-theme') === 'dark'
+      , { timeout: 10000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+
+      const metrics = await page.evaluate(() => {
+        const root = document.documentElement;
+        const body = document.body;
+        const main = document.querySelector('main.workspace-page, main#main-content, main') || body;
+        const mainRect = main.getBoundingClientRect();
+        const navToggle = document.querySelector('.enterprise-console-menu-toggle') ||
+          document.getElementById('mobile-toggle-btn');
+        const navStyle = navToggle ? getComputedStyle(navToggle) : null;
+        const navRect = navToggle ? navToggle.getBoundingClientRect() : null;
+        const navLabel = navToggle?.getAttribute('aria-label')?.trim() || '';
+        const controls = navToggle?.getAttribute('aria-controls') || '';
+        const responsiveTables = Array.from(document.querySelectorAll('table.table-stack')).map(table => {
+          const tableRect = table.getBoundingClientRect();
+          const row = table.querySelector('tbody tr:not(.row-skeleton)') || table.querySelector('tbody tr');
+          const labeledCells = Array.from(table.querySelectorAll('tbody td[data-label]'));
+          // Les cellules d'actions peuvent volontairement rester en flex ; mesurer une cellule de contenu.
+          const cell = labeledCells.find(candidate =>
+            candidate.parentElement?.lastElementChild !== candidate
+          ) || labeledCells[0] || null;
+          const cellRect = cell?.getBoundingClientRect();
+          return {
+            tableDisplay: getComputedStyle(table).display,
+            rowDisplay: row ? getComputedStyle(row).display : null,
+            cellDisplay: cell ? getComputedStyle(cell).display : null,
+            tableWidth: Math.round(tableRect.width),
+            cellWidth: cellRect ? Math.round(cellRect.width) : 0,
+            hasRows: Boolean(row),
+            hasLabeledCells: labeledCells.length > 0
+          };
+        });
+        return {
+          viewport: window.innerWidth,
+          documentWidth: root.scrollWidth,
+          bodyWidth: body.scrollWidth,
+          theme: root.getAttribute('data-theme'),
+          colorScheme: getComputedStyle(root).colorScheme,
+          bodyBackground: getComputedStyle(body).backgroundColor,
+          bodyLuminance: (() => {
+            const match = getComputedStyle(body).backgroundColor.match(/rgba?\(([^)]+)\)/i);
+            if (!match) return null;
+            const channels = match[1].split(',').slice(0, 3)
+              .map(channel => Number.parseFloat(channel.trim()) / 255);
+            const linear = value => value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+            return Number((0.2126 * linear(channels[0]) +
+              0.7152 * linear(channels[1]) + 0.0722 * linear(channels[2])).toFixed(3));
+          })(),
+          mainLeft: Math.round(mainRect.left),
+          mainRight: Math.round(mainRect.right),
+          navigationVisible: Boolean(navToggle && navStyle && navRect &&
+            navStyle.display !== 'none' && navStyle.visibility !== 'hidden' &&
+            Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
+          navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
+            navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          responsiveTables
+        };
+      });
+
+      assert.equal(metrics.viewport, viewport.width,
+        pageDefinition.name + ' : la largeur CSS simulant le zoom 200 % doit être de 720 px.');
+      assert.equal(metrics.theme, 'dark',
+        pageDefinition.name + ' doit conserver le thème sombre au zoom 200 %.');
+      assert.equal(metrics.colorScheme, 'dark',
+        pageDefinition.name + ' doit conserver color-scheme: dark au zoom 200 %.');
+      assert.ok(metrics.bodyLuminance !== null && metrics.bodyLuminance < 0.55,
+        pageDefinition.name + ' conserve un fond trop clair en thème sombre au zoom 200 % : ' +
+        JSON.stringify(metrics));
+      assert.ok(metrics.documentWidth <= viewport.width + 1 && metrics.bodyWidth <= viewport.width + 1,
+        pageDefinition.name + ' déborde horizontalement en thème sombre au zoom 200 % : ' + JSON.stringify(metrics));
+      assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
+        pageDefinition.name + ' sort du viewport utile en thème sombre au zoom 200 % : ' + JSON.stringify(metrics));
+      assert.equal(metrics.navigationVisible, true,
+        pageDefinition.name + ' doit garder la navigation visible en thème sombre au zoom 200 %.');
+      assert.equal(metrics.navigationAccessible, true,
+        pageDefinition.name + ' doit garder un bouton de navigation accessible en thème sombre au zoom 200 %.');
+      for (const table of metrics.responsiveTables) {
+        assert.equal(table.tableDisplay, 'block',
+          pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
+        assert.equal(table.rowDisplay, 'block',
+          pageDefinition.name + ' : chaque ligne de tableau doit occuper sa propre carte à 720 px.');
+        assert.equal(table.hasRows, true,
+          pageDefinition.name + ' : le tableau doit afficher ses données ou son état vide à 720 px.');
+        if (table.hasLabeledCells) {
+          assert.equal(table.cellDisplay, 'block',
+            pageDefinition.name + ' : les cellules de contenu doivent être affichées verticalement à 720 px.');
+          assert.ok(table.cellWidth >= table.tableWidth * 0.9,
+            pageDefinition.name + ' : les cellules ne doivent pas se compresser à une lettre par ligne : ' +
+            JSON.stringify(table));
+        }
+      }
+
+      const screenshot = 'zoom-200-dark-' + pageDefinition.name + '-720.png';
+      await page.screenshot({
+        path: path.join(OUTPUT_DIR, screenshot),
+        fullPage: true
+      });
+      results.push({ page: pageDefinition.name, screenshot, ...metrics });
+      assert.deepEqual(pageErrors, [],
+        pageDefinition.name + ' a généré des erreurs JavaScript en thème sombre au zoom 200 % : ' + pageErrors.join(' | '));
+    } finally {
+      await page.close();
+    }
+  }
+
+  return {
+    pageCount: pages.length,
+    viewportWidth: viewport.width,
+    screenshots: results.length,
+    pages: results
+  };
+}
+
+async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
+  const results = [];
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+
+  for (const pageDefinition of pages) {
+    const page = await preparePage(browser, baseUrl, fixtures, false);
+    const pageErrors = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    try {
+      await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+      if (pageDefinition.plan) {
+        await page.evaluate(plan => {
+          const user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+          user.plan = plan;
+          localStorage.setItem('sf_user', JSON.stringify(user));
+        }, pageDefinition.plan);
+      }
+      await page.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+      await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
+      await page.evaluate(() => document.fonts && document.fonts.ready);
+      await new Promise(resolve => setTimeout(resolve, 80));
+
+      // Vérifier le vrai parcours clavier (pas un focus() programmatique, qui ne
+      // déclenche pas nécessairement :focus-visible).
+      await page.keyboard.press('Tab');
+      const metrics = await page.evaluate(() => {
+        const isVisible = element => {
+          if (!element || !element.getClientRects().length) return false;
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return style.display !== 'none' && style.visibility !== 'hidden' &&
+            Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0;
+        };
+        const textOf = element => String(element?.innerText || element?.textContent || '')
+          .replace(/\s+/g, ' ').trim();
+        const accessibleName = element => {
+          const ariaLabel = element.getAttribute('aria-label')?.trim();
+          if (ariaLabel) return ariaLabel;
+          const labelledBy = element.getAttribute('aria-labelledby');
+          if (labelledBy) {
+            const value = labelledBy.split(/\s+/)
+              .map(id => document.getElementById(id))
+              .filter(Boolean)
+              .map(textOf)
+              .filter(Boolean)
+              .join(' ');
+            if (value) return value;
+          }
+          if ('labels' in element && element.labels?.length) {
+            const value = Array.from(element.labels).map(textOf).filter(Boolean).join(' ');
+            if (value) return value;
+          }
+          if (element.tagName === 'IMG') return element.getAttribute('alt')?.trim() || '';
+          const imageAlt = Array.from(element.querySelectorAll('img[alt]'))
+            .map(image => image.getAttribute('alt')?.trim() || '').filter(Boolean).join(' ');
+          const text = textOf(element);
+          if (text) return text;
+          if (imageAlt) return imageAlt;
+          const title = element.getAttribute('title')?.trim();
+          if (title) return title;
+          if (/^(INPUT)$/.test(element.tagName) && /^(button|submit|reset|image)$/i.test(element.type)) {
+            return element.value?.trim() || '';
+          }
+          return '';
+        };
+        const selectorFor = element => {
+          const parts = [element.tagName.toLowerCase()];
+          if (element.id) parts.push('#' + element.id);
+          if (typeof element.className === 'string' && element.className.trim()) {
+            parts.push('.' + element.className.trim().split(/\s+/).slice(0, 2).join('.'));
+          }
+          return parts.join('');
+        };
+        const controls = Array.from(document.querySelectorAll(
+          'a[href], button, input:not([type="hidden"]), select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])'
+        )).filter(isVisible);
+        const unnamedControls = controls.filter(element => !accessibleName(element))
+          .slice(0, 50)
+          .map(element => ({ selector: selectorFor(element), type: element.type || element.getAttribute('role') || '',
+            placeholder: element.getAttribute('placeholder') || '' }));
+        const unnamedImages = Array.from(document.querySelectorAll('img:not([alt])'))
+          .filter(isVisible)
+          .slice(0, 30)
+          .map(selectorFor);
+        const unnamedFrames = Array.from(document.querySelectorAll('iframe:not([title])'))
+          .filter(isVisible)
+          .slice(0, 20)
+          .map(selectorFor);
+        const mainLandmarks = document.querySelectorAll('main, [role="main"]').length;
+        const navigationLandmarks = Array.from(document.querySelectorAll('nav, [role="navigation"]'))
+          .filter(isVisible)
+          .map(element => ({ label: element.getAttribute('aria-label') || '',
+            labelledBy: element.getAttribute('aria-labelledby') || '', text: textOf(element).slice(0, 100) }));
+        const headings = Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6'))
+          .filter(element => isVisible(element) && !element.closest('[aria-hidden="true"]'))
+          .map(element => ({ level: Number(element.tagName.slice(1)), text: textOf(element).slice(0, 100) }));
+        const visibleH1 = headings.filter(heading => heading.level === 1).length;
+        const focus = document.activeElement;
+        const focusStyle = focus && focus !== document.body ? getComputedStyle(focus) : null;
+        const focusVisible = Boolean(focus && focus !== document.body && focus.matches(':focus-visible'));
+        const focusHasIndicator = Boolean(focusStyle && (
+          (focusStyle.outlineStyle !== 'none' && Number.parseFloat(focusStyle.outlineWidth) > 0) ||
+          (focusStyle.boxShadow && focusStyle.boxShadow !== 'none')
+        ));
+
+        const parseColor = value => {
+          const match = String(value || '').match(/rgba?\(([^)]+)\)/i);
+          if (!match) return null;
+          const channels = match[1].split(',').map(part => Number.parseFloat(part.trim()));
+          if (channels.length < 3 || channels.some(channel => !Number.isFinite(channel))) return null;
+          return { r: channels[0] / 255, g: channels[1] / 255, b: channels[2] / 255,
+            a: channels.length > 3 ? channels[3] : 1 };
+        };
+        const luminance = color => {
+          const linear = value => value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+          return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b);
+        };
+        const composite = (foreground, background) => {
+          const alpha = foreground.a ?? 1;
+          return {
+            r: foreground.r * alpha + background.r * (1 - alpha),
+            g: foreground.g * alpha + background.g * (1 - alpha),
+            b: foreground.b * alpha + background.b * (1 - alpha),
+            a: 1
+          };
+        };
+        const contrastRatio = (first, second) => {
+          const values = [luminance(first), luminance(second)].sort((a, b) => b - a);
+          return (values[0] + 0.05) / (values[1] + 0.05);
+        };
+        const textCandidates = Array.from(document.querySelectorAll(
+          'h1,h2,h3,h4,h5,h6,p,label,a,button,td,th,caption,legend,.stat-value,.nav-item,.field-label'
+        )).filter(element => isVisible(element) && textOf(element) &&
+          !element.closest('svg,[aria-hidden="true"],.ic,.icon'));
+        const contrastIssues = [];
+        const unmeasurableContrast = [];
+        for (const element of textCandidates) {
+          const ownStyle = getComputedStyle(element);
+          const foreground = parseColor(ownStyle.color);
+          if (!foreground || foreground.a < 0.95) continue;
+          let ancestor = element;
+          let background = null;
+          let gradient = false;
+          while (ancestor) {
+            const style = getComputedStyle(ancestor);
+            if (style.backgroundImage && style.backgroundImage !== 'none') {
+              gradient = true;
+              break;
+            }
+            const color = parseColor(style.backgroundColor);
+            if (color && color.a >= 0.95) {
+              background = color;
+              break;
+            }
+            ancestor = ancestor.parentElement;
+          }
+          if (gradient || element.closest(
+            '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
+          )) {
+            unmeasurableContrast.push(selectorFor(element));
+            continue;
+          }
+          if (!background) background = parseColor(getComputedStyle(document.body).backgroundColor);
+          if (!background) continue;
+          const renderedForeground = foreground.a < 1 ? composite(foreground, background) : foreground;
+          const ratio = contrastRatio(renderedForeground, background);
+          const fontSize = Number.parseFloat(ownStyle.fontSize) || 15;
+          const fontWeight = Number.parseInt(ownStyle.fontWeight, 10) || 400;
+          const largeText = fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
+          const required = largeText ? 3 : 4.5;
+          if (ratio + 0.01 < required) {
+            contrastIssues.push({
+              selector: selectorFor(element),
+              text: textOf(element).slice(0, 80),
+              foreground: ownStyle.color,
+              background: ownStyle.backgroundColor,
+              ratio: Number(ratio.toFixed(2)),
+              required
+            });
+          }
+        }
+
+        const nonSemanticActions = Array.from(document.querySelectorAll('[onclick]'))
+          .filter(isVisible)
+          .filter(element => {
+            const handler = (element.getAttribute('onclick') || '').trim();
+            // Un onclick qui ne fait qu'arrêter la propagation d'un clic n'est
+            // pas une action interactive (ex. cellule Actions dans une ligne cliquable).
+            if (/^event\.stopPropagation\(\);?$/.test(handler)) return false;
+            return !/^(A|BUTTON|INPUT|SELECT|TEXTAREA)$/.test(element.tagName) &&
+              !element.hasAttribute('role') && !element.hasAttribute('tabindex');
+          })
+          .slice(0, 30)
+          .map(selectorFor);
+
+        const gradientSurfaces = Array.from(document.querySelectorAll(
+          '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
+        )).map(element => ({
+          className: element.className,
+          backgroundImage: getComputedStyle(element).backgroundImage,
+          labelColor: getComputedStyle(element.querySelector('.stat-label')).color,
+          valueColor: getComputedStyle(element.querySelector('.stat-value')).color
+        }));
+
+        return {
+          viewport: window.innerWidth,
+          theme: document.documentElement.getAttribute('data-theme'),
+          gradientSurfaces,
+          visibleControlCount: controls.length,
+          unnamedControls,
+          unnamedImages,
+          unnamedFrames,
+          mainLandmarks,
+          navigationLandmarks,
+          headings,
+          visibleH1,
+          focus: focus && focus !== document.body ? {
+            selector: selectorFor(focus),
+            focusVisible,
+            hasIndicator: focusHasIndicator,
+            outline: focusStyle?.outline || '',
+            boxShadow: focusStyle?.boxShadow || ''
+          } : null,
+          contrastIssues: contrastIssues.slice(0, 50),
+          contrastIssueCount: contrastIssues.length,
+          unmeasurableContrastCount: unmeasurableContrast.length,
+          nonSemanticActions
+        };
+      });
+
+      assert.equal(metrics.unnamedControls.length, 0,
+        pageDefinition.name + ' contient des commandes sans nom accessible : ' + JSON.stringify(metrics.unnamedControls));
+      assert.equal(metrics.unnamedImages.length, 0,
+        pageDefinition.name + ' contient des images sans alternative textuelle : ' + JSON.stringify(metrics.unnamedImages));
+      assert.equal(metrics.unnamedFrames.length, 0,
+        pageDefinition.name + ' contient des cadres sans titre : ' + JSON.stringify(metrics.unnamedFrames));
+      assert.equal(metrics.mainLandmarks, 1,
+        pageDefinition.name + ' doit contenir exactement un repère principal.');
+      assert.ok(metrics.navigationLandmarks.every(nav => nav.label || nav.labelledBy),
+        pageDefinition.name + ' contient une navigation sans nom accessible.');
+      assert.equal(metrics.visibleH1, 1,
+        pageDefinition.name + ' doit exposer un seul titre principal, hors aperçus décoratifs.');
+      assert.ok(metrics.focus?.focusVisible && metrics.focus?.hasIndicator,
+        pageDefinition.name + ' doit afficher un indicateur au premier focus clavier : ' + JSON.stringify(metrics.focus));
+      assert.equal(metrics.contrastIssueCount, 0,
+        pageDefinition.name + ' contient des textes sous le contraste requis : ' + JSON.stringify(metrics.contrastIssues));
+      assert.equal(metrics.nonSemanticActions.length, 0,
+        pageDefinition.name + ' contient des actions non sémantiques : ' + JSON.stringify(metrics.nonSemanticActions));
+      if (pageDefinition.name === 'rapports') {
+        assert.equal(metrics.gradientSurfaces.length, 4,
+          'Les quatre cartes KPI doivent être présentes sur la page Rapports.');
+        for (const surface of metrics.gradientSurfaces) {
+          assert.match(surface.backgroundImage, /gradient/i,
+            'Le dégradé de ' + surface.className + ' doit être effectivement rendu.');
+          assert.equal(surface.labelColor, 'rgb(255, 255, 255)',
+            'Les libellés des cartes KPI doivent être blancs à pleine opacité.');
+          assert.equal(surface.valueColor, 'rgb(255, 255, 255)',
+            'Les valeurs des cartes KPI doivent être blanches.');
+        }
+      }
+
+      const screenshot = 'accessibilite-' + pageDefinition.name + '-1280.png';
+      await page.screenshot({ path: path.join(OUTPUT_DIR, screenshot), fullPage: true });
+      results.push({
+        page: pageDefinition.name,
+        screenshot,
+        ...metrics,
+        javascriptErrors: pageErrors
+      });
+    } finally {
+      await page.close();
+    }
+  }
+
+  return {
+    pageCount: pages.length,
+    viewportWidth: 1280,
+    pages: results,
+    totals: {
+      unnamedControls: results.reduce((sum, page) => sum + page.unnamedControls.length, 0),
+      unnamedImages: results.reduce((sum, page) => sum + page.unnamedImages.length, 0),
+      unnamedFrames: results.reduce((sum, page) => sum + page.unnamedFrames.length, 0),
+      invalidMainLandmarks: results.filter(page => page.mainLandmarks !== 1).length,
+      missingNavigationLabels: results.filter(page => page.navigationLandmarks.some(nav => !nav.label && !nav.labelledBy)).length,
+      pagesWithoutH1: results.filter(page => page.visibleH1 < 1).length,
+      pagesWithMultipleH1: results.filter(page => page.visibleH1 > 1).length,
+      missingKeyboardFocus: results.filter(page => !page.focus?.focusVisible || !page.focus?.hasIndicator).length,
+      contrastIssues: results.reduce((sum, page) => sum + page.contrastIssueCount, 0),
+      nonSemanticActions: results.reduce((sum, page) => sum + page.nonSemanticActions.length, 0),
+      javascriptErrors: results.reduce((sum, page) => sum + page.javascriptErrors.length, 0)
+    }
+  };
+}
+
 async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   if (DATASET === 'empty') return { skipped: 'jeu de données vide' };
   const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -3049,6 +3621,9 @@ async function main() {
     const businessLightThemeDesktop = await verifyBusinessPagesLightThemeDesktop(browser, baseUrl, fixtures);
     const businessDarkThemeMobile = await verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures);
     const businessLightThemeMobile = await verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures);
+    const businessPagesZoom200 = await verifyBusinessPagesZoom200(browser, baseUrl, fixtures);
+    const businessPagesDarkThemeZoom200 = await verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures);
+    const accessibility = await verifyBusinessPagesAccessibility(browser, baseUrl, fixtures);
     const documentFlows = await verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures);
     const report = {
       dataset: DATASET,
@@ -3064,8 +3639,11 @@ async function main() {
       businessLightThemeDesktop,
       businessDarkThemeMobile,
       businessLightThemeMobile,
+      businessPagesZoom200,
+      businessPagesDarkThemeZoom200,
+      accessibility,
       documentFlows,
-      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessLightThemeDesktop.screenshots + businessDarkThemeMobile.screenshots + businessLightThemeMobile.screenshots + (documentFlows.screenshots || 0),
+      screenshots: results.length + 2 + publicPages.length + themeConsistency.screenshots + businessDarkTheme.screenshots + businessLightThemeDesktop.screenshots + businessDarkThemeMobile.screenshots + businessLightThemeMobile.screenshots + businessPagesZoom200.screenshots + businessPagesDarkThemeZoom200.screenshots + accessibility.pageCount + (documentFlows.screenshots || 0),
       note: 'Captures du navigateur avec réponses API fictives injectées ; aucune donnée réelle n’est utilisée.'
     };
     fs.writeFileSync(path.join(OUTPUT_DIR, 'rapport-recette-visuelle.json'), JSON.stringify(report, null, 2));
