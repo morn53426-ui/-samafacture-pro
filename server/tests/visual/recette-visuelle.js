@@ -1859,13 +1859,13 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
 
   await groupPage.evaluate(() => window.SamaTheme.definir('dark'));
   await groupPage.waitForFunction(() =>
-    getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(40, 39, 32)'
+    getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(26, 27, 46)'
   );
   const dark = await readGroupTheme();
   assert.equal(dark.theme, 'dark', 'Le centre Entreprise doit appliquer le thème sombre sans rechargement.');
-  assert.equal(dark.page, 'rgb(29, 28, 24)', 'Le fond du centre Entreprise doit suivre le graphite du thème sombre.');
-  assert.equal(dark.panel, 'rgb(40, 39, 32)', 'Les panneaux ne doivent plus rester blancs en thème sombre.');
-  assert.equal(dark.dashboardCard, 'rgb(40, 39, 32)', 'Les cartes de pilotage doivent utiliser la surface sombre.');
+  assert.equal(dark.page, 'rgb(17, 18, 34)', 'Le fond du centre Entreprise doit suivre l’indigo profond du thème sombre SUNUPILOT.');
+  assert.equal(dark.panel, 'rgb(26, 27, 46)', 'Les panneaux ne doivent plus rester blancs en thème sombre.');
+  assert.equal(dark.dashboardCard, 'rgb(26, 27, 46)', 'Les cartes de pilotage doivent utiliser la surface sombre.');
   assert.equal(dark.sidebar, 'rgb(23, 23, 19)', 'Le rail latéral doit devenir sombre avec le reste de l’application.');
   assert.equal(dark.horizontalOverflow, false, 'Le thème sombre ne doit pas provoquer de débordement.');
   const headingContrast = contrastRatio(dark.heading, dark.page);
@@ -1920,7 +1920,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
       name + ' doit assombrir les lignes de grille avec le thème sombre.');
     assert.notEqual(darkColors.tick, lightColors.tick,
       name + ' doit adapter les libellés du graphique avec le thème sombre.');
-    const contrast = contrastRatio(darkColors.tick, 'rgb(40, 39, 32)');
+    const contrast = contrastRatio(darkColors.tick, 'rgb(26, 27, 46)');
     assert.ok(contrast >= 4.5,
       name + ' : les libellés du graphique doivent rester lisibles en thème sombre. Contraste : ' + contrast.toFixed(2));
     await page.screenshot({
@@ -2062,7 +2062,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     'La scène de prévisualisation doit suivre le thème sombre.');
   assert.notEqual(previewDark.stage, 'rgb(233, 237, 242)',
     'La scène de prévisualisation ne doit pas conserver son ancien fond gris clair en thème sombre.');
-  assert.equal(previewDark.dialog, 'rgb(40, 39, 32)',
+  assert.equal(previewDark.dialog, 'rgb(26, 27, 46)',
     'La fenêtre d’aperçu doit suivre le thème sombre.');
   assert.equal(previewDark.paper, 'rgb(255, 255, 255)',
     'La feuille A4 doit rester blanche pour refléter le rendu imprimé.');
@@ -2169,8 +2169,8 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
 
   assert.equal(darkMetrics.theme, 'dark', 'Le thème sombre doit être appliqué avant le rendu du tableau de bord.');
   assert.notEqual(darkMetrics.card, 'rgb(255, 255, 255)', 'Les cartes ne doivent pas rester blanches en thème sombre.');
-  assert.equal(darkMetrics.background, 'rgb(29, 28, 24)', 'Le thème sombre doit reprendre le fond graphite de la direction Unslop.');
-  assert.equal(darkMetrics.card, 'rgb(40, 39, 32)', 'Les cartes sombres doivent utiliser la teinte papier profonde.');
+  assert.equal(darkMetrics.background, 'rgb(17, 18, 34)', 'Le thème sombre doit reprendre le fond indigo profond de l’identité SUNUPILOT.');
+  assert.equal(darkMetrics.card, 'rgb(26, 27, 46)', 'Les cartes sombres doivent utiliser la teinte papier profonde.');
   assert.equal(darkMetrics.sidebar, 'rgb(23, 23, 19)', 'Le rail compact ne doit pas rester blanc en thème sombre.');
   assert.equal(darkMetrics.sidebarNav, 'rgb(23, 23, 19)', 'La navigation compacte doit adopter le fond du rail sombre.');
   const sidebarContrast = contrastRatio(darkMetrics.sidebarLabel, darkMetrics.sidebar);
