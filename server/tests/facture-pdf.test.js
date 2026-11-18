@@ -1,5 +1,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const request = require('supertest');
 const puppeteer = require('puppeteer');
 const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
@@ -102,8 +104,19 @@ describe('Génération PDF de facture', () => {
       const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
       assert.ok(pageCount >= 1 && pageCount <= 2,
         modele + ' ne doit pas créer de pagination excessive pour une facture simple (pages=' + pageCount + ')');
-      const nomsPolicesPdf = Array.from(pdfLatin1.matchAll(/\/BaseFont\s*\/([^\s/]+)/g), match => match[1]);
-      assert.ok(nomsPolicesPdf.some(name => /IBMPlexSans/i.test(name)),
+      const nomsPolicesPdf = Array.from(
+        pdfLatin1.matchAll(/\/(?:BaseFont|FontName)\s*\/([^\s/]+)/g),
+        match => match[1]
+      );
+      const sansIntegree = nomsPolicesPdf.some(name => /IBMPlexSans/i.test(name));
+      if (!sansIntegree) {
+        // Conserver le vrai PDF fautif dans l'artefact de diagnostic CI pour analyser
+        // les ressources de police avec pdffonts/PDFium, sans affaiblir l'assertion.
+        const diagnosticDir = path.resolve(__dirname, 'diagnostics');
+        fs.mkdirSync(diagnosticDir, { recursive: true });
+        fs.writeFileSync(path.join(diagnosticDir, 'police-manquante-' + modele + '.pdf'), res.body);
+      }
+      assert.ok(sansIntegree,
         modele + ' doit intégrer IBM Plex Sans dans le vrai PDF, polices trouvées : ' + nomsPolicesPdf.join(', '));
       assert.ok(nomsPolicesPdf.some(name => /IBMPlexMono/i.test(name)),
         modele + ' doit intégrer IBM Plex Mono dans le vrai PDF, polices trouvées : ' + nomsPolicesPdf.join(', '));
