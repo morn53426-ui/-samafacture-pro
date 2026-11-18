@@ -13,6 +13,7 @@ L'interface utilise une identité sénégalaise contemporaine, construite autour
 - **Indigo profond** — `#18265B` : navigation, titres, éléments de structure et repères de confiance.
 - **Vert baobab** — `#087A3D` : actions principales, validation et accents de croissance.
 - Les fonds neutres restent clairs en mode clair et indigo profond en mode sombre afin de préserver le contraste, la lisibilité et l'impression des documents.
+- Pour les nouveaux composants, réutilisez les variables CSS existantes (`--navy-900`, `--emerald`, `--cream`, `--paper`) au lieu d'introduire des nuances de marque locales.
 
 Le logo associe un baobab stylisé à un symbole de pilotage et de progression. La marque SunuPilot reste un nom de travail tant que la recherche d'antériorité et la validation juridique auprès de l'OAPI n'ont pas été finalisées.
  Le périmètre principal comprend l'authentification, les clients, le catalogue, les factures/devis, les encaissements, les dépenses et les rapports. Une extension de modules professionnels (commandes, avoirs, acomptes, équipes, établissements, caisses, documents, analyses, automatisations et intégrations API/webhooks) est décrite dans [MODULES_PROFESSIONNELS.md](MODULES_PROFESSIONNELS.md), avec ses limites actuelles.
