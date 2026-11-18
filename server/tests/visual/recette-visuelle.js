@@ -2326,7 +2326,6 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       format: 'A4',
       preferCSSPageSize: true,
       printBackground: true,
-      margin: { top: '12mm', bottom: '14mm', left: '12mm', right: '12mm' },
       scale: 1
     });
     // Puppeteer 25 peut renvoyer un Uint8Array plutôt qu'un Buffer : normaliser
