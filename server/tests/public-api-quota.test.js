@@ -42,7 +42,7 @@ describe('API publique : quota mensuel des factures gratuites', () => {
   });
 
   test('les deux noms d’en-tête de clé API restent acceptés', async () => {
-    const current = await request(app).get('/api/v1/health').set('X-OptiGest-Key', apiKey);
+    const current = await request(app).get('/api/v1/health').set('X-SunuPilot-Key', apiKey);
     assert.equal(current.status, 200, current.text);
 
     const legacy = await request(app).get('/api/v1/health').set('X-SamaFacture-Key', apiKey);
@@ -52,7 +52,7 @@ describe('API publique : quota mensuel des factures gratuites', () => {
   test("une date d'émission passée ne permet pas de dépasser le quota par l'API publique", async () => {
     const createInvoice = () => request(app)
       .post('/api/v1/invoices')
-      .set('X-OptiGest-Key', apiKey)
+      .set('X-SunuPilot-Key', apiKey)
       .send({
         client_id: clientId,
         date_emission: '2000-01-01',

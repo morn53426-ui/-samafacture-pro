@@ -5,13 +5,13 @@
 <script src="js/icons.js"></script>
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
-<title>Paramètres — OptiGest</title>
+<title>Paramètres — SunuPilot</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="stylesheet" href="css/workspace-polish.css" />
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0F1B33" />
+<meta name="theme-color" content="#18265B" />
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 <style>
@@ -650,7 +650,7 @@
                 Couleur principale (filet des totaux)
               </label>
               <div class="perso-color-row">
-                <input type="color" id="perso_couleur_principale" aria-label="Couleur principale du document" value="#0F1B33" disabled onchange="updatePersoColorValue('couleur_principale')" />
+                <input type="color" id="perso_couleur_principale" aria-label="Couleur principale du document" value="#18265B" disabled onchange="updatePersoColorValue('couleur_principale')" />
                 <span class="perso-color-value" id="perso_couleur_principale_value">Par défaut</span>
               </div>
             </div>
@@ -660,7 +660,7 @@
                 Couleur secondaire (tampon de statut)
               </label>
               <div class="perso-color-row">
-                <input type="color" id="perso_couleur_secondaire" aria-label="Couleur secondaire du document" value="#0F1B33" disabled onchange="updatePersoColorValue('couleur_secondaire')" />
+                <input type="color" id="perso_couleur_secondaire" aria-label="Couleur secondaire du document" value="#18265B" disabled onchange="updatePersoColorValue('couleur_secondaire')" />
                 <span class="perso-color-value" id="perso_couleur_secondaire_value">Par défaut</span>
               </div>
             </div>
@@ -1448,7 +1448,7 @@
     } catch (err) {
       // Visible dans la console navigateur (F12) pour diagnostiquer un futur cas encore non
       // prévu, en plus du message affiché à l'utilisateur.
-      console.error('[OptiGest] Échec de l’enregistrement des paramètres entreprise :', err);
+      console.error('[SunuPilot] Échec de l’enregistrement des paramètres entreprise :', err);
       showEntrepriseMessage(err?.message || 'Impossible d’enregistrer les modifications.', 'error');
     } finally {
       restore();

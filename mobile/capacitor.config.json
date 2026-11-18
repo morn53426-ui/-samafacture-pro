@@ -1,6 +1,6 @@
 {
-  "appId": "com.optigest.app",
-  "appName": "OptiGest",
+  "appId": "com.sunupilot.app",
+  "appName": "SunuPilot",
   "webDir": "../public",
   "bundledWebRuntime": false,
   "server": {

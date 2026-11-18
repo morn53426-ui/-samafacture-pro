@@ -3,7 +3,7 @@
 
 // Contrôles HTTP strictement non destructifs pour un environnement de préproduction.
 // Ce script ne crée aucun compte, aucune facture et aucune autre donnée.
-const BASE_URL = String(process.env.OPTIGEST_BASE_URL || process.env.SAMAFACTURE_BASE_URL || '').trim();
+const BASE_URL = String(process.env.SUNUPILOT_BASE_URL || process.env.SAMAFACTURE_BASE_URL || '').trim();
 const ALLOW_HTTP = process.env.ALLOW_HTTP_STAGING === 'true';
 const TIMEOUT_MS = 10000;
 
@@ -26,7 +26,7 @@ async function get(path, headers = {}) {
 
 async function run() {
   if (!BASE_URL) {
-    report(false, 'OPTIGEST_BASE_URL', 'définir l’URL HTTPS de staging');
+    report(false, 'SUNUPILOT_BASE_URL', 'définir l’URL HTTPS de staging');
     return;
   }
 
@@ -84,7 +84,7 @@ async function run() {
       'GET /api/clients doit répondre HTTP 401 ; obtenu HTTP ' + protectedRoute.status
     );
 
-    const token = String(process.env.OPTIGEST_STAGING_TOKEN || process.env.SAMAFACTURE_STAGING_TOKEN || '').trim();
+    const token = String(process.env.SUNUPILOT_STAGING_TOKEN || process.env.SAMAFACTURE_STAGING_TOKEN || '').trim();
     if (token) {
       const session = await get('/api/auth/me', { Authorization: 'Bearer ' + token });
       const sessionBody = await session.json().catch(() => ({}));
@@ -94,7 +94,7 @@ async function run() {
         'GET /api/auth/me — HTTP ' + session.status
       );
     } else {
-      process.stdout.write('INFO  Authentification positive ignorée — OPTIGEST_STAGING_TOKEN non fourni.\n');
+      process.stdout.write('INFO  Authentification positive ignorée — SUNUPILOT_STAGING_TOKEN non fourni.\n');
     }
   } catch (err) {
     report(false, 'Accès à staging', err && err.name === 'TimeoutError'

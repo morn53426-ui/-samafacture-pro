@@ -1,4 +1,4 @@
-# Docker — OptiGest
+# Docker — SunuPilot
 
 ## Prérequis et versions
 

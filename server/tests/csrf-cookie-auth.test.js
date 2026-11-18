@@ -90,8 +90,8 @@ describe('requireAuth — repli sur le cookie sf_token (migration progressive)',
     assert.equal(appele, true);
   });
 
-  test("POST via cookie avec le nouvel en-tête OptiGest est autorisé", async () => {
-    const req = fauxeRequete({ method: 'POST', cookies: { sf_token: jetonValide() }, xRequestedWith: 'OptiGest' });
+  test("POST via cookie avec le nouvel en-tête SunuPilot est autorisé", async () => {
+    const req = fauxeRequete({ method: 'POST', cookies: { sf_token: jetonValide() }, xRequestedWith: 'SunuPilot' });
     const res = fauxeReponse();
     let appele = false;
     await requireAuth(req, res, () => { appele = true; });

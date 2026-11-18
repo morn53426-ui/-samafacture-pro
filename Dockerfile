@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 # ---------------------------------------------------------------------------
-# Image de production pour OptiGest.
+# Image de production pour SunuPilot.
 #
 # A construire depuis la RACINE du dépôt (celle où se trouvent server/ et public/) :
-#   docker build -t optigest .
+#   docker build -t sunupilot .
 # Le contexte doit inclure les deux dossiers, car server/app.js sert le frontend statique
 # depuis ../public (chemin relatif à server/, voir express.static(PUBLIC_DIR) dans app.js).
 #

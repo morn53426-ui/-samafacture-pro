@@ -24,15 +24,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          git archive --format=zip --prefix=OptiGest/ HEAD -o dist/OptiGest-Complet.zip
-          test -s dist/OptiGest-Complet.zip
-          unzip -t dist/OptiGest-Complet.zip
-          sha256sum dist/OptiGest-Complet.zip
+          git archive --format=zip --prefix=SunuPilot/ HEAD -o dist/SunuPilot-Complet.zip
+          test -s dist/SunuPilot-Complet.zip
+          unzip -t dist/SunuPilot-Complet.zip
+          sha256sum dist/SunuPilot-Complet.zip
 
       - name: Upload source ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: OptiGest-Complet-PR-${{ github.event.pull_request.number }}
-          path: dist/OptiGest-Complet.zip
+          name: SunuPilot-Complet-PR-${{ github.event.pull_request.number }}
+          path: dist/SunuPilot-Complet.zip
           if-no-files-found: error
           retention-days: 14

@@ -1,16 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
-  <title id="title">OptiGest</title>
-  <defs>
-    <linearGradient id="blue" x1=".1" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#29D2EE"/><stop offset=".5" stop-color="#087BE8"/><stop offset="1" stop-color="#123B9B"/></linearGradient>
-    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2CE078"/><stop offset="1" stop-color="#0AAA55"/></linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="#F5F9FF"/>
-  <g transform="translate(49 48) scale(1.62)">
-    <path d="M222 53 A124 124 0 1 0 240 226" fill="none" stroke="url(#blue)" stroke-width="25" stroke-linecap="round"/>
-    <path d="M39 191 A103 103 0 0 1 185 45" fill="none" stroke="#24CBEA" stroke-width="11" stroke-linecap="round" opacity=".95"/>
-    <rect x="72" y="148" width="34" height="58" rx="7" fill="url(#blue)"/>
-    <rect x="119" y="111" width="34" height="95" rx="7" fill="url(#blue)"/>
-    <rect x="166" y="73" width="34" height="133" rx="7" fill="url(#blue)"/>
-    <path d="M68 197 L119 235 L232 111" fill="none" stroke="url(#green)" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">SunuPilot</title>
+  <desc id="desc">Baobab, pilotage et croissance.</desc>
+  <defs><linearGradient id="leaf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#20A85A"/><stop offset="1" stop-color="#087A3D"/></linearGradient></defs>
+  <rect width="512" height="512" rx="104" fill="#18265B"/>
+  <path d="M252 268 C250 224 240 190 222 166 M260 266 C272 218 289 188 319 167 M253 246 C222 217 193 205 163 209 M272 238 C306 209 341 201 376 210" fill="none" stroke="#087A3D" stroke-width="24" stroke-linecap="round"/>
+  <path d="M165 205 C139 195 130 171 145 155 C139 132 159 115 181 120 C192 98 221 97 235 115 C253 95 282 102 289 123 C313 108 341 123 340 146 C365 153 369 180 350 196 C358 219 330 237 306 226 C285 247 254 241 246 222 C219 242 185 232 181 211Z" fill="url(#leaf)"/>
+  <path d="M254 212 C245 260 244 291 254 324" stroke="#20A85A" stroke-width="28" stroke-linecap="round"/>
+  <path d="M166 367 H345" stroke="#087A3D" stroke-width="14" stroke-linecap="round"/>
+  <rect x="177" y="315" width="38" height="52" rx="9" fill="#20A85A"/>
+  <rect x="237" y="283" width="38" height="84" rx="9" fill="#20A85A"/>
+  <rect x="297" y="246" width="38" height="121" rx="9" fill="#20A85A"/>
 </svg>

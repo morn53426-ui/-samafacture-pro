@@ -90,9 +90,9 @@ function renderSidebar(activePage) {
   const html = `
     <aside class="sidebar${sidebarCollapsed ? ' is-collapsed' : ''}" id="app-sidebar">
       <div class="sidebar-brand">
-        <div class="mark"><img src="images/optigest-icon.svg" alt="OptiGest" /></div>
+        <div class="mark"><img src="images/sunupilot-icon.svg" alt="SunuPilot" /></div>
         <div class="sidebar-brand-copy">
-          <div class="name">OptiGest</div>
+          <div class="name">SunuPilot</div>
           <div class="sub">Gestion commerciale</div>
         </div>
         <button type="button" class="sidebar-collapse-toggle" id="sidebar-collapse-toggle" onclick="toggleDesktopSidebar()" aria-controls="app-navigation" aria-label="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}" aria-expanded="${String(!sidebarCollapsed)}" title="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}">${Icon(sidebarCollapsed ? 'arrow-right' : 'arrow-left')}</button>
@@ -198,9 +198,9 @@ function renderTopbar(title, subtitle) {
         <button type="button" class="enterprise-console-menu-toggle" onclick="toggleSidebar()" aria-label="Ouvrir la navigation" aria-controls="app-navigation" aria-expanded="false">
           ${Icon('menu')}
         </button>
-        <a class="enterprise-console-brand" href="dashboard.html" aria-label="OptiGest, tableau de bord">
-          <span class="enterprise-console-brand-mark"><img src="images/optigest-icon.svg" alt="" /></span>
-          <span><strong>OptiGest</strong><small>Gestion d’entreprise</small></span>
+        <a class="enterprise-console-brand" href="dashboard.html" aria-label="SunuPilot, tableau de bord">
+          <span class="enterprise-console-brand-mark"><img src="images/sunupilot-icon.svg" alt="" /></span>
+          <span><strong>SunuPilot</strong><small>Gestion d’entreprise</small></span>
         </a>
         <div class="enterprise-console-view">
           <span>Vue consolidée</span>
@@ -220,7 +220,7 @@ function renderTopbar(title, subtitle) {
         <form class="app-topbar-search enterprise-console-search" role="search" onsubmit="return submitWorkspaceSearch(event)">
           <span class="ic" aria-hidden="true">${Icon('search')}</span>
           <input id="workspace-search" type="search"
-            placeholder="Rechercher dans OptiGest..." aria-label="Rechercher dans OptiGest" />
+            placeholder="Rechercher dans SunuPilot..." aria-label="Rechercher dans SunuPilot" />
           <button type="submit" aria-label="Lancer la recherche">${Icon('arrow-up-right')}</button>
         </form>
         <nav class="enterprise-console-utility-links" aria-label="Aide et paramètres">
@@ -472,8 +472,8 @@ function submitWorkspaceSearch(event) {
 // -----------------------------------------------------------------------------
 function initRealtime() {
   const token = Api.token();
-  if (!token || window.__optigestSocketLoading || window.__samafactureSocketLoading) return;
-  window.__optigestSocketLoading = true;
+  if (!token || window.__sunupilotSocketLoading || window.__samafactureSocketLoading) return;
+  window.__sunupilotSocketLoading = true;
   // Alias conservé pour d’éventuels scripts déjà déployés qui vérifient encore ce marqueur.
   window.__samafactureSocketLoading = true;
 
@@ -516,7 +516,7 @@ function initRealtime() {
     window.addEventListener('sf-company-changed', connecterNotifications);
   };
   script.onerror = () => {
-    window.__optigestSocketLoading = false;
+    window.__sunupilotSocketLoading = false;
     window.__samafactureSocketLoading = false;
   };
   document.head.appendChild(script);

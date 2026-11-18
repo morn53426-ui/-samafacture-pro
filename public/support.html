@@ -5,20 +5,20 @@
 <script src="js/icons.js"></script>
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
-<title>Support technique — OptiGest</title>
-<meta name="description" content="Besoin d’aide avec OptiGest ? Consultez le centre d’aide et préparez une demande au support technique." />
+<title>Support technique — SunuPilot</title>
+<meta name="description" content="Besoin d’aide avec SunuPilot ? Consultez le centre d’aide et préparez une demande au support technique." />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="index, follow" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0F1B33" />
-<link rel="icon" type="image/svg+xml" href="images/optigest-icon.svg" />
+<link rel="icon" type="image/svg+xml" href="images/sunupilot-icon.svg" />
 
 </head>
 <body>
 
 <header class="lp-header">
-  <div class="brand"><img src="images/optigest-icon.svg" alt="Logo OptiGest" /> OptiGest</div>
+  <div class="brand"><img src="images/sunupilot-icon.svg" alt="Logo SunuPilot" /> SunuPilot</div>
   <nav>
     <a href="index.html">Accueil</a>
     <a href="login.html">Connexion</a>
@@ -33,7 +33,7 @@
   <div class="grid grid-2">
     <div class="card">
       <h3>Décrivez votre problème</h3>
-      <p style="color:var(--ink-soft);">Préparez votre demande. L’envoi par e-mail sera activé dès qu’une adresse officielle OptiGest sera configurée.</p>
+      <p style="color:var(--ink-soft);">Préparez votre demande. L’envoi par e-mail sera activé dès qu’une adresse officielle SunuPilot sera configurée.</p>
       <div id="msg"></div>
       <form id="support-form">
         <div class="field"><label>Sujet</label>
@@ -89,7 +89,7 @@
 
 <footer class="lp-footer">
   <div class="lp-footer-inner">
-    <div class="brand" style="color:#fff;"><img src="images/optigest-icon.svg" alt="" style="width:28px;height:28px;border-radius:7px;" /> OptiGest</div>
+    <div class="brand" style="color:#fff;"><img src="images/sunupilot-icon.svg" alt="" style="width:28px;height:28px;border-radius:7px;" /> SunuPilot</div>
     <div class="lp-footer-links">
       <a href="aide.html">Centre d'aide</a>
       <a href="support.html">Support technique</a>
@@ -97,7 +97,7 @@
       <a href="conditions.html">Conditions d'utilisation</a>
     </div>
   </div>
-  <div class="lp-footer-bottom">© 2026 OptiGest. Tous droits réservés.</div>
+  <div class="lp-footer-bottom">© 2026 SunuPilot. Tous droits réservés.</div>
 </footer>
 
 <script src="js/brand-config.js"></script>
@@ -107,7 +107,7 @@
   const user = Api.currentUser();
   if (user?.entreprise_email) document.getElementById('email').value = user.entreprise_email;
 
-  const configuredSupportEmail = String(window.OPTIGEST_CONFIG?.supportEmail || '').trim();
+  const configuredSupportEmail = String(window.SUNUPILOT_CONFIG?.supportEmail || '').trim();
   const supportSubmit = document.getElementById('support-submit');
   if (!configuredSupportEmail) {
     supportSubmit.disabled = true;
@@ -118,7 +118,7 @@
 
   document.getElementById('support-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const supportEmail = String(window.OPTIGEST_CONFIG?.supportEmail || '').trim();
+    const supportEmail = String(window.SUNUPILOT_CONFIG?.supportEmail || '').trim();
     if (!supportEmail) {
       document.getElementById('msg').innerHTML = `<div class="error-box" role="alert">Le support par e-mail n’est pas encore configuré. Consultez le centre d’aide ou contactez l’administrateur de votre espace.</div>`;
       return;
@@ -128,7 +128,7 @@
     const email = document.getElementById('email').value.trim();
     const message = document.getElementById('message').value.trim();
     const body = `De : ${email}\\n\\n${message}`;
-    const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent('[OptiGest] ' + sujet)}&body=${encodeURIComponent(body)}`;
+    const mailto = `mailto:${supportEmail}?subject=${encodeURIComponent('[SunuPilot] ' + sujet)}&body=${encodeURIComponent(body)}`;
     window.location.href = mailto;
 
     document.getElementById('msg').innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:0.85rem;">Votre messagerie va s’ouvrir avec le message pré-rempli.</div>`;

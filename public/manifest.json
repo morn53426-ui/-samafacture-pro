@@ -1,23 +1,17 @@
 {
-  "name": "OptiGest",
-  "short_name": "OptiGest",
+  "name": "SunuPilot",
+  "short_name": "SunuPilot",
   "description": "Plateforme de gestion d’entreprise : facturation, devis, CRM, comptabilité OHADA, achats, stocks et automatisations.",
   "start_url": "/dashboard.html",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#F7FAFF",
-  "theme_color": "#123B78",
+  "background_color": "#F8FAFC",
+  "theme_color": "#18265B",
   "lang": "fr",
   "icons": [
     {
-      "src": "images/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "images/optigest-icon.svg",
+      "src": "images/sunupilot-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"

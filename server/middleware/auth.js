@@ -12,7 +12,7 @@ const METHODES_SENSIBLES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 // public/js/api.js (Api.request() l'envoie systématiquement).
 const EN_TETE_ANTI_CSRF = 'x-requested-with';
 // Accepte temporairement l'en-tête historique pour les anciens clients déjà déployés.
-const VALEURS_ANTI_CSRF = new Set(['OptiGest', 'SamaFacturePro']);
+const VALEURS_ANTI_CSRF = new Set(['SunuPilot', 'OptiGest', 'SamaFacturePro']);
 
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';

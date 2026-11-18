@@ -150,7 +150,7 @@ app.use((req, res, next) => {
 });
 
 // CORS : en production, restreint aux origines listées dans ALLOWED_ORIGINS (séparées par
-// des virgules dans .env, ex: "https://optigest.example,https://www.optigest.example").
+// des virgules dans .env, ex: "https://sunupilot.example,https://www.sunupilot.example").
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
 const isProduction = process.env.NODE_ENV === 'production';
 if (isProduction && allowedOrigins.length === 0) {
@@ -306,7 +306,7 @@ const docsActivesParDefaut = process.env.NODE_ENV === 'production'
   : process.env.DISABLE_API_DOCS !== 'true';
 if (docsActivesParDefaut) {
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customSiteTitle: 'OptiGest — Documentation API'
+    customSiteTitle: 'SunuPilot — Documentation API'
   }));
 }
 
@@ -353,7 +353,7 @@ app.get('/sitemap.xml', (req, res) => {
 // SQL supplémentaires, ni provoquer des 503 en cascade sous charge. La disponibilité de la
 // base est testée séparément par /api/ready.
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'OptiGest API' });
+  res.json({ status: 'ok', service: 'SunuPilot API' });
 });
 
 // Readiness distincte de la santé : utilisée par un load balancer pour ne router du trafic
@@ -518,7 +518,7 @@ async function start() {
   // jamais PORT directement, sous peine de conflit "port déjà utilisé" entre workers.
   const listenPort = cluster.isWorker ? 0 : PORT;
   server.listen(listenPort, () => {
-    console.log(`OptiGest API démarrée sur http://localhost:${PORT}`);
+    console.log(`SunuPilot API démarrée sur http://localhost:${PORT}`);
   });
 
   // Arrêt propre : laisse les requêtes en cours se terminer et ferme le pool MySQL
