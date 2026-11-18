@@ -1920,6 +1920,29 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   const previewLight = await readPreviewTheme();
   await settingsPage.evaluate(() => window.SamaTheme.definir('dark'));
   const previewDark = await readPreviewTheme();
+  const goldBadgeColors = await settingsPage.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.className = 'plan-soon-badge';
+    probe.textContent = 'Bientôt';
+    document.body.appendChild(probe);
+    const soon = getComputedStyle(probe);
+    const proBadge = document.querySelector('.invoice-template-tier.tier-pro');
+    const pro = proBadge ? getComputedStyle(proBadge) : null;
+    const result = {
+      soonText: soon.color,
+      soonBackground: soon.backgroundColor,
+      proText: pro ? pro.color : null,
+      proBackground: pro ? pro.backgroundColor : null
+    };
+    probe.remove();
+    return result;
+  });
+  const soonBadgeContrast = contrastRatio(goldBadgeColors.soonText, goldBadgeColors.soonBackground);
+  const proBadgeContrast = contrastRatio(goldBadgeColors.proText, goldBadgeColors.proBackground);
+  assert.ok(soonBadgeContrast >= 4.5,
+    'Le badge de disponibilité doit rester lisible sur son fond doré sombre. Contraste : ' + soonBadgeContrast.toFixed(2));
+  assert.ok(proBadgeContrast >= 4.5,
+    'Le badge des modèles Pro doit rester lisible sur son fond doré sombre. Contraste : ' + proBadgeContrast.toFixed(2));
   assert.notEqual(previewDark.stage, previewLight.stage,
     'La scène de prévisualisation doit suivre le thème sombre.');
   assert.notEqual(previewDark.stage, 'rgb(233, 237, 242)',
@@ -1938,6 +1961,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     enterprise: { light, dark, headingContrast: Number(headingContrast.toFixed(2)), sidebarContrast: Number(sidebarContrast.toFixed(2)) },
     charts: { finances, reports },
     settingsPreview: { light: previewLight, dark: previewDark },
+    goldBadges: { colors: goldBadgeColors, soonContrast: Number(soonBadgeContrast.toFixed(2)), proContrast: Number(proBadgeContrast.toFixed(2)) },
     screenshots: 5
   };
 }
