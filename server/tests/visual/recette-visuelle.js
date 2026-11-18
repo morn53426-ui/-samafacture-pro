@@ -1917,10 +1917,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     dialog: getComputedStyle(document.querySelector('.invoice-template-preview-dialog')).backgroundColor,
     paper: getComputedStyle(document.querySelector('.invoice-template-preview-full-page')).backgroundColor
   }));
-  const previewLight = await readPreviewTheme();
-  await settingsPage.evaluate(() => window.SamaTheme.definir('dark'));
-  const previewDark = await readPreviewTheme();
-  const goldBadgeColors = await settingsPage.evaluate(() => {
+  const readGoldBadgeColors = () => settingsPage.evaluate(() => {
     const probe = document.createElement('span');
     probe.className = 'plan-soon-badge';
     probe.textContent = 'Bientôt';
@@ -1937,12 +1934,24 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     probe.remove();
     return result;
   });
-  const soonBadgeContrast = contrastRatio(goldBadgeColors.soonText, goldBadgeColors.soonBackground);
-  const proBadgeContrast = contrastRatio(goldBadgeColors.proText, goldBadgeColors.proBackground);
-  assert.ok(soonBadgeContrast >= 4.5,
-    'Le badge de disponibilité doit rester lisible sur son fond doré sombre. Contraste : ' + soonBadgeContrast.toFixed(2));
-  assert.ok(proBadgeContrast >= 4.5,
-    'Le badge des modèles Pro doit rester lisible sur son fond doré sombre. Contraste : ' + proBadgeContrast.toFixed(2));
+  const previewLight = await readPreviewTheme();
+  const goldBadgeColorsLight = await readGoldBadgeColors();
+  await settingsPage.evaluate(() => window.SamaTheme.definir('dark'));
+  const previewDark = await readPreviewTheme();
+  const goldBadgeColorsDark = await readGoldBadgeColors();
+  const soonBadgeLightContrast = contrastRatio(goldBadgeColorsLight.soonText, goldBadgeColorsLight.soonBackground);
+  const proBadgeLightContrast = contrastRatio(goldBadgeColorsLight.proText, goldBadgeColorsLight.proBackground);
+  const soonBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.soonText, goldBadgeColorsDark.soonBackground);
+  const proBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.proText, goldBadgeColorsDark.proBackground);
+  for (const [label, contrast] of [
+    ['Disponibilité clair', soonBadgeLightContrast],
+    ['Modèle Pro clair', proBadgeLightContrast],
+    ['Disponibilité sombre', soonBadgeDarkContrast],
+    ['Modèle Pro sombre', proBadgeDarkContrast]
+  ]) {
+    assert.ok(contrast >= 4.5,
+      label + ' doit conserver un contraste de 4,5:1. Valeur : ' + contrast.toFixed(2));
+  }
   assert.notEqual(previewDark.stage, previewLight.stage,
     'La scène de prévisualisation doit suivre le thème sombre.');
   assert.notEqual(previewDark.stage, 'rgb(233, 237, 242)',
@@ -1961,7 +1970,10 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     enterprise: { light, dark, headingContrast: Number(headingContrast.toFixed(2)), sidebarContrast: Number(sidebarContrast.toFixed(2)) },
     charts: { finances, reports },
     settingsPreview: { light: previewLight, dark: previewDark },
-    goldBadges: { colors: goldBadgeColors, soonContrast: Number(soonBadgeContrast.toFixed(2)), proContrast: Number(proBadgeContrast.toFixed(2)) },
+    goldBadges: {
+      light: { colors: goldBadgeColorsLight, soonContrast: Number(soonBadgeLightContrast.toFixed(2)), proContrast: Number(proBadgeLightContrast.toFixed(2)) },
+      dark: { colors: goldBadgeColorsDark, soonContrast: Number(soonBadgeDarkContrast.toFixed(2)), proContrast: Number(proBadgeDarkContrast.toFixed(2)) }
+    },
     screenshots: 5
   };
 }
