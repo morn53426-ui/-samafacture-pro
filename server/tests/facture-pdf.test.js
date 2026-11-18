@@ -59,10 +59,16 @@ describe('Génération PDF de facture', () => {
     assert.equal(res.body.slice(0, 5).toString('latin1'), '%PDF-');
   });
 
-  test('les cinq nouveaux modèles produisent chacun un vrai PDF avec Puppeteer', async () => {
-    const nouveauxModeles = ['nova', 'nordique', 'luxe', 'tech', 'horizon'];
+  test('les trente et un modèles produisent un vrai PDF A4 avec Puppeteer', async () => {
+    const tousModeles = [
+      'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
+      'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
+      'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs',
+      'nova', 'nordique', 'luxe', 'tech', 'horizon',
+      'eclipse', 'saphir', 'conseil', 'imperial', 'panorama', 'groupe', 'majeste'
+    ];
 
-    for (const modele of nouveauxModeles) {
+    for (const modele of tousModeles) {
       await pool.query(
         'UPDATE users SET facture_template = ? WHERE id = ?',
         [modele, userIdA]
@@ -85,8 +91,17 @@ describe('Génération PDF de facture', () => {
         modele + ' doit produire une signature PDF valide');
       assert.ok(res.body.length > 1500,
         modele + ' ne doit pas produire un PDF vide ou tronqué');
-      assert.match(res.body.toString('latin1'), /\/Type\s*\/Page\b/,
+      const pdfLatin1 = res.body.toString('latin1');
+      assert.match(pdfLatin1, /\/Type\s*\/Page\b/,
         modele + ' doit contenir au moins une page PDF');
+      const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
+      assert.ok(mediaBox, modele + ' doit déclarer une zone de page PDF.');
+      assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
+        Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
+        modele + ' doit être au vrai format A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
+      const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
+      assert.ok(pageCount >= 1 && pageCount <= 2,
+        modele + ' ne doit pas créer de pagination excessive pour une facture simple (pages=' + pageCount + ')');
     }
   });
 
