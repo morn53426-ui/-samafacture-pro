@@ -149,15 +149,18 @@
   function addLigne() {
     ligneCount++;
     const id = 'l' + ligneCount;
-    const produitOptions = produits.map(p => `<option value="${p.id}" data-prix="${p.prix_ht}" data-tva="${p.tva}">${escapeHtml(p.nom)}</option>`).join('');
+    const produitOptions = produits.map(p => {
+      const typeLabel = p.type_catalogue === 'service' ? 'Service' : p.type_catalogue === 'produit' ? 'Produit' : 'Non classé';
+      return `<option value="${p.id}" data-nom="${escapeHtml(p.nom)}" data-prix="${p.prix_ht}" data-tva="${p.tva}">${typeLabel} — ${escapeHtml(p.nom)}</option>`;
+    }).join('');
     const row = document.createElement('tr');
     row.id = id;
     row.innerHTML = `
       <td class="ligne-designation-cell">
         <div class="ligne-mobile-field">
-          <label class="ligne-mobile-label" for="${id}-produit">Produit du catalogue</label>
+          <label class="ligne-mobile-label" for="${id}-produit">Produit ou service du catalogue</label>
           <select id="${id}-produit" class="ligne-produit" style="margin-bottom:4px;" onchange="applyProduit('${id}', this)">
-            <option value="">Produit du catalogue (optionnel)</option>
+            <option value="">Produit ou service du catalogue (optionnel)</option>
             ${produitOptions}
           </select>
         </div>
@@ -194,7 +197,7 @@
     const row = document.getElementById(rowId);
     const opt = select.options[select.selectedIndex];
     if (opt.value) {
-      row.querySelector('.ligne-designation').value = opt.textContent;
+      row.querySelector('.ligne-designation').value = opt.dataset.nom || opt.textContent;
       row.querySelector('.ligne-pu').value = opt.dataset.prix;
       row.querySelector('.ligne-tva').value = opt.dataset.tva;
     }
