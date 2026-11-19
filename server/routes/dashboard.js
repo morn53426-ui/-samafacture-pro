@@ -144,7 +144,7 @@ async function buildDashboard(userId) {
       `SELECT DATE_FORMAT(date_emission, '%Y-%m') as mois, COALESCE(SUM(total),0) as total
        FROM factures
        WHERE user_id = ? AND type = 'facture' AND statut <> 'annulee'
-         AND date_emission >= DATE_SUB(?, INTERVAL 5 MONTH) AND date_emission <= ?
+         AND date_emission >= DATE_SUB(DATE_FORMAT(?, '%Y-%m-01'), INTERVAL 5 MONTH) AND date_emission <= ?
        GROUP BY mois ORDER BY mois`,
       [userId, localToday, localToday]
     ),
