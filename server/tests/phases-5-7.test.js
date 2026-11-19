@@ -450,6 +450,55 @@ test('les ajustements et transferts de stock restent atomiques, isolés et sans 
   const storedProduct = productList.body.produits.find(item => Number(item.id) === productId);
   assert.equal(Number(storedProduct.stock), 7, 'le stock global du produit doit rester égal à la somme des entrepôts');
 });
+test('associer une ligne d’achat saisie libre à un produit permet sa réception sans réaffecter le stock après coup', async () => {
+  const product = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Produit à associer à une commande', prix_ht: 1000, prix_achat: 400, stock: 0 });
+  assert.equal(product.status, 201, product.text);
+  const service = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Service non réceptionnable', prix_ht: 1000, type_catalogue: 'service', stock: 0 });
+  assert.equal(service.status, 201, service.text);
+  const supplier = await request(app).post('/api/pro/suppliers')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Fournisseur ligne libre' });
+  assert.equal(supplier.status, 201, supplier.text);
+  const order = await request(app).post('/api/pro/purchase-orders')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ fournisseur_id: supplier.body.id, lignes: [{
+      designation: 'Article à identifier à la réception', quantite: 1, prix_unitaire: 400, tva: 18
+    }] });
+  assert.equal(order.status, 201, order.text);
+  const details = await request(app).get('/api/pro/purchase-orders/' + order.body.id)
+    .set('Authorization', 'Bearer ' + tokenA);
+  const lineId = details.body.lignes[0].id;
+
+  const unlinkedReceipt = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ lignes: [{ ligne_id: lineId, quantite: 1 }] });
+  assert.equal(unlinkedReceipt.status, 400, unlinkedReceipt.text);
+  const foreignLink = await request(app).put('/api/pro/purchase-orders/' + order.body.id + '/lines/' + lineId + '/product')
+    .set('Authorization', 'Bearer ' + tokenB).send({ produit_id: product.body.produit.id });
+  assert.equal(foreignLink.status, 404, foreignLink.text);
+  const serviceLink = await request(app).put('/api/pro/purchase-orders/' + order.body.id + '/lines/' + lineId + '/product')
+    .set('Authorization', 'Bearer ' + tokenA).send({ produit_id: service.body.produit.id });
+  assert.equal(serviceLink.status, 400, serviceLink.text);
+
+  const linked = await request(app).put('/api/pro/purchase-orders/' + order.body.id + '/lines/' + lineId + '/product')
+    .set('Authorization', 'Bearer ' + tokenA).send({ produit_id: product.body.produit.id });
+  assert.equal(linked.status, 200, linked.text);
+  const receipt = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ operation_id: 'phase57-free-line-receipt-001', lignes: [{ ligne_id: lineId, quantite: 1 }] });
+  assert.equal(receipt.status, 201, receipt.text);
+
+  const reassign = await request(app).put('/api/pro/purchase-orders/' + order.body.id + '/lines/' + lineId + '/product')
+    .set('Authorization', 'Bearer ' + tokenA).send({ produit_id: product.body.produit.id });
+  assert.equal(reassign.status, 409, reassign.text);
+  const products = await request(app).get('/api/produits').set('Authorization', 'Bearer ' + tokenA);
+  const received = products.body.produits.find(p => Number(p.id) === Number(product.body.produit.id));
+  assert.equal(Number(received.stock), 1, 'la réception alimente le produit associé');
+});
 test('automatisations : créer, lister, désactiver et supprimer les règles autorisées', async () => {
   const rules = [
     { type: 'relance_impayes_email', nom: 'Relance impayés test', configuration: { jours_retard: 10, frequence_jours: 5 } },
