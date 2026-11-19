@@ -1126,7 +1126,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.deepEqual(accountingLabels, [
       'Paiements enregistrés', 'Dépenses', 'Écart paiements - dépenses', 'TVA inscrite sur factures'
     ], 'Le rapport doit distinguer les paiements, les dépenses, leur écart et la TVA inscrite sur facture.');
-    const accountingNote = await page.$eval('.reports-accounting-note', element => element.textContent.replace(/\\s+/g, ' ').trim());
+    const accountingNote = await page.$eval('.reports-accounting-note', element => element.textContent.trim());
     assert.match(accountingNote, /date d’émission des factures/);
     assert.match(accountingNote, /y compris celles marquées annulées/);
     assert.match(accountingNote, /remboursements ne sont pas déduits automatiquement/);
