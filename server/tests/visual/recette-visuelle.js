@@ -1787,8 +1787,8 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
   }));
   assert.deepEqual(compact, {
     collapsed: true,
-    sidebarWidth: 76,
-    mainMargin: 76,
+    sidebarWidth: 96,
+    mainMargin: 96,
     toggleExpanded: 'false'
   }, 'Le bouton doit réduire la navigation et réaligner la zone de travail.');
 
