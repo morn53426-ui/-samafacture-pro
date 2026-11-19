@@ -25,6 +25,7 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /totalsByMonth\.get\(key\) \?\? 0/);
     assert.match(dashboard, /group_by: 'month'/);
     assert.match(dashboard, /canvas\.dataset\.dashboardMonthCount = String\(series\.monthCount\)/);
+    assert.match(dashboard, /exclude_cancelled: 'true'/);
   });
 
   test('les quatre KPI utilisent les bons indicateurs et la valorisation de stock reste explicite si indisponible', () => {
