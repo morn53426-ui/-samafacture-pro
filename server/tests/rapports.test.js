@@ -77,6 +77,12 @@ describe('Rapports', () => {
         "UPDATE factures SET statut = 'annulee' WHERE id = ? AND user_id = ?",
         [factureAnnuleeId, userId]
       );
+      const comptabilite = await request(app)
+        .get('/api/rapports/comptabilite')
+        .set('Authorization', `Bearer ${token}`);
+      assert.equal(comptabilite.status, 200);
+      assert.equal(Number(comptabilite.body.tva_collectee), 540,
+        'le calcul actuel conserve la TVA inscrite sur une facture même après son annulation');
 
       const historique = await request(app)
         .get('/api/rapports/ventes?group_by=month')
