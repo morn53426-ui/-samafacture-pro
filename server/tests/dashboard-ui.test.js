@@ -34,6 +34,24 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /renderRecentInvoices\(stats\.dernieres_factures \|\| \[\]\)/);
   });
 
+  test('les actions rapides correspondent aux quatre parcours de la référence', () => {
+    const start = dashboard.indexOf('<div class="dashboard-actions">');
+    const end = dashboard.indexOf('</div>', start);
+    assert.ok(start >= 0 && end > start, 'Le bloc des actions rapides doit exister.');
+    const actions = dashboard.slice(start, end);
+    const expected = [
+      ['nouvelle-facture.html', 'Nouvelle facture'],
+      ['devis.html', 'Nouveau devis'],
+      ['clients.html', 'Ajouter un client'],
+      ['achats.html#buying-orders', 'Enregistrer un achat']
+    ];
+    for (const [href, label] of expected) {
+      assert.ok(actions.includes('href="' + href + '"'), 'Destination absente : ' + href);
+      assert.ok(actions.includes(label), 'Action absente : ' + label);
+    }
+    assert.equal((actions.match(/class="dashboard-action /g) || []).length, 4);
+  });
+
   test('les cinq cartes de modules pointent vers les pages métier existantes', () => {
     const expected = [
       ['crm.html', 'CRM &amp; suivi client'],
