@@ -175,7 +175,11 @@ async function loadAll(){
   ['receipt-warehouse','adjust-warehouse','transfer-from','transfer-to'].forEach(id=>$(id).innerHTML=wh);
   ['adjust-product','transfer-product'].forEach(id=>$(id).innerHTML=products.map(p=>opt(p.id,p.nom)).join(''));
   $('receipt-order').innerHTML='<option value="">Sélectionner une commande</option>'+orders.filter(o=>!['recue','annulee'].includes(o.statut)).map(o=>opt(o.id,o.numero+' · '+o.fournisseur_nom+' · '+o.statut)).join('');
-  $('purchase-orders').innerHTML='<h3>Commandes récentes</h3>'+orders.map(o=>'<div class="pro-list-row"><div><strong>'+escapeHtml(o.numero)+'</strong><small>'+escapeHtml(o.fournisseur_nom)+' · '+escapeHtml(o.date_commande)+' · '+fmt(o.total_ttc)+'</small></div><span>'+escapeHtml(o.statut)+'</span></div>').join('')||'<p class="pro-muted">Aucune commande fournisseur.</p>';
+    $('purchase-orders').innerHTML='<h3>Commandes récentes</h3>'+(orders.length?orders.map(o=>{
+    const cancellable=!['recue','annulee'].includes(o.statut);
+    const cancelButton=cancellable?'<button type="button" class="btn btn-outline btn-sm" data-cancel-purchase-order="'+Number(o.id)+'" data-order-number="'+escapeHtml(o.numero)+'" aria-label="Annuler la commande fournisseur '+escapeHtml(o.numero)+'">Annuler</button>':'';
+    return '<div class="pro-list-row"><div><strong>'+escapeHtml(o.numero)+'</strong><small>'+escapeHtml(o.fournisseur_nom)+' · '+escapeHtml(o.date_commande)+' · '+fmt(o.total_ttc)+'</small></div><span>'+escapeHtml(o.statut)+'</span>'+cancelButton+'</div>';
+  }).join(''):'<p class="pro-muted">Aucune commande fournisseur.</p>');
   $('warehouses-list').innerHTML=warehouses.map(w=>'<div class="pro-list-row"><strong>'+escapeHtml(w.code+' · '+w.nom)+'</strong><span>'+(w.par_defaut?'Principal':'Entrepôt')+'</span></div>').join('');
   $('stock-list').innerHTML=stocks.map(s=>{const v=valuation.find(x=>Number(x.id)===Number(s.produit_id));return '<tr><td>'+escapeHtml(s.nom)+'</td><td>'+escapeHtml(s.reference||'—')+'</td><td>'+Number(s.nb_entrepots||0)+'</td><td>'+Number(s.quantite||0)+'</td><td>'+fmt(s.prix_achat)+'</td><td>'+fmt(v?.valeur||0)+'</td></tr>';}).join('')||'<tr><td colspan="6">Aucun produit.</td></tr>';
   $('movement-list').innerHTML=moves.map(m=>'<tr><td>'+escapeHtml(String(m.created_at||'').slice(0,16))+'</td><td>'+escapeHtml(m.produit_nom)+'</td><td>'+escapeHtml(m.entrepot_nom)+'</td><td>'+escapeHtml(m.type)+'</td><td>'+Number(m.quantite)+'</td><td>'+escapeHtml(m.motif||m.reference||'')+'</td></tr>').join('')||'<tr><td colspan="6">Aucun mouvement enregistré.</td></tr>';
@@ -185,6 +189,23 @@ $('supplier-form').addEventListener('submit',async e=>{
   e.preventDefault();
   try{await Api.post('/pro/suppliers',{nom:$('supplier-name').value,email:$('supplier-email').value,telephone:$('supplier-phone').value,adresse:$('supplier-address').value,ninea:$('supplier-ninea').value,notes:$('supplier-notes').value});e.target.reset();await loadAll();showToast('Fournisseur ajouté.','success');}
   catch(err){showToast(err.message,'error');}
+});
+$('purchase-orders').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-cancel-purchase-order]');
+  if(!button)return;
+  const id=Number(button.dataset.cancelPurchaseOrder);
+  if(!Number.isSafeInteger(id)||id<=0){showToast('Commande invalide.','error');return;}
+  const numero=button.dataset.orderNumber||String(id);
+  const confirmed=window.confirm('Annuler la commande '+numero+' ? Les quantités déjà réceptionnées resteront en stock. Le reliquat ne pourra plus être réceptionné.');
+  if(!confirmed)return;
+  try{
+    const result=await Api.post('/pro/purchase-orders/'+id+'/cancel',{});
+    if(activeReceipt&&Number(activeReceipt.commande.id)===id){
+      activeReceipt=null;$('receipt-lines').innerHTML='';$('submit-receipt').hidden=true;
+    }
+    showToast('Commande '+numero+' annulée. '+Number(result.quantite_recue_conservee||0)+' unité(s) reçue(s) conservée(s), '+Number(result.quantite_restante_annulee||0)+' unité(s) restantes abandonnées.','success');
+    await loadAll();
+  }catch(err){showToast(err.message,'error');}
 });
 $('add-purchase-line').addEventListener('click',()=>addPurchaseLine());
 $('purchase-form').addEventListener('submit',async e=>{
