@@ -350,6 +350,106 @@ test('annuler une commande fournisseur conserve les réceptions partielles et bl
     .set('Authorization', 'Bearer ' + tokenA).send({});
   assert.equal(fullCancel.status, 409, fullCancel.text);
 });
+test('les ajustements et transferts de stock restent atomiques, isolés et sans stock négatif', async () => {
+  const product = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Article transfert concurrent phases 5-7', prix_ht: 1000, prix_achat: 500, stock: 5 });
+  assert.equal(product.status, 201, product.text);
+  const productId = Number(product.body.produit.id);
+
+  const defaultWarehouses = await request(app).get('/api/pro/warehouses')
+    .set('Authorization', 'Bearer ' + tokenA);
+  assert.equal(defaultWarehouses.status, 200, defaultWarehouses.text);
+  const sourceWarehouse = defaultWarehouses.body.entrepots.find(item => Number(item.par_defaut) === 1);
+  assert.ok(sourceWarehouse, 'un entrepôt principal doit être créé');
+  const destination = await request(app).post('/api/pro/warehouses')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ code: 'PHASE57-DEST', nom: 'Dépôt destination phases 5-7' });
+  assert.equal(destination.status, 201, destination.text);
+  const destinationId = Number(destination.body.id);
+
+  const foreignWarehouses = await request(app).get('/api/pro/warehouses')
+    .set('Authorization', 'Bearer ' + tokenB);
+  assert.equal(foreignWarehouses.status, 200, foreignWarehouses.text);
+  const foreignWarehouse = foreignWarehouses.body.entrepots.find(item => Number(item.par_defaut) === 1);
+  assert.ok(foreignWarehouse, 'le second tenant doit avoir son propre entrepôt principal');
+
+  const rowsForProduct = async () => {
+    const [rows] = await pool.query(
+      `SELECT e.id AS entrepot_id, s.quantite
+         FROM pro_stocks_entrepots s
+         JOIN pro_entrepots e ON e.id = s.entrepot_id AND e.user_id = s.user_id
+        WHERE s.user_id = ? AND s.produit_id = ?`,
+      [userA, productId]
+    );
+    return Object.fromEntries(rows.map(row => [Number(row.entrepot_id), Number(row.quantite)]));
+  };
+  let balances = await rowsForProduct();
+  assert.equal(balances[Number(sourceWarehouse.id)], 5, 'le stock initial doit être placé dans le magasin principal');
+
+  const invalidAdjustment = await request(app).post('/api/pro/inventory/adjustments')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ produit_id: productId, entrepot_id: sourceWarehouse.id, quantite: -6, motif: 'Test refus stock négatif' });
+  assert.equal(invalidAdjustment.status, 409, invalidAdjustment.text);
+  balances = await rowsForProduct();
+  assert.equal(balances[Number(sourceWarehouse.id)], 5, 'un ajustement refusé ne doit pas modifier le stock');
+
+  const adjustment = await request(app).post('/api/pro/inventory/adjustments')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ produit_id: productId, entrepot_id: sourceWarehouse.id, quantite: 2, motif: 'Réception inventaire test' });
+  assert.equal(adjustment.status, 200, adjustment.text);
+  balances = await rowsForProduct();
+  assert.equal(balances[Number(sourceWarehouse.id)], 7);
+
+  const crossTenantTransfer = await request(app).post('/api/pro/inventory/transfers')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ produit_id: productId, entrepot_source_id: sourceWarehouse.id, entrepot_destination_id: foreignWarehouse.id, quantite: 1 });
+  assert.equal(crossTenantTransfer.status, 404, crossTenantTransfer.text);
+
+  const concurrentTransfers = await Promise.all([
+    request(app).post('/api/pro/inventory/transfers').set('Authorization', 'Bearer ' + tokenA)
+      .send({ produit_id: productId, entrepot_source_id: sourceWarehouse.id, entrepot_destination_id: destinationId, quantite: 4 }),
+    request(app).post('/api/pro/inventory/transfers').set('Authorization', 'Bearer ' + tokenA)
+      .send({ produit_id: productId, entrepot_source_id: sourceWarehouse.id, entrepot_destination_id: destinationId, quantite: 4 })
+  ]);
+  assert.deepEqual(concurrentTransfers.map(response => response.status).sort(), [200, 409],
+    'deux transferts concurrents ne doivent jamais retirer plus que le stock disponible');
+  balances = await rowsForProduct();
+  assert.equal(balances[Number(sourceWarehouse.id)], 3, 'un seul transfert doit débiter quatre unités');
+  assert.equal(balances[destinationId], 4, 'le dépôt cible doit recevoir les quatre unités une seule fois');
+  assert.equal(Object.values(balances).reduce((sum, qty) => sum + qty, 0), 7,
+    'un transfert interne doit conserver le stock total de l’entreprise');
+
+  const [[movementSummary]] = await pool.query(
+    `SELECT COUNT(*) AS total, COUNT(DISTINCT reference) AS references_distinctes,
+            SUM(CASE WHEN type = 'transfert_sortant' THEN quantite ELSE 0 END) AS sortant,
+            SUM(CASE WHEN type = 'transfert_entrant' THEN quantite ELSE 0 END) AS entrant
+       FROM pro_mouvements_stock
+      WHERE user_id = ? AND produit_id = ? AND type IN ('transfert_sortant', 'transfert_entrant')`,
+    [userA, productId]
+  );
+  assert.equal(Number(movementSummary.total), 2, 'un seul transfert doit créer deux mouvements liés');
+  assert.equal(Number(movementSummary.references_distinctes), 1, 'les deux mouvements doivent partager une référence');
+  assert.equal(Number(movementSummary.sortant), -4);
+  assert.equal(Number(movementSummary.entrant), 4);
+
+  const tooLarge = await request(app).post('/api/pro/inventory/transfers')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ produit_id: productId, entrepot_source_id: sourceWarehouse.id, entrepot_destination_id: destinationId, quantite: 4 });
+  assert.equal(tooLarge.status, 409, tooLarge.text);
+  const service = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Prestation non stockable transfert', prix_ht: 1000, type_catalogue: 'service', stock: 0 });
+  assert.equal(service.status, 201, service.text);
+  const serviceTransfer = await request(app).post('/api/pro/inventory/transfers')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ produit_id: service.body.produit.id, entrepot_source_id: sourceWarehouse.id, entrepot_destination_id: destinationId, quantite: 1 });
+  assert.equal(serviceTransfer.status, 409, serviceTransfer.text);
+
+  const productList = await request(app).get('/api/produits').set('Authorization', 'Bearer ' + tokenA);
+  const storedProduct = productList.body.produits.find(item => Number(item.id) === productId);
+  assert.equal(Number(storedProduct.stock), 7, 'le stock global du produit doit rester égal à la somme des entrepôts');
+});
 test('automatisations : créer, lister, désactiver et supprimer les règles autorisées', async () => {
   const rules = [
     { type: 'relance_impayes_email', nom: 'Relance impayés test', configuration: { jours_retard: 10, frequence_jours: 5 } },
