@@ -251,7 +251,7 @@ test('une commande fournisseur en attente bloque la conversion en service et res
     .send({
       lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 3 }]
     });
-  assert.equal(receipt.status, 200, receipt.text);
+  assert.equal(receipt.status, 201, receipt.text);
 
   const stored = await request(app).get('/api/produits')
     .set('Authorization', 'Bearer ' + tokenA);
