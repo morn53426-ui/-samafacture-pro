@@ -246,12 +246,16 @@ test('une commande fournisseur en attente bloque la conversion en service et res
   assert.equal(details.status, 200, details.text);
   assert.equal(details.body.lignes.length, 1);
 
+  const receiptPayload = { operation_id: 'phase57-full-receipt-retry-001', lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 3 }] };
   const receipt = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
-    .set('Authorization', 'Bearer ' + tokenA)
-    .send({
-      lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 3 }]
-    });
+    .set('Authorization', 'Bearer ' + tokenA).send(receiptPayload);
   assert.equal(receipt.status, 201, receipt.text);
+  assert.equal(receipt.body.repeated, false);
+  const replayedReceipt = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
+    .set('Authorization', 'Bearer ' + tokenA).send(receiptPayload);
+  assert.equal(replayedReceipt.status, 200, replayedReceipt.text);
+  assert.equal(replayedReceipt.body.repeated, true);
+  assert.equal(replayedReceipt.body.reception_id, receipt.body.reception_id);
 
   const stored = await request(app).get('/api/produits')
     .set('Authorization', 'Bearer ' + tokenA);
@@ -282,9 +286,15 @@ test('annuler une commande fournisseur conserve les réceptions partielles et bl
 
   const partial = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
     .set('Authorization', 'Bearer ' + tokenA)
-    .send({ lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 2 }] });
+    .send({ operation_id: 'phase57-partial-receipt-retry-001', lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 2 }] });
   assert.equal(partial.status, 201, partial.text);
   assert.equal(partial.body.statut, 'partiellement_recue');
+  const partialReplay = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ operation_id: 'phase57-partial-receipt-retry-001', lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 2 }] });
+  assert.equal(partialReplay.status, 200, partialReplay.text);
+  assert.equal(partialReplay.body.repeated, true);
+  assert.equal(partialReplay.body.reception_id, partial.body.reception_id);
 
   const foreignCancel = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/cancel')
     .set('Authorization', 'Bearer ' + tokenB).send({});
