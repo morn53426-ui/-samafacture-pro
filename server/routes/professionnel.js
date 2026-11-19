@@ -2413,16 +2413,17 @@ async function ensureDefaultWarehouse(uid) {
     }
     throw err;
   } finally {
+    let discardConnection = false;
     if (lockAcquired) {
       try {
         await conn.query('SELECT RELEASE_LOCK(?)', [lockName]);
-      } catch (releaseError) {
-        // Ne jamais remettre au pool une connexion qui pourrait conserver le verrou.
-        conn.destroy();
-        throw releaseError;
+      } catch (_) {
+        // Détruire la connexion force MySQL à libérer tout verrou nommé restant.
+        discardConnection = true;
       }
     }
-    conn.release();
+    if (discardConnection) conn.destroy();
+    else conn.release();
   }
 }
 
