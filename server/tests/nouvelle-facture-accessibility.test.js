@@ -16,6 +16,7 @@ const fields = [
   'objet',
   'reference_externe',
   'conditions_reglement',
+  'entrepot_id',
   'remise',
   'frais_livraison',
   'commentaires'
@@ -33,4 +34,13 @@ test('les champs principaux du formulaire facture/devis ont un label HTML associ
     );
     assert.ok(html.includes('id="' + id + '"'), 'Le contrôle #' + id + ' doit exister.');
   }
+});
+
+test('la facture propose un entrepôt actif et masque ce choix pour un devis', () => {
+  assert.match(html, /id="invoice-warehouse-field"/);
+  assert.match(html, /Entrepôt de sortie du stock/);
+  assert.match(html, /Api\.get\('\/pro\/warehouses'\)/);
+  assert.match(html, /Number\(item\.actif\) === 1/);
+  assert.match(html, /invoice-warehouse-field'\)\.hidden = isQuote/);
+  assert.match(html, /entrepot_id: documentType === 'facture'/);
 });
