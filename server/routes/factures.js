@@ -228,7 +228,24 @@ function remiseInputValue(value) {
  * qu'une seule fois par produit, même si un produit apparaît sur plusieurs lignes.
  * `ajustements` : tableau de { produit_id, delta }. Ne fait rien si vide.
  */
-async function appliquerAjustementsStock(conn, userId, ajustements) {
+async function selectionnerEntrepotFacture(conn, userId, requestedWarehouseId = null) {
+  await conn.query(
+    "INSERT IGNORE INTO pro_entrepots (user_id, code, nom, par_defaut) VALUES (?, 'PRINCIPAL', 'Magasin principal', 1)",
+    [userId]
+  );
+  const query = requestedWarehouseId
+    ? 'SELECT id, nom FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1 FOR UPDATE'
+    : "SELECT id, nom FROM pro_entrepots WHERE user_id = ? AND code = 'PRINCIPAL' AND actif = 1 LIMIT 1 FOR UPDATE";
+  const params = requestedWarehouseId ? [requestedWarehouseId, userId] : [userId];
+  const [rows] = await conn.query(query, params);
+  return rows[0] || null;
+}
+
+/**
+ * Applique les variations de stock dans l'entrepôt associé à la facture.
+ * Un entrepôt explicite n'est jamais substitué silencieusement par le principal.
+ */
+async function appliquerAjustementsStock(conn, userId, ajustements, requestedWarehouseId = null) {
   if (!ajustements.length) return;
 
   // Une ligne liée à un service peut figurer sur une facture, mais ne représente
@@ -257,20 +274,34 @@ async function appliquerAjustementsStock(conn, userId, ajustements) {
   const ids = [...parProduit.keys()];
   if (!ids.length) return;
 
-  // Le stock historique du catalogue reste le total agrégé. Le dépôt principal est
-  // initialisé une seule fois à partir du stock existant pour assurer une migration
-  // douce des anciennes entreprises. Chaque vente/annulation alimente ensuite le
-  // journal multi-entrepôts dans la même transaction SQL que la facture.
+  // Les stocks historiques du catalogue sont migrés dans le magasin principal,
+  // indépendamment de l'entrepôt choisi pour cette vente.
   await conn.query(
     "INSERT IGNORE INTO pro_entrepots (user_id, code, nom, par_defaut) VALUES (?, 'PRINCIPAL', 'Magasin principal', 1)",
     [userId]
   );
-  const [[warehouse]] = await conn.query(
-    'SELECT id, nom FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1',
-    [userId, 'PRINCIPAL']
+  const [[mainWarehouse]] = await conn.query(
+    "SELECT id, nom FROM pro_entrepots WHERE user_id = ? AND code = 'PRINCIPAL' LIMIT 1",
+    [userId]
   );
+  if (!mainWarehouse) throw new Error('Entrepôt principal introuvable.');
+
+  let warehouse = mainWarehouse;
+  if (requestedWarehouseId) {
+    const [warehouseRows] = await conn.query(
+      'SELECT id, nom FROM pro_entrepots WHERE id = ? AND user_id = ? LIMIT 1',
+      [requestedWarehouseId, userId]
+    );
+    warehouse = warehouseRows[0];
+  }
+  if (!warehouse) throw new Error('Entrepôt associé à la facture introuvable.');
+
   await conn.query(
     'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0)) FROM produits p LEFT JOIN (SELECT user_id, produit_id, SUM(quantite) AS total FROM pro_stocks_entrepots GROUP BY user_id, produit_id) existing ON existing.user_id = p.user_id AND existing.produit_id = p.id WHERE p.user_id = ? AND p.id IN (' + ids.map(() => '?').join(',') + ')',
+    [mainWarehouse.id, userId, ...ids]
+  );
+  await conn.query(
+    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, 0 FROM produits p WHERE p.user_id = ? AND p.id IN (' + ids.map(() => '?').join(',') + ')',
     [warehouse.id, userId, ...ids]
   );
 
@@ -306,11 +337,20 @@ async function appliquerAjustementsStock(conn, userId, ajustements) {
  * (saisie libre, jamais liée à l'inventaire).
  */
 async function ajusterStockFacture(conn, factureId, userId, sens) {
+  const [[facture]] = await conn.query(
+    'SELECT entrepot_id FROM factures WHERE id = ? AND user_id = ?',
+    [factureId, userId]
+  );
+  if (!facture) return;
   const [lignes] = await conn.query(
     'SELECT produit_id, quantite FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL',
     [factureId]
   );
-  await appliquerAjustementsStock(conn, userId, lignes.map((l) => ({ produit_id: l.produit_id, delta: sens * l.quantite })));
+  await appliquerAjustementsStock(
+    conn, userId,
+    lignes.map((l) => ({ produit_id: l.produit_id, delta: sens * l.quantite })),
+    facture.entrepot_id || null
+  );
 }
 
 /**
@@ -452,6 +492,7 @@ router.get('/:id', async (req, res, next) => {
  *               date_validite: { type: string, format: date, nullable: true, description: 'Date limite de validité, uniquement pour un devis.' }
  *               objet: { type: string, maxLength: 190, description: 'Objet ou prestation.' }
  *               reference_externe: { type: string, maxLength: 100, description: 'Référence client ou bon de commande.' }
+ *               entrepot_id: { type: integer, nullable: true, description: 'Entrepôt de sortie du stock pour une facture. Omis ou nul : magasin principal. Ignoré pour un devis.' }
  *               conditions_reglement: { type: string, maxLength: 5000, description: 'Conditions spécifiques à ce document.' }
  *               remise: { type: number, default: 0 }
  *               frais_livraison: { type: number, default: 0 }
@@ -473,7 +514,7 @@ router.post('/', async (req, res, next) => {
     if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 100)) {
       return res.status(400).json({ error: 'Idempotency-Key invalide (8 à 100 caractères).' });
     }
-    const { client_id, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, remise, frais_livraison, mode_paiement, commentaires, lignes } = req.body;
+    const { client_id, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, remise, frais_livraison, mode_paiement, commentaires, lignes, entrepot_id } = req.body;
 
     // Une nouvelle tentative avec la même clé doit retourner le document déjà créé plutôt
     // que créer une seconde facture. La clé est facultative afin de préserver exactement le
@@ -544,6 +585,12 @@ router.post('/', async (req, res, next) => {
     }
     const docType = type === 'devis' ? 'devis' : 'facture';
     const dateValidite = docType === 'devis' ? optionalIsoDate(date_validite) : null;
+    const requestedWarehouseId = docType === 'facture' && entrepot_id !== undefined && entrepot_id !== null && entrepot_id !== ''
+      ? Number(entrepot_id)
+      : null;
+    if (requestedWarehouseId !== null && (!Number.isSafeInteger(requestedWarehouseId) || requestedWarehouseId <= 0)) {
+      return res.status(400).json({ error: 'Entrepôt de sortie invalide.' });
+    }
     if (dateValidite === undefined) {
       return res.status(400).json({ error: 'La date de validité du devis est invalide.' });
     }
@@ -581,13 +628,20 @@ router.post('/', async (req, res, next) => {
         });
       }
     }
+    const invoiceWarehouse = docType === 'facture'
+      ? await selectionnerEntrepotFacture(conn, req.tenantId, requestedWarehouseId)
+      : null;
+    if (docType === 'facture' && !invoiceWarehouse) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'L’entrepôt de sortie est introuvable ou inactif.' });
+    }
     const numero = await nextNumero(conn, req.tenantId, docType, Number(companyLocalDate.slice(0, 4)));
     const [result] = await conn.query(
-      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, entrepot_id, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.tenantId, client_id, numero, docType, date_emission || companyLocalDate,
-        date_echeance || null, dateValidite, objetDocument, referenceDocument, conditionsDocument,
+        date_echeance || null, dateValidite, objetDocument, referenceDocument, invoiceWarehouse?.id || null, conditionsDocument,
         documentCurrency, remiseAppliquee, fraisLivraisonValides, mode_paiement || null,
         commentaires || null, sous_total, total_tva, total, verificationCode, idempotencyKey
       ]
@@ -603,7 +657,7 @@ router.post('/', async (req, res, next) => {
     // indication, pas une contrainte dure. Restauré symétriquement si la facture est
     // supprimée ou annulée (voir DELETE /:id et PUT /:id/statut plus bas).
     if (docType === 'facture') {
-      await appliquerAjustementsStock(conn, req.tenantId, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
+      await appliquerAjustementsStock(conn, req.tenantId, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })), invoiceWarehouse.id);
     }
 
     await conn.commit();
@@ -757,10 +811,23 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
       });
     }
 
+    const rawWarehouseId = req.body.entrepot_id;
+    const requestedWarehouseId = rawWarehouseId !== undefined && rawWarehouseId !== null && rawWarehouseId !== ''
+      ? Number(rawWarehouseId)
+      : null;
+    if (requestedWarehouseId !== null && (!Number.isSafeInteger(requestedWarehouseId) || requestedWarehouseId <= 0)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Entrepôt de sortie invalide.' });
+    }
+    const invoiceWarehouse = await selectionnerEntrepotFacture(conn, req.tenantId, requestedWarehouseId);
+    if (!invoiceWarehouse) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'L’entrepôt de sortie est introuvable ou inactif.' });
+    }
     const numero = await nextNumero(conn, req.tenantId, 'facture', Number(accountLocalDate.slice(0, 4)));
     await conn.query(
-      `UPDATE factures SET type = 'facture', numero = ?, date_emission = ?, statut = 'en_attente', date_validite = NULL WHERE id = ? AND user_id = ? AND type = 'devis'`,
-      [numero, accountLocalDate, devis.id, req.tenantId]
+      `UPDATE factures SET type = 'facture', numero = ?, date_emission = ?, statut = 'en_attente', date_validite = NULL, entrepot_id = ? WHERE id = ? AND user_id = ? AND type = 'devis'`,
+      [numero, accountLocalDate, invoiceWarehouse.id, devis.id, req.tenantId]
     );
     const [lignesDevis] = await conn.query(
       'SELECT produit_id, quantite FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL',
@@ -768,7 +835,8 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
     );
     await appliquerAjustementsStock(
       conn, req.tenantId,
-      lignesDevis.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite }))
+      lignesDevis.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })),
+      invoiceWarehouse.id
     );
 
     await conn.commit();
