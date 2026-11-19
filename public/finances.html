@@ -29,12 +29,12 @@
       <div class="card stat-card card-skeleton">
         <div class="stat-icon icon-navy"><i class="ic" data-icon="landmark"></i></div>
         <div class="stat-label">Écart cumulé paiements - dépenses</div>
-        <div class="stat-value mono" id="stat-tresorerie">···</div>
+        <div class="stat-value mono" id="stat-ecart-cumule">···</div>
       </div>
       <div class="card stat-card card-skeleton">
         <div class="stat-icon icon-emerald"><i class="ic" data-icon="trending-up"></i></div>
         <div class="stat-label">Écart du mois paiements - dépenses</div>
-        <div class="stat-value mono" id="stat-benefice">···</div>
+        <div class="stat-value mono" id="stat-ecart-mois">···</div>
       </div>
       <div class="card stat-card card-skeleton">
         <div class="stat-icon icon-gold"><i class="ic" data-icon="sparkles"></i></div>
@@ -111,8 +111,8 @@
   }
 
   async function loadFinances() {
-    // Réutilise les deux endpoints existants : /dashboard (trésorerie, évolution des ventes)
-    // et /rapports/comptabilite (bénéfice net calculé sur le mois en cours).
+    // Réutilise les deux endpoints existants : /dashboard (écarts enregistrés et évolution des ventes facturées)
+    // et /rapports/comptabilite (écart des paiements enregistrés et dépenses sur le mois en cours).
     const today = financeLocalDateParts();
     const now = new Date(today.year, today.month - 1, today.day);
     const debutMois = today.year + '-' + String(today.month).padStart(2, '0') + '-01';
@@ -123,8 +123,8 @@
       Api.get('/rapports/comptabilite?from=' + debutMois + '&to=' + dateDuJour)
     ]);
 
-    document.getElementById('stat-tresorerie').textContent = formatMontant(dash.tresorerie);
-    document.getElementById('stat-benefice').textContent = formatMontant(compta.benefice);
+    document.getElementById('stat-ecart-cumule').textContent = formatMontant(dash.tresorerie);
+    document.getElementById('stat-ecart-mois').textContent = formatMontant(compta.benefice);
 
     document.querySelectorAll('#stats-grid .card-skeleton').forEach(c => c.classList.remove('card-skeleton'));
 
