@@ -320,7 +320,6 @@
       group_by: 'month',
       from: range.from,
       to: range.to,
-      exclude_cancelled: 'true',
       exclude_cancelled: 'true'
     });
     const { rows } = await Api.get('/rapports/ventes?' + params.toString());
