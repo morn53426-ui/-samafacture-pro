@@ -2512,6 +2512,63 @@ router.post('/purchase-orders', async (req, res, next) => {
   } finally { if (conn) conn.release(); }
 });
 
+router.post('/purchase-orders/:id/cancel', async (req, res, next) => {
+  let conn;
+  try {
+    const uid = owner(req);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [orderRows] = await conn.query(
+      'SELECT * FROM pro_commandes_fournisseurs WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, uid]
+    );
+    const order = orderRows[0];
+    if (!order) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Commande fournisseur introuvable.' });
+    }
+    if (order.statut === 'annulee') {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Cette commande fournisseur est déjà annulée.' });
+    }
+    const [[progress]] = await conn.query(
+      `SELECT COUNT(*) AS lignes,
+              COALESCE(SUM(quantite), 0) AS commandee,
+              COALESCE(SUM(quantite_recue), 0) AS recue
+         FROM pro_commandes_fournisseurs_lignes
+        WHERE commande_id = ? AND user_id = ?`,
+      [order.id, uid]
+    );
+    const orderedQuantity = Number(progress.commandee || 0);
+    const receivedQuantity = Number(progress.recue || 0);
+    if (Number(progress.lignes || 0) === 0 || order.statut === 'recue' ||
+        (orderedQuantity > 0 && receivedQuantity + 0.0001 >= orderedQuantity)) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Une commande intégralement réceptionnée ne peut pas être annulée.' });
+    }
+    const remainingQuantity = Math.max(0, Math.round((orderedQuantity - receivedQuantity) * 1000) / 1000);
+    await conn.query(
+      "UPDATE pro_commandes_fournisseurs SET statut = 'annulee' WHERE id = ? AND user_id = ?",
+      [order.id, uid]
+    );
+    await conn.commit();
+    await audit(req, 'achat.commande_annulee', 'commande_fournisseur', order.id, {
+      reference: order.numero,
+      quantite_recue_conservee: Math.round(receivedQuantity * 1000) / 1000,
+      quantite_restante_annulee: remainingQuantity
+    });
+    res.json({
+      id: order.id,
+      numero: order.numero,
+      statut: 'annulee',
+      quantite_recue_conservee: Math.round(receivedQuantity * 1000) / 1000,
+      quantite_restante_annulee: remainingQuantity
+    });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    next(err);
+  } finally { if (conn) conn.release(); }
+});
 router.post('/purchase-orders/:id/receive', async (req, res, next) => {
   let conn;
   try {
