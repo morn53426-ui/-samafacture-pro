@@ -3543,6 +3543,7 @@ thead th { background: #F2F6FD; color: #52627D; }
 .dashboard-periods { display:flex; gap:5px; flex-wrap:wrap; }
 .dashboard-periods .btn { min-height:31px; padding:5px 10px; border-radius:8px; font-size:.72rem; }
 .dashboard-periods .btn-primary { background:var(--workspace-blue); border-color:var(--workspace-blue); }
+.dashboard-periods .dashboard-period-select { min-width:142px; text-align:left; cursor:pointer; }
 .dashboard-chart-wrap { position:relative; min-height:230px; width:100%; }
 .dashboard-chart-wrap canvas { display:block; width:100% !important; max-height:250px; }
 .dashboard-donut-wrap { display:grid; grid-template-columns:minmax(130px, 1fr) minmax(110px, .9fr); gap:12px; align-items:center; min-height:218px; }
