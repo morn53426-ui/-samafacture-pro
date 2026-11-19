@@ -169,6 +169,7 @@ async function runMigrations(conn) {
   // v14 : preuve email à usage unique pour les invitations classiques d’équipe (migration 009).
   // v15 : fondation des abonnements SaaS (prix versionnés, consentements, mandats,
   // périodes, tentatives, inbox webhook et audit) ; aucune donnée ni paiement créé.
+  // v16 : type structuré des fiches catalogue ; les anciennes fiches restent non classées.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
