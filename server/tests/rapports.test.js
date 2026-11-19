@@ -90,6 +90,12 @@ describe('Rapports', () => {
         'le paiement déjà enregistré reste agrégé après annulation de la facture');
       assert.equal(Number(comptabilite.body.tva_collectee), 540,
         'le calcul conserve la TVA inscrite sur la facture annulée');
+      const tableauBord = await request(app)
+        .get('/api/dashboard')
+        .set('Authorization', `Bearer ${token}`);
+      assert.equal(tableauBord.status, 200);
+      assert.equal(tableauBord.body.evolution_mensuelle.reduce((sum, row) => sum + Number(row.total), 0), 2360,
+        'la prévision financière exclut les factures annulées de ses ventes mensuelles');
 
       const historique = await request(app)
         .get('/api/rapports/ventes?group_by=month')
