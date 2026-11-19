@@ -2373,7 +2373,7 @@ async function ensureDefaultWarehouse(uid) {
 
     await conn.beginTransaction();
     transactionStarted = true;
-    await conn.query(
+    const [warehouseInsert] = await conn.query(
       "INSERT IGNORE INTO pro_entrepots (user_id, code, nom, par_defaut) VALUES (?, 'PRINCIPAL', 'Magasin principal', 1)",
       [userId]
     );
@@ -2383,26 +2383,25 @@ async function ensureDefaultWarehouse(uid) {
     );
     if (!warehouse) throw new Error('Impossible de retrouver le magasin principal après son initialisation.');
 
-    // Ne tente d’insérer que les produits sans ligne de stock dans ce magasin.
-    // Cela évite de verrouiller inutilement toutes les clés déjà présentes à chaque appel.
-    await conn.query(
-      `INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite)
-       SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0))
-       FROM produits p
-       LEFT JOIN (
-         SELECT user_id, produit_id, SUM(quantite) AS total
-         FROM pro_stocks_entrepots
-         GROUP BY user_id, produit_id
-       ) existing ON existing.user_id = p.user_id AND existing.produit_id = p.id
-       LEFT JOIN pro_stocks_entrepots principal
-         ON principal.user_id = p.user_id
-         AND principal.entrepot_id = ?
-         AND principal.produit_id = p.id
-       WHERE p.user_id = ?
-         AND COALESCE(p.type_catalogue, 'non_classe') <> 'service'
-         AND principal.id IS NULL`,
-      [warehouse.id, warehouse.id, userId]
-    );
+    // Le backfill historique est nécessaire uniquement à la création du magasin.
+    // Sur les appels suivants, ne pas rescanner/verrouiller le stock pendant les transferts
+    // ou les réceptions concurrents. La création de produit initialise sa propre ligne.
+    if (Number(warehouseInsert.affectedRows) === 1) {
+      await conn.query(
+        `INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite)
+         SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0))
+         FROM produits p
+         LEFT JOIN (
+           SELECT produit_id, SUM(quantite) AS total
+           FROM pro_stocks_entrepots
+           WHERE user_id = ?
+           GROUP BY produit_id
+         ) existing ON existing.produit_id = p.id
+         WHERE p.user_id = ?
+           AND COALESCE(p.type_catalogue, 'non_classe') <> 'service'`,
+        [warehouse.id, userId, userId]
+      );
+    }
 
     await conn.commit();
     transactionStarted = false;
