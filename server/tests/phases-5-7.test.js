@@ -557,6 +557,21 @@ test('une facture débite et restitue le stock dans son entrepôt de vente', asy
   stock = await stockByWarehouse();
   assert.equal(Object.values(stock).reduce((sum, value) => sum + value, 0), quoteBefore, 'un devis ne débite aucun entrepôt');
   assert.equal(quote.body.facture.entrepot_id, null);
+
+  const converted = await request(app).post('/api/factures/' + quote.body.facture.id + '/transformer-en-facture')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ entrepot_id: secondaryWarehouseId });
+  assert.equal(converted.status, 200, converted.text);
+  assert.equal(Number(converted.body.facture.entrepot_id), secondaryWarehouseId);
+  stock = await stockByWarehouse();
+  assert.equal(stock[Number(mainWarehouse.id)], 4, 'la conversion ne débite pas le magasin principal');
+  assert.equal(stock[secondaryWarehouseId], 3, 'la conversion débite le dépôt choisi');
+
+  const convertedCancelled = await request(app).put('/api/factures/' + quote.body.facture.id + '/statut')
+    .set('Authorization', 'Bearer ' + tokenA).send({ statut: 'annulee' });
+  assert.equal(convertedCancelled.status, 200, convertedCancelled.text);
+  stock = await stockByWarehouse();
+  assert.equal(stock[secondaryWarehouseId], 6, 'l’annulation après conversion restitue le dépôt choisi');
 });
 test('associer une ligne d’achat saisie libre à un produit permet sa réception sans réaffecter le stock après coup', async () => {
   const product = await request(app).post('/api/produits')
