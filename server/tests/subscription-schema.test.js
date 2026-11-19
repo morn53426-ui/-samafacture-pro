@@ -40,12 +40,12 @@ test('la migration v15 crée les huit tables du moteur SaaS', async () => {
   assert.deepEqual(actual, [...EXPECTED_TABLES].sort());
 });
 
-test('la base de test annonce la version de schéma 15 après migration', async () => {
+test('la base de test annonce la version de schéma 16 après migration', async () => {
   const [[meta]] = await pool.query(
     'SELECT version FROM _samafacture_schema_meta WHERE id = 1'
   );
   assert.ok(meta);
-  assert.equal(Number(meta.version), 15);
+  assert.equal(Number(meta.version), 16);
 });
 
 test('la fondation du moteur est vide : aucun prix publié, abonnement, mandat ou débit créé', async () => {
