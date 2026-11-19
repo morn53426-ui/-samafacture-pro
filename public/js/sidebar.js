@@ -69,8 +69,14 @@ function renderSidebar(activePage) {
   // enregistrée. Le rail compact garde les libellés visibles sous les icônes sur ordinateur.
   const sidebarCollapsed = window.matchMedia('(min-width: 901px)').matches && (
     isEnterpriseConsole || (() => {
-      try { return localStorage.getItem('sf-sidebar-collapsed') !== 'false'; }
-      catch { return true; }
+      try {
+        const preference = localStorage.getItem('sf-sidebar-collapsed');
+        // Sur le tableau de bord, le menu complet est le défaut visuel ; une préférence
+        // enregistrée par l'utilisateur reste prioritaire sur toutes les pages.
+        return preference === null ? activePage !== 'dashboard' : preference !== 'false';
+      } catch {
+        return activePage !== 'dashboard';
+      }
     })()
   );
   // Évite de montrer le menu en position développée pendant son repli initial.

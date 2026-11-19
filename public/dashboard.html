@@ -25,7 +25,7 @@
       <div>
         <div class="workspace-page-kicker">Activité</div>
         <h1 id="dashboard-greeting">Tableau de bord</h1>
-        <p>Indicateurs et mouvements récents de votre activité.</p>
+        <p>Voici la synthèse de votre activité sur Sunupilot.</p>
       </div>
       <div class="dashboard-context"><i class="ic" data-icon="calendar"></i><span id="dashboard-period-label">Vue d'ensemble de votre activité</span></div>
     </section>
@@ -72,6 +72,40 @@
           </div>
         </div>
       </article>
+    </section>
+
+    <section class="dashboard-section dashboard-modules-section" aria-labelledby="dashboard-modules-title">
+      <header class="dashboard-panel-head">
+        <div class="dashboard-panel-title">
+          <i class="ic" data-icon="clipboard-list"></i>
+          <div>
+            <h2 id="dashboard-modules-title">Modules Sunupilot</h2>
+            <p class="dashboard-panel-subtitle">Accédez directement à vos outils de gestion</p>
+          </div>
+        </div>
+      </header>
+      <nav class="dashboard-modules" aria-label="Modules Sunupilot">
+        <a class="dashboard-module-card is-green" href="crm.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="contact-round"></i></span>
+          <span class="dashboard-module-copy"><strong>CRM &amp; suivi client</strong><small>Gérez vos clients et opportunités</small></span>
+        </a>
+        <a class="dashboard-module-card is-indigo" href="paiements-professionnels.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="credit-card"></i></span>
+          <span class="dashboard-module-copy"><strong>Paiement en ligne</strong><small>Consultez les options de paiement disponibles</small></span>
+        </a>
+        <a class="dashboard-module-card is-blue" href="comptabilite.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="landmark"></i></span>
+          <span class="dashboard-module-copy"><strong>Comptabilité OHADA</strong><small>Retrouvez votre espace comptable</small></span>
+        </a>
+        <a class="dashboard-module-card is-amber" href="achats.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="package"></i></span>
+          <span class="dashboard-module-copy"><strong>Achats &amp; Stocks</strong><small>Suivez achats, articles et stocks</small></span>
+        </a>
+        <a class="dashboard-module-card is-purple" href="automatisations.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="workflow"></i></span>
+          <span class="dashboard-module-copy"><strong>Automatisation</strong><small>Accédez à vos tâches automatisées</small></span>
+        </a>
+      </nav>
     </section>
 
     <section class="dashboard-grid dashboard-bottom-grid" aria-label="Activité récente et raccourcis">
@@ -147,7 +181,10 @@
   }
 
   const user = Api.currentUser() || {};
-  document.getElementById('dashboard-greeting').textContent = 'Tableau de bord';
+  const greetingName = String(user.prenom || user.nom || '').trim().split(/\s+/)[0];
+  document.getElementById('dashboard-greeting').textContent = greetingName
+    ? 'Bonjour ' + greetingName + ' 👋'
+    : 'Bienvenue sur Sunupilot';
 
   function renderKpis(stats) {
     const value = (v) => Number(v || 0);
