@@ -188,9 +188,12 @@
 
   function renderKpis(stats) {
     const value = (v) => Number(v || 0);
+    // Les espaces de groupement restent visibles, mais deviennent des points
+    // de retour à la ligne pour les montants longs, sans couper décimales ou devise.
+    const amount = (v) => formatMontant(value(v)).replace(/([,\.\u00a0\u202f ](?=\d{3}(?:[^\d]|$)))/g, '$1<wbr>');
     document.getElementById('stats-grid').innerHTML = `
       <article class="dashboard-kpi blue">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('banknote')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.chiffre_affaires))}</strong><span class="dashboard-kpi-label">Chiffre d'affaires</span></div></div>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('banknote')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${amount(stats.chiffre_affaires)}</strong><span class="dashboard-kpi-label">Chiffre d'affaires</span></div></div>
         <span class="dashboard-kpi-note">Encaissements cumulés enregistrés</span>
       </article>
       <article class="dashboard-kpi green">
@@ -202,7 +205,7 @@
         <span class="dashboard-kpi-note">Ajoutés sur les 30 derniers jours</span>
       </article>
       <article class="dashboard-kpi amber">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('package')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.valeur_stock))}</strong><span class="dashboard-kpi-label">Valeur du stock</span></div></div>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('package')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${amount(stats.valeur_stock)}</strong><span class="dashboard-kpi-label">Valeur du stock</span></div></div>
         <span class="dashboard-kpi-note">Valorisation au coût d’achat</span>
       </article>
     `;
