@@ -115,7 +115,7 @@ async function buildDashboard(userId) {
     return { ...base, derniers_paiements: [], dernieres_factures: [], derniers_clients: derniersClients, evolution_mensuelle: [], top_clients: [], top_produits: [], repartition_ventes: [] };
   }
 
-  // These five reads are independent and are deliberately kept as separate result sets:
+  // These independent reads are deliberately kept as separate result sets:
   // this preserves compatibility with existing MySQL/WAMP installations without enabling
   // multipleStatements globally. They execute concurrently, but only after the inexpensive
   // summary has established that the user actually has invoice data.
@@ -178,8 +178,12 @@ async function buildDashboard(userId) {
        JOIN factures f ON f.id = fl.facture_id
        LEFT JOIN produits p ON p.id = fl.produit_id AND p.user_id = f.user_id
        WHERE f.user_id = ? AND f.type = 'facture' AND f.statut <> 'annulee'
-       GROUP BY type_catalogue
-       ORDER BY FIELD(type_catalogue, 'produit', 'service', 'non_classe')`,
+       GROUP BY CASE
+         WHEN p.id IS NULL THEN 'non_classe'
+         WHEN p.type_catalogue = 'service' THEN 'service'
+         WHEN p.type_catalogue = 'produit' THEN 'produit'
+         ELSE 'non_classe'
+       END`,
       [userId]
     )
   ]);
