@@ -44,7 +44,17 @@ function makeLong(prefix, length) {
   const filler = ' — Départements et services régionaux de gestion commerciale';
   let value = prefix;
   while (value.length < length) value += filler;
-  return value.slice(0, length);
+  const sample = value.slice(0, length);
+  // Garder des chaînes longues sans couper un mot au milieu : les fixtures doivent
+  // éprouver les retours à la ligne, pas donner l'impression que le PDF tronque le texte.
+  if (value.length > length && /[\p{L}\p{M}]$/u.test(sample) &&
+      /[\p{L}\p{M}]/u.test(value[length])) {
+    return sample
+      .replace(/[\p{L}\p{M}'’\-]+$/u, '')
+      .replace(/\s+[—–-]$/u, '')
+      .trimEnd();
+  }
+  return sample;
 }
 
 function makeFixtures() {
@@ -1859,14 +1869,14 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
 
   await groupPage.evaluate(() => window.SamaTheme.definir('dark'));
   await groupPage.waitForFunction(() =>
-    getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(40, 39, 32)'
+    getComputedStyle(document.querySelector('.group-panel')).backgroundColor === 'rgb(26, 27, 46)'
   );
   const dark = await readGroupTheme();
   assert.equal(dark.theme, 'dark', 'Le centre Entreprise doit appliquer le thème sombre sans rechargement.');
-  assert.equal(dark.page, 'rgb(29, 28, 24)', 'Le fond du centre Entreprise doit suivre le graphite du thème sombre.');
-  assert.equal(dark.panel, 'rgb(40, 39, 32)', 'Les panneaux ne doivent plus rester blancs en thème sombre.');
-  assert.equal(dark.dashboardCard, 'rgb(40, 39, 32)', 'Les cartes de pilotage doivent utiliser la surface sombre.');
-  assert.equal(dark.sidebar, 'rgb(23, 23, 19)', 'Le rail latéral doit devenir sombre avec le reste de l’application.');
+  assert.equal(dark.page, 'rgb(17, 18, 34)', 'Le fond du centre Entreprise doit suivre l’indigo profond du thème sombre SUNUPILOT.');
+  assert.equal(dark.panel, 'rgb(26, 27, 46)', 'Les panneaux ne doivent plus rester blancs en thème sombre.');
+  assert.equal(dark.dashboardCard, 'rgb(26, 27, 46)', 'Les cartes de pilotage doivent utiliser la surface sombre.');
+  assert.equal(dark.sidebar, 'rgb(22, 22, 56)', 'Le rail latéral doit devenir sombre avec le reste de l’application.');
   assert.equal(dark.horizontalOverflow, false, 'Le thème sombre ne doit pas provoquer de débordement.');
   const headingContrast = contrastRatio(dark.heading, dark.page);
   const sidebarActiveContrast = contrastRatio(dark.sidebarText, dark.sidebarActiveBackground);
@@ -1920,7 +1930,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
       name + ' doit assombrir les lignes de grille avec le thème sombre.');
     assert.notEqual(darkColors.tick, lightColors.tick,
       name + ' doit adapter les libellés du graphique avec le thème sombre.');
-    const contrast = contrastRatio(darkColors.tick, 'rgb(40, 39, 32)');
+    const contrast = contrastRatio(darkColors.tick, 'rgb(26, 27, 46)');
     assert.ok(contrast >= 4.5,
       name + ' : les libellés du graphique doivent rester lisibles en thème sombre. Contraste : ' + contrast.toFixed(2));
     await page.screenshot({
@@ -2062,7 +2072,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     'La scène de prévisualisation doit suivre le thème sombre.');
   assert.notEqual(previewDark.stage, 'rgb(233, 237, 242)',
     'La scène de prévisualisation ne doit pas conserver son ancien fond gris clair en thème sombre.');
-  assert.equal(previewDark.dialog, 'rgb(40, 39, 32)',
+  assert.equal(previewDark.dialog, 'rgb(26, 27, 46)',
     'La fenêtre d’aperçu doit suivre le thème sombre.');
   assert.equal(previewDark.paper, 'rgb(255, 255, 255)',
     'La feuille A4 doit rester blanche pour refléter le rendu imprimé.');
@@ -2169,10 +2179,10 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
 
   assert.equal(darkMetrics.theme, 'dark', 'Le thème sombre doit être appliqué avant le rendu du tableau de bord.');
   assert.notEqual(darkMetrics.card, 'rgb(255, 255, 255)', 'Les cartes ne doivent pas rester blanches en thème sombre.');
-  assert.equal(darkMetrics.background, 'rgb(29, 28, 24)', 'Le thème sombre doit reprendre le fond graphite de la direction Unslop.');
-  assert.equal(darkMetrics.card, 'rgb(40, 39, 32)', 'Les cartes sombres doivent utiliser la teinte papier profonde.');
-  assert.equal(darkMetrics.sidebar, 'rgb(23, 23, 19)', 'Le rail compact ne doit pas rester blanc en thème sombre.');
-  assert.equal(darkMetrics.sidebarNav, 'rgb(23, 23, 19)', 'La navigation compacte doit adopter le fond du rail sombre.');
+  assert.equal(darkMetrics.background, 'rgb(17, 18, 34)', 'Le thème sombre doit reprendre le fond indigo profond de l’identité SUNUPILOT.');
+  assert.equal(darkMetrics.card, 'rgb(26, 27, 46)', 'Les cartes sombres doivent utiliser la teinte papier profonde.');
+  assert.equal(darkMetrics.sidebar, 'rgb(22, 22, 56)', 'Le rail compact ne doit pas rester blanc en thème sombre.');
+  assert.equal(darkMetrics.sidebarNav, 'rgb(22, 22, 56)', 'La navigation compacte doit adopter le fond du rail sombre.');
   const sidebarContrast = contrastRatio(darkMetrics.sidebarLabel, darkMetrics.sidebar);
   assert.ok(sidebarContrast >= 4.5,
     'Les libellés du rail compact doivent garder un contraste de 4,5:1. Valeur : ' + sidebarContrast.toFixed(2));
@@ -3454,6 +3464,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       validityLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Validité du devis'),
       dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance')
     }));
+    assert.equal(screenMetrics.title, type === 'devis' ? 'Devis — Sunupilot' : 'Facture — Sunupilot',
+      type + ' : le titre du document et les métadonnées PDF doivent identifier le bon type.');
     assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),
       type + ' : toutes les lignes doivent être rendues avant l’impression : ' + JSON.stringify(screenMetrics));
     assert.ok(screenMetrics.documentWidth <= screenMetrics.viewportWidth + 1,
@@ -3485,6 +3497,9 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       fullPage: true
     });
     await page.emulateMediaType('print');
+    // La recette simule volontairement un navigateur hors réseau : les requêtes
+    // Google Fonts sont bloquées dans preparePage(). On vérifie donc la pile CSS
+    // demandée sans exiger que le fichier distant soit téléchargeable ici.
     const printMetrics = await page.evaluate(() => ({
       toolbarDisplay: getComputedStyle(document.querySelector('.toolbar')).display,
       themeToggleDisplay: document.querySelector('.theme-toggle-flottant')
@@ -3492,13 +3507,16 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         : 'none',
       tableHeaderDisplay: getComputedStyle(document.querySelector('.sf-document-table thead')).display,
       pageRule: getComputedStyle(document.querySelector('.invoice-doc')).breakInside,
-      overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX
+      overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX,
+      documentFontFamily: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily
     }));
     assert.equal(printMetrics.toolbarDisplay, 'none', type + ' : la barre d’outils ne doit jamais être imprimée.');
     assert.equal(printMetrics.themeToggleDisplay, 'none', type + ' : le sélecteur de thème ne doit jamais recouvrir le document imprimé.');
     assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
       type + ' : l’en-tête du tableau doit être répété lorsque le document passe sur une nouvelle page.');
     assert.equal(printMetrics.overflowX, 'visible', type + ' : le document ne doit pas être coupé horizontalement à l’impression.');
+    assert.match(printMetrics.documentFontFamily, /IBM Plex Sans/i,
+      type + ' : la pile typographique IBM Plex Sans doit rester prioritaire pour le document imprimé.');
 
     const pdf = await page.pdf({
       format: 'A4',
@@ -3516,6 +3534,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
     if (type === 'devis') {
       assert.ok(pages >= 2, 'Le devis long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
+      assert.ok(pages <= 3, 'Le devis long ne doit pas créer une quatrième page quasi vide. Pages détectées : ' + pages);
     }
     fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdfBuffer);
     return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };

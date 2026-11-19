@@ -41,13 +41,13 @@ function renderAuthSide() {
   ).join('');
 
   return ''
-    + '<section class="auth-side" id="auth-slider" role="region" aria-roledescription="carrousel" aria-label="Présentation de SamaFacture Pro">'
+    + '<section class="auth-side" id="auth-slider" role="region" aria-roledescription="carrousel" aria-label="Présentation de SUNUPILOT">'
     + slidesHtml
     + '<div class="auth-slide-overlay" aria-hidden="true"></div>'
     + '<button type="button" class="auth-slider-arrow prev" aria-label="Image précédente">‹</button>'
     + '<button type="button" class="auth-slider-arrow next" aria-label="Image suivante">›</button>'
     + '<div class="auth-content">'
-    + '  <div class="auth-badge"><div class="mark" style="width:46px;height:46px;border-radius:13px;overflow:hidden;flex-shrink:0;padding:3px;box-sizing:border-box;background:#fff;border:1px solid rgba(229,193,127,.85);box-shadow:0 7px 20px rgba(0,0,0,.22);"><img src="images/icon-192.png" alt="" style="display:block;width:100%;height:100%;object-fit:contain;" /></div><div style="font-family:var(--font-display);font-weight:700;font-size:1.1rem;">SamaFacture Pro</div></div>'
+    + '  <div class="auth-badge"><div class="mark" style="width:46px;height:46px;border-radius:13px;overflow:hidden;flex-shrink:0;padding:3px;box-sizing:border-box;background:#fff;border:1px solid rgba(229,193,127,.85);box-shadow:0 7px 20px rgba(0,0,0,.22);"><img src="images/icon-192.png" alt="" style="display:block;width:100%;height:100%;object-fit:contain;" /></div><div style="font-family:var(--font-display);font-weight:700;font-size:1.1rem;">SUNUPILOT</div></div>'
     + '  <div class="auth-slide-caption" aria-live="polite" aria-atomic="true"><span class="eyebrow" data-auth-eyebrow>' + slides[0].eyebrow + '</span><h2 data-auth-title>' + slides[0].title + '</h2><p data-auth-description>' + slides[0].description + '</p></div>'
     + '  <div class="auth-marquee-group">'
     + '    <div class="auth-marquee"><div class="auth-marquee-track">' + marqueeItems + '</div></div>'

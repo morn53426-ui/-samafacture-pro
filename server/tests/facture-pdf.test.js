@@ -9,8 +9,16 @@ const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardown
 // GET /api/factures/:id/pdf (génération via Puppeteer, utils/pdf.js) n'était pas testé.
 // Nécessite un Chromium installé/téléchargeable (voir npm postinstall de puppeteer) — pas
 // exécutable dans un environnement sans accès réseau, mais doit passer en CI/local normal.
+const TOUS_LES_MODELES_FACTURE = [
+  'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
+  'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
+  'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs',
+  'nova', 'nordique', 'luxe', 'tech', 'horizon',
+  'eclipse', 'saphir', 'conseil', 'imperial', 'panorama', 'groupe', 'majeste'
+];
+
 describe('Génération PDF de facture', () => {
-  let userIdA, tokenA, userIdB, tokenB, factureId;
+  let userIdA, tokenA, userIdB, tokenB, factureId, clientId;
 
   before(async () => {
     await setupTestDatabase();
@@ -30,11 +38,12 @@ describe('Génération PDF de facture', () => {
       .post('/api/clients')
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ nom: 'Client PDF' });
+    clientId = client.body.client.id;
 
     const facture = await request(app)
       .post('/api/factures')
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ client_id: client.body.client.id, type: 'facture', lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 10000, tva: 18 }] });
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Service', quantite: 1, prix_unitaire: 10000, tva: 18 }] });
     factureId = facture.body.facture.id;
   });
 
@@ -62,15 +71,7 @@ describe('Génération PDF de facture', () => {
   });
 
   test('les trente et un modèles produisent un vrai PDF A4 avec Puppeteer', async () => {
-    const tousModeles = [
-      'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
-      'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
-      'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs',
-      'nova', 'nordique', 'luxe', 'tech', 'horizon',
-      'eclipse', 'saphir', 'conseil', 'imperial', 'panorama', 'groupe', 'majeste'
-    ];
-
-    for (const modele of tousModeles) {
+    for (const modele of TOUS_LES_MODELES_FACTURE) {
       await pool.query(
         'UPDATE users SET facture_template = ? WHERE id = ?',
         [modele, userIdA]
@@ -120,6 +121,66 @@ describe('Génération PDF de facture', () => {
         modele + ' doit intégrer IBM Plex Sans dans le vrai PDF, polices trouvées : ' + nomsPolicesPdf.join(', '));
       assert.ok(nomsPolicesPdf.some(name => /IBMPlexMono/i.test(name)),
         modele + ' doit intégrer IBM Plex Mono dans le vrai PDF, polices trouvées : ' + nomsPolicesPdf.join(', '));
+    }
+  });
+
+  test('les trente et un modèles produisent un vrai PDF A4 pour un devis', async () => {
+    const devis = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({
+        client_id: clientId,
+        type: 'devis',
+        date_validite: '2026-12-15',
+        lignes: [{ designation: 'Prestation de conseil', quantite: 1, prix_unitaire: 10000, tva: 18 }]
+      });
+    assert.equal(devis.status, 201, devis.text);
+
+    for (const modele of TOUS_LES_MODELES_FACTURE) {
+      await pool.query(
+        'UPDATE users SET facture_template = ? WHERE id = ?',
+        [modele, userIdA]
+      );
+
+      const res = await request(app)
+        .get(`/api/factures/${devis.body.facture.id}/pdf`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks = [];
+          response.on('data', chunk => chunks.push(chunk));
+          response.on('end', () => callback(null, Buffer.concat(chunks)));
+        });
+
+      assert.equal(res.status, 200, modele + ' doit générer un PDF de devis en HTTP 200');
+      assert.match(res.headers['content-type'] || '', /^application\/pdf(?:;|$)/,
+        modele + ' doit renvoyer un fichier PDF de devis');
+      assert.match(res.headers['content-disposition'] || '', /^attachment; filename="devis-/,
+        modele + ' doit nommer le téléchargement comme un devis');
+      assert.equal(res.body.slice(0, 5).toString('latin1'), '%PDF-',
+        modele + ' doit produire une signature PDF valide');
+      assert.ok(res.body.length > 1500,
+        modele + ' ne doit pas produire un PDF de devis vide ou tronqué');
+
+      const pdfLatin1 = res.body.toString('latin1');
+      const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
+      assert.ok(mediaBox, modele + ' doit déclarer une zone de page PDF.');
+      assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
+        Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
+        modele + ' doit être au vrai format A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
+
+      const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
+      assert.ok(pageCount >= 1 && pageCount <= 2,
+        modele + ' ne doit pas créer une pagination excessive pour un devis simple (pages=' + pageCount + ')');
+
+      const fontNames = Array.from(
+        pdfLatin1.matchAll(/\/(?:BaseFont|FontName)\s*\/([^\s/]+)/g),
+        match => match[1]
+      );
+      assert.ok(fontNames.some(name => /IBMPlexSans/i.test(name)),
+        modele + ' doit intégrer IBM Plex Sans au PDF du devis, polices trouvées : ' + fontNames.join(', '));
+      assert.ok(fontNames.some(name => /IBMPlexMono/i.test(name)),
+        modele + ' doit intégrer IBM Plex Mono au PDF du devis, polices trouvées : ' + fontNames.join(', '));
     }
   });
 

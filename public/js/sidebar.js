@@ -90,9 +90,9 @@ function renderSidebar(activePage) {
   const html = `
     <aside class="sidebar${sidebarCollapsed ? ' is-collapsed' : ''}" id="app-sidebar">
       <div class="sidebar-brand">
-        <div class="mark"><img src="images/icon-192.png" alt="SamaFacture Pro" /></div>
+        <div class="mark"><img src="images/icon-192.png" alt="Sunupilot" /></div>
         <div class="sidebar-brand-copy">
-          <div class="name">SamaFacture <span class="brand-pro">Pro</span></div>
+          <div class="name">SUNU<span class="brand-pro">PILOT</span></div>
           <div class="sub">Gestion commerciale</div>
         </div>
         <button type="button" class="sidebar-collapse-toggle" id="sidebar-collapse-toggle" onclick="toggleDesktopSidebar()" aria-controls="app-navigation" aria-label="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}" aria-expanded="${String(!sidebarCollapsed)}" title="${sidebarCollapsed ? 'Élargir le menu' : 'Réduire le menu'}">${Icon(sidebarCollapsed ? 'arrow-right' : 'arrow-left')}</button>
@@ -198,9 +198,9 @@ function renderTopbar(title, subtitle) {
         <button type="button" class="enterprise-console-menu-toggle" onclick="toggleSidebar()" aria-label="Ouvrir la navigation" aria-controls="app-navigation" aria-expanded="false">
           ${Icon('menu')}
         </button>
-        <a class="enterprise-console-brand" href="dashboard.html" aria-label="SamaFacture Pro, tableau de bord">
+        <a class="enterprise-console-brand" href="dashboard.html" aria-label="Sunupilot, tableau de bord">
           <span class="enterprise-console-brand-mark"><img src="images/icon-192.png" alt="" /></span>
-          <span><strong>SamaFacture <em>Pro</em></strong><small>Gestion d’entreprise</small></span>
+          <span><strong>SUNUPILOT</strong><small>Gestion d’entreprise</small></span>
         </a>
         <div class="enterprise-console-view">
           <span>Vue consolidée</span>
@@ -220,7 +220,7 @@ function renderTopbar(title, subtitle) {
         <form class="app-topbar-search enterprise-console-search" role="search" onsubmit="return submitWorkspaceSearch(event)">
           <span class="ic" aria-hidden="true">${Icon('search')}</span>
           <input id="workspace-search" type="search"
-            placeholder="Rechercher dans SamaFacture..." aria-label="Rechercher dans SamaFacture" />
+            placeholder="Rechercher dans SUNUPILOT..." aria-label="Rechercher dans Sunupilot" />
           <button type="submit" aria-label="Lancer la recherche">${Icon('arrow-up-right')}</button>
         </form>
         <nav class="enterprise-console-utility-links" aria-label="Aide et paramètres">

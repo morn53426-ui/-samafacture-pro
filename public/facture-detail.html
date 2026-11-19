@@ -5,12 +5,12 @@
 <script src="js/icons.js"></script>
 <script src="js/tooltip.js"></script>
 <meta charset="UTF-8" />
-<title>Facture — SamaFacture Pro</title>
+<title>Facture — Sunupilot</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#0F1B33" />
+<meta name="theme-color" content="#29265E" />
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 <style>
@@ -148,6 +148,7 @@
     });
 
     const isDevis = facture.type === 'devis';
+    document.title = `${isDevis ? 'Devis' : 'Facture'} — Sunupilot`;
     const template = user.facture_template || 'classique';
 
     document.getElementById('doc').innerHTML = templates.renderInvoiceHtml({

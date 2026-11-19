@@ -1,4 +1,5 @@
-// Enregistre le service worker (mise en cache de l'interface pour un chargement rapide/hors-ligne)
+// Met en cache le shell statique pour accélérer l'interface ; les pages HTML et les données API
+// restent servies par le réseau et ne sont pas disponibles hors ligne.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});

@@ -354,6 +354,23 @@ describe('Impression et génération PDF', () => {
       'Les piles de polices ne doivent pas casser les guillemets de l’attribut style HTML.');
   });
 
+  test("les micro-libellés des modèles ne descendent pas sous 9 pt à l'impression", () => {
+    const fixedRemSizes = Array.from(
+      rendererSource.matchAll(/font-size:\s*((?:\d*\.)\d+)rem/g),
+      match => match[1]
+    );
+    const belowPrintMinimum = [...new Set(fixedRemSizes)]
+      .filter(size => Number(size) < 0.75);
+    assert.ok(belowPrintMinimum.length > 0,
+      'Le catalogue doit être audité sur ses petites tailles fixes.');
+    for (const size of belowPrintMinimum) {
+      assert.ok(cssSource.includes('[style*="font-size:' + size + 'rem"]'),
+        'La taille ' + size + 'rem doit être remontée à 9 pt dans le média print.');
+    }
+    assert.match(cssSource, /\.invoice-doc \[style\*="font-size:[^"]+"\]\s*\{\s*font-size:\s*9pt !important;/s,
+      'Les mentions secondaires ciblées doivent être lisibles dans les PDF.');
+  });
+
   test("l'impression A4 utilise une seule marge, une taille lisible et une pagination ciblée", () => {
     assert.match(pageSource, /@page\s*\{\s*size:\s*A4 portrait;\s*margin:\s*12mm 12mm 14mm;/);
     assert.match(pageSource, /padding:\s*0 !important/);

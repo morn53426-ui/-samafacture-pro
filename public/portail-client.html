@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mon espace client — SamaFacture Pro</title><meta name="robots" content="noindex,nofollow">
+<title>Mon espace client — Sunupilot</title><meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer"><meta name="theme-color" content="#0F1B33">
 <link rel="stylesheet" href="css/style.css"><link rel="icon" type="image/png" href="images/icon-192.png">
 <style>
@@ -30,11 +30,11 @@
 <body>
 <main class="portal-shell">
   <header class="portal-head">
-    <div class="portal-brand"><img id="company-logo" src="images/icon-192.png" alt=""><span id="company-name">SamaFacture Pro</span></div>
+    <div class="portal-brand"><img id="company-logo" src="images/icon-192.png" alt=""><span id="company-name">Sunupilot</span></div>
     <span class="portal-meta">Espace client sécurisé</span>
   </header>
   <div id="portal-content"><section class="portal-error"><h2>Chargement de votre espace…</h2><p>Vérification de votre lien personnel.</p></section></div>
-  <footer class="portal-meta" style="text-align:center;margin-top:28px">Lien personnel et temporaire · SamaFacture Pro</footer>
+  <footer class="portal-meta" style="text-align:center;margin-top:28px">Lien personnel et temporaire · Sunupilot</footer>
 </main>
 <script>
 const token = new URLSearchParams(location.hash.slice(1)).get('token') || '';
@@ -47,8 +47,8 @@ const money = (value,currency,locale) => {
 const date = value => value ? new Date(String(value).slice(0,10)+'T12:00:00').toLocaleDateString('fr-FR') : '—';
 function render(data){
   const company=data.entreprise||{},client=data.client||{},summary=data.resume||{};
-  document.title='Espace client — '+(company.nom||'SamaFacture Pro');
-  document.getElementById('company-name').textContent=company.nom||'SamaFacture Pro';
+  document.title='Espace client — '+(company.nom||'Sunupilot');
+  document.getElementById('company-name').textContent=company.nom||'Sunupilot';
   if(company.logo && /^data:image\/(png|jpe?g|webp|svg\+xml);base64,|^https:\/\//i.test(company.logo)) document.getElementById('company-logo').src=company.logo;
   const docs=(data.documents||[]);
   root.innerHTML='<section class="portal-hero"><h1>Bonjour '+safe(client.nom||'')+'</h1><p>Consultez ici vos factures, devis, échéances et décisions commerciales.</p></section>'+

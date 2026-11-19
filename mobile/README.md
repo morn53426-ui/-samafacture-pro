@@ -1,4 +1,4 @@
-# SamaFacture Pro — App iOS / Android (Capacitor)
+# Sunupilot — App iOS / Android (Capacitor)
 
 Ce dossier enveloppe votre site web existant (`public/`) dans une vraie app native, sans
 réécrire le code. Le principe : l'app installée sur le téléphone ouvre directement votre
@@ -19,8 +19,8 @@ republier sur les stores à chaque changement de contenu).
 
 Avant toute commande, ouvrez `capacitor.config.json` dans ce dossier et modifiez :
 
-- `"appId"` : un identifiant unique inversé, ex. `com.votresociete.samafacture` (ne le
-  changez plus une fois l'app publiée — c'est son identité permanente sur les stores).
+- `"appId"` : l’identifiant existant `com.samafacturepro.app` est volontairement conservé
+  pour préserver la continuité des installations. Ne le changez pas pendant ce rebranding.
 - `"server.url"` : remplacez `https://votredomaine.com` par le vrai domaine où votre
   serveur est déployé (voir la Phase 10 de `RAPPORT_AUDIT.md` pour le déploiement Docker).
 
@@ -42,7 +42,7 @@ Les icônes actuelles (`public/images/icon-192.png`, `icon-512.png`,
 
 ```bash
 npm install -D @capacitor/assets
-npx capacitor-assets generate --iconBackgroundColor '#0F1B33' --iconBackgroundColorDark '#0F1B33'
+npx capacitor-assets generate --iconBackgroundColor '#F6F7F5' --iconBackgroundColorDark '#29265E'
 ```
 
 (fournissez une icône source haute résolution dans `resources/icon.png` avant de lancer
