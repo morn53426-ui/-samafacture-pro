@@ -64,7 +64,7 @@ async function fetchVentes(userId, { from, to, group_by = 'month', exclude_cance
  *       - in: query
  *         name: group_by
  *         schema: { type: string, enum: [day, week, month, year, client, produit], default: month }
-       - in: query
+ *       - in: query
  *         name: exclude_cancelled
  *         schema: { type: boolean, default: false }
  *         description: Exclut les factures annulées lorsque true. Le comportement historique est conservé par défaut.
