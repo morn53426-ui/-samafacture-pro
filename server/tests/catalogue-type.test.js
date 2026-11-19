@@ -12,6 +12,7 @@ const migration = fs.readFileSync(path.join(root, 'config', 'db.js'), 'utf8');
 const schema = fs.readFileSync(path.join(root, 'database', 'schema.sql'), 'utf8');
 const page = fs.readFileSync(path.join(root, '..', 'public', 'produits.html'), 'utf8');
 const purchasesPage = fs.readFileSync(path.join(root, '..', 'public', 'achats.html'), 'utf8');
+const invoicePage = fs.readFileSync(path.join(root, '..', 'public', 'nouvelle-facture.html'), 'utf8');
 
 describe('Catalogue — distinction produit/service', () => {
   test('les types acceptés sont explicites et normalisés', () => {
@@ -78,6 +79,13 @@ describe('Catalogue — distinction produit/service', () => {
     assert.match(invoices, /if \(!stockManagedIds\.has\(productId\)\) continue/);
     assert.match(invoices, /appliquerAjustementsStock\(conn, req\.tenantId, computedLignes/);
     assert.match(invoices, /lignesDevis\.map\(\(l\) => \(\{ produit_id: l\.produit_id, delta: -l\.quantite \}\)\)/);
+  });
+
+  test('la création de facture distingue les services sans modifier leur désignation commerciale', () => {
+    assert.match(invoicePage, /Produit ou service du catalogue/);
+    assert.match(invoicePage, /const typeLabel = p\.type_catalogue === 'service' \? 'Service'/);
+    assert.match(invoicePage, /data-nom="\$\{escapeHtml\(p\.nom\)\}"/);
+    assert.match(invoicePage, /opt\.dataset\.nom \|\| opt\.textContent/);
   });
 
   test('les services ne sont pas proposés dans les achats ou mouvements de stock physiques', () => {
