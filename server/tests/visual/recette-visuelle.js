@@ -1133,7 +1133,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     const kpiLabels = await page.$$eval('#stats-grid .dashboard-kpi-label', elements =>
       elements.map(element => element.textContent.trim())
     );
-    assert.deepEqual(kpiLabels, ["Chiffre d'affaires", 'Factures émises', 'Nouveaux clients', 'Valeur du stock'],
+    assert.deepEqual(kpiLabels, ['Encaissements cumulés', 'Factures émises', 'Nouveaux clients', 'Valeur du stock'],
       'Le dashboard doit afficher les quatre KPI métier attendus.');
     const kpiValuesFit = await page.$$eval('#stats-grid .dashboard-kpi-value', elements =>
       elements.every(element => {
