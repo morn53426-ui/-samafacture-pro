@@ -73,6 +73,11 @@ describe('Rapports', () => {
     assert.ok(factureAnnuleeId, 'la facture de test doit être créée');
 
     try {
+      const paiementAnnule = await request(app)
+        .post(`/api/factures/${factureAnnuleeId}/paiements`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ montant: 1180, methode: 'Espèces' });
+      assert.equal(paiementAnnule.status, 201);
       await pool.query(
         "UPDATE factures SET statut = 'annulee' WHERE id = ? AND user_id = ?",
         [factureAnnuleeId, userId]
@@ -81,8 +86,10 @@ describe('Rapports', () => {
         .get('/api/rapports/comptabilite')
         .set('Authorization', `Bearer ${token}`);
       assert.equal(comptabilite.status, 200);
+      assert.equal(Number(comptabilite.body.recettes), 3540,
+        'le paiement déjà enregistré reste agrégé après annulation de la facture');
       assert.equal(Number(comptabilite.body.tva_collectee), 540,
-        'le calcul actuel conserve la TVA inscrite sur une facture même après son annulation');
+        'le calcul conserve la TVA inscrite sur la facture annulée');
 
       const historique = await request(app)
         .get('/api/rapports/ventes?group_by=month')
