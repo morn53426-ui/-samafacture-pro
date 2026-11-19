@@ -1110,7 +1110,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     }));
     assert.ok(brandLogo.naturalWidth > 0,
       'Le logo Sunupilot de la navigation doit charger une image valide : ' + JSON.stringify(brandLogo));
-    const kpiLabels = await page.$eval('#stats-grid .dashboard-kpi-label', elements =>
+    const kpiLabels = await page.$$eval('#stats-grid .dashboard-kpi-label', elements =>
       elements.map(element => element.textContent.trim())
     );
     assert.deepEqual(kpiLabels, ["Chiffre d'affaires", 'Factures émises', 'Nouveaux clients', 'Valeur du stock'],
