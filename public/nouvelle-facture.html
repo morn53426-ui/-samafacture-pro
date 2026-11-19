@@ -71,6 +71,11 @@
           <div class="field"><label for="reference_externe">Référence client / bon de commande</label><input type="text" id="reference_externe" maxlength="100" placeholder="Ex. BC-2026-014" /></div>
         </div>
         <div class="field"><label for="conditions_reglement">Conditions de règlement / validité</label><textarea id="conditions_reglement" rows="3" maxlength="5000" placeholder="Conditions particulières de paiement ou de validité du devis."></textarea></div>
+        <div class="field" id="invoice-warehouse-field">
+          <label for="entrepot_id">Entrepôt de sortie du stock</label>
+          <select id="entrepot_id" aria-describedby="invoice-warehouse-help"></select>
+          <small id="invoice-warehouse-help" class="text-muted">Les quantités vendues seront débitées de cet entrepôt. Le magasin principal est sélectionné par défaut.</small>
+        </div>
 
         <div class="invoice-section-heading invoice-lines-heading"><span class="ic"><i class="ic" data-icon="file-stack"></i></span><div><h3>Articles</h3><p>Ajoutez les prestations ou produits facturés.</p></div></div>
         <div class="invoice-lines-container" role="region" aria-label="Articles du document">
@@ -120,13 +125,23 @@
 
   let clients = [];
   let produits = [];
+  let entrepots = [];
   let ligneCount = 0;
 
   document.getElementById('date_emission').value = dateCivileAujourdhui();
 
   async function init() {
-    const [{ clients: c }, { produits: p }] = await Promise.all([Api.get('/clients'), Api.get('/produits')]);
+    const [{ clients: c }, { produits: p }, { entrepots: w }] = await Promise.all([
+      Api.get('/clients'), Api.get('/produits'), Api.get('/pro/warehouses')
+    ]);
     clients = c; produits = p;
+    entrepots = (w || []).filter(item => Number(item.actif) === 1);
+    const warehouseSelect = document.getElementById('entrepot_id');
+    warehouseSelect.innerHTML = entrepots.map(item =>
+      `<option value="${Number(item.id)}">${escapeHtml(item.code + ' · ' + item.nom)}</option>`
+    ).join('');
+    const defaultWarehouse = entrepots.find(item => Number(item.par_defaut) === 1) || entrepots[0];
+    if (defaultWarehouse) warehouseSelect.value = String(defaultWarehouse.id);
     document.getElementById('client_id').innerHTML = '<option value="">Sélectionner un client</option>' +
       clients.map(cl => `<option value="${cl.id}">${escapeHtml(cl.nom)}</option>`).join('');
     addLigne();
@@ -136,6 +151,7 @@
       document.getElementById('page-title').textContent = isQuote ? 'Nouveau devis' : 'Nouvelle facture';
       document.getElementById('invoice-due-field').hidden = isQuote;
       document.getElementById('quote-validity-field').hidden = !isQuote;
+      document.getElementById('invoice-warehouse-field').hidden = isQuote;
       document.getElementById('submit-facture-btn').textContent = isQuote ? 'Créer le devis' : 'Créer la facture';
     };
     document.querySelectorAll('input[name=doc_type]').forEach(r => r.addEventListener('change', syncDocumentType));
@@ -259,12 +275,17 @@
     const lignes = getLignes().filter(l => l.designation && l.quantite > 0);
     const client_id = document.getElementById('client_id').value;
 
+    const documentType = document.querySelector('input[name=doc_type]:checked').value;
     if (!client_id) { errorBox.innerHTML = `<div class="error-box">Veuillez sélectionner un client.</div>`; return; }
     if (lignes.length === 0) { errorBox.innerHTML = `<div class="error-box">Ajoutez au moins un article.</div>`; return; }
+    if (documentType === 'facture' && !document.getElementById('entrepot_id').value) {
+      errorBox.innerHTML = `<div class="error-box">Sélectionnez un entrepôt de sortie du stock.</div>`; return;
+    }
 
     const payload = {
       client_id,
-      type: document.querySelector('input[name=doc_type]:checked').value,
+      type: documentType,
+      entrepot_id: documentType === 'facture' ? Number(document.getElementById('entrepot_id').value) : null,
       date_emission: document.getElementById('date_emission').value,
       date_echeance: document.querySelector('input[name=doc_type]:checked').value === 'facture' ? document.getElementById('date_echeance').value : null,
       date_validite: document.querySelector('input[name=doc_type]:checked').value === 'devis' ? document.getElementById('date_validite').value : null,
