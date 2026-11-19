@@ -31,7 +31,7 @@
     </section>
 
     <section class="dashboard-kpis" id="stats-grid" aria-label="Indicateurs clés">
-      <article class="dashboard-kpi blue card-skeleton"><div class="dashboard-kpi-label">Chiffre d'affaires</div><strong class="dashboard-kpi-value">···</strong></article>
+      <article class="dashboard-kpi blue card-skeleton"><div class="dashboard-kpi-label">Encaissements cumulés</div><strong class="dashboard-kpi-value">···</strong></article>
       <article class="dashboard-kpi green card-skeleton"><div class="dashboard-kpi-label">Factures payées</div><strong class="dashboard-kpi-value">···</strong></article>
       <article class="dashboard-kpi purple card-skeleton"><div class="dashboard-kpi-label">Factures en attente</div><strong class="dashboard-kpi-value">···</strong></article>
       <article class="dashboard-kpi amber card-skeleton"><div class="dashboard-kpi-label">Solde net estimé</div><strong class="dashboard-kpi-value">···</strong></article>
@@ -42,7 +42,7 @@
         <header class="dashboard-panel-head">
           <div class="dashboard-panel-title">
             <i class="ic" data-icon="bar-chart"></i>
-            <div><h2>Évolution du chiffre d'affaires</h2><p class="dashboard-panel-subtitle">Montant TTC des factures par mois</p></div>
+            <div><h2>Évolution des ventes facturées</h2><p class="dashboard-panel-subtitle">Montant TTC facturé par mois, hors annulations</p></div>
           </div>
           <div class="dashboard-periods">
             <select id="dashboard-period-select" class="btn btn-sm btn-outline dashboard-period-select" aria-label="Période du graphique" onchange="setPeriode(this.value)">
@@ -60,13 +60,13 @@
         <header class="dashboard-panel-head">
           <div class="dashboard-panel-title">
             <i class="ic" data-icon="bar-chart"></i>
-            <div><h2>Répartition des ventes</h2><p class="dashboard-panel-subtitle">Montants TTC des lignes facturées par type</p></div>
+            <div><h2>Répartition des ventes</h2><p class="dashboard-panel-subtitle">Montants TTC facturés par type, hors annulations</p></div>
           </div>
         </header>
         <div class="dashboard-donut-wrap">
           <div class="dashboard-donut-graphic">
             <canvas id="chart-repartition" role="img" aria-label="Graphique de répartition des ventes par type de catalogue."></canvas>
-            <div class="dashboard-donut-center" aria-hidden="true"><strong id="sales-total">0</strong><span>Montant TTC</span></div>
+            <div class="dashboard-donut-center" aria-hidden="true"><strong id="sales-total">0</strong><span>TTC facturé</span></div>
           </div>
           <div class="dashboard-legend" id="sales-legend" aria-live="polite">
             <div class="dashboard-empty">Chargement des données…</div>
@@ -192,7 +192,7 @@
     const amount = (v) => formatMontant(value(v)).replace(/([,\.\u00a0\u202f ](?=\d{3}(?:[^\d]|$)))/g, '$1<wbr>');
     document.getElementById('stats-grid').innerHTML = `
       <article class="dashboard-kpi blue">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('banknote')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${amount(stats.chiffre_affaires)}</strong><span class="dashboard-kpi-label">Chiffre d'affaires</span></div></div>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('banknote')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${amount(stats.chiffre_affaires)}</strong><span class="dashboard-kpi-label">Encaissements cumulés</span></div></div>
         <span class="dashboard-kpi-note">Encaissements cumulés enregistrés</span>
       </article>
       <article class="dashboard-kpi green">
@@ -348,7 +348,7 @@
       data: {
         labels: series.labels,
         datasets: [{
-          label: "Chiffre d'affaires",
+          label: 'Ventes TTC facturées',
           data: series.values,
           borderColor: accent,
           backgroundColor: gradient,
@@ -386,7 +386,7 @@
     canvas.dataset.dashboardPeriod = period;
     canvas.dataset.dashboardMonthCount = String(series.monthCount);
     canvas.setAttribute('aria-label',
-      "Évolution du chiffre d'affaires sur " + range.monthCount + " mois. Montants TTC des factures par mois.");
+      "Ventes TTC facturées sur " + range.monthCount + " mois, hors factures annulées.");
   }
 
   function formatDashboardCount(value) {
@@ -471,10 +471,10 @@
       }
     });
     canvas.setAttribute('aria-label', total
-      ? 'Répartition des ventes par type de catalogue. Montant total TTC : ' +
+      ? 'Répartition des montants TTC facturés par type de catalogue, hors factures annulées. Total : ' +
         formatMontant(total) + '. ' +
         rows.map(row => row.label + ' : ' + formatMontant(row.value)).join('; ') + '.'
-      : 'Aucune ligne de facture enregistrée pour la répartition des ventes.');
+      : 'Aucune ligne de facture active enregistrée pour la répartition des ventes.');
   }
 
   function setPeriode(period) {
