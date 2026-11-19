@@ -126,7 +126,7 @@ router.post('/', async (req, res, next) => {
  * @openapi
  * /produits/{id}:
  *   put:
- *     summary: Met à jour un produit (champs fournis uniquement)
+ *     summary: Met à jour une fiche produit ou service (champs fournis uniquement)
  *     tags: [Produits]
  *     parameters:
  *       - in: path
@@ -176,7 +176,7 @@ router.put('/:id', async (req, res, next) => {
       // silencieusement des quantités d'entrepôt ou un stock catalogue historique.
       if (isStockManagedType(existingType)) {
         const [[stockTotals]] = await conn.query(
-          'SELECT COALESCE(SUM(quantite), 0) AS total FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?',
+          'SELECT COALESCE(SUM(ABS(quantite)), 0) AS total FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?',
           [req.tenantId, existing.id]
         );
         if (Number(existing.stock || 0) > 0 || Number(stockTotals?.total || 0) > 0) {
