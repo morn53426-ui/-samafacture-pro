@@ -164,7 +164,7 @@ async function loadAll(){
     Api.get('/pro/purchase-orders'),Api.get('/pro/inventory/stock'),
     Api.get('/pro/inventory/movements'),Api.get('/pro/inventory/valuation')
   ]);
-  suppliers=results[0].fournisseurs||[];products=results[1].produits||[];warehouses=results[2].entrepots||[];
+  suppliers=results[0].fournisseurs||[];products=(results[1].produits||[]).filter(p=>p.type_catalogue !== 'service');warehouses=results[2].entrepots||[];
   const orders=results[3].commandes||[],stocks=results[4].stocks||[],moves=results[5].mouvements||[],valuation=results[6].valorisation||[];
   $('kpi-suppliers').textContent=suppliers.filter(s=>s.actif).length;
   $('kpi-open-orders').textContent=orders.filter(o=>!['recue','annulee'].includes(o.statut)).length;
