@@ -15,6 +15,18 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /Bienvenue sur Sunupilot/);
   });
 
+  test('le graphique de chiffre d\'affaires couvre six ou douze mois et conserve les mois sans vente', () => {
+    assert.match(dashboard, /<h2>Évolution du chiffre d'affaires<\/h2>/);
+    assert.match(dashboard, /id="dashboard-period-select"/);
+    assert.match(dashboard, /<option value="6m">6 derniers mois<\/option>/);
+    assert.match(dashboard, /<option value="12m">12 derniers mois<\/option>/);
+    assert.match(dashboard, /function dashboardMonthRange\(period\)/);
+    assert.match(dashboard, /function buildDashboardMonthSeries\(rows, period\)/);
+    assert.match(dashboard, /totalsByMonth\.get\(key\) \?\? 0/);
+    assert.match(dashboard, /group_by: 'month'/);
+    assert.match(dashboard, /canvas\.dataset\.dashboardMonthCount = String\(series\.monthCount\)/);
+  });
+
   test('les quatre KPI utilisent les bons indicateurs et la valorisation de stock reste explicite si indisponible', () => {
     assert.match(dashboard, /Chiffre d'affaires/);
     assert.match(dashboard, /Factures émises/);
