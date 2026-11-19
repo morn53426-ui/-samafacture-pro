@@ -198,6 +198,7 @@ async function runMigrations(conn) {
     { table: 'users', column: 'format_date', definition: "VARCHAR(20) NOT NULL DEFAULT 'dd/MM/yyyy'" },
     { table: 'users', column: 'regime_fiscal', definition: "VARCHAR(30) NOT NULL DEFAULT 'standard'" },
     { table: 'factures', column: 'devise', definition: "VARCHAR(10) NOT NULL DEFAULT 'FCFA'" },
+    { table: 'produits', column: 'type_catalogue', definition: "VARCHAR(20) NOT NULL DEFAULT 'non_classe' AFTER nom" },
     { table: 'produits', column: 'stock_minimum', definition: 'DECIMAL(14,3) NOT NULL DEFAULT 0' },
     { table: 'users', column: 'facture_personnalisation', definition: 'TEXT' },
     { table: 'users', column: 'entreprise_rccm', definition: 'VARCHAR(80)' },
