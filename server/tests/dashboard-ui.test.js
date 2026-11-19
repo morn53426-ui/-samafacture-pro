@@ -41,8 +41,8 @@ describe('Dashboard Sunupilot — structure de référence', () => {
   });
 
   test('la légende des ventes passe en colonne unique sur mobile', () => {
-    assert.match(styles, /@media \\(max-width: 640px\\)[\\s\\S]*?\\.dashboard-legend \\{ grid-template-columns:minmax\\(0,1fr\\)/);
-    assert.match(styles, /\\.dashboard-legend-item strong \\{[\\s\\S]*?white-space:nowrap/);
+    assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?\.dashboard-legend\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/);
+    assert.match(styles, /\.dashboard-legend-item strong\s*\{[^}]*white-space:\s*nowrap/);
   });
 
   test('le tableau de bord affiche les dernières factures avec statut et total TTC', () => {
