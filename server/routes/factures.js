@@ -492,6 +492,7 @@ router.get('/:id', async (req, res, next) => {
  *               date_validite: { type: string, format: date, nullable: true, description: 'Date limite de validité, uniquement pour un devis.' }
  *               objet: { type: string, maxLength: 190, description: 'Objet ou prestation.' }
  *               reference_externe: { type: string, maxLength: 100, description: 'Référence client ou bon de commande.' }
+ *               entrepot_id: { type: integer, nullable: true, description: 'Entrepôt de sortie du stock pour une facture. Omis ou nul : magasin principal. Ignoré pour un devis.' }
  *               conditions_reglement: { type: string, maxLength: 5000, description: 'Conditions spécifiques à ce document.' }
  *               remise: { type: number, default: 0 }
  *               frais_livraison: { type: number, default: 0 }
