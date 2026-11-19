@@ -40,6 +40,13 @@
             <label for="client_id">Client *</label>
             <select id="client_id" required></select>
           </div>
+          <div class="field" id="invoice-warehouse-field">
+            <label for="entrepot_id">Entrepôt de sortie du stock</label>
+            <select id="entrepot_id" aria-describedby="invoice-warehouse-help" required>
+              <option value="">Chargement des entrepôts…</option>
+            </select>
+            <small id="invoice-warehouse-help">Les articles liés au catalogue seront déduits de cet entrepôt. Les restitutions liées à la facture reviendront au même endroit.</small>
+          </div>
           <div class="field">
             <label for="mode_paiement">Mode de paiement</label>
             <select id="mode_paiement">
@@ -125,16 +132,26 @@
   document.getElementById('date_emission').value = dateCivileAujourdhui();
 
   async function init() {
-    const [{ clients: c }, { produits: p }] = await Promise.all([Api.get('/clients'), Api.get('/produits')]);
+    const [{ clients: c }, { produits: p }, { entrepots }] = await Promise.all([
+      Api.get('/clients'), Api.get('/produits'), Api.get('/pro/warehouses')
+    ]);
     clients = c; produits = p;
     document.getElementById('client_id').innerHTML = '<option value="">Sélectionner un client</option>' +
       clients.map(cl => `<option value="${cl.id}">${escapeHtml(cl.nom)}</option>`).join('');
+    const activeWarehouses = (entrepots || []).filter(entrepot => Number(entrepot.actif) === 1);
+    const warehouseSelect = document.getElementById('entrepot_id');
+    warehouseSelect.innerHTML = '<option value="">Sélectionner un entrepôt</option>' +
+      activeWarehouses.map(entrepot => `<option value="${Number(entrepot.id)}">${escapeHtml(entrepot.nom)}${Number(entrepot.par_defaut) === 1 ? ' (principal)' : ''}</option>`).join('');
+    const defaultWarehouse = activeWarehouses.find(entrepot => Number(entrepot.par_defaut) === 1) || activeWarehouses[0];
+    if (defaultWarehouse) warehouseSelect.value = String(defaultWarehouse.id);
+    warehouseSelect.disabled = activeWarehouses.length === 0;
     addLigne();
 
     const syncDocumentType = () => {
       const isQuote = document.querySelector('input[name=doc_type]:checked').value === 'devis';
       document.getElementById('page-title').textContent = isQuote ? 'Nouveau devis' : 'Nouvelle facture';
       document.getElementById('invoice-due-field').hidden = isQuote;
+      document.getElementById('invoice-warehouse-field').hidden = isQuote;
       document.getElementById('quote-validity-field').hidden = !isQuote;
       document.getElementById('submit-facture-btn').textContent = isQuote ? 'Créer le devis' : 'Créer la facture';
     };
@@ -260,11 +277,17 @@
     const client_id = document.getElementById('client_id').value;
 
     if (!client_id) { errorBox.innerHTML = `<div class="error-box">Veuillez sélectionner un client.</div>`; return; }
+    if (document.querySelector('input[name=doc_type]:checked').value === 'facture' && !document.getElementById('entrepot_id').value) {
+      errorBox.innerHTML = `<div class="error-box">Veuillez sélectionner un entrepôt de sortie du stock.</div>`;
+      return;
+    }
     if (lignes.length === 0) { errorBox.innerHTML = `<div class="error-box">Ajoutez au moins un article.</div>`; return; }
 
+    const docType = document.querySelector('input[name=doc_type]:checked').value;
     const payload = {
       client_id,
-      type: document.querySelector('input[name=doc_type]:checked').value,
+      type: docType,
+      entrepot_id: docType === 'facture' ? Number(document.getElementById('entrepot_id').value) || null : null,
       date_emission: document.getElementById('date_emission').value,
       date_echeance: document.querySelector('input[name=doc_type]:checked').value === 'facture' ? document.getElementById('date_echeance').value : null,
       date_validite: document.querySelector('input[name=doc_type]:checked').value === 'devis' ? document.getElementById('date_validite').value : null,

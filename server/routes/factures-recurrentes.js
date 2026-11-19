@@ -3,7 +3,7 @@ const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
-const { computeTotals, insererLignesFacture } = require('./factures');
+const { computeTotals, insererLignesFacture, ajusterStockFacture, resoudreEntrepotFacture } = require('./factures');
 const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { localDateString } = require('../utils/local-date');
 
@@ -153,12 +153,37 @@ router.post('/', async (req, res, next) => {
     }
     const jourAncre = parseDateOnly(prochaineDate).day;
 
-    const lignesClean = lignes.map(l => ({
-      designation: String(l.designation || '').slice(0, 255),
-      quantite: positiveNumber(l.quantite, 1),
-      prix_unitaire: positiveNumber(l.prix_unitaire, 0),
-      tva: percentage(l.tva, 0)
-    }));
+    if (lignes.some(ligne => !ligne || typeof ligne !== 'object' || Array.isArray(ligne))) {
+      return res.status(400).json({ error: 'Chaque ligne doit être un objet de facture valide.' });
+    }
+
+    // Comme pour la création manuelle, ne conserver le lien catalogue que si le produit
+    // appartient bien à l'entreprise courante. Les lignes libres restent facturables.
+    const requestedProductIds = [...new Set(lignes
+      .map(ligne => Number(ligne.produit_id))
+      .filter(id => Number.isSafeInteger(id) && id > 0)
+    )];
+    const ownedProductIds = new Set();
+    if (requestedProductIds.length) {
+      const [ownedProducts] = await pool.query(
+        `SELECT id FROM produits WHERE user_id = ? AND id IN (${requestedProductIds.map(() => '?').join(',')})`,
+        [req.tenantId, ...requestedProductIds]
+      );
+      for (const product of ownedProducts) ownedProductIds.add(Number(product.id));
+    }
+
+    const lignesClean = lignes.map(l => {
+      const productId = Number(l.produit_id);
+      return {
+        produit_id: l.produit_id && Number.isSafeInteger(productId) && ownedProductIds.has(productId)
+          ? productId
+          : null,
+        designation: String(l.designation || '').slice(0, 255),
+        quantite: positiveNumber(l.quantite, 1),
+        prix_unitaire: positiveNumber(l.prix_unitaire, 0),
+        tva: percentage(l.tva, 0)
+      };
+    });
 
     const [result] = await pool.query(
       `INSERT INTO factures_recurrentes (user_id, client_id, libelle, frequence, prochaine_date, jour_ancre, remise, frais_livraison, mode_paiement, commentaires, lignes_json, envoi_auto_email)
@@ -392,14 +417,22 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
     const [[{ n }]] = await conn.query('SELECT LAST_INSERT_ID() as n');
     const numero = `${prefix}-${year}-${String(n).padStart(4, '0')}`;
 
+    const invoiceWarehouse = await resoudreEntrepotFacture(conn, userId, null);
+    if (!invoiceWarehouse) {
+      throw new Error('Le magasin principal est introuvable ou inactif pour cette entreprise.');
+    }
+
     const [result] = await conn.query(
-      `INSERT INTO factures (user_id, client_id, numero, type, date_emission, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
-       VALUES (?, ?, ?, 'facture', ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, modele.client_id, numero, documentDate, documentCurrency, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
+      `INSERT INTO factures (user_id, client_id, entrepot_id, numero, type, date_emission, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total)
+       VALUES (?, ?, ?, ?, 'facture', ?, ?, 'en_attente', ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, modele.client_id, invoiceWarehouse.id, numero, documentDate, documentCurrency, remiseAppliquee, modele.frais_livraison, modele.mode_paiement, modele.commentaires, sous_total, total_tva, total]
     );
     const factureId = result.insertId;
 
     await insererLignesFacture(conn, factureId, computedLignes);
+    // Le magasin utilisé est mémorisé sur la facture et dans le journal de stock,
+    // afin que les annulations et suppressions restituent au bon endroit.
+    await ajusterStockFacture(conn, factureId, userId, -1, invoiceWarehouse.id);
 
     if (scheduledDateDue) {
       const nextDate = addInterval(modele.prochaine_date, modele.frequence, modele.jour_ancre);

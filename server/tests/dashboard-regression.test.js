@@ -66,6 +66,36 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.doesNotMatch(block, /pool\.query/);
   });
 
+  test('le formulaire de facture permet de choisir un entrepôt et masque ce choix pour un devis', () => {
+    const invoiceForm = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'nouvelle-facture.html'), 'utf8');
+    assert.match(invoiceForm, /id="invoice-warehouse-field"/);
+    assert.match(invoiceForm, /id="entrepot_id"/);
+    assert.match(invoiceForm, /Api\.get\('\/pro\/warehouses'\)/);
+    assert.match(invoiceForm, /par_defaut/);
+    assert.match(invoiceForm, /entrepot_id: docType === 'facture'/);
+    assert.match(invoiceForm, /invoice-warehouse-field'\)\.hidden = isQuote/);
+  });
+
+  test('la conversion d’un devis demande un entrepôt et transmet son identifiant à l’API', () => {
+    const quotePage = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'devis.html'), 'utf8');
+    assert.match(quotePage, /id="quote-warehouse-modal"/);
+    assert.ok(quotePage.indexOf('<div id="quote-warehouse-modal"') < quotePage.indexOf('<script src="js/workspace-modals.js"></script>'),
+      'la modale de conversion doit exister avant l’initialisation du gestionnaire de focus');
+    assert.match(quotePage, /aria-labelledby="quote-warehouse-title"/);
+    assert.match(quotePage, /Api\.get\('\/pro\/warehouses'\)/);
+    assert.match(quotePage, /item\.par_defaut/);
+    assert.match(quotePage, /transformer-en-facture`, \{ entrepot_id: entrepotId \}\)/);
+    assert.match(quotePage, /Aucun entrepôt actif/);
+  });
+
+  test('la migration 17 mémorise l’entrepôt des factures existantes sans réécrire leur historique', () => {
+    const dbSource = fs.readFileSync(path.join(__dirname, '..', 'config', 'db.js'), 'utf8');
+    const schemaSource = fs.readFileSync(path.join(__dirname, '..', 'database', 'schema.sql'), 'utf8');
+    assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 17/);
+    assert.match(dbSource, /table: 'factures', column: 'entrepot_id', definition: 'INT UNSIGNED NULL AFTER client_id'/);
+    assert.match(schemaSource, /entrepot_id INT UNSIGNED NULL/);
+  });
+
   test('la migration garantit la colonne facture_personnalisation sur les bases existantes', () => {
     const dbSource = fs.readFileSync(path.join(__dirname, '..', 'config', 'db.js'), 'utf8');
     assert.match(dbSource, /column: 'facture_personnalisation', definition: 'TEXT'/);

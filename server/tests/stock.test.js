@@ -1,7 +1,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 // Le stock d'un produit doit se décompter automatiquement à la facturation (jamais pour un
 // devis), et se restituer symétriquement en cas d'annulation ou de suppression — fonctionnalité
@@ -124,6 +124,172 @@ describe('Décompte et restitution automatique du stock', () => {
       .set('Authorization', `Bearer ${token}`);
 
     assert.equal(await stockActuel(), avant + 6);
+  });
+  test('une facture débite l’entrepôt choisi et restitue au même endroit à chaque transition', async () => {
+    const product = await request(app).post('/api/produits')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Produit facturé depuis un dépôt secondaire', prix_ht: 1000, tva: 18, stock: 10 });
+    assert.equal(product.status, 201, product.text);
+    const selectedProductId = Number(product.body.produit.id);
+
+    const warehousesResponse = await request(app).get('/api/pro/warehouses')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(warehousesResponse.status, 200, warehousesResponse.text);
+    const mainWarehouse = warehousesResponse.body.entrepots.find(item => Number(item.par_defaut) === 1);
+    assert.ok(mainWarehouse, 'le magasin principal doit exister');
+
+    const secondaryResponse = await request(app).post('/api/pro/warehouses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ code: 'FACTURE-SECONDAIRE', nom: 'Dépôt secondaire facturation' });
+    assert.equal(secondaryResponse.status, 201, secondaryResponse.text);
+    const secondaryWarehouseId = Number(secondaryResponse.body.id);
+
+    // Simule une ancienne fiche catalogue : stock global présent, mais pas encore ventilé par entrepôt.
+    await pool.query(
+      'DELETE FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?',
+      [userId, selectedProductId]
+    );
+    assert.equal(await pool.query('SELECT stock FROM produits WHERE id = ? AND user_id = ?', [selectedProductId, userId]).then(([rows]) => Number(rows[0].stock)), 10);
+
+    const foreignRegistration = await request(app).post('/api/auth/register')
+      .send({ nom: 'Autre société', email: emailDeTest('stock-warehouse-foreign'), password: 'motdepasse123', acceptTerms: true });
+    assert.equal(foreignRegistration.status, 201, foreignRegistration.text);
+    const foreignUserId = foreignRegistration.body.user.id;
+    const foreignToken = foreignRegistration.body.token;
+    try {
+      const foreignWarehouses = await request(app).get('/api/pro/warehouses')
+        .set('Authorization', `Bearer ${foreignToken}`);
+      assert.equal(foreignWarehouses.status, 200);
+      const foreignWarehouseId = Number(foreignWarehouses.body.entrepots.find(item => Number(item.par_defaut) === 1).id);
+
+      const balances = async () => {
+        const [rows] = await pool.query(
+          'SELECT entrepot_id, quantite FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?',
+          [userId, selectedProductId]
+        );
+        return Object.fromEntries(rows.map(row => [Number(row.entrepot_id), Number(row.quantite)]));
+      };
+      const storedTotal = async () => {
+        const [rows] = await pool.query('SELECT stock FROM produits WHERE id = ? AND user_id = ?', [selectedProductId, userId]);
+        return Number(rows[0].stock);
+      };
+
+      const invalidWarehouseInvoice = await request(app).post('/api/factures')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          client_id: clientId, type: 'facture', entrepot_id: foreignWarehouseId,
+          lignes: [{ designation: 'Produit refusé', produit_id: selectedProductId, quantite: 1, prix_unitaire: 1000, tva: 18 }]
+        });
+      assert.equal(invalidWarehouseInvoice.status, 400, invalidWarehouseInvoice.text);
+      assert.equal(await storedTotal(), 10, 'un entrepôt d’une autre entreprise ne doit pas modifier le stock');
+
+      let currentBalances = await balances();
+      assert.equal(currentBalances[Number(mainWarehouse.id)], undefined, 'le stock historique n’est pas encore ventilé avant la première vente');
+      assert.equal(currentBalances[secondaryWarehouseId], undefined, 'aucun dépôt secondaire ne reçoit une copie du stock global');
+
+      const invoiceResponse = await request(app).post('/api/factures')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          client_id: clientId, type: 'facture', entrepot_id: secondaryWarehouseId,
+          lignes: [{ designation: 'Produit facturé', produit_id: selectedProductId, quantite: 3, prix_unitaire: 1000, tva: 18 }]
+        });
+      assert.equal(invoiceResponse.status, 201, invoiceResponse.text);
+      const invoiceId = Number(invoiceResponse.body.facture.id);
+      assert.equal(Number(invoiceResponse.body.facture.entrepot_id), secondaryWarehouseId);
+      currentBalances = await balances();
+      assert.equal(currentBalances[Number(mainWarehouse.id)], 10);
+      assert.equal(currentBalances[secondaryWarehouseId], -3, 'la sortie est enregistrée dans le dépôt sélectionné');
+      assert.equal(await storedTotal(), 7, 'le stock catalogue reste la somme des entrepôts');
+
+      const cancelled = await request(app).put(`/api/factures/${invoiceId}/statut`)
+        .set('Authorization', `Bearer ${token}`).send({ statut: 'annulee' });
+      assert.equal(cancelled.status, 200, cancelled.text);
+      currentBalances = await balances();
+      assert.equal(currentBalances[Number(mainWarehouse.id)], 10);
+      assert.equal(currentBalances[secondaryWarehouseId], 0, 'l’annulation restitue dans le dépôt de sortie d’origine');
+      assert.equal(await storedTotal(), 10);
+
+      const reactivated = await request(app).put(`/api/factures/${invoiceId}/statut`)
+        .set('Authorization', `Bearer ${token}`).send({ statut: 'en_attente' });
+      assert.equal(reactivated.status, 200, reactivated.text);
+      currentBalances = await balances();
+      assert.equal(currentBalances[secondaryWarehouseId], -3, 'la réactivation redébite le même dépôt');
+      assert.equal(await storedTotal(), 7);
+
+      const deleted = await request(app).delete(`/api/factures/${invoiceId}`)
+        .set('Authorization', `Bearer ${token}`);
+      assert.equal(deleted.status, 200, deleted.text);
+      currentBalances = await balances();
+      assert.equal(currentBalances[Number(mainWarehouse.id)], 10);
+      assert.equal(currentBalances[secondaryWarehouseId], 0, 'la suppression restitue dans le dépôt mémorisé');
+      assert.equal(await storedTotal(), 10);
+
+      const concurrentInvoice = await request(app).post('/api/factures')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          client_id: clientId, type: 'facture', entrepot_id: secondaryWarehouseId,
+          lignes: [{ designation: 'Sortie concurrente', produit_id: selectedProductId, quantite: 1, prix_unitaire: 1000, tva: 18 }]
+        });
+      assert.equal(concurrentInvoice.status, 201, concurrentInvoice.text);
+      const concurrentId = Number(concurrentInvoice.body.facture.id);
+      const [deleteResponse, cancelResponse] = await Promise.all([
+        request(app).delete(`/api/factures/${concurrentId}`).set('Authorization', `Bearer ${token}`),
+        request(app).put(`/api/factures/${concurrentId}/statut`).set('Authorization', `Bearer ${token}`).send({ statut: 'annulee' })
+      ]);
+      assert.equal(deleteResponse.status, 200, deleteResponse.text);
+      assert.ok([200, 404].includes(cancelResponse.status),
+        'annulation concurrente : elle réussit avant la suppression ou trouve la facture déjà supprimée');
+      currentBalances = await balances();
+      assert.equal(currentBalances[Number(mainWarehouse.id)], 10);
+      assert.equal(currentBalances[secondaryWarehouseId], 0,
+        'une suppression et une annulation concurrentes ne doivent restituer le stock qu’une fois');
+      assert.equal(await storedTotal(), 10);
+
+      const quoteResponse = await request(app).post('/api/factures')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          client_id: clientId, type: 'devis',
+          lignes: [{ designation: 'Produit du devis', produit_id: selectedProductId, quantite: 2, prix_unitaire: 1000, tva: 18 }]
+        });
+      assert.equal(quoteResponse.status, 201, quoteResponse.text);
+      assert.equal(await storedTotal(), 10, 'un devis ne débite aucun entrepôt');
+      const transformed = await request(app).post(`/api/factures/${quoteResponse.body.facture.id}/transformer-en-facture`)
+        .set('Authorization', `Bearer ${token}`).send({ entrepot_id: secondaryWarehouseId });
+      assert.equal(transformed.status, 200, transformed.text);
+      assert.equal(Number(transformed.body.facture.entrepot_id), secondaryWarehouseId);
+      currentBalances = await balances();
+      assert.equal(currentBalances[secondaryWarehouseId], -2, 'la transformation débite le dépôt choisi');
+      const cancelTransformed = await request(app).put(`/api/factures/${quoteResponse.body.facture.id}/statut`)
+        .set('Authorization', `Bearer ${token}`).send({ statut: 'annulee' });
+      assert.equal(cancelTransformed.status, 200, cancelTransformed.text);
+      currentBalances = await balances();
+      assert.equal(currentBalances[secondaryWarehouseId], 0, 'la facture transformée restitue au dépôt mémorisé');
+
+      const original = await request(app).post('/api/factures')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          client_id: clientId, type: 'facture', entrepot_id: secondaryWarehouseId,
+          lignes: [{ designation: 'Produit à dupliquer', produit_id: selectedProductId, quantite: 1, prix_unitaire: 1000, tva: 18 }]
+        });
+      assert.equal(original.status, 201, original.text);
+      const duplicate = await request(app).post(`/api/factures/${original.body.facture.id}/dupliquer`)
+        .set('Authorization', `Bearer ${token}`).send({});
+      assert.equal(duplicate.status, 201, duplicate.text);
+      assert.equal(Number(duplicate.body.facture.entrepot_id), secondaryWarehouseId);
+      currentBalances = await balances();
+      assert.equal(currentBalances[secondaryWarehouseId], -2, 'la duplication d’une facture débite le même dépôt');
+      const deleteDuplicate = await request(app).delete(`/api/factures/${duplicate.body.facture.id}`)
+        .set('Authorization', `Bearer ${token}`);
+      const deleteOriginal = await request(app).delete(`/api/factures/${original.body.facture.id}`)
+        .set('Authorization', `Bearer ${token}`);
+      assert.equal(deleteDuplicate.status, 200);
+      assert.equal(deleteOriginal.status, 200);
+      currentBalances = await balances();
+      assert.equal(currentBalances[secondaryWarehouseId], 0);
+      assert.equal(await storedTotal(), 10);
+    } finally {
+      await nettoyerUtilisateur(foreignUserId);
+    }
   });
 });
 

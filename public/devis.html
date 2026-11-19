@@ -62,7 +62,24 @@
 <script src="js/whatsapp-share.js"></script>
 <script src="js/pwa.js"></script>
 <script src="js/sidebar.js"></script>
+<div id="quote-warehouse-modal" data-workspace-modal role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="quote-warehouse-title" aria-describedby="quote-warehouse-help" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+  <div class="card workspace-modal-panel" tabindex="-1" style="width:440px; max-width:92vw;">
+    <h3 id="quote-warehouse-title">Choisir l’entrepôt de sortie</h3>
+    <p id="quote-warehouse-help">Les articles liés au catalogue seront déduits de cet entrepôt. Les restitutions ultérieures reviendront au même endroit.</p>
+    <div id="quote-warehouse-error" role="alert" aria-live="assertive"></div>
+    <div class="field">
+      <label for="quote-warehouse-select">Entrepôt *</label>
+      <select id="quote-warehouse-select" required></select>
+    </div>
+    <div class="workspace-modal-actions" style="display:flex; gap:10px; justify-content:flex-end;">
+      <button type="button" class="btn btn-outline" data-modal-close onclick="closeQuoteWarehouseModal()">Annuler</button>
+      <button type="button" class="btn btn-primary" id="confirm-quote-warehouse">Créer la facture</button>
+    </div>
+  </div>
+</div>
 <script src="js/workspace-modals.js"></script>
+
+
 <script>
   requireAuthPage();
   renderSidebar('devis');
@@ -91,11 +108,57 @@
     renderPagination('pagination', pagination, (p) => load(p));
   }
 
+  let quoteToTransformId = null;
+
   async function transformer(id) {
-    if (!confirm('Transformer ce devis en facture ?')) return;
-    await Api.post(`/factures/${id}/transformer-en-facture`, {});
-    location.href = 'factures.html';
+    const modal = document.getElementById('quote-warehouse-modal');
+    const select = document.getElementById('quote-warehouse-select');
+    const error = document.getElementById('quote-warehouse-error');
+    const button = document.getElementById('confirm-quote-warehouse');
+    error.innerHTML = '';
+    button.disabled = true;
+    select.innerHTML = '<option value="">Chargement des entrepôts…</option>';
+    try {
+      const { entrepots } = await Api.get('/pro/warehouses');
+      const activeWarehouses = (entrepots || []).filter(item => Number(item.actif) === 1);
+      select.innerHTML = '<option value="">Sélectionner un entrepôt</option>' +
+        activeWarehouses.map(item => `<option value="${Number(item.id)}">${escapeHtml(item.nom)}${Number(item.par_defaut) === 1 ? ' (principal)' : ''}</option>`).join('');
+      const preferred = activeWarehouses.find(item => Number(item.par_defaut) === 1) || activeWarehouses[0];
+      if (!preferred) throw new Error('Aucun entrepôt actif. Créez ou réactivez un entrepôt avant de convertir ce devis.');
+      select.value = String(preferred.id);
+      quoteToTransformId = Number(id);
+      button.disabled = false;
+      modal.style.display = 'flex';
+    } catch (err) {
+      showFatalError(err.message);
+    }
   }
+
+  function closeQuoteWarehouseModal() {
+    document.getElementById('quote-warehouse-modal').style.display = 'none';
+    quoteToTransformId = null;
+  }
+
+  document.getElementById('confirm-quote-warehouse').addEventListener('click', async () => {
+    const select = document.getElementById('quote-warehouse-select');
+    const button = document.getElementById('confirm-quote-warehouse');
+    const error = document.getElementById('quote-warehouse-error');
+    const entrepotId = Number(select.value);
+    if (!Number.isSafeInteger(entrepotId) || entrepotId <= 0 || !quoteToTransformId) {
+      error.innerHTML = '<div class="error-box">Sélectionnez un entrepôt valide.</div>';
+      return;
+    }
+    const restore = setButtonLoading(button, 'Conversion en cours…');
+    try {
+      await Api.post(`/factures/${quoteToTransformId}/transformer-en-facture`, { entrepot_id: entrepotId });
+      closeQuoteWarehouseModal();
+      location.href = 'factures.html';
+    } catch (err) {
+      error.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
+    } finally {
+      restore();
+    }
+  });
 
   function printFacture(id) {
     window.open(`facture-detail.html?id=${id}`, '_blank');
