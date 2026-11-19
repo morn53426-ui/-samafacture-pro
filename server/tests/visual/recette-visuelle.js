@@ -1146,6 +1146,12 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     );
     assert.equal(kpiValuesFit, true,
       'Les valeurs des KPI doivent rester entièrement lisibles, même avec les données extrêmes.');
+    await page.waitForFunction(() => {
+      const canvas = document.getElementById('chart-evolution');
+      const select = document.getElementById('dashboard-period-select');
+      return Boolean(canvas?.dataset.dashboardPeriod === '6m' &&
+        canvas.dataset.dashboardMonthCount === '6' && select?.value === '6m');
+    }, { timeout: 15000 });
   }
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.invoiceLabels, ['N° facture', 'Client', 'Émission', 'Statut', 'Total TTC'],
@@ -1371,18 +1377,27 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   const chartAnimation = await normalPage.$eval('#chart-evolution', (canvas) => canvas.dataset.sfChartAnimation);
   assert.equal(chartAnimation, 'disabled', 'Le graphique fonctionnel doit rester sans animation.');
 
-  const button = await normalPage.$('[data-periode="week"]');
-  const bounds = await button.boundingBox();
+  const periodSelect = await normalPage.$('#dashboard-period-select');
+  assert.ok(periodSelect, 'Le sélecteur de période doit être présent.');
+  await periodSelect.select('12m');
+  await normalPage.waitForFunction(() =>
+    document.getElementById('chart-evolution')?.dataset.dashboardPeriod === '12m'
+  );
+  await periodSelect.select('6m');
+  await normalPage.waitForFunction(() =>
+    document.getElementById('chart-evolution')?.dataset.dashboardPeriod === '6m'
+  );
+  const bounds = await periodSelect.boundingBox();
   await normalPage.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await normalPage.mouse.down();
   // Laisser la transition de 130 ms atteindre son état final avant de lire la matrice.
   await new Promise((resolve) => setTimeout(resolve, 180));
-  const buttonState = await button.evaluate((element) => ({
+  const buttonState = await periodSelect.evaluate((element) => ({
     active: element.matches(':active'),
     transform: getComputedStyle(element).transform
   }));
   await normalPage.mouse.up();
-  assert.equal(buttonState.active, true, 'Le pointeur doit maintenir le bouton pressé pendant la mesure.');
+  assert.equal(buttonState.active, true, 'Le sélecteur de période doit rester actif pendant la mesure.');
   const pressMatrix = buttonState.transform.match(/^matrix\(([^)]+)\)$/);
   const pressScale = pressMatrix ? pressMatrix[1].split(',').map(Number) : [];
   assert.ok(pressScale.length === 6 &&
