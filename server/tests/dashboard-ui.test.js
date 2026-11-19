@@ -91,7 +91,7 @@ describe('Dashboard Sunupilot — structure de référence', () => {
 
   test('le libellé accessible du graphique précise le montant total TTC et les trois catégories', () => {
     assert.match(dashboard, /Montant total TTC :/);
-    assert.match(dashboard, /Répartition des montants TTC facturés par type de catalogue/);
+    assert.match(dashboard, /Répartition des ventes : montants TTC facturés par type de catalogue, hors factures annulées/);
     assert.match(dashboard, /row\.label \+ ' : ' \+ formatMontant\(row\.value\)/);
   });
 
