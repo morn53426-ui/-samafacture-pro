@@ -2459,9 +2459,15 @@ router.post('/purchase-orders', async (req, res, next) => {
     if (!supplier) return res.status(400).json({ error: 'Fournisseur inconnu ou inactif.' });
     let totalHt = 0, totalTax = 0;
     const normalized = [];
-    const productIds = [...new Set(lines.map(line => Number(line.produit_id)).filter(Boolean))].sort((a, b) => a - b);
+    const productIds = [];
     for (const line of lines) {
       const designation = String(line.designation || '').trim().slice(0, 255);
+      const rawProductId = line.produit_id;
+      const productId = rawProductId === undefined || rawProductId === null || rawProductId === '' ? null : Number(rawProductId);
+      if (productId !== null && (!Number.isSafeInteger(productId) || productId <= 0)) {
+        return res.status(400).json({ error: 'Le produit associé à une ligne de commande est invalide.' });
+      }
+      if (productId !== null) productIds.push(productId);
       const qty = Math.round(Number(line.quantite) * 1000) / 1000, price = Math.round(Number(line.prix_unitaire) * 100) / 100, tax = Math.round(Number(line.tva || 0) * 100) / 100;
       if (!designation || !Number.isFinite(qty) || qty <= 0 || qty > 10000000 || !Number.isFinite(price) || price < 0 || !Number.isFinite(tax) || tax < 0 || tax > 100) {
         return res.status(400).json({ error: 'Chaque ligne doit avoir une désignation, une quantité, un prix et une TVA valides.' });
@@ -2469,26 +2475,27 @@ router.post('/purchase-orders', async (req, res, next) => {
       const ht = Math.round(qty * price * 100) / 100;
       const vat = Math.round(ht * tax) / 100;
       totalHt += ht; totalTax += vat;
-      normalized.push({ produit_id: Number(line.produit_id) || null, designation, qty, price, tax, total: ht + vat });
+      normalized.push({ produit_id: productId, designation, qty, price, tax, total: ht + vat });
     }
     totalHt = Math.round(totalHt * 100) / 100;
     totalTax = Math.round(totalTax * 100) / 100;
+    const uniqueProductIds = [...new Set(productIds)].sort((a, b) => a - b);
     const numero = randomRef('ACH');
     conn = await pool.getConnection();
     await conn.beginTransaction();
-    if (productIds.length) {
+    if (uniqueProductIds.length) {
       const [owned] = await conn.query(
         `SELECT id, type_catalogue FROM produits
-         WHERE user_id = ? AND id IN (${productIds.map(() => '?').join(',')})
+         WHERE user_id = ? AND id IN (${uniqueProductIds.map(() => '?').join(',')})
          ORDER BY id FOR UPDATE`,
-        [uid, ...productIds]
+        [uid, ...uniqueProductIds]
       );
       const ownedById = new Map(owned.map(row => [Number(row.id), row]));
-      if (productIds.some(id => !ownedById.has(id))) {
+      if (uniqueProductIds.some(id => !ownedById.has(id))) {
         await conn.rollback();
         return res.status(400).json({ error: 'Un produit référencé n’appartient pas à cette entreprise.' });
       }
-      if (productIds.some(id => ownedById.get(id).type_catalogue === 'service')) {
+      if (uniqueProductIds.some(id => ownedById.get(id).type_catalogue === 'service')) {
         await conn.rollback();
         return res.status(400).json({ error: 'Les services ne peuvent pas être commandés via Achats & stocks.' });
       }
