@@ -21,7 +21,7 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /Nouveaux clients/);
     assert.match(dashboard, /Valeur du stock/);
     assert.match(dashboard, /Ajoutés sur les 30 derniers jours/);
-    assert.match(dashboard, /formatMontant\(value\(stats\.valeur_stock\)\)/);
+    assert.match(dashboard, /amount\(stats\.valeur_stock\)/);
     assert.doesNotMatch(dashboard, /Api\.get\('\/pro\/inventory\/valuation'/);
   });
 
