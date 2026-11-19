@@ -3119,7 +3119,10 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           .map(keyFor);
       });
       const focusableCount = focusableKeys.length;
-      const maxTabSteps = Math.min(Math.max(focusableCount + 2, 4), 140);
+      // Les champs natifs (notamment input[type=date]) peuvent garder le même
+      // activeElement pendant qu'une touche Tab traverse leurs sous-segments.
+      // Prévoir une marge de répétitions, sans permettre une boucle infinie.
+      const maxTabSteps = Math.min(Math.max(focusableCount * 2 + 4, 4), 240);
 
       const readFocusStop = () => page.evaluate(() => {
         const element = document.activeElement;
@@ -3159,7 +3162,6 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           ancestor = ancestor.parentElement;
         }
         const style = getComputedStyle(element);
-        const directIndicator = indicatorFor(element);
         return {
           key: parts.join('>'),
           selector: element.tagName.toLowerCase() +
@@ -3192,9 +3194,14 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             await page.keyboard.press('Tab');
           }
           const stop = await readFocusStop();
-          if (!stop || seen.has(stop.key)) break;
-          seen.add(stop.key);
-          stops.push(stop);
+          if (!stop) break;
+          if (!seen.has(stop.key)) {
+            seen.add(stop.key);
+            stops.push(stop);
+          } else if (seen.size >= focusableKeys.length) {
+            // Retour au premier élément après avoir visité tous les arrêts attendus.
+            break;
+          }
         }
         return stops;
       };
@@ -3460,10 +3467,16 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
         pageDefinition.name + ' ne conserve pas color-scheme: ' + theme + ' dans l’audit clavier.');
       assert.deepEqual(missingForwardKeys, [],
         pageDefinition.name + ' : certains éléments tabulables ne sont pas atteignables avec Tab : ' +
-        JSON.stringify(missingForwardKeys));
+        JSON.stringify({
+          missing: missingForwardKeys,
+          visited: keyboardTraversal.map(stop => ({ selector: stop.selector, text: stop.text }))
+        }));
       assert.deepEqual(missingReverseKeys, [],
         pageDefinition.name + ' : certains éléments tabulables ne sont pas atteignables avec Maj+Tab : ' +
-        JSON.stringify(missingReverseKeys));
+        JSON.stringify({
+          missing: missingReverseKeys,
+          visited: reverseTraversal.map(stop => ({ selector: stop.selector, text: stop.text }))
+        }));
       assert.ok(keyboardTraversal.every(stop => stop.focusVisible && stop.hasIndicator),
         pageDefinition.name + ' : certains arrêts Tab n’ont pas de focus visible : ' +
         JSON.stringify(keyboardTraversal.filter(stop => !stop.focusVisible || !stop.hasIndicator)));
