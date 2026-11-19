@@ -178,7 +178,7 @@ router.get('/export-excel', async (req, res, next) => {
  * @openapi
  * /rapports/comptabilite:
  *   get:
- *     summary: Résumé comptable (recettes, dépenses, bénéfice, TVA collectée) sur une période
+ *     summary: Synthèse des paiements enregistrés, dépenses, écart et TVA inscrite sur les factures
  *     tags: [Rapports]
  *     parameters:
  *       - in: query
@@ -188,7 +188,12 @@ router.get('/export-excel', async (req, res, next) => {
  *         name: to
  *         schema: { type: string, format: date }
  *     responses:
- *       200: { description: Résumé chiffré de la période. }
+ *       200:
+ *         description: >-
+ *           Les paiements enregistrés et la TVA inscrite sur les factures sont agrégés par date d’émission.
+ *           La TVA inclut tous les statuts de facture ; cet endpoint ne déduit pas de remboursements
+ *           ni d’avoirs. Le champ benefice est un écart paiements moins dépenses, pas un résultat
+ *           comptable certifié.
  */
 router.get('/comptabilite', async (req, res, next) => {
   try {
@@ -207,6 +212,11 @@ router.get('/comptabilite', async (req, res, next) => {
     if (to) { dateFilterD.push('date_depense <= ?'); paramsD.push(to); }
     const whereD = dateFilterD.length ? ' AND ' + dateFilterD.join(' AND ') : '';
 
+    // Conservation du contrat historique de l’API : les recettes agrègent montant_paye,
+    // mais restent filtrées par date_emission (pas par date de paiement). La TVA agrège
+    // total_tva de toutes les factures, annulées comprises ; aucun remboursement/avoir
+    // n’est modélisé dans ce résumé. L’interface doit donc éviter « TVA collectée » et
+    // « bénéfice net », qui suggéreraient une comptabilité de trésorerie ou un résultat certifié.
     const [
       [[{ total: recettes }]],
       [[{ total: tvaCollectee }]],
