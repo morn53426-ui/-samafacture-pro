@@ -7521,3 +7521,15 @@ a.btn .icon {
 .dashboard-invoice-status.is-pending { color: var(--gold-text); background: color-mix(in srgb, var(--gold) 11%, var(--paper)); border-color: color-mix(in srgb, var(--gold) 23%, var(--line)); }
 .dashboard-invoice-status.is-overdue { color: var(--clay); background: color-mix(in srgb, var(--clay) 9%, var(--paper)); border-color: color-mix(in srgb, var(--clay) 20%, var(--line)); }
 .dashboard-invoice-status.is-cancelled, .dashboard-invoice-status.is-unknown { color: var(--ink-soft); background: color-mix(in srgb, var(--ink-soft) 7%, var(--paper)); border-color: var(--line); }
+
+
+/* KPI : permettre au texte long de se replier sans être coupé par la carte. */
+.dashboard-kpi-top { min-width:0; }
+.dashboard-kpi-icon { flex:0 0 auto; }
+.dashboard-kpi-copy { flex:1 1 auto; min-width:0; }
+.dashboard-kpi-value {
+  max-width:100%;
+  white-space:normal;
+  overflow-wrap:normal;
+  word-break:normal;
+}
