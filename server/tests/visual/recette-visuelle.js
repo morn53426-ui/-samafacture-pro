@@ -1120,7 +1120,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   }
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
   if (pageDefinition.name === 'rapports') {
-    const accountingLabels = await page.$eval('.reports-kpi-grid .stat-label', elements =>
+    const accountingLabels = await page.$$eval('.reports-kpi-grid .stat-label', elements =>
       elements.map(element => element.textContent.trim())
     );
     assert.deepEqual(accountingLabels, [
