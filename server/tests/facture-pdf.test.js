@@ -153,7 +153,7 @@ describe('Génération PDF de facture', () => {
         });
 
       assert.equal(res.status, 200, modele + ' doit générer un PDF de devis en HTTP 200');
-      assert.match(res.headers['content-type'] || '', /^application\\/pdf(?:;|$)/,
+      assert.match(res.headers['content-type'] || '', /^application\/pdf(?:;|$)/,
         modele + ' doit renvoyer un fichier PDF de devis');
       assert.match(res.headers['content-disposition'] || '', /^attachment; filename="devis-/,
         modele + ' doit nommer le téléchargement comme un devis');
@@ -163,18 +163,18 @@ describe('Génération PDF de facture', () => {
         modele + ' ne doit pas produire un PDF de devis vide ou tronqué');
 
       const pdfLatin1 = res.body.toString('latin1');
-      const mediaBox = pdfLatin1.match(/\\/MediaBox\\s*\\[\\s*0\\s+0\\s+([\\d.]+)\\s+([\\d.]+)\\s*\\]/);
+      const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
       assert.ok(mediaBox, modele + ' doit déclarer une zone de page PDF.');
       assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
         Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
         modele + ' doit être au vrai format A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
 
-      const pageCount = (pdfLatin1.match(/\\/Type\\s*\\/Page\\b/g) || []).length;
+      const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
       assert.ok(pageCount >= 1 && pageCount <= 2,
         modele + ' ne doit pas créer une pagination excessive pour un devis simple (pages=' + pageCount + ')');
 
       const fontNames = Array.from(
-        pdfLatin1.matchAll(/\\/(?:BaseFont|FontName)\\s*\\/([^\\s/]+)/g),
+        pdfLatin1.matchAll(/\/(?:BaseFont|FontName)\s*\/([^\s/]+)/g),
         match => match[1]
       );
       assert.ok(fontNames.some(name => /IBMPlexSans/i.test(name)),
