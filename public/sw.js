@@ -18,19 +18,25 @@ const SHELL_FILES = [
 ];
 
 self.addEventListener('install', (event) => {
+  // L'installation échoue si une ressource du shell manque : mieux vaut conserver l'ancien
+  // service worker actif que d'activer silencieusement un cache incomplet.
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES)).catch(() => {})
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(SHELL_FILES))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
+  // Attendre à la fois le nettoyage des anciens caches et la prise de contrôle des clients.
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    Promise.all([
+      caches.keys().then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      ),
+      self.clients.claim()
+    ])
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
