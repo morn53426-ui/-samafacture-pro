@@ -10,7 +10,7 @@ function normalizeCatalogueType(value, fallback = 'produit') {
 // Les anciennes fiches non classées restent stockables afin de préserver leur
 // comportement historique. Seul le type service est exclu du stock physique.
 function isStockManagedType(type) {
-  return type !== 'service';
+  return type === 'produit' || type === 'non_classe';
 }
 
 module.exports = {
