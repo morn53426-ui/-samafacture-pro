@@ -6,6 +6,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const helper = require('../utils/catalogue-type');
 const route = fs.readFileSync(path.join(root, 'routes', 'produits.js'), 'utf8');
+const professional = fs.readFileSync(path.join(root, 'routes', 'professionnel.js'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'config', 'db.js'), 'utf8');
 const schema = fs.readFileSync(path.join(root, 'database', 'schema.sql'), 'utf8');
 const page = fs.readFileSync(path.join(root, '..', 'public', 'produits.html'), 'utf8');
@@ -59,6 +60,14 @@ describe('Catalogue — distinction produit/service', () => {
     assert.match(page, /stockFields\.hidden = isService/);
     assert.match(page, /field\.disabled = isService/);
     assert.match(page, /p\.type_catalogue === 'service' \? '—' : p\.stock/);
+  });
+
+  test('les services sont exclus de tous les flux de stock et des achats physiques', () => {
+    assert.match(professional, /COALESCE\(p\.type_catalogue, 'non_classe'\) <> 'service'/);
+    assert.match(professional, /ownedById\.get\(id\)\.type_catalogue === 'service'/);
+    assert.match(professional, /Un service ne peut pas être réceptionné dans le stock physique/);
+    assert.match(professional, /Un service ne peut pas recevoir de mouvement de stock/);
+    assert.match(professional, /Un service ne peut pas être transféré entre entrepôts/);
   });
 
   test('les anciennes fiches non classées restent éditables sans conversion automatique', () => {
