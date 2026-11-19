@@ -31,6 +31,7 @@ function emptyDashboard() {
     chiffre_affaires: 0,
     factures_emises: 0,
     nouveaux_clients: 0,
+    valeur_stock: 0,
     factures_payees: { n: 0, total: 0 },
     factures_en_attente: { n: 0, total: 0 },
     factures_en_retard: { n: 0, total: 0 },
@@ -67,10 +68,19 @@ async function buildDashboard(userId) {
        COALESCE(SUM(CASE WHEN statut = 'en_retard' OR (statut = 'en_attente' AND date_echeance IS NOT NULL AND date_echeance < ?) THEN total ELSE 0 END),0) AS retard_total,
        SUM(CASE WHEN statut <> 'annulee' THEN 1 ELSE 0 END) AS factures_emises,
        (SELECT COUNT(*) FROM clients c WHERE c.user_id = ? AND c.created_at >= DATE_SUB(?, INTERVAL 30 DAY)) AS nouveaux_clients,
+       (SELECT COALESCE(SUM(GREATEST(0, COALESCE(stocks.quantite, p.stock)) * p.prix_achat),0)
+          FROM produits p
+          LEFT JOIN (
+            SELECT produit_id, SUM(quantite) AS quantite
+              FROM pro_stocks_entrepots
+             WHERE user_id = ?
+             GROUP BY produit_id
+          ) stocks ON stocks.produit_id = p.id
+         WHERE p.user_id = ?) AS valeur_stock,
        (SELECT COALESCE(SUM(d.montant),0) FROM depenses d WHERE d.user_id = ?) AS total_depenses
      FROM factures
      WHERE user_id = ? AND type = 'facture'`,
-    [localToday, localToday, localToday, localToday, userId, localToday, userId, userId]
+    [localToday, localToday, localToday, localToday, userId, localToday, userId, userId, userId, userId]
   );
   const summary = summaryRows?.[0] || {};
 
@@ -78,6 +88,7 @@ async function buildDashboard(userId) {
     chiffre_affaires: Number(summary?.chiffre_affaires || 0),
     factures_emises: Number(summary?.factures_emises || 0),
     nouveaux_clients: Number(summary?.nouveaux_clients || 0),
+    valeur_stock: Number(summary?.valeur_stock || 0),
     factures_payees: { n: Number(summary?.payees_n || 0), total: Number(summary?.payees_total || 0) },
     factures_en_attente: { n: Number(summary?.attente_n || 0), total: Number(summary?.attente_total || 0) },
     factures_en_retard: { n: Number(summary?.retard_n || 0), total: Number(summary?.retard_total || 0) },

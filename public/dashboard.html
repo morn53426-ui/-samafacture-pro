@@ -202,8 +202,8 @@
         <span class="dashboard-kpi-note">Ajoutés sur les 30 derniers jours</span>
       </article>
       <article class="dashboard-kpi amber">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('package')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${stats.valeur_stock_disponible ? formatMontant(value(stats.valeur_stock)) : '—'}</strong><span class="dashboard-kpi-label">Valeur du stock</span></div></div>
-        <span class="dashboard-kpi-note">${stats.valeur_stock_disponible ? 'Valorisation au coût d’achat' : 'Données de stock indisponibles'}</span>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('package')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.valeur_stock))}</strong><span class="dashboard-kpi-label">Valeur du stock</span></div></div>
+        <span class="dashboard-kpi-note">Valorisation au coût d’achat</span>
       </article>
     `;
   }
@@ -241,13 +241,7 @@
   }
 
   async function load() {
-    const [stats, stockResult] = await Promise.all([
-      Api.get('/dashboard'),
-      Api.get('/pro/inventory/valuation').catch(() => null)
-    ]);
-    const stockValue = Number(stockResult?.valeur_totale);
-    stats.valeur_stock_disponible = Boolean(stockResult) && Number.isFinite(stockValue);
-    stats.valeur_stock = stats.valeur_stock_disponible ? stockValue : null;
+    const stats = await Api.get('/dashboard');
     lastDashboardStats = stats;
     renderKpis(stats);
     renderRecentInvoices(stats.dernieres_factures || []);

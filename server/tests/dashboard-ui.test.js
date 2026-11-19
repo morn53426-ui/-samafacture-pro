@@ -21,9 +21,8 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /Nouveaux clients/);
     assert.match(dashboard, /Valeur du stock/);
     assert.match(dashboard, /Ajoutés sur les 30 derniers jours/);
-    assert.match(dashboard, /Api\.get\('\/pro\/inventory\/valuation'\)\.catch\(\(\) => null\)/);
-    assert.match(dashboard, /stats\.valeur_stock_disponible \? formatMontant/);
-    assert.match(dashboard, /Données de stock indisponibles/);
+    assert.match(dashboard, /formatMontant\(value\(stats\.valeur_stock\)\)/);
+    assert.doesNotMatch(dashboard, /Api\.get\('\/pro\/inventory\/valuation'/);
   });
 
   test('le tableau de bord affiche les dernières factures avec statut et total TTC', () => {

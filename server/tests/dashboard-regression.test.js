@@ -31,6 +31,9 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.match(source, /SELECT COUNT\(\*\) FROM clients c WHERE c\.user_id = \? AND c\.created_at >= DATE_SUB\(\?, INTERVAL 30 DAY\)/);
     assert.match(source, /factures_emises: Number\(summary\?\.factures_emises \|\| 0\)/);
     assert.match(source, /nouveaux_clients: Number\(summary\?\.nouveaux_clients \|\| 0\)/);
+    assert.match(source, /AS valeur_stock/);
+    assert.match(source, /COALESCE\(stocks\.quantite, p\.stock\)/);
+    assert.match(source, /FROM pro_stocks_entrepots[\s\S]*?WHERE user_id = \?[\s\S]*?GROUP BY produit_id/);
   });
 
   test('les dernières factures sont limitées au locataire et excluent les devis', () => {
