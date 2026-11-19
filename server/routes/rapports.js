@@ -9,12 +9,14 @@ const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
 
 // Récupère les mêmes lignes que /ventes, factorisé pour être réutilisé par l'export Excel.
-async function fetchVentes(userId, { from, to, group_by = 'month' }) {
-  const dateFilter = [];
+async function fetchVentes(userId, { from, to, group_by = 'month', exclude_cancelled } = {}) {
+  const filters = [];
   const params = [userId];
-  if (from) { dateFilter.push('f.date_emission >= ?'); params.push(from); }
-  if (to) { dateFilter.push('f.date_emission <= ?'); params.push(to); }
-  const whereExtra = dateFilter.length ? ' AND ' + dateFilter.join(' AND ') : '';
+  if (from) { filters.push('f.date_emission >= ?'); params.push(from); }
+  if (to) { filters.push('f.date_emission <= ?'); params.push(to); }
+  // Keep legacy report/export totals unchanged unless the caller explicitly opts out of cancelled invoices.
+  if (exclude_cancelled === 'true') filters.push("f.statut <> 'annulee'");
+  const whereExtra = filters.length ? ' AND ' + filters.join(' AND ') : '';
 
   if (group_by === 'client') {
     const [rows] = await pool.query(
@@ -62,6 +64,10 @@ async function fetchVentes(userId, { from, to, group_by = 'month' }) {
  *       - in: query
  *         name: group_by
  *         schema: { type: string, enum: [day, week, month, year, client, produit], default: month }
+       - in: query
+ *         name: exclude_cancelled
+ *         schema: { type: boolean, default: false }
+ *         description: Exclut les factures annulées lorsque true. Le comportement historique est conservé par défaut.
  *     responses:
  *       200: { description: Lignes agrégées selon le regroupement demandé. }
  */
