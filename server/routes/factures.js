@@ -237,13 +237,14 @@ async function appliquerAjustementsStock(conn, userId, ajustements) {
   const requestedIds = [...new Set(ajustements
     .map(({ produit_id }) => Number(produit_id))
     .filter(id => Number.isSafeInteger(id) && id > 0)
-  )];
+  )].sort((a, b) => a - b);
   if (!requestedIds.length) return;
 
   const [stockManagedRows] = await conn.query(
     `SELECT id FROM produits
      WHERE user_id = ? AND id IN (${requestedIds.map(() => '?').join(',')})
-       AND COALESCE(type_catalogue, 'non_classe') <> 'service'`,
+       AND COALESCE(type_catalogue, 'non_classe') <> 'service'
+     ORDER BY id FOR UPDATE`,
     [userId, ...requestedIds]
   );
   const stockManagedIds = new Set(stockManagedRows.map(row => Number(row.id)));
