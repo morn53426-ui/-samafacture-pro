@@ -470,11 +470,10 @@
         }
       }
     });
-    canvas.setAttribute('aria-label', total
-      ? 'Répartition des montants TTC facturés par type de catalogue, hors factures annulées. Total : ' +
-         'Montant total TTC : ' + formatMontant(total) + '. ' +
-        rows.map(row => row.label + ' : ' + formatMontant(row.value)).join('; ') + '.'
-      : 'Aucune ligne de facture active enregistrée pour la répartition des ventes.');
+    canvas.setAttribute('aria-label',
+      'Répartition des montants TTC facturés par type de catalogue, hors factures annulées. Montant total TTC : ' +
+      formatMontant(total) + '. ' +
+      rows.map(row => row.label + ' : ' + formatMontant(row.value)).join('; ') + '.');
   }
 
   function setPeriode(period) {
