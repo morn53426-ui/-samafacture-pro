@@ -1105,6 +1105,17 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     );
     assert.deepEqual(kpiLabels, ["Chiffre d'affaires", 'Factures émises', 'Nouveaux clients', 'Valeur du stock'],
       'Le dashboard doit afficher les quatre KPI métier attendus.');
+    const kpiValuesFit = await page.$eval('#stats-grid .dashboard-kpi-value', elements =>
+      elements.every(element => {
+        const card = element.closest('.dashboard-kpi');
+        return card &&
+          element.clientWidth > 0 &&
+          element.scrollWidth <= element.clientWidth + 1 &&
+          element.getBoundingClientRect().right <= card.getBoundingClientRect().right + 1;
+      })
+    );
+    assert.equal(kpiValuesFit, true,
+      'Les valeurs des KPI doivent rester entièrement lisibles, même avec les données extrêmes.');
   }
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
     assert.deepEqual(metrics.invoiceLabels, ['N° facture', 'Client', 'Émission', 'Statut', 'Total TTC'],
