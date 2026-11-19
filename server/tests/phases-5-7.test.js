@@ -284,17 +284,25 @@ test('annuler une commande fournisseur conserve les réceptions partielles et bl
     .set('Authorization', 'Bearer ' + tokenA);
   assert.equal(details.status, 200, details.text);
 
-  const partial = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
-    .set('Authorization', 'Bearer ' + tokenA)
-    .send({ operation_id: 'phase57-partial-receipt-retry-001', lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 2 }] });
-  assert.equal(partial.status, 201, partial.text);
+  const partialPayload = { operation_id: 'phase57-partial-receipt-retry-001', lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 2 }] };
+  const partialResponses = await Promise.all([
+    request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive').set('Authorization', 'Bearer ' + tokenA).send(partialPayload),
+    request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive').set('Authorization', 'Bearer ' + tokenA).send(partialPayload)
+  ]);
+  assert.deepEqual(partialResponses.map(response => response.status).sort(), [200, 201],
+    'deux soumissions simultanées doivent créer une seule réception');
+  const partial = partialResponses.find(response => response.status === 201);
+  const partialReplay = partialResponses.find(response => response.status === 200);
   assert.equal(partial.body.statut, 'partiellement_recue');
-  const partialReplay = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
-    .set('Authorization', 'Bearer ' + tokenA)
-    .send({ operation_id: 'phase57-partial-receipt-retry-001', lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 2 }] });
-  assert.equal(partialReplay.status, 200, partialReplay.text);
   assert.equal(partialReplay.body.repeated, true);
   assert.equal(partialReplay.body.reception_id, partial.body.reception_id);
+  const alteredReplay = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ operation_id: 'phase57-partial-receipt-retry-001', lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 1 }] });
+  assert.equal(alteredReplay.status, 409, alteredReplay.text);
+  const productAfterReplay = await request(app).get('/api/produits').set('Authorization', 'Bearer ' + tokenA);
+  const stockAfterReplay = productAfterReplay.body.produits.find(p => Number(p.id) === Number(product.body.produit.id));
+  assert.equal(Number(stockAfterReplay.stock), 2, 'une répétition simultanée ne doit pas ajouter de stock en double');
 
   const foreignCancel = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/cancel')
     .set('Authorization', 'Bearer ' + tokenB).send({});
