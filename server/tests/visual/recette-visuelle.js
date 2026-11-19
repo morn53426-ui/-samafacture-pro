@@ -97,11 +97,11 @@ function makeFixtures() {
   ];
 
   const produits = [
-    { id: 1, nom: makeLong('Matériel informatique professionnel — lot complet avec installation et maintenance ', 188), reference: 'REF-2026-ULTRA-LONGUE-REFERENCE-001', prix_ht: 999999999999.99, prix_achat: 600000000000, tva: 18, stock: 999999999 },
-    { id: 2, nom: 'Prestation de démonstration', reference: 'PRESTA-TEST-002', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 12 },
-    { id: 3, nom: 'Bougie parfumée ambre et bois de santal', reference: 'BOUGIE-AMB-001', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 54 },
-    { id: 4, nom: 'Service de maintenance annuelle', reference: 'SERV-MAINT-2026', prix_ht: 1250000, prix_achat: 300000, tva: 18, stock: 0 },
-    { id: 5, nom: 'Produit avec stock faible', reference: 'STOCK-LOW-1', prix_ht: 1000, prix_achat: 500, tva: 0, stock: 1 }
+    { id: 1, type_catalogue: 'produit', nom: makeLong('Matériel informatique professionnel — lot complet avec installation et maintenance ', 188), reference: 'REF-2026-ULTRA-LONGUE-REFERENCE-001', prix_ht: 999999999999.99, prix_achat: 600000000000, tva: 18, stock: 999999999 },
+    { id: 2, type_catalogue: 'service', nom: 'Prestation de démonstration', reference: 'PRESTA-TEST-002', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 0 },
+    { id: 3, type_catalogue: 'non_classe', nom: 'Bougie parfumée ambre et bois de santal', reference: 'BOUGIE-AMB-001', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 54 },
+    { id: 4, type_catalogue: 'service', nom: 'Service de maintenance annuelle', reference: 'SERV-MAINT-2026', prix_ht: 1250000, prix_achat: 300000, tva: 18, stock: 0 },
+    { id: 5, type_catalogue: 'produit', nom: 'Produit avec stock faible', reference: 'STOCK-LOW-1', prix_ht: 1000, prix_achat: 500, tva: 0, stock: 1 }
   ];
 
   const factures = [
@@ -529,6 +529,16 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     throw new Error(pageDefinition.name + ' indisponible; diagnostic=' +
       JSON.stringify({ ...diagnostic, apiRequests: page.__visualApiRequests, pageErrors }) +
       '; cause=' + error.message);
+  }
+  if (pageDefinition.name === 'produits') {
+    const catalogue = await page.evaluate(() => [...document.querySelectorAll('#produits-body tr')].map(row => ({
+      type: row.querySelector('[data-label="Type"]')?.textContent.trim() || '',
+      stock: row.querySelector('[data-label="Stock"]')?.textContent.trim() || ''
+    })));
+    assert.deepEqual(catalogue.map(row => row.type).sort(), ['Non classé', 'Produit', 'Produit', 'Service', 'Service'].sort(),
+      'La recette du catalogue doit couvrir les trois types de fiche.');
+    assert.ok(catalogue.filter(row => row.type === 'Service').every(row => row.stock === '—'),
+      'Un service ne doit jamais afficher de quantité de stock physique.');
   }
   if (pageDefinition.name === 'groupe-entreprise') {
     const groupUi = await page.evaluate(() => {
@@ -3485,6 +3495,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.equal(String(payload.client_id), '1', 'Le client sélectionné doit figurer dans le payload.');
     assert.equal(payload.lignes.length, 1, 'Une ligne produit doit figurer dans le document.');
     assert.equal(payload.lignes[0].designation, 'Prestation de démonstration');
+    assert.equal(payload.lignes[0].produit_id, 2, 'Le service choisi dans le catalogue doit conserver son identifiant sur la ligne de facture.');
     assert.equal(payload.lignes[0].quantite, 2);
     assert.equal(payload.remise, 1000);
     assert.equal(payload.frais_livraison, 1500);
