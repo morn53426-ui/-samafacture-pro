@@ -6,6 +6,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const helper = require('../utils/catalogue-type');
 const route = fs.readFileSync(path.join(root, 'routes', 'produits.js'), 'utf8');
+const invoices = fs.readFileSync(path.join(root, 'routes', 'factures.js'), 'utf8');
 const professional = fs.readFileSync(path.join(root, 'routes', 'professionnel.js'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'config', 'db.js'), 'utf8');
 const schema = fs.readFileSync(path.join(root, 'database', 'schema.sql'), 'utf8');
@@ -69,6 +70,14 @@ describe('Catalogue — distinction produit/service', () => {
     assert.match(professional, /Un service ne peut pas être réceptionné dans le stock physique/);
     assert.match(professional, /Un service ne peut pas recevoir de mouvement de stock/);
     assert.match(professional, /Un service ne peut pas être transféré entre entrepôts/);
+  });
+
+  test('la création, l’annulation et la conversion de facture ignorent le stock des services', () => {
+    assert.match(invoices, /SELECT id FROM produits[\s\S]*?COALESCE\(type_catalogue, 'non_classe'\) <> 'service'/);
+    assert.match(invoices, /const stockManagedIds = new Set\(stockManagedRows\.map\(row => Number\(row\.id\)\)\)/);
+    assert.match(invoices, /if \(!stockManagedIds\.has\(productId\)\) continue/);
+    assert.match(invoices, /appliquerAjustementsStock\(conn, req\.tenantId, computedLignes/);
+    assert.match(invoices, /lignesDevis\.map\(\(l\) => \(\{ produit_id: l\.produit_id, delta: -l\.quantite \}\)\)/);
   });
 
   test('les services ne sont pas proposés dans les achats ou mouvements de stock physiques', () => {
