@@ -86,6 +86,8 @@ describe('Catalogue — distinction produit/service', () => {
     assert.match(invoicePage, /const typeLabel = p\.type_catalogue === 'service' \? 'Service'/);
     assert.match(invoicePage, /data-nom="\$\{escapeHtml\(p\.nom\)\}"/);
     assert.match(invoicePage, /opt\.dataset\.nom \|\| opt\.textContent/);
+    assert.match(invoicePage, /const produitId = row\.querySelector\('\.ligne-produit'\)\.value/);
+    assert.match(invoicePage, /produit_id: produitId \? Number\(produitId\) : null/);
   });
 
   test('les services ne sont pas proposés dans les achats ou mouvements de stock physiques', () => {
