@@ -55,6 +55,17 @@ describe('Catalogue — distinction produit/service', () => {
     assert.match(route, /UPDATE produits SET nom=\?, type_catalogue=\?/);
   });
 
+  test('une commande fournisseur ouverte bloque la conversion et les écritures catalogue sont sérialisées', () => {
+    assert.match(route, /pro_commandes_fournisseurs_lignes l[\s\S]*?JOIN pro_commandes_fournisseurs o[\s\S]*?l\.quantite_recue[\s\S]*?o\.statut NOT IN \('annulee', 'recue'\)/);
+    assert.match(route, /commande fournisseur reste à réceptionner/);
+    const purchaseOrderRoute = professional.slice(
+      professional.indexOf("router.post('/purchase-orders'"),
+      professional.indexOf("router.post('/purchase-orders/:id/receive'")
+    );
+    assert.match(purchaseOrderRoute, /await conn\.beginTransaction\(\)[\s\S]*?SELECT id, type_catalogue FROM produits[\s\S]*?ORDER BY id FOR UPDATE/);
+    assert.match(invoices, /COALESCE\(type_catalogue, 'non_classe'\) <> 'service'[\s\S]*?ORDER BY id FOR UPDATE/);
+  });
+
   test('le formulaire demande le type et masque les quantités pour les services', () => {
     assert.match(page, /<select id="type_catalogue" required>/);
     assert.match(page, /<option value="produit">/);
