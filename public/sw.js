@@ -1,5 +1,5 @@
 // v7 : actualise les icônes Sunupilot régénérées depuis le symbole SVG officiel.
-const CACHE_NAME = 'sunupilot-shell-v7';
+const CACHE_NAME = 'sunupilot-shell-v8';
 
 // Fichiers statiques de l'interface (l'API n'est jamais mise en cache : les données doivent
 // toujours être à jour).
