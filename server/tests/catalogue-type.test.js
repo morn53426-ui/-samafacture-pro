@@ -10,6 +10,7 @@ const professional = fs.readFileSync(path.join(root, 'routes', 'professionnel.js
 const migration = fs.readFileSync(path.join(root, 'config', 'db.js'), 'utf8');
 const schema = fs.readFileSync(path.join(root, 'database', 'schema.sql'), 'utf8');
 const page = fs.readFileSync(path.join(root, '..', 'public', 'produits.html'), 'utf8');
+const purchasesPage = fs.readFileSync(path.join(root, '..', 'public', 'achats.html'), 'utf8');
 
 describe('Catalogue — distinction produit/service', () => {
   test('les types acceptés sont explicites et normalisés', () => {
@@ -68,6 +69,11 @@ describe('Catalogue — distinction produit/service', () => {
     assert.match(professional, /Un service ne peut pas être réceptionné dans le stock physique/);
     assert.match(professional, /Un service ne peut pas recevoir de mouvement de stock/);
     assert.match(professional, /Un service ne peut pas être transféré entre entrepôts/);
+  });
+
+  test('les services ne sont pas proposés dans les achats ou mouvements de stock physiques', () => {
+    assert.match(purchasesPage, /products=\(results\[1\]\.produits\|\|\[\]\)\.filter\(p=>p\.type_catalogue !== 'service'\)/);
+    assert.match(professional, /COALESCE\(p\.type_catalogue, 'non_classe'\) <> 'service'/);
   });
 
   test('les anciennes fiches non classées restent éditables sans conversion automatique', () => {
