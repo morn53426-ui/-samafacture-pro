@@ -104,6 +104,9 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: 'Le type doit être produit, service ou non classé.' });
     }
     const stockManaged = isStockManagedType(catalogueType);
+    if (!stockManaged && (nonNegativeQuantity(stock) > 0 || nonNegativeQuantity(stock_minimum) > 0)) {
+      return res.status(400).json({ error: 'Un service ne peut pas avoir de quantité ni de seuil de stock.' });
+    }
     const quantity = stockManaged ? nonNegativeQuantity(stock) : 0;
     const minimumQuantity = stockManaged ? nonNegativeQuantity(stock_minimum) : 0;
 
@@ -168,9 +171,10 @@ router.put('/:id', async (req, res, next) => {
     let warehouses = [];
 
     if (!stockManaged) {
-      if (stock !== undefined && nonNegativeQuantity(stock) > 0) {
+      if ((stock !== undefined && nonNegativeQuantity(stock) > 0) ||
+          (stock_minimum !== undefined && nonNegativeQuantity(stock_minimum) > 0)) {
         await conn.rollback();
-        return res.status(400).json({ error: 'Un service ne peut pas avoir de quantité en stock.' });
+        return res.status(400).json({ error: 'Un service ne peut pas avoir de quantité ni de seuil de stock.' });
       }
       // La conversion n'est autorisée qu'après sortie réelle du stock : ne pas effacer
       // silencieusement des quantités d'entrepôt ou un stock catalogue historique.
