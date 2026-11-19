@@ -2569,6 +2569,66 @@ router.post('/purchase-orders/:id/cancel', async (req, res, next) => {
     next(err);
   } finally { if (conn) conn.release(); }
 });
+router.put('/purchase-orders/:id/lines/:lineId/product', async (req, res, next) => {
+  let conn;
+  try {
+    const uid = owner(req);
+    const orderId = Number(req.params.id), lineId = Number(req.params.lineId), productId = Number(req.body.produit_id);
+    if (![orderId, lineId, productId].every(value => Number.isSafeInteger(value) && value > 0)) {
+      return res.status(400).json({ error: 'Commande, ligne et produit doivent être valides.' });
+    }
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [orders] = await conn.query(
+      'SELECT id, statut FROM pro_commandes_fournisseurs WHERE id = ? AND user_id = ? FOR UPDATE',
+      [orderId, uid]
+    );
+    const order = orders[0];
+    if (!order) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Commande fournisseur introuvable.' });
+    }
+    if (order.statut === 'annulee' || order.statut === 'recue') {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Cette commande ne peut plus être modifiée.' });
+    }
+    const [lines] = await conn.query(
+      'SELECT id, quantite_recue FROM pro_commandes_fournisseurs_lignes WHERE id = ? AND commande_id = ? AND user_id = ? FOR UPDATE',
+      [lineId, orderId, uid]
+    );
+    const line = lines[0];
+    if (!line) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Ligne de commande introuvable.' });
+    }
+    if (Number(line.quantite_recue) > 0) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Le produit d’une ligne déjà réceptionnée ne peut plus être modifié.' });
+    }
+    const [products] = await conn.query(
+      'SELECT id, type_catalogue FROM produits WHERE id = ? AND user_id = ? FOR UPDATE',
+      [productId, uid]
+    );
+    if (!products.length) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le produit sélectionné n’appartient pas à cette entreprise.' });
+    }
+    if (products[0].type_catalogue === 'service') {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Un service ne peut pas être associé à une réception de stock physique.' });
+    }
+    await conn.query(
+      'UPDATE pro_commandes_fournisseurs_lignes SET produit_id = ? WHERE id = ? AND commande_id = ? AND user_id = ?',
+      [productId, lineId, orderId, uid]
+    );
+    await conn.commit();
+    await audit(req, 'achat.ligne_produit_associe', 'commande_fournisseur', orderId, { ligne_id: lineId, produit_id: productId });
+    res.json({ success: true, commande_id: orderId, ligne_id: lineId, produit_id: productId });
+  } catch (err) {
+    if (conn) await conn.rollback();
+    next(err);
+  } finally { if (conn) conn.release(); }
+});
 router.post('/purchase-orders/:id/receive', async (req, res, next) => {
   let conn;
   try {
