@@ -451,6 +451,16 @@ test('les ajustements et transferts de stock restent atomiques, isolés et sans 
   assert.equal(Number(storedProduct.stock), 7, 'le stock global du produit doit rester égal à la somme des entrepôts');
 });
 test('une facture débite et restitue le stock dans son entrepôt de vente', async () => {
+  const [[warehouseColumn]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures' AND COLUMN_NAME = 'entrepot_id'`
+  );
+  assert.equal(Number(warehouseColumn.total), 1, 'la migration v17 doit ajouter l’entrepôt à la facture');
+  const [[warehouseIndex]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures' AND INDEX_NAME = 'idx_factures_user_entrepot'`
+  );
+  assert.equal(Number(warehouseIndex.total), 1, 'l’index multi-tenant facture/entrepôt doit être présent');
   const product = await request(app).post('/api/produits')
     .set('Authorization', 'Bearer ' + tokenA)
     .send({ nom: 'Produit vente entrepôt secondaire', prix_ht: 1200, prix_achat: 700, stock: 10 });
