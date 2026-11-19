@@ -1119,6 +1119,21 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       JSON.stringify(layout));
   }
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
+  if (pageDefinition.name === 'finances') {
+    const financeLabels = await page.$$eval('#stats-grid .stat-label', elements =>
+      elements.map(element => element.textContent.trim())
+    );
+    assert.deepEqual(financeLabels, [
+      'Écart cumulé paiements - dépenses',
+      'Écart du mois paiements - dépenses',
+      'Estimation des ventes mois prochain',
+      "Objectif d'encaissements"
+    ], 'Les indicateurs financiers doivent refléter les sommes réellement calculées.');
+    const financeNote = await page.$eval('.finance-accounting-note', element => element.textContent.trim());
+    assert.match(financeNote, /ni un solde bancaire ni un bénéfice comptable/);
+    assert.match(financeNote, /date d’émission des factures/);
+    assert.match(financeNote, /remboursements ne sont pas déduits automatiquement/);
+  }
   if (pageDefinition.name === 'rapports') {
     const accountingLabels = await page.$$eval('.reports-kpi-grid .stat-label', elements =>
       elements.map(element => element.textContent.trim())
