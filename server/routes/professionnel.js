@@ -2576,23 +2576,66 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
     const uid = owner(req), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
     const warehouseId = Number(req.body.entrepot_id) || await ensureDefaultWarehouse(uid);
     if (!lines.length || lines.length > 100) return res.status(400).json({ error: 'Indiquez au moins une ligne à réceptionner.' });
-    if (new Set(lines.map(line => String(line.ligne_id))).size !== lines.length) return res.status(400).json({ error: 'Une même ligne de commande ne peut être réceptionnée qu’une fois par opération.' });
+    const normalizedLines = lines.map(line => ({
+      ligne_id: Number(line.ligne_id),
+      quantite: Math.round(Number(line.quantite) * 1000) / 1000
+    }));
+    if (normalizedLines.some(line => !Number.isSafeInteger(line.ligne_id) || line.ligne_id <= 0 ||
+        !Number.isFinite(line.quantite) || line.quantite <= 0)) {
+      return res.status(400).json({ error: 'Chaque ligne doit avoir un identifiant et une quantité reçue valides.' });
+    }
+    if (new Set(normalizedLines.map(line => line.ligne_id)).size !== normalizedLines.length) return res.status(400).json({ error: 'Une même ligne de commande ne peut être réceptionnée qu’une fois par opération.' });
+    const operationId = String(req.body.operation_id || '').trim();
+    if (operationId && !/^[a-zA-Z0-9_-]{16,64}$/.test(operationId)) {
+      return res.status(400).json({ error: 'Identifiant d’opération de réception invalide.' });
+    }
+    const reference = operationId ? 'REC-' + operationId : randomRef('REC');
     conn = await pool.getConnection();
     await conn.beginTransaction();
     const [orderRows] = await conn.query('SELECT * FROM pro_commandes_fournisseurs WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
     const order = orderRows[0];
-    if (!order || order.statut === 'annulee' || order.statut === 'recue') { await conn.rollback(); return res.status(409).json({ error: 'Commande absente, annulée ou déjà intégralement réceptionnée.' }); }
+    if (!order) { await conn.rollback(); return res.status(404).json({ error: 'Commande fournisseur introuvable.' }); }
+    const [existingReceipts] = await conn.query(
+      'SELECT id, commande_id FROM pro_receptions_achats WHERE user_id = ? AND reference = ? FOR UPDATE',
+      [uid, reference]
+    );
+    if (existingReceipts.length) {
+      const existing = existingReceipts[0];
+      if (Number(existing.commande_id) !== Number(order.id)) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'Cet identifiant de réception est déjà utilisé pour une autre commande.' });
+      }
+      const [savedLines] = await conn.query(
+        'SELECT commande_ligne_id, quantite FROM pro_receptions_achats_lignes WHERE reception_id = ? AND user_id = ? ORDER BY commande_ligne_id',
+        [existing.id, uid]
+      );
+      const requested = normalizedLines.slice().sort((a, b) => a.ligne_id - b.ligne_id);
+      const saved = savedLines.map(line => ({ ligne_id: Number(line.commande_ligne_id), quantite: Number(line.quantite) }))
+        .sort((a, b) => a.ligne_id - b.ligne_id);
+      const samePayload = requested.length === saved.length && requested.every((line, index) =>
+        line.ligne_id === saved[index].ligne_id && Math.abs(line.quantite - saved[index].quantite) <= 0.0001
+      );
+      if (!samePayload) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'Cet identifiant de réception a déjà été utilisé avec des quantités différentes.' });
+      }
+      await conn.rollback();
+      return res.status(200).json({ reception_id: existing.id, reference, statut: order.statut, repeated: true });
+    }
+    if (order.statut === 'annulee' || order.statut === 'recue') {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Commande annulée ou déjà intégralement réceptionnée.' });
+    }
     const [warehouseRows] = await conn.query('SELECT id, nom FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1', [warehouseId, uid]);
     if (!warehouseRows.length) { await conn.rollback(); return res.status(400).json({ error: 'Entrepôt invalide.' }); }
-    const reference = randomRef('REC');
     const [receipt] = await conn.query(
       'INSERT INTO pro_receptions_achats (user_id, commande_id, entrepot_id, reference, date_reception, acteur_user_id) VALUES (?, ?, ?, ?, ?, ?)',
       [uid, order.id, warehouseId, reference, await safeDateForUser(req.body.date_reception, uid), actor(req)]
     );
     const [orderLines] = await conn.query('SELECT * FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? FOR UPDATE', [order.id, uid]);
-    for (const received of lines) {
-      const line = orderLines.find(item => Number(item.id) === Number(received.ligne_id));
-      const qty = Math.round(Number(received.quantite) * 1000) / 1000;
+    for (const received of normalizedLines) {
+      const line = orderLines.find(item => Number(item.id) === received.ligne_id);
+      const qty = received.quantite;
       if (!line || !Number.isFinite(qty) || qty <= 0 || qty > Number(line.quantite) - Number(line.quantite_recue) + 0.0001) {
         throw new Error('Quantité reçue invalide ou supérieure au reliquat de commande.');
       }
@@ -2624,7 +2667,7 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
     );
     await conn.commit();
     await audit(req, 'achat.reception', 'commande_fournisseur', order.id, { reference, statut: status });
-    res.status(201).json({ reception_id: receipt.insertId, reference, statut: status });
+    res.status(201).json({ reception_id: receipt.insertId, reference, statut: status, repeated: false });
   } catch (err) {
     if (conn) await conn.rollback();
     if (/Quantité reçue|associée à un produit|Produit supprimé|service ne peut pas être réceptionné/.test(err.message || '')) return res.status(400).json({ error: err.message });
