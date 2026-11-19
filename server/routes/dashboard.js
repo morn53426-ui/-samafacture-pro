@@ -57,6 +57,9 @@ async function buildDashboard(userId) {
 
   // One summary query replaces the old factures + depenses queries. It also gives us
   // invoice_count so a brand-new account does not needlessly execute four more joins.
+  // Le champ historique chiffre_affaires reste exposé pour compatibilité API : il mesure
+  // les paiements enregistrés (y compris ceux d'une facture annulée ensuite), pas les ventes facturées.
+  // Aucun flux de remboursement n'est modélisé ici ; ne pas présenter cette somme comme un solde bancaire.
   const [summaryRows] = await pool.query(
     `SELECT
        COUNT(*) AS invoice_count,
