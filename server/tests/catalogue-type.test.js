@@ -40,6 +40,7 @@ describe('Catalogue — distinction produit/service', () => {
     assert.match(route, /const stockManaged = isStockManagedType\(catalogueType\)/);
     assert.match(route, /INSERT INTO produits \(user_id, nom, type_catalogue,/);
     assert.match(route, /if \(stockManaged\) \{\s*await initialiserStockEntrepotPrincipal/);
+    assert.match(route, /if \(!stockManaged && \(nonNegativeQuantity\(stock\) > 0 \|\| nonNegativeQuantity\(stock_minimum\) > 0\)\)/);
     assert.match(route, /const quantity = stockManaged \? nonNegativeQuantity\(stock\) : 0/);
   });
 
