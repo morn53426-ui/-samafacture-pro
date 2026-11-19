@@ -589,6 +589,12 @@ select:focus, textarea:focus {
   border-color: var(--emerald);
   box-shadow: 0 0 0 3px var(--emerald-light);
 }
+.reports-filter-card input[type="date"]:focus {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  border-color: var(--emerald);
+  box-shadow: 0 0 0 3px var(--emerald-light);
+}
 
 /* Désactivé */
 input:disabled, select:disabled, textarea:disabled {

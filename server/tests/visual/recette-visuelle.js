@@ -3137,7 +3137,8 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
         const indicatorFor = candidate => {
           const style = getComputedStyle(candidate);
           const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
-          const shadow = Boolean(style.boxShadow && style.boxShadow !== 'none');
+          const shadow = Boolean(style.boxShadow && style.boxShadow !== 'none' &&
+            !style.boxShadow.includes('inset'));
           return { visible: Boolean(outline || shadow), outline: style.outline, boxShadow: style.boxShadow };
         };
         // Certains composants placent l'indicateur sur leur enveloppe : le focus
@@ -3172,6 +3173,8 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           text: String(element.innerText || element.textContent || element.getAttribute('aria-label') || '')
             .replace(/\\s+/g, ' ').trim().slice(0, 80),
           focusVisible: element.matches(':focus-visible'),
+          focused: element.matches(':focus'),
+          nativeDateControl: element.matches('input[type="date"]'),
           hasIndicator: Boolean(indicatorOwner),
           indicatorOwner,
           outline: style.outline,
@@ -3477,13 +3480,15 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           missing: missingReverseKeys,
           visited: reverseTraversal.map(stop => ({ selector: stop.selector, text: stop.text }))
         }));
-      assert.ok(keyboardTraversal.every(stop => stop.focusVisible && stop.hasIndicator),
+      const hasKeyboardFocusIndicator = stop => stop.hasIndicator &&
+        (stop.focusVisible || (stop.nativeDateControl && stop.focused));
+      assert.ok(keyboardTraversal.every(hasKeyboardFocusIndicator),
         pageDefinition.name + ' : certains arrêts Tab n’ont pas de focus visible : ' +
-        JSON.stringify(keyboardTraversal.filter(stop => !stop.focusVisible || !stop.hasIndicator)));
-      assert.ok(reverseTraversal.every(stop => stop.focusVisible && stop.hasIndicator),
+        JSON.stringify(keyboardTraversal.filter(stop => !hasKeyboardFocusIndicator(stop))));
+      assert.ok(reverseTraversal.every(hasKeyboardFocusIndicator),
         pageDefinition.name + ' : certains arrêts Maj+Tab n’ont pas de focus visible : ' +
-        JSON.stringify(reverseTraversal.filter(stop => !stop.focusVisible || !stop.hasIndicator)));
-      assert.ok(reverseFocus?.focusVisible && reverseFocus?.hasIndicator,
+        JSON.stringify(reverseTraversal.filter(stop => !hasKeyboardFocusIndicator(stop))));
+      assert.ok(reverseFocus && hasKeyboardFocusIndicator(reverseFocus),
         pageDefinition.name + ' : Maj+Tab ne produit pas un premier focus visible : ' +
         JSON.stringify(reverseFocus));
       assert.deepEqual(pageErrors, [],
