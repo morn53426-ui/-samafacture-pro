@@ -76,7 +76,7 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.match(source, /date_echeance >= \?/);
     assert.match(source, /date_echeance < \?/);
     assert.match(source, /date_emission >= DATE_SUB\(DATE_FORMAT\(\?, '%Y-%m-01'\), INTERVAL 5 MONTH\)/);
-    assert.match(source, /AND statut <> 'annulee'[\s\S]*?date_emission >= DATE_SUB\(\?, INTERVAL 5 MONTH\)[\s\S]*?AND date_emission <= \?/);
+    assert.match(source, /AND statut <> 'annulee'[\s\S]*?date_emission >= DATE_SUB\(DATE_FORMAT\(\?, '%Y-%m-01'\), INTERVAL 5 MONTH\)[\s\S]*?AND date_emission <= \?/);
     assert.doesNotMatch(source, /date_echeance .*CURDATE\(\)/);
     assert.doesNotMatch(source, /date_emission >= DATE_SUB\(CURDATE\(\)/);
   });
