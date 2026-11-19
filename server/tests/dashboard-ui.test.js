@@ -15,8 +15,8 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /Bienvenue sur Sunupilot/);
   });
 
-  test('le graphique de chiffre d\'affaires couvre six ou douze mois et conserve les mois sans vente', () => {
-    assert.match(dashboard, /<h2>Évolution du chiffre d'affaires<\/h2>/);
+  test('le graphique des ventes facturées couvre six ou douze mois et conserve les mois sans vente', () => {
+    assert.match(dashboard, /<h2>Évolution des ventes facturées<\/h2>/);
     assert.match(dashboard, /id="dashboard-period-select"/);
     assert.match(dashboard, /<option value="6m">6 derniers mois<\/option>/);
     assert.match(dashboard, /<option value="12m">12 derniers mois<\/option>/);
@@ -27,11 +27,13 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /exclude_cancelled: 'true'/);
     assert.match(dashboard, /to: today\.year \+ '-' \+ pad\(today\.month\) \+ '-' \+ pad\(today\.day\),/);
     assert.match(dashboard, /canvas\.dataset\.dashboardMonthCount = String\(series\.monthCount\)/);
-    assert.match(dashboard, /exclude_cancelled: 'true'/);
   });
 
   test('les quatre KPI utilisent les bons indicateurs et la valorisation de stock reste explicite si indisponible', () => {
-    assert.match(dashboard, /Chiffre d'affaires/);
+    assert.match(dashboard, /Encaissements cumulés/);
+    assert.match(dashboard, /Encaissements cumulés enregistrés/);
+    assert.match(dashboard, /amount\(stats\.chiffre_affaires\)/);
+    assert.doesNotMatch(dashboard, /Chiffre d'affaires/);
     assert.match(dashboard, /Factures émises/);
     assert.match(dashboard, /Nouveaux clients/);
     assert.match(dashboard, /Valeur du stock/);
@@ -89,7 +91,9 @@ describe('Dashboard Sunupilot — structure de référence', () => {
 
   test('la répartition des ventes affiche les montants TTC par type de catalogue', () => {
     assert.match(dashboard, /Répartition des ventes/);
-    assert.match(dashboard, /Montants TTC des lignes facturées par type/);
+    assert.match(dashboard, /Montants TTC facturés par type, hors annulations/);
+    assert.match(dashboard, /TTC facturé/);
+    assert.match(dashboard, /Ventes TTC facturées sur/);
     assert.match(dashboard, /id="sales-total"/);
     assert.match(dashboard, /id="sales-legend"/);
     assert.match(dashboard, /stats\.repartition_ventes/);
