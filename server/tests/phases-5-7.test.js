@@ -259,6 +259,79 @@ test('une commande fournisseur en attente bloque la conversion en service et res
   assert.equal(Number(receivedProduct.stock), 3, 'la réception fournisseur doit alimenter le stock du produit');
 });
 
+test('annuler une commande fournisseur conserve les réceptions partielles et bloque tout nouveau reliquat', async () => {
+  const product = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Article réception partielle annulée', prix_ht: 1000, prix_achat: 500, stock: 0 });
+  assert.equal(product.status, 201, product.text);
+  const supplier = await request(app).post('/api/pro/suppliers')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Fournisseur annulation partielle' });
+  assert.equal(supplier.status, 201, supplier.text);
+
+  const order = await request(app).post('/api/pro/purchase-orders')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ fournisseur_id: supplier.body.id, lignes: [{
+      produit_id: product.body.produit.id, designation: 'Article commandé',
+      quantite: 5, prix_unitaire: 500, tva: 18
+    }] });
+  assert.equal(order.status, 201, order.text);
+  const details = await request(app).get('/api/pro/purchase-orders/' + order.body.id)
+    .set('Authorization', 'Bearer ' + tokenA);
+  assert.equal(details.status, 200, details.text);
+
+  const partial = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 2 }] });
+  assert.equal(partial.status, 201, partial.text);
+  assert.equal(partial.body.statut, 'partiellement_recue');
+
+  const foreignCancel = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/cancel')
+    .set('Authorization', 'Bearer ' + tokenB).send({});
+  assert.equal(foreignCancel.status, 404, foreignCancel.text);
+
+  const cancelled = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/cancel')
+    .set('Authorization', 'Bearer ' + tokenA).send({});
+  assert.equal(cancelled.status, 200, cancelled.text);
+  assert.equal(cancelled.body.statut, 'annulee');
+  assert.equal(Number(cancelled.body.quantite_recue_conservee), 2);
+  assert.equal(Number(cancelled.body.quantite_restante_annulee), 3);
+
+  const afterCancel = await request(app).get('/api/pro/purchase-orders/' + order.body.id)
+    .set('Authorization', 'Bearer ' + tokenA);
+  assert.equal(afterCancel.body.commande.statut, 'annulee');
+  assert.equal(Number(afterCancel.body.lignes[0].quantite_recue), 2);
+  const productsAfterCancel = await request(app).get('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA);
+  const stockAfterCancel = productsAfterCancel.body.produits.find(p => Number(p.id) === Number(product.body.produit.id));
+  assert.equal(Number(stockAfterCancel.stock), 2, 'les unités déjà reçues restent physiquement en stock');
+
+  const blockedReceipt = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 3 }] });
+  assert.equal(blockedReceipt.status, 409, blockedReceipt.text);
+  const duplicateCancel = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/cancel')
+    .set('Authorization', 'Bearer ' + tokenA).send({});
+  assert.equal(duplicateCancel.status, 409, duplicateCancel.text);
+
+  const fullyReceivedOrder = await request(app).post('/api/pro/purchase-orders')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ fournisseur_id: supplier.body.id, lignes: [{
+      produit_id: product.body.produit.id, designation: 'Article complètement reçu',
+      quantite: 1, prix_unitaire: 500, tva: 18
+    }] });
+  assert.equal(fullyReceivedOrder.status, 201, fullyReceivedOrder.text);
+  const fullyReceivedDetails = await request(app).get('/api/pro/purchase-orders/' + fullyReceivedOrder.body.id)
+    .set('Authorization', 'Bearer ' + tokenA);
+  const fullReceipt = await request(app).post('/api/pro/purchase-orders/' + fullyReceivedOrder.body.id + '/receive')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ lignes: [{ ligne_id: fullyReceivedDetails.body.lignes[0].id, quantite: 1 }] });
+  assert.equal(fullReceipt.status, 201, fullReceipt.text);
+  assert.equal(fullReceipt.body.statut, 'recue');
+  const fullCancel = await request(app).post('/api/pro/purchase-orders/' + fullyReceivedOrder.body.id + '/cancel')
+    .set('Authorization', 'Bearer ' + tokenA).send({});
+  assert.equal(fullCancel.status, 409, fullCancel.text);
+});
 test('automatisations : créer, lister, désactiver et supprimer les règles autorisées', async () => {
   const rules = [
     { type: 'relance_impayes_email', nom: 'Relance impayés test', configuration: { jours_retard: 10, frequence_jours: 5 } },
