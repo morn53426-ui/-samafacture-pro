@@ -44,7 +44,17 @@ function makeLong(prefix, length) {
   const filler = ' — Départements et services régionaux de gestion commerciale';
   let value = prefix;
   while (value.length < length) value += filler;
-  return value.slice(0, length);
+  const sample = value.slice(0, length);
+  // Garder des chaînes longues sans couper un mot au milieu : les fixtures doivent
+  // éprouver les retours à la ligne, pas donner l'impression que le PDF tronque le texte.
+  if (value.length > length && /[\\p{L}\\p{M}]$/u.test(sample) &&
+      /[\\p{L}\\p{M}]/u.test(value[length])) {
+    return sample
+      .replace(/[\\p{L}\\p{M}'’\\-]+$/u, '')
+      .replace(/\\s+[—–-]$/u, '')
+      .trimEnd();
+  }
+  return sample;
 }
 
 function makeFixtures() {
