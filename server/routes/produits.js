@@ -187,6 +187,20 @@ router.put('/:id', async (req, res, next) => {
           await conn.rollback();
           return res.status(409).json({ error: 'Impossible de convertir cet article en service tant qu’il reste une quantité en stock. Ajustez d’abord les stocks dans Achats & stocks.' });
         }
+
+        const [[pendingPurchase]] = await conn.query(
+          `SELECT COALESCE(SUM(GREATEST(l.quantite - l.quantite_recue, 0)), 0) AS total
+           FROM pro_commandes_fournisseurs_lignes l
+           JOIN pro_commandes_fournisseurs o
+             ON o.id = l.commande_id AND o.user_id = l.user_id
+           WHERE l.user_id = ? AND l.produit_id = ?
+             AND o.statut NOT IN ('annulee', 'recue')`,
+          [req.tenantId, existing.id]
+        );
+        if (Number(pendingPurchase?.total || 0) > 0) {
+          await conn.rollback();
+          return res.status(409).json({ error: 'Impossible de convertir cet article en service tant qu’une commande fournisseur reste à réceptionner.' });
+        }
       }
     } else {
       const [warehouseRows] = await conn.query(
