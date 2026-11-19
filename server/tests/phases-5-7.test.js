@@ -450,6 +450,104 @@ test('les ajustements et transferts de stock restent atomiques, isolés et sans 
   const storedProduct = productList.body.produits.find(item => Number(item.id) === productId);
   assert.equal(Number(storedProduct.stock), 7, 'le stock global du produit doit rester égal à la somme des entrepôts');
 });
+test('une facture débite et restitue le stock dans son entrepôt de vente', async () => {
+  const product = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Produit vente entrepôt secondaire', prix_ht: 1200, prix_achat: 700, stock: 10 });
+  assert.equal(product.status, 201, product.text);
+  const productId = Number(product.body.produit.id);
+
+  const warehousesResponse = await request(app).get('/api/pro/warehouses')
+    .set('Authorization', 'Bearer ' + tokenA);
+  assert.equal(warehousesResponse.status, 200, warehousesResponse.text);
+  const mainWarehouse = warehousesResponse.body.entrepots.find(w => Number(w.par_defaut) === 1);
+  assert.ok(mainWarehouse);
+  const secondaryResponse = await request(app).post('/api/pro/warehouses')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ code: 'INVOICE-SECONDARY', nom: 'Dépôt vente secondaire' });
+  assert.equal(secondaryResponse.status, 201, secondaryResponse.text);
+  const secondaryWarehouseId = Number(secondaryResponse.body.id);
+
+  const foreignWarehouses = await request(app).get('/api/pro/warehouses')
+    .set('Authorization', 'Bearer ' + tokenB);
+  const foreignWarehouse = foreignWarehouses.body.entrepots.find(w => Number(w.par_defaut) === 1);
+  assert.ok(foreignWarehouse);
+
+  const stockByWarehouse = async () => {
+    const [rows] = await pool.query(
+      'SELECT entrepot_id, quantite FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?',
+      [userA, productId]
+    );
+    return Object.fromEntries(rows.map(row => [Number(row.entrepot_id), Number(row.quantite)]));
+  };
+  let stock = await stockByWarehouse();
+  assert.equal(stock[Number(mainWarehouse.id)], 10, 'le stock initial est migré au magasin principal');
+
+  const moved = await request(app).post('/api/pro/inventory/transfers')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ produit_id: productId, entrepot_source_id: mainWarehouse.id, entrepot_destination_id: secondaryWarehouseId, quantite: 6 });
+  assert.equal(moved.status, 200, moved.text);
+  stock = await stockByWarehouse();
+  assert.equal(stock[Number(mainWarehouse.id)], 4);
+  assert.equal(stock[secondaryWarehouseId], 6);
+
+  const foreignInvoice = await request(app).post('/api/factures')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ client_id: clientA, type: 'facture', entrepot_id: foreignWarehouse.id,
+      lignes: [{ designation: 'Vente refusée', produit_id: productId, quantite: 1, prix_unitaire: 1200, tva: 18 }] });
+  assert.equal(foreignInvoice.status, 400, foreignInvoice.text);
+  stock = await stockByWarehouse();
+  assert.equal(stock[Number(mainWarehouse.id)], 4);
+  assert.equal(stock[secondaryWarehouseId], 6);
+
+  const invoice = await request(app).post('/api/factures')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ client_id: clientA, type: 'facture', entrepot_id: secondaryWarehouseId,
+      lignes: [{ designation: 'Vente dépôt secondaire', produit_id: productId, quantite: 2, prix_unitaire: 1200, tva: 18 }] });
+  assert.equal(invoice.status, 201, invoice.text);
+  const invoiceId = Number(invoice.body.facture.id);
+  assert.equal(Number(invoice.body.facture.entrepot_id), secondaryWarehouseId);
+  stock = await stockByWarehouse();
+  assert.equal(stock[Number(mainWarehouse.id)], 4, 'la vente ne doit pas débiter le magasin principal');
+  assert.equal(stock[secondaryWarehouseId], 4, 'la vente débite le dépôt sélectionné');
+
+  let [movements] = await pool.query(
+    "SELECT entrepot_id, type, quantite FROM pro_mouvements_stock WHERE user_id = ? AND produit_id = ? AND type = 'vente' ORDER BY id DESC LIMIT 1",
+    [userA, productId]
+  );
+  assert.equal(Number(movements[0].entrepot_id), secondaryWarehouseId);
+  assert.equal(Number(movements[0].quantite), -2);
+
+  const cancelled = await request(app).put('/api/factures/' + invoiceId + '/statut')
+    .set('Authorization', 'Bearer ' + tokenA).send({ statut: 'annulee' });
+  assert.equal(cancelled.status, 200, cancelled.text);
+  stock = await stockByWarehouse();
+  assert.equal(stock[Number(mainWarehouse.id)], 4);
+  assert.equal(stock[secondaryWarehouseId], 6, 'l’annulation restitue dans le dépôt d’origine');
+
+  const reactivated = await request(app).put('/api/factures/' + invoiceId + '/statut')
+    .set('Authorization', 'Bearer ' + tokenA).send({ statut: 'en_attente' });
+  assert.equal(reactivated.status, 200, reactivated.text);
+  stock = await stockByWarehouse();
+  assert.equal(stock[secondaryWarehouseId], 4, 'la réactivation redébite le même dépôt');
+
+  const deleted = await request(app).delete('/api/factures/' + invoiceId)
+    .set('Authorization', 'Bearer ' + tokenA);
+  assert.equal(deleted.status, 200, deleted.text);
+  stock = await stockByWarehouse();
+  assert.equal(stock[Number(mainWarehouse.id)], 4);
+  assert.equal(stock[secondaryWarehouseId], 6, 'la suppression restitue dans le dépôt d’origine');
+
+  const quoteBefore = Object.values(stock).reduce((sum, value) => sum + value, 0);
+  const quote = await request(app).post('/api/factures')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ client_id: clientA, type: 'devis', entrepot_id: secondaryWarehouseId,
+      lignes: [{ designation: 'Devis sans sortie', produit_id: productId, quantite: 3, prix_unitaire: 1200, tva: 18 }] });
+  assert.equal(quote.status, 201, quote.text);
+  stock = await stockByWarehouse();
+  assert.equal(Object.values(stock).reduce((sum, value) => sum + value, 0), quoteBefore, 'un devis ne débite aucun entrepôt');
+  assert.equal(quote.body.facture.entrepot_id, null);
+});
 test('associer une ligne d’achat saisie libre à un produit permet sa réception sans réaffecter le stock après coup', async () => {
   const product = await request(app).post('/api/produits')
     .set('Authorization', 'Bearer ' + tokenA)
