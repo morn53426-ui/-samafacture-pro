@@ -93,12 +93,30 @@
 
   const OBJECTIF_STORAGE_KEY = 'samafacture_objectif_mensuel';
 
+  function financeLocalDateParts() {
+    const user = Api.currentUser() || {};
+    const timezone = user.fuseau_horaire || 'Africa/Dakar';
+    let parts;
+    try {
+      parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(new Date());
+    } catch (error) {
+      parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Africa/Dakar', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(new Date());
+    }
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return { year: Number(values.year), month: Number(values.month), day: Number(values.day) };
+  }
+
   async function loadFinances() {
     // Réutilise les deux endpoints existants : /dashboard (trésorerie, évolution des ventes)
     // et /rapports/comptabilite (bénéfice net calculé sur le mois en cours).
-    const now = new Date();
-    const debutMois = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const dateDuJour = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const today = financeLocalDateParts();
+    const now = new Date(today.year, today.month - 1, today.day);
+    const debutMois = today.year + '-' + String(today.month).padStart(2, '0') + '-01';
+    const dateDuJour = today.year + '-' + String(today.month).padStart(2, '0') + '-' + String(today.day).padStart(2, '0');
 
     const [dash, compta] = await Promise.all([
       Api.get('/dashboard'),
