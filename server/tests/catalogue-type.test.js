@@ -56,7 +56,7 @@ describe('Catalogue — distinction produit/service', () => {
   });
 
   test('une commande fournisseur ouverte bloque la conversion et les écritures catalogue sont sérialisées', () => {
-    assert.match(route, /pro_commandes_fournisseurs_lignes l[\s\S]*?JOIN pro_commandes_fournisseurs o[\s\S]*?l\.quantite_recue[\s\S]*?o\.statut NOT IN \('annulee', 'recue'\)/);
+    assert.match(route, /SELECT COALESCE\(SUM\(GREATEST\(l\.quantite - l\.quantite_recue, 0\)\), 0\) AS total[\s\S]*?FROM pro_commandes_fournisseurs_lignes l[\s\S]*?JOIN pro_commandes_fournisseurs o[\s\S]*?o\.statut NOT IN \('annulee', 'recue'\)/);
     assert.match(route, /commande fournisseur reste à réceptionner/);
     const purchaseOrderRoute = professional.slice(
       professional.indexOf("router.post('/purchase-orders'"),
