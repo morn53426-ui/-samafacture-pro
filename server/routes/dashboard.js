@@ -96,6 +96,8 @@ async function buildDashboard(userId) {
     factures_payees: { n: Number(summary?.payees_n || 0), total: Number(summary?.payees_total || 0) },
     factures_en_attente: { n: Number(summary?.attente_n || 0), total: Number(summary?.attente_total || 0) },
     factures_en_retard: { n: Number(summary?.retard_n || 0), total: Number(summary?.retard_total || 0) },
+    // Champ historique conservé pour compatibilité : écart cumulé paiements enregistrés - dépenses,
+    // pas un solde bancaire (les remboursements et autres mouvements ne sont pas modélisés).
     tresorerie: Number(summary?.chiffre_affaires || 0) - Number(summary?.total_depenses || 0)
   };
 
@@ -140,9 +142,11 @@ async function buildDashboard(userId) {
     pool.query(`SELECT * FROM clients WHERE user_id = ? ORDER BY created_at DESC LIMIT 5`, [userId]),
     pool.query(
       `SELECT DATE_FORMAT(date_emission, '%Y-%m') as mois, COALESCE(SUM(total),0) as total
-       FROM factures WHERE user_id = ? AND type = 'facture' AND date_emission >= DATE_SUB(?, INTERVAL 6 MONTH)
+       FROM factures
+       WHERE user_id = ? AND type = 'facture' AND statut <> 'annulee'
+         AND date_emission >= DATE_SUB(?, INTERVAL 5 MONTH) AND date_emission <= ?
        GROUP BY mois ORDER BY mois`,
-      [userId, localToday]
+      [userId, localToday, localToday]
     ),
     pool.query(
       `SELECT c.id, c.nom, COUNT(f.id) as nb_factures, COALESCE(SUM(f.total),0) as total
@@ -207,7 +211,7 @@ async function buildDashboard(userId) {
  * @openapi
  * /dashboard:
  *   get:
- *     summary: Statistiques du tableau de bord (trésorerie, factures en retard, évolution mensuelle des ventes...)
+ *     summary: Indicateurs de paiements enregistrés, factures, ventes facturées et stock
  *     tags: [Tableau de bord]
  *     responses:
  *       200:
