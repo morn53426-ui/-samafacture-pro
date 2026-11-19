@@ -286,13 +286,14 @@ async function appliquerAjustementsStock(conn, userId, ajustements, requestedWar
   );
   if (!mainWarehouse) throw new Error('Entrepôt principal introuvable.');
 
-  const [warehouseRows] = requestedWarehouseId
-    ? await conn.query(
-        'SELECT id, nom FROM pro_entrepots WHERE id = ? AND user_id = ? LIMIT 1',
-        [requestedWarehouseId, userId]
-      )
-    : [[mainWarehouse]];
-  const warehouse = warehouseRows[0];
+  let warehouse = mainWarehouse;
+  if (requestedWarehouseId) {
+    const [warehouseRows] = await conn.query(
+      'SELECT id, nom FROM pro_entrepots WHERE id = ? AND user_id = ? LIMIT 1',
+      [requestedWarehouseId, userId]
+    );
+    warehouse = warehouseRows[0];
+  }
   if (!warehouse) throw new Error('Entrepôt associé à la facture introuvable.');
 
   await conn.query(
