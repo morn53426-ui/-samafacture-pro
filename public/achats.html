@@ -201,7 +201,7 @@ $('purchase-orders').addEventListener('click',async event=>{
   try{
     const result=await Api.post('/pro/purchase-orders/'+id+'/cancel',{});
     if(activeReceipt&&Number(activeReceipt.commande.id)===id){
-      activeReceipt=null;$('receipt-lines').innerHTML='';$('submit-receipt').hidden=true;
+      activeReceipt=null;$('receipt-lines').innerHTML='';$('submit-receipt').hidden=true;$('submit-receipt').disabled=false;
     }
     showToast('Commande '+numero+' annulée. '+Number(result.quantite_recue_conservee||0)+' unité(s) reçue(s) conservée(s), '+Number(result.quantite_restante_annulee||0)+' unité(s) restantes abandonnées.','success');
     await loadAll();
@@ -217,21 +217,29 @@ $('purchase-form').addEventListener('submit',async e=>{
 $('warehouse-form').addEventListener('submit',async e=>{
   e.preventDefault();try{await Api.post('/pro/warehouses',{code:$('warehouse-code').value,nom:$('warehouse-name').value,adresse:$('warehouse-address').value});e.target.reset();await loadAll();showToast('Entrepôt créé.','success');}catch(err){showToast(err.message,'error');}
 });
+function createReceiptOperationId(){
+  const bytes=new Uint8Array(16);
+  if(window.crypto&&typeof window.crypto.getRandomValues==='function')window.crypto.getRandomValues(bytes);
+  else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256);
+  return Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+
 $('load-receipt-lines').addEventListener('click',async()=>{
   const id=$('receipt-order').value;if(!id){showToast('Choisissez une commande.','error');return;}
   try{
-    const data=await Api.get('/pro/purchase-orders/'+id);activeReceipt=data;
+    const data=await Api.get('/pro/purchase-orders/'+id);activeReceipt={...data,operationId:createReceiptOperationId(),submitting:false};
     const lines=data.lignes||[];
     $('receipt-lines').innerHTML='<div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:650px"><thead><tr><th>Produit / Désignation</th><th>Commandé</th><th>Déjà reçu</th><th>Reste</th><th>À réceptionner</th></tr></thead><tbody>'+lines.map(l=>'<tr data-line="'+l.id+'"><td>'+escapeHtml(l.designation)+(l.produit_id?'':' <span class="pro-note">— associez un produit avant réception</span>')+'</td><td>'+Number(l.quantite)+'</td><td>'+Number(l.quantite_recue)+'</td><td>'+Math.max(0,Number(l.quantite)-Number(l.quantite_recue))+'</td><td><input class="receive-qty" type="number" min="0" max="'+Math.max(0,Number(l.quantite)-Number(l.quantite_recue))+'" step="0.001" value="0" '+(l.produit_id?'':'disabled')+'></td></tr>').join('')+'</tbody></table></div>';
     $('submit-receipt').hidden=false;
   }catch(err){showToast(err.message,'error');}
 });
 $('submit-receipt').addEventListener('click',async()=>{
-  if(!activeReceipt)return;
+  if(!activeReceipt||activeReceipt.submitting)return;
   const lignes=[...$('receipt-lines').querySelectorAll('tr[data-line]')].map(row=>({ligne_id:Number(row.dataset.line),quantite:Number(row.querySelector('.receive-qty').value)})).filter(l=>l.quantite>0);
   if(!lignes.length){showToast('Saisissez au moins une quantité à réceptionner.','error');return;}
-  try{const r=await Api.post('/pro/purchase-orders/'+activeReceipt.commande.id+'/receive',{entrepot_id:Number($('receipt-warehouse').value),date_reception:$('receipt-date').value||undefined,lignes});showToast('Réception '+r.reference+' enregistrée.','success');activeReceipt=null;$('receipt-lines').innerHTML='';$('submit-receipt').hidden=true;await loadAll();}
-  catch(err){showToast(err.message,'error');}
+  activeReceipt.submitting=true;$('submit-receipt').disabled=true;
+  try{const r=await Api.post('/pro/purchase-orders/'+activeReceipt.commande.id+'/receive',{operation_id:activeReceipt.operationId,entrepot_id:Number($('receipt-warehouse').value),date_reception:$('receipt-date').value||undefined,lignes});showToast('Réception '+r.reference+(r.repeated?' déjà enregistrée.':' enregistrée.'),'success');activeReceipt=null;$('receipt-lines').innerHTML='';$('submit-receipt').hidden=true;$('submit-receipt').disabled=false;await loadAll();}
+  catch(err){if(activeReceipt)activeReceipt.submitting=false;$('submit-receipt').disabled=false;showToast(err.message,'error');}
 });
 $('adjustment-form').addEventListener('submit',async e=>{
   e.preventDefault();try{await Api.post('/pro/inventory/adjustments',{produit_id:Number($('adjust-product').value),entrepot_id:Number($('adjust-warehouse').value),quantite:Number($('adjust-qty').value),motif:$('adjust-reason').value});e.target.reset();await loadAll();showToast('Ajustement enregistré.','success');}catch(err){showToast(err.message,'error');}
