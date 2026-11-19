@@ -49,7 +49,7 @@
     <div class="grid grid-4 reports-kpi-grid" style="margin-bottom:18px;">
       <div class="card stat-card reports-kpi-blue">
         <div class="stat-icon icon-emerald"><i class="ic" data-icon="banknote"></i></div>
-        <div class="stat-label">Recettes</div>
+        <div class="stat-label">Paiements enregistrés</div>
         <div class="stat-value mono" id="rec-recettes">0</div>
       </div>
       <div class="card stat-card reports-kpi-green">
@@ -59,15 +59,16 @@
       </div>
       <div class="card stat-card reports-kpi-purple">
         <div class="stat-icon icon-navy"><i class="ic" data-icon="trending-up"></i></div>
-        <div class="stat-label">Bénéfice net</div>
+        <div class="stat-label">Écart paiements - dépenses</div>
         <div class="stat-value mono" id="rec-benefice">0</div>
       </div>
       <div class="card stat-card reports-kpi-amber">
         <div class="stat-icon icon-gold"><i class="ic" data-icon="receipt"></i></div>
-        <div class="stat-label">TVA collectée</div>
+        <div class="stat-label">TVA inscrite sur factures</div>
         <div class="stat-value mono" id="rec-tva">0</div>
       </div>
     </div>
+    <p class="reports-accounting-note" role="note">Les paiements sont rattachés à la date d’émission des factures. La TVA reprend le total inscrit sur les factures, y compris celles marquées annulées ; les remboursements ne sont pas déduits automatiquement.</p>
 
     <div class="card" style="margin-bottom:18px;">
       <h3 id="chart-title">Ventes par mois</h3>

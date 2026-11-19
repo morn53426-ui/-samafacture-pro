@@ -21,8 +21,43 @@ function publicFile(relativePath) {
   return absolute;
 }
 
+function pngCrc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function assertPngIntegrity(png, label) {
+  let offset = 8;
+  let hasIend = false;
+
+  while (offset < png.length) {
+    assert.ok(offset + 12 <= png.length, label + ' contient un en-tête de bloc tronqué.');
+    const length = png.readUInt32BE(offset);
+    const end = offset + 12 + length;
+    assert.ok(end <= png.length, label + ' contient un bloc tronqué.');
+    const type = png.toString('ascii', offset + 4, offset + 8);
+    const expectedCrc = png.readUInt32BE(offset + 8 + length);
+    const actualCrc = pngCrc32(png.subarray(offset + 4, offset + 8 + length));
+    assert.equal(actualCrc, expectedCrc, label + ' possède un CRC invalide dans le bloc ' + type + '.');
+    offset = end;
+    if (type === 'IEND') {
+      hasIend = true;
+      break;
+    }
+  }
+
+  assert.ok(hasIend, label + ' doit se terminer par un bloc IEND.');
+  assert.equal(offset, png.length, label + ' ne doit contenir aucune donnée après IEND.');
+}
+
 function loadServiceWorker({
-  cacheNames = ['old-cache', 'sunupilot-shell-v5'],
+  cacheNames = ['old-cache', 'sunupilot-shell-v9'],
   onAddAll = async () => {},
   onDelete = async () => true,
   onSkipWaiting = async () => {},
@@ -98,6 +133,7 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
 
       if (icon.type === 'image/png') {
         const png = fs.readFileSync(filePath);
+        assertPngIntegrity(png, icon.src);
         assert.deepEqual(
           [...png.subarray(0, 8)],
           [137, 80, 78, 71, 13, 10, 26, 10],
@@ -146,6 +182,7 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
 
     for (const required of [
       '/css/style.css',
+      '/css/workspace-polish.css',
       '/js/api.js',
       '/js/sidebar.js',
       '/js/pwa.js',
@@ -190,7 +227,7 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
     await installPromise;
 
     assert.deepEqual(harness.events, [
-      'caches.open:sunupilot-shell-v5',
+      'caches.open:sunupilot-shell-v9',
       'cache.addAll',
       'skipWaiting'
     ]);
@@ -215,7 +252,7 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
     const deletedCaches = [];
     let claimCompleted = false;
     const harness = loadServiceWorker({
-      cacheNames: ['old-cache', 'sunupilot-shell-v4', 'sunupilot-shell-v5'],
+      cacheNames: ['old-cache', 'sunupilot-shell-v4', 'sunupilot-shell-v5', 'sunupilot-shell-v6', 'sunupilot-shell-v8', 'sunupilot-shell-v9'],
       onDelete: async (name) => {
         deletedCaches.push(name);
         await Promise.resolve();
@@ -230,7 +267,7 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
 
     await activatePromise;
 
-    assert.deepEqual(deletedCaches, ['old-cache', 'sunupilot-shell-v4']);
+    assert.deepEqual(deletedCaches, ['old-cache', 'sunupilot-shell-v4', 'sunupilot-shell-v5', 'sunupilot-shell-v6', 'sunupilot-shell-v8']);
     assert.equal(claimCompleted, true);
   });
 

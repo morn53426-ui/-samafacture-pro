@@ -164,7 +164,7 @@ async function loadAll(){
     Api.get('/pro/purchase-orders'),Api.get('/pro/inventory/stock'),
     Api.get('/pro/inventory/movements'),Api.get('/pro/inventory/valuation')
   ]);
-  suppliers=results[0].fournisseurs||[];products=results[1].produits||[];warehouses=results[2].entrepots||[];
+  suppliers=results[0].fournisseurs||[];products=(results[1].produits||[]).filter(p=>p.type_catalogue !== 'service');warehouses=results[2].entrepots||[];
   const orders=results[3].commandes||[],stocks=results[4].stocks||[],moves=results[5].mouvements||[],valuation=results[6].valorisation||[];
   $('kpi-suppliers').textContent=suppliers.filter(s=>s.actif).length;
   $('kpi-open-orders').textContent=orders.filter(o=>!['recue','annulee'].includes(o.statut)).length;
@@ -175,7 +175,11 @@ async function loadAll(){
   ['receipt-warehouse','adjust-warehouse','transfer-from','transfer-to'].forEach(id=>$(id).innerHTML=wh);
   ['adjust-product','transfer-product'].forEach(id=>$(id).innerHTML=products.map(p=>opt(p.id,p.nom)).join(''));
   $('receipt-order').innerHTML='<option value="">Sélectionner une commande</option>'+orders.filter(o=>!['recue','annulee'].includes(o.statut)).map(o=>opt(o.id,o.numero+' · '+o.fournisseur_nom+' · '+o.statut)).join('');
-  $('purchase-orders').innerHTML='<h3>Commandes récentes</h3>'+orders.map(o=>'<div class="pro-list-row"><div><strong>'+escapeHtml(o.numero)+'</strong><small>'+escapeHtml(o.fournisseur_nom)+' · '+escapeHtml(o.date_commande)+' · '+fmt(o.total_ttc)+'</small></div><span>'+escapeHtml(o.statut)+'</span></div>').join('')||'<p class="pro-muted">Aucune commande fournisseur.</p>';
+    $('purchase-orders').innerHTML='<h3>Commandes récentes</h3>'+(orders.length?orders.map(o=>{
+    const cancellable=!['recue','annulee'].includes(o.statut);
+    const cancelButton=cancellable?'<button type="button" class="btn btn-outline btn-sm" data-cancel-purchase-order="'+Number(o.id)+'" data-order-number="'+escapeHtml(o.numero)+'" aria-label="Annuler la commande fournisseur '+escapeHtml(o.numero)+'">Annuler</button>':'';
+    return '<div class="pro-list-row"><div><strong>'+escapeHtml(o.numero)+'</strong><small>'+escapeHtml(o.fournisseur_nom)+' · '+escapeHtml(o.date_commande)+' · '+fmt(o.total_ttc)+'</small></div><span>'+escapeHtml(o.statut)+'</span>'+cancelButton+'</div>';
+  }).join(''):'<p class="pro-muted">Aucune commande fournisseur.</p>');
   $('warehouses-list').innerHTML=warehouses.map(w=>'<div class="pro-list-row"><strong>'+escapeHtml(w.code+' · '+w.nom)+'</strong><span>'+(w.par_defaut?'Principal':'Entrepôt')+'</span></div>').join('');
   $('stock-list').innerHTML=stocks.map(s=>{const v=valuation.find(x=>Number(x.id)===Number(s.produit_id));return '<tr><td>'+escapeHtml(s.nom)+'</td><td>'+escapeHtml(s.reference||'—')+'</td><td>'+Number(s.nb_entrepots||0)+'</td><td>'+Number(s.quantite||0)+'</td><td>'+fmt(s.prix_achat)+'</td><td>'+fmt(v?.valeur||0)+'</td></tr>';}).join('')||'<tr><td colspan="6">Aucun produit.</td></tr>';
   $('movement-list').innerHTML=moves.map(m=>'<tr><td>'+escapeHtml(String(m.created_at||'').slice(0,16))+'</td><td>'+escapeHtml(m.produit_nom)+'</td><td>'+escapeHtml(m.entrepot_nom)+'</td><td>'+escapeHtml(m.type)+'</td><td>'+Number(m.quantite)+'</td><td>'+escapeHtml(m.motif||m.reference||'')+'</td></tr>').join('')||'<tr><td colspan="6">Aucun mouvement enregistré.</td></tr>';
@@ -185,6 +189,23 @@ $('supplier-form').addEventListener('submit',async e=>{
   e.preventDefault();
   try{await Api.post('/pro/suppliers',{nom:$('supplier-name').value,email:$('supplier-email').value,telephone:$('supplier-phone').value,adresse:$('supplier-address').value,ninea:$('supplier-ninea').value,notes:$('supplier-notes').value});e.target.reset();await loadAll();showToast('Fournisseur ajouté.','success');}
   catch(err){showToast(err.message,'error');}
+});
+$('purchase-orders').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-cancel-purchase-order]');
+  if(!button)return;
+  const id=Number(button.dataset.cancelPurchaseOrder);
+  if(!Number.isSafeInteger(id)||id<=0){showToast('Commande invalide.','error');return;}
+  const numero=button.dataset.orderNumber||String(id);
+  const confirmed=window.confirm('Annuler la commande '+numero+' ? Les quantités déjà réceptionnées resteront en stock. Le reliquat ne pourra plus être réceptionné.');
+  if(!confirmed)return;
+  try{
+    const result=await Api.post('/pro/purchase-orders/'+id+'/cancel',{});
+    if(activeReceipt&&Number(activeReceipt.commande.id)===id){
+      activeReceipt=null;$('receipt-lines').innerHTML='';$('submit-receipt').hidden=true;$('submit-receipt').disabled=false;
+    }
+    showToast('Commande '+numero+' annulée. '+Number(result.quantite_recue_conservee||0)+' unité(s) reçue(s) conservée(s), '+Number(result.quantite_restante_annulee||0)+' unité(s) restantes abandonnées.','success');
+    await loadAll();
+  }catch(err){showToast(err.message,'error');}
 });
 $('add-purchase-line').addEventListener('click',()=>addPurchaseLine());
 $('purchase-form').addEventListener('submit',async e=>{
@@ -196,21 +217,56 @@ $('purchase-form').addEventListener('submit',async e=>{
 $('warehouse-form').addEventListener('submit',async e=>{
   e.preventDefault();try{await Api.post('/pro/warehouses',{code:$('warehouse-code').value,nom:$('warehouse-name').value,adresse:$('warehouse-address').value});e.target.reset();await loadAll();showToast('Entrepôt créé.','success');}catch(err){showToast(err.message,'error');}
 });
+function createReceiptOperationId(){
+  const bytes=new Uint8Array(16);
+  if(window.crypto&&typeof window.crypto.getRandomValues==='function')window.crypto.getRandomValues(bytes);
+  else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256);
+  return Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+
+function renderReceiptLines(){
+  if(!activeReceipt)return;
+  const lines=activeReceipt.lignes||[];
+  $('receipt-lines').innerHTML='<div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:760px"><thead><tr><th>Produit / Désignation</th><th>Commandé</th><th>Déjà reçu</th><th>Reste</th><th>À réceptionner</th></tr></thead><tbody>'+lines.map(l=>{
+    const remaining=Math.max(0,Number(l.quantite)-Number(l.quantite_recue));
+    const canAssociate=!l.produit_id&&Number(l.quantite_recue)<=0;
+    const association=canAssociate?'<div class="receipt-product-association"><select class="receipt-product" aria-label="Produit catalogue pour '+escapeHtml(l.designation)+'"><option value="">Sélectionner un produit</option>'+products.map(p=>opt(p.id,p.nom+' · '+(p.reference||'sans réf.'))).join('')+'</select><button type="button" class="btn btn-outline btn-sm" data-associate-purchase-line="'+Number(l.id)+'" aria-label="Associer un produit à '+escapeHtml(l.designation)+'">Associer</button></div>':(!l.produit_id?'<span class="pro-note">Produit non associé ; ligne déjà réceptionnée, association verrouillée.</span>':'');
+    return '<tr data-line="'+Number(l.id)+'"><td><div>'+escapeHtml(l.designation)+association+'</div></td><td>'+Number(l.quantite)+'</td><td>'+Number(l.quantite_recue)+'</td><td>'+remaining+'</td><td><input class="receive-qty" type="number" min="0" max="'+remaining+'" step="0.001" value="0" '+(l.produit_id&&remaining>0?'':'disabled')+'></td></tr>';
+  }).join('')+'</tbody></table></div>';
+  $('submit-receipt').hidden=!lines.some(line=>Number(line.produit_id)>0&&Number(line.quantite)-Number(line.quantite_recue)>0);
+}
+
 $('load-receipt-lines').addEventListener('click',async()=>{
   const id=$('receipt-order').value;if(!id){showToast('Choisissez une commande.','error');return;}
   try{
-    const data=await Api.get('/pro/purchase-orders/'+id);activeReceipt=data;
-    const lines=data.lignes||[];
-    $('receipt-lines').innerHTML='<div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:650px"><thead><tr><th>Produit / Désignation</th><th>Commandé</th><th>Déjà reçu</th><th>Reste</th><th>À réceptionner</th></tr></thead><tbody>'+lines.map(l=>'<tr data-line="'+l.id+'"><td>'+escapeHtml(l.designation)+(l.produit_id?'':' <span class="pro-note">— associez un produit avant réception</span>')+'</td><td>'+Number(l.quantite)+'</td><td>'+Number(l.quantite_recue)+'</td><td>'+Math.max(0,Number(l.quantite)-Number(l.quantite_recue))+'</td><td><input class="receive-qty" type="number" min="0" max="'+Math.max(0,Number(l.quantite)-Number(l.quantite_recue))+'" step="0.001" value="0" '+(l.produit_id?'':'disabled')+'></td></tr>').join('')+'</tbody></table></div>';
-    $('submit-receipt').hidden=false;
+    const data=await Api.get('/pro/purchase-orders/'+id);activeReceipt={...data,operationId:createReceiptOperationId(),submitting:false};
+    renderReceiptLines();
   }catch(err){showToast(err.message,'error');}
 });
+$('receipt-lines').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-associate-purchase-line]');
+  if(!button||!activeReceipt||activeReceipt.submitting)return;
+  const row=button.closest('tr[data-line]');
+  const productId=Number(row?.querySelector('.receipt-product')?.value);
+  const lineId=Number(button.dataset.associatePurchaseLine);
+  if(!Number.isSafeInteger(productId)||productId<=0){showToast('Sélectionnez un produit du catalogue.','error');return;}
+  const orderId=Number(activeReceipt.commande.id);
+  button.disabled=true;
+  try{
+    await Api.put('/pro/purchase-orders/'+orderId+'/lines/'+lineId+'/product',{produit_id:productId});
+    const data=await Api.get('/pro/purchase-orders/'+orderId);
+    activeReceipt={...data,operationId:activeReceipt.operationId,submitting:false};
+    renderReceiptLines();
+    showToast('Produit associé à la ligne.','success');
+  }catch(err){button.disabled=false;showToast(err.message,'error');}
+});
 $('submit-receipt').addEventListener('click',async()=>{
-  if(!activeReceipt)return;
+  if(!activeReceipt||activeReceipt.submitting)return;
   const lignes=[...$('receipt-lines').querySelectorAll('tr[data-line]')].map(row=>({ligne_id:Number(row.dataset.line),quantite:Number(row.querySelector('.receive-qty').value)})).filter(l=>l.quantite>0);
   if(!lignes.length){showToast('Saisissez au moins une quantité à réceptionner.','error');return;}
-  try{const r=await Api.post('/pro/purchase-orders/'+activeReceipt.commande.id+'/receive',{entrepot_id:Number($('receipt-warehouse').value),date_reception:$('receipt-date').value||undefined,lignes});showToast('Réception '+r.reference+' enregistrée.','success');activeReceipt=null;$('receipt-lines').innerHTML='';$('submit-receipt').hidden=true;await loadAll();}
-  catch(err){showToast(err.message,'error');}
+  activeReceipt.submitting=true;$('submit-receipt').disabled=true;
+  try{const r=await Api.post('/pro/purchase-orders/'+activeReceipt.commande.id+'/receive',{operation_id:activeReceipt.operationId,entrepot_id:Number($('receipt-warehouse').value),date_reception:$('receipt-date').value||undefined,lignes});showToast('Réception '+r.reference+(r.repeated?' déjà enregistrée.':' enregistrée.'),'success');activeReceipt=null;$('receipt-lines').innerHTML='';$('submit-receipt').hidden=true;$('submit-receipt').disabled=false;await loadAll();}
+  catch(err){if(activeReceipt)activeReceipt.submitting=false;$('submit-receipt').disabled=false;showToast(err.message,'error');}
 });
 $('adjustment-form').addEventListener('submit',async e=>{
   e.preventDefault();try{await Api.post('/pro/inventory/adjustments',{produit_id:Number($('adjust-product').value),entrepot_id:Number($('adjust-warehouse').value),quantite:Number($('adjust-qty').value),motif:$('adjust-reason').value});e.target.reset();await loadAll();showToast('Ajustement enregistré.','success');}catch(err){showToast(err.message,'error');}

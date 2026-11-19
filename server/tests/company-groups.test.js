@@ -99,9 +99,9 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v15 sans perdre les données existantes', async () => {
+test('une base v8 reçoit les migrations v9 à v16 sans perdre les données existantes', async () => {
   // Simule strictement l'état de main : schéma v8 sans colonne/index v9-v10,
-  // ni tables multi-sociétés v11, outbox v12, preuves v13-v14 et abonnements v15.
+  // ni tables multi-sociétés v11, outbox v12, preuves v13-v14 et abonnements v15 ; la colonne catalogue non classée v16.
   await pool.query('DROP TABLE IF EXISTS email_outbox');
   await pool.query('DROP TABLE IF EXISTS pro_team_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitation_verifications');
@@ -143,10 +143,10 @@ test('une base v8 reçoit les migrations v9 à v15 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v15 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v16 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 15, 'la version doit suivre la séquence v8 → v9 → v10 → v11 → v12 → v13 → v14 → v15');
+  assert.equal(Number(meta.version), 16, 'la version doit inclure la migration catalogue v16 après les migrations v8 à v15');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -187,7 +187,7 @@ test('une base v8 reçoit les migrations v9 à v15 sans perdre les données exis
       'saas_subscription_payment_attempts', 'saas_subscription_periods', 'saas_subscription_price_versions',
       'saas_subscription_webhook_events', 'saas_subscriptions'
     ].sort(),
-    'les tables v11-v15, dont les huit tables du moteur SaaS, doivent être créées'
+    'les tables v11-v15, dont les huit tables du moteur SaaS, doivent être créées avant la colonne catalogue v16'
   );
 });
 

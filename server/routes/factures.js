@@ -230,10 +230,29 @@ function remiseInputValue(value) {
  */
 async function appliquerAjustementsStock(conn, userId, ajustements) {
   if (!ajustements.length) return;
+
+  // Une ligne liée à un service peut figurer sur une facture, mais ne représente
+  // jamais un article physique. Revalider le type dans la transaction évite qu'une
+  // vente, une annulation ou une transformation de devis ne modifie son stock.
+  const requestedIds = [...new Set(ajustements
+    .map(({ produit_id }) => Number(produit_id))
+    .filter(id => Number.isSafeInteger(id) && id > 0)
+  )].sort((a, b) => a - b);
+  if (!requestedIds.length) return;
+
+  const [stockManagedRows] = await conn.query(
+    `SELECT id FROM produits
+     WHERE user_id = ? AND id IN (${requestedIds.map(() => '?').join(',')})
+       AND COALESCE(type_catalogue, 'non_classe') <> 'service'
+     ORDER BY id FOR UPDATE`,
+    [userId, ...requestedIds]
+  );
+  const stockManagedIds = new Set(stockManagedRows.map(row => Number(row.id)));
   const parProduit = new Map();
   for (const { produit_id, delta } of ajustements) {
-    if (!produit_id) continue;
-    parProduit.set(Number(produit_id), (parProduit.get(Number(produit_id)) || 0) + Number(delta));
+    const productId = Number(produit_id);
+    if (!stockManagedIds.has(productId)) continue;
+    parProduit.set(productId, (parProduit.get(productId) || 0) + Number(delta));
   }
   const ids = [...parProduit.keys()];
   if (!ids.length) return;

@@ -1,10 +1,11 @@
-// v5 : invalide le cache de l'ancienne identité visuelle et charge le nouveau kit de marque.
-const CACHE_NAME = 'sunupilot-shell-v5';
+// v9 : invalide le shell après les évolutions récentes des styles et de la navigation.
+const CACHE_NAME = 'sunupilot-shell-v9';
 
 // Fichiers statiques de l'interface (l'API n'est jamais mise en cache : les données doivent
 // toujours être à jour).
 const SHELL_FILES = [
   '/css/style.css',
+  '/css/workspace-polish.css',
   '/js/api.js',
   '/js/sidebar.js',
   '/js/auth-slider.js',

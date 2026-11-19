@@ -69,8 +69,14 @@ function renderSidebar(activePage) {
   // enregistrée. Le rail compact garde les libellés visibles sous les icônes sur ordinateur.
   const sidebarCollapsed = window.matchMedia('(min-width: 901px)').matches && (
     isEnterpriseConsole || (() => {
-      try { return localStorage.getItem('sf-sidebar-collapsed') !== 'false'; }
-      catch { return true; }
+      try {
+        const preference = localStorage.getItem('sf-sidebar-collapsed');
+        // Sur le tableau de bord, le menu complet est le défaut visuel ; une préférence
+        // enregistrée par l'utilisateur reste prioritaire sur toutes les pages.
+        return preference === null ? activePage !== 'dashboard' : preference !== 'false';
+      } catch {
+        return activePage !== 'dashboard';
+      }
     })()
   );
   // Évite de montrer le menu en position développée pendant son repli initial.
@@ -90,7 +96,7 @@ function renderSidebar(activePage) {
   const html = `
     <aside class="sidebar${sidebarCollapsed ? ' is-collapsed' : ''}" id="app-sidebar">
       <div class="sidebar-brand">
-        <div class="mark"><img src="images/icon-192.png" alt="Sunupilot" /></div>
+        <div class="mark"><img src="images/sunupilot-mark.svg" alt="Sunupilot" /></div>
         <div class="sidebar-brand-copy">
           <div class="name">SUNU<span class="brand-pro">PILOT</span></div>
           <div class="sub">Gestion commerciale</div>
@@ -199,7 +205,7 @@ function renderTopbar(title, subtitle) {
           ${Icon('menu')}
         </button>
         <a class="enterprise-console-brand" href="dashboard.html" aria-label="Sunupilot, tableau de bord">
-          <span class="enterprise-console-brand-mark"><img src="images/icon-192.png" alt="" /></span>
+          <span class="enterprise-console-brand-mark"><img src="images/sunupilot-mark.svg" alt="" /></span>
           <span><strong>SUNUPILOT</strong><small>Gestion d’entreprise</small></span>
         </a>
         <div class="enterprise-console-view">

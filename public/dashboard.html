@@ -25,13 +25,13 @@
       <div>
         <div class="workspace-page-kicker">Activité</div>
         <h1 id="dashboard-greeting">Tableau de bord</h1>
-        <p>Indicateurs et mouvements récents de votre activité.</p>
+        <p>Voici la synthèse de votre activité sur Sunupilot.</p>
       </div>
       <div class="dashboard-context"><i class="ic" data-icon="calendar"></i><span id="dashboard-period-label">Vue d'ensemble de votre activité</span></div>
     </section>
 
     <section class="dashboard-kpis" id="stats-grid" aria-label="Indicateurs clés">
-      <article class="dashboard-kpi blue card-skeleton"><div class="dashboard-kpi-label">Chiffre d'affaires</div><strong class="dashboard-kpi-value">···</strong></article>
+      <article class="dashboard-kpi blue card-skeleton"><div class="dashboard-kpi-label">Encaissements cumulés</div><strong class="dashboard-kpi-value">···</strong></article>
       <article class="dashboard-kpi green card-skeleton"><div class="dashboard-kpi-label">Factures payées</div><strong class="dashboard-kpi-value">···</strong></article>
       <article class="dashboard-kpi purple card-skeleton"><div class="dashboard-kpi-label">Factures en attente</div><strong class="dashboard-kpi-value">···</strong></article>
       <article class="dashboard-kpi amber card-skeleton"><div class="dashboard-kpi-label">Solde net estimé</div><strong class="dashboard-kpi-value">···</strong></article>
@@ -42,12 +42,13 @@
         <header class="dashboard-panel-head">
           <div class="dashboard-panel-title">
             <i class="ic" data-icon="bar-chart"></i>
-            <div><h2>Évolution des ventes</h2><p class="dashboard-panel-subtitle">Montant des factures par période</p></div>
+            <div><h2>Évolution des ventes facturées</h2><p class="dashboard-panel-subtitle">Montant TTC facturé par mois, hors annulations</p></div>
           </div>
-          <div class="dashboard-periods" role="group" aria-label="Période du graphique">
-            <button type="button" class="btn btn-sm btn-outline" data-periode="day" onclick="setPeriode('day')">Jour</button>
-            <button type="button" class="btn btn-sm btn-primary" data-periode="week" onclick="setPeriode('week')">Semaine</button>
-            <button type="button" class="btn btn-sm btn-outline" data-periode="month" onclick="setPeriode('month')">Mois</button>
+          <div class="dashboard-periods">
+            <select id="dashboard-period-select" class="btn btn-sm btn-outline dashboard-period-select" aria-label="Période du graphique" onchange="setPeriode(this.value)">
+              <option value="6m">6 derniers mois</option>
+              <option value="12m">12 derniers mois</option>
+            </select>
           </div>
         </header>
         <div class="dashboard-chart-wrap" id="chart-wrap">
@@ -59,19 +60,53 @@
         <header class="dashboard-panel-head">
           <div class="dashboard-panel-title">
             <i class="ic" data-icon="bar-chart"></i>
-            <div><h2>Factures par statut</h2><p class="dashboard-panel-subtitle">Répartition du nombre de factures</p></div>
+            <div><h2>Répartition des ventes</h2><p class="dashboard-panel-subtitle">Montants TTC facturés par type, hors annulations</p></div>
           </div>
         </header>
         <div class="dashboard-donut-wrap">
           <div class="dashboard-donut-graphic">
-            <canvas id="chart-repartition" role="img" aria-label="Graphique de répartition des factures payées, en attente et en retard."></canvas>
-            <div class="dashboard-donut-center" aria-hidden="true"><strong id="invoice-total">0</strong><span>Factures</span></div>
+            <canvas id="chart-repartition" role="img" aria-label="Graphique de répartition des ventes par type de catalogue."></canvas>
+            <div class="dashboard-donut-center" aria-hidden="true"><strong id="sales-total">0</strong><span>TTC facturé</span></div>
           </div>
-          <div class="dashboard-legend" id="invoice-legend" aria-live="polite">
+          <div class="dashboard-legend" id="sales-legend" aria-live="polite">
             <div class="dashboard-empty">Chargement des données…</div>
           </div>
         </div>
       </article>
+    </section>
+
+    <section class="dashboard-section dashboard-modules-section" aria-labelledby="dashboard-modules-title">
+      <header class="dashboard-panel-head">
+        <div class="dashboard-panel-title">
+          <i class="ic" data-icon="clipboard-list"></i>
+          <div>
+            <h2 id="dashboard-modules-title">Modules Sunupilot</h2>
+            <p class="dashboard-panel-subtitle">Accédez directement à vos outils de gestion</p>
+          </div>
+        </div>
+      </header>
+      <nav class="dashboard-modules" aria-label="Modules Sunupilot">
+        <a class="dashboard-module-card is-green" href="crm.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="contact-round"></i></span>
+          <span class="dashboard-module-copy"><strong>CRM &amp; suivi client</strong><small>Gérez vos clients et opportunités</small></span>
+        </a>
+        <a class="dashboard-module-card is-indigo" href="paiements-professionnels.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="credit-card"></i></span>
+          <span class="dashboard-module-copy"><strong>Paiement en ligne</strong><small>Consultez les options de paiement disponibles</small></span>
+        </a>
+        <a class="dashboard-module-card is-blue" href="comptabilite.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="landmark"></i></span>
+          <span class="dashboard-module-copy"><strong>Comptabilité OHADA</strong><small>Retrouvez votre espace comptable</small></span>
+        </a>
+        <a class="dashboard-module-card is-amber" href="achats.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="package"></i></span>
+          <span class="dashboard-module-copy"><strong>Achats &amp; Stocks</strong><small>Suivez achats, articles et stocks</small></span>
+        </a>
+        <a class="dashboard-module-card is-purple" href="automatisations.html">
+          <span class="dashboard-module-icon"><i class="ic" data-icon="workflow"></i></span>
+          <span class="dashboard-module-copy"><strong>Automatisation</strong><small>Accédez à vos tâches automatisées</small></span>
+        </a>
+      </nav>
     </section>
 
     <section class="dashboard-grid dashboard-bottom-grid" aria-label="Activité récente et raccourcis">
@@ -79,14 +114,14 @@
         <header class="dashboard-panel-head">
           <div class="dashboard-panel-title">
             <i class="ic" data-icon="file-text"></i>
-            <div><h2>Encaissements récents</h2><p class="dashboard-panel-subtitle">Derniers paiements enregistrés</p></div>
+            <div><h2>Dernières factures</h2><p class="dashboard-panel-subtitle">Derniers documents commerciaux émis</p></div>
           </div>
           <a href="factures.html" class="dashboard-chip">Voir les factures <i class="ic" data-icon="arrow-up-right"></i></a>
         </header>
         <div class="dashboard-table-wrap">
           <table class="dashboard-table">
-            <thead><tr><th>Référence</th><th>Client</th><th>Méthode</th><th>Date</th><th>Montant</th></tr></thead>
-            <tbody id="paiements-body">
+            <thead><tr><th>N° facture</th><th>Client</th><th>Émission</th><th>Statut</th><th>Total TTC</th></tr></thead>
+            <tbody id="dernieres-factures-body">
               <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
               <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
             </tbody>
@@ -102,12 +137,10 @@
           </div>
         </header>
         <div class="dashboard-actions">
-          <a class="dashboard-action blue" href="nouvelle-facture.html"><i class="ic" data-icon="file-plus"></i><span>Nouvelle facture</span></a>
-          <a class="dashboard-action green" href="devis.html"><i class="ic" data-icon="file-stack"></i><span>Nouveau devis</span></a>
+          <a class="dashboard-action green" href="nouvelle-facture.html"><i class="ic" data-icon="file-plus"></i><span>Nouvelle facture</span></a>
+          <a class="dashboard-action blue" href="devis.html"><i class="ic" data-icon="file-stack"></i><span>Nouveau devis</span></a>
           <a class="dashboard-action purple" href="clients.html"><i class="ic" data-icon="users"></i><span>Ajouter un client</span></a>
-          <a class="dashboard-action amber" href="produits.html"><i class="ic" data-icon="package"></i><span>Ajouter un produit</span></a>
-          <a class="dashboard-action navy" href="rapports.html"><i class="ic" data-icon="bar-chart"></i><span>Rapports</span></a>
-          <a class="dashboard-action cyan" href="parametres.html"><i class="ic" data-icon="settings"></i><span>Paramètres</span></a>
+          <a class="dashboard-action navy" href="achats.html#buying-orders"><i class="ic" data-icon="package"></i><span>Enregistrer un achat</span></a>
         </div>
       </article>
     </section>
@@ -138,8 +171,8 @@
   renderTopbar('Tableau de bord', "Vue d'ensemble de votre activité");
 
   let chart;
-  let statusChart;
-  let periode = 'week';
+  let salesChart;
+  let periode = '6m';
   let lastDashboardStats = null;
 
   function dashboardThemeColor(token, fallback) {
@@ -147,40 +180,54 @@
   }
 
   const user = Api.currentUser() || {};
-  document.getElementById('dashboard-greeting').textContent = 'Tableau de bord';
+  const greetingName = String(user.prenom || user.nom || '').trim().split(/\s+/)[0];
+  document.getElementById('dashboard-greeting').textContent = greetingName
+    ? 'Bonjour ' + greetingName + ' 👋'
+    : 'Bienvenue sur Sunupilot';
 
   function renderKpis(stats) {
     const value = (v) => Number(v || 0);
+    // Les espaces de groupement restent visibles, mais deviennent des points
+    // de retour à la ligne pour les montants longs, sans couper décimales ou devise.
+    const amount = (v) => formatMontant(value(v)).replace(/([,\.\u00a0\u202f ](?=\d{3}(?:[^\d]|$)))/g, '$1<wbr>');
     document.getElementById('stats-grid').innerHTML = `
       <article class="dashboard-kpi blue">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('banknote')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.chiffre_affaires))}</strong><span class="dashboard-kpi-label">Chiffre d'affaires</span></div></div>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('banknote')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${amount(stats.chiffre_affaires)}</strong><span class="dashboard-kpi-label">Encaissements cumulés</span></div></div>
         <span class="dashboard-kpi-note">Encaissements cumulés enregistrés</span>
       </article>
       <article class="dashboard-kpi green">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('check-circle')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${value(stats.factures_payees?.n).toLocaleString('fr-FR')}</strong><span class="dashboard-kpi-label">Factures payées</span></div></div>
-        <span class="dashboard-kpi-note">${formatMontant(value(stats.factures_payees?.total))} réglés</span>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('file-check')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatDashboardCount(stats.factures_emises)}</strong><span class="dashboard-kpi-label">Factures émises</span></div></div>
+        <span class="dashboard-kpi-note">Factures actives, hors devis et annulations</span>
       </article>
       <article class="dashboard-kpi purple">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('clock')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${value(stats.factures_en_attente?.n).toLocaleString('fr-FR')}</strong><span class="dashboard-kpi-label">Factures en attente</span></div></div>
-        <span class="dashboard-kpi-note">${formatMontant(value(stats.factures_en_attente?.total))} à recevoir</span>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('users')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatDashboardCount(stats.nouveaux_clients)}</strong><span class="dashboard-kpi-label">Nouveaux clients</span></div></div>
+        <span class="dashboard-kpi-note">Ajoutés sur les 30 derniers jours</span>
       </article>
       <article class="dashboard-kpi amber">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('wallet')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.tresorerie))}</strong><span class="dashboard-kpi-label">Solde net estimé</span></div></div>
-        <span class="dashboard-kpi-note">Encaissements moins dépenses</span>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('package')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${amount(stats.valeur_stock)}</strong><span class="dashboard-kpi-label">Valeur du stock</span></div></div>
+        <span class="dashboard-kpi-note">Valorisation au coût d’achat</span>
       </article>
     `;
   }
 
-  function renderRecentPayments(rows) {
-    const body = document.getElementById('paiements-body');
-    body.innerHTML = rows?.length ? rows.map(p => `
-      <tr>
-        <td data-label="Référence" class="mono">${escapeHtml(p.numero || '—')}</td>
-        <td data-label="Client">${escapeHtml(p.client_nom || '—')}</td>
-        <td data-label="Méthode">${escapeHtml(p.methode || '—')}</td>
-        <td data-label="Date">${p.date_paiement ? formatDate(p.date_paiement) : '—'}</td>
-        <td data-label="Montant" class="mono">${formatMontant(p.montant)}</td>
-      </tr>`).join('') : `<tr><td colspan="5"><div class="dashboard-empty"><i class="ic">${Icon('wallet')}</i><br>Aucun paiement enregistré pour l'instant.</div></td></tr>`;
+  function renderRecentInvoices(rows) {
+    const body = document.getElementById('dernieres-factures-body');
+    const statuses = {
+      payee: { label: 'Payée', className: 'is-paid' },
+      en_attente: { label: 'En attente', className: 'is-pending' },
+      en_retard: { label: 'En retard', className: 'is-overdue' },
+      annulee: { label: 'Annulée', className: 'is-cancelled' }
+    };
+    body.innerHTML = rows?.length ? rows.map(invoice => {
+      const status = statuses[invoice.statut] || { label: 'Non renseigné', className: 'is-unknown' };
+      return '<tr>' +
+        '<td data-label="N° facture" class="mono">' + escapeHtml(invoice.numero || '—') + '</td>' +
+        '<td data-label="Client">' + escapeHtml(invoice.client_nom || '—') + '</td>' +
+        '<td data-label="Émission">' + (invoice.date_emission ? formatDate(invoice.date_emission) : '—') + '</td>' +
+        '<td data-label="Statut"><span class="dashboard-invoice-status ' + status.className + '">' + status.label + '</span></td>' +
+        '<td data-label="Total TTC" class="mono">' + formatMontant(invoice.total) + '</td>' +
+        '</tr>';
+    }).join('') : '<tr><td colspan="5"><div class="dashboard-empty"><i class="ic">' + Icon('file-text') + '</i><br>Aucune facture émise pour l\'instant.</div></td></tr>';
   }
 
   function renderRecentClients(rows) {
@@ -199,23 +246,84 @@
     const stats = await Api.get('/dashboard');
     lastDashboardStats = stats;
     renderKpis(stats);
-    renderRecentPayments(stats.derniers_paiements || []);
+    renderRecentInvoices(stats.dernieres_factures || []);
     renderRecentClients(stats.derniers_clients || []);
-    await renderStatusChart(stats);
+    await renderSalesChart(stats);
     await loadChart(periode);
   }
 
-  async function loadChart(period) {
-    periode = period;
-    document.querySelectorAll('[data-periode]').forEach(button => {
-      const active = button.dataset.periode === period;
-      button.classList.toggle('btn-primary', active);
-      button.classList.toggle('btn-outline', !active);
-      button.setAttribute('aria-pressed', String(active));
-    });
+  function dashboardDateParts(date = new Date()) {
+    const timeZone = user.fuseau_horaire || 'Africa/Dakar';
+    const options = { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' };
+    let parts;
+    try {
+      parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(date);
+    } catch {
+      parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Africa/Dakar', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(date);
+    }
+    const values = Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+    return { year: Number(values.year), month: Number(values.month), day: Number(values.day) };
+  }
 
-    const titleByPeriod = { day: 'Évolution quotidienne', week: 'Évolution hebdomadaire', month: 'Évolution mensuelle' };
-    const { rows } = await Api.get('/rapports/ventes?group_by=' + encodeURIComponent(period));
+  function dashboardMonthRange(period) {
+    const monthCount = period === '12m' ? 12 : 6;
+    const today = dashboardDateParts();
+    const currentMonthIndex = today.year * 12 + today.month - 1;
+    const firstMonthIndex = currentMonthIndex - monthCount + 1;
+    const firstYear = Math.floor(firstMonthIndex / 12);
+    const firstMonth = firstMonthIndex % 12 + 1;
+    const pad = value => String(value).padStart(2, '0');
+    return {
+      from: firstYear + '-' + pad(firstMonth) + '-01',
+      to: today.year + '-' + pad(today.month) + '-' + pad(today.day),
+      monthCount,
+      firstMonthIndex
+    };
+  }
+
+  function buildDashboardMonthSeries(rows, period) {
+    const range = dashboardMonthRange(period);
+    const totalsByMonth = new Map((Array.isArray(rows) ? rows : []).map(row => {
+      const value = Number(row.total);
+      return [String(row.label || ''), Number.isFinite(value) ? value : 0];
+    }));
+    const labels = [];
+    const values = [];
+    const labelOptions = period === '12m'
+      ? { month: 'short', year: '2-digit', timeZone: 'UTC' }
+      : { month: 'short', timeZone: 'UTC' };
+
+    for (let offset = 0; offset < range.monthCount; offset++) {
+      const monthIndex = range.firstMonthIndex + offset;
+      const year = Math.floor(monthIndex / 12);
+      const month = monthIndex % 12;
+      const key = year + '-' + String(month + 1).padStart(2, '0');
+      const labelDate = new Date(Date.UTC(year, month, 15, 12));
+      const rawLabel = new Intl.DateTimeFormat('fr-FR', labelOptions).format(labelDate);
+      labels.push(rawLabel.charAt(0).toLocaleUpperCase('fr-FR') + rawLabel.slice(1));
+      values.push(totalsByMonth.get(key) ?? 0);
+    }
+
+    return { labels, values, monthCount: range.monthCount };
+  }
+
+  async function loadChart(period) {
+    period = period === '12m' ? '12m' : '6m';
+    periode = period;
+    const periodSelect = document.getElementById('dashboard-period-select');
+    if (periodSelect && periodSelect.value !== period) periodSelect.value = period;
+
+    const range = dashboardMonthRange(period);
+    const params = new URLSearchParams({
+      group_by: 'month',
+      from: range.from,
+      to: range.to,
+      exclude_cancelled: 'true'
+    });
+    const { rows } = await Api.get('/rapports/ventes?' + params.toString());
+    const series = buildDashboardMonthSeries(rows, period);
     const canvas = document.getElementById('chart-evolution');
     try {
       await window.chartReady;
@@ -238,16 +346,16 @@
     chart = new Chart(canvas, {
       type: 'line',
       data: {
-        labels: rows?.length ? rows.map(row => row.label) : ['Aucune donnée'],
+        labels: series.labels,
         datasets: [{
-          label: 'Ventes',
-          data: rows?.length ? rows.map(row => Number(row.total || 0)) : [0],
+          label: 'Ventes TTC facturées',
+          data: series.values,
           borderColor: accent,
           backgroundColor: gradient,
           borderWidth: 3,
           fill: true,
           tension: 0.35,
-          pointRadius: rows?.length ? 3 : 0,
+          pointRadius: series.values.some(value => value !== 0) ? 3 : 0,
           pointHoverRadius: 5,
           pointBackgroundColor: surface,
           pointBorderColor: accent,
@@ -275,7 +383,10 @@
         }
       }
     });
-    canvas.setAttribute('aria-label', titleByPeriod[period] + '. Les montants détaillés sont disponibles dans les rapports.');
+    canvas.dataset.dashboardPeriod = period;
+    canvas.dataset.dashboardMonthCount = String(series.monthCount);
+    canvas.setAttribute('aria-label',
+      "Ventes TTC facturées sur " + range.monthCount + " mois, hors factures annulées.");
   }
 
   function formatDashboardCount(value) {
@@ -287,19 +398,36 @@
     }).format(count);
   }
 
-  async function renderStatusChart(stats) {
+  function formatDashboardCompactAmount(value) {
+    const amount = Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
+    return new Intl.NumberFormat('fr-FR', {
+      notation: 'compact',
+      maximumFractionDigits: 1
+    }).format(amount);
+  }
+
+  async function renderSalesChart(stats) {
+    const amounts = new Map(
+      (Array.isArray(stats.repartition_ventes) ? stats.repartition_ventes : [])
+        .map(row => [String(row.type_catalogue || ''), Number(row.total_ttc || 0)])
+    );
+    const chartAmount = type => {
+      const value = amounts.get(type);
+      return Number.isFinite(value) ? Math.max(0, value) : 0;
+    };
     const rows = [
-      { label: 'Payées', value: Number(stats.factures_payees?.n || 0), color: dashboardThemeColor('--emerald', '#087A57') },
-      { label: 'En attente', value: Number(stats.factures_en_attente?.n || 0), color: dashboardThemeColor('--gold', '#96713E') },
-      { label: 'En retard', value: Number(stats.factures_en_retard?.n || 0), color: dashboardThemeColor('--clay', '#B64D48') }
+      { label: 'Produits', value: chartAmount('produit'), color: dashboardThemeColor('--emerald', '#087A57') },
+      { label: 'Services', value: chartAmount('service'), color: dashboardThemeColor('--navy-800', '#29265E') },
+      { label: 'Non classés', value: chartAmount('non_classe'), color: dashboardThemeColor('--ink-soft', '#80796F') }
     ];
     const total = rows.reduce((sum, row) => sum + row.value, 0);
-    document.getElementById('invoice-total').textContent = formatDashboardCount(total);
-    document.getElementById('invoice-legend').innerHTML = rows.map(row => `
-      <div class="dashboard-legend-item">
-        <span class="dashboard-legend-dot" style="background:${row.color};"></span>
-        <div>${row.label}<strong>${row.value.toLocaleString('fr-FR')}</strong></div>
-      </div>`).join('');
+    document.getElementById('sales-total').textContent = formatDashboardCompactAmount(total);
+    document.getElementById('sales-legend').innerHTML = rows.map(row =>
+      '<div class="dashboard-legend-item">' +
+        '<span class="dashboard-legend-dot" style="background:' + row.color + ';"></span>' +
+        '<div>' + row.label + '<strong>' + formatMontant(row.value) + '</strong></div>' +
+      '</div>'
+    ).join('');
     const canvas = document.getElementById('chart-repartition');
     try {
       await window.chartReady;
@@ -308,8 +436,8 @@
       if (graphic) graphic.innerHTML = '<div class="dashboard-empty">Le graphique est indisponible sans accès au service de graphiques.</div>';
       return;
     }
-    if (statusChart) statusChart.destroy();
-    statusChart = new Chart(canvas, {
+    if (salesChart) salesChart.destroy();
+    salesChart = new Chart(canvas, {
       type: 'doughnut',
       data: {
         labels: rows.map(row => row.label),
@@ -334,14 +462,18 @@
             titleColor: dashboardThemeColor('--ink', '#24211D'),
             bodyColor: dashboardThemeColor('--ink', '#24211D'),
             borderColor: dashboardThemeColor('--line', '#E6DED2'),
-            borderWidth: 1
+            borderWidth: 1,
+            callbacks: {
+              label: context => context.label + ': ' + formatMontant(context.parsed)
+            }
           }
         }
       }
     });
-    canvas.setAttribute('aria-label', total
-      ? 'Répartition de ' + total + ' factures : ' + rows.map(row => row.label + ' ' + row.value).join(', ')
-      : 'Aucune facture enregistrée.');
+    canvas.setAttribute('aria-label',
+      'Répartition des ventes : montants TTC facturés par type de catalogue, hors factures annulées. Montant total TTC : ' +
+      formatMontant(total) + '. ' +
+      rows.map(row => row.label + ' : ' + formatMontant(row.value)).join('; ') + '.');
   }
 
   function setPeriode(period) {
@@ -351,7 +483,7 @@
   document.addEventListener('sf:theme-change', () => {
     loadChart(periode).catch(error => showFatalError(error.message));
     if (lastDashboardStats) {
-      renderStatusChart(lastDashboardStats).catch(error => showFatalError(error.message));
+      renderSalesChart(lastDashboardStats).catch(error => showFatalError(error.message));
     }
   });
 

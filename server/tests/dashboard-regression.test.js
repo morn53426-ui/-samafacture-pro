@@ -26,6 +26,32 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.match(source, /dashboardInFlight\.set\(key, pending\)/);
   });
 
+  test('les KPI factures émises et nouveaux clients sont calculés sur le compte courant', () => {
+    assert.match(source, /SUM\(CASE WHEN statut <> 'annulee' THEN 1 ELSE 0 END\) AS factures_emises/);
+    assert.match(source, /SELECT COUNT\(\*\) FROM clients c WHERE c\.user_id = \? AND c\.created_at >= DATE_SUB\(\?, INTERVAL 30 DAY\)/);
+    assert.match(source, /factures_emises: Number\(summary\?\.factures_emises \|\| 0\)/);
+    assert.match(source, /nouveaux_clients: Number\(summary\?\.nouveaux_clients \|\| 0\)/);
+    assert.match(source, /AS valeur_stock/);
+    assert.match(source, /COALESCE\(stocks\.quantite, p\.stock\)/);
+    assert.match(source, /FROM pro_stocks_entrepots[\s\S]*?WHERE user_id = \?[\s\S]*?GROUP BY produit_id/);
+  });
+
+  test('les dernières factures sont limitées au locataire et excluent les devis', () => {
+    assert.match(source, /dernieres_factures: dernieresFactures \|\| \[\]/);
+    assert.match(source, /f\.user_id = \? AND f\.type = 'facture'[\s\S]*?ORDER BY f\.date_emission DESC, f\.id DESC[\s\S]*?LIMIT 5/);
+    assert.match(source, /LEFT JOIN clients c ON c\.id = f\.client_id AND c\.user_id = f\.user_id/);
+  });
+
+  test('la répartition des ventes utilise les montants TTC et respecte l’isolation entreprise', () => {
+    assert.match(source, /repartition_ventes: \[\]/);
+    assert.match(source, /repartition_ventes: repartitionVentes \|\| \[\]/);
+    assert.match(source, /WHEN p\.id IS NULL THEN 'non_classe'[\s\S]*WHEN p\.type_catalogue = 'service' THEN 'service'[\s\S]*WHEN p\.type_catalogue = 'produit' THEN 'produit'/);
+    assert.match(source, /GROUP BY CASE[\s\S]*WHEN p\.id IS NULL THEN 'non_classe'/);
+    assert.match(source, /COALESCE\(SUM\(fl\.total_ligne\), 0\) AS total_ttc/);
+    assert.match(source, /LEFT JOIN produits p ON p\.id = fl\.produit_id AND p\.user_id = f\.user_id/);
+    assert.match(source, /WHERE f\.user_id = \? AND f\.type = 'facture' AND f\.statut <> 'annulee'/);
+  });
+
   test('le cache est borné et temporaire', () => {
     assert.match(source, /DASHBOARD_CACHE_TTL_MS/);
     assert.match(source, /DASHBOARD_CACHE_MAX/);
@@ -49,7 +75,8 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.match(source, /localDateString\(accountRows\?\.\[0\]\?\.fuseau_horaire \|\| 'Africa\/Dakar'\)/);
     assert.match(source, /date_echeance >= \?/);
     assert.match(source, /date_echeance < \?/);
-    assert.match(source, /date_emission >= DATE_SUB\(\?, INTERVAL 6 MONTH\)/);
+    assert.match(source, /date_emission >= DATE_SUB\(DATE_FORMAT\(\?, '%Y-%m-01'\), INTERVAL 5 MONTH\)/);
+    assert.match(source, /AND statut <> 'annulee'[\s\S]*?date_emission >= DATE_SUB\(DATE_FORMAT\(\?, '%Y-%m-01'\), INTERVAL 5 MONTH\)[\s\S]*?AND date_emission <= \?/);
     assert.doesNotMatch(source, /date_echeance .*CURDATE\(\)/);
     assert.doesNotMatch(source, /date_emission >= DATE_SUB\(CURDATE\(\)/);
   });

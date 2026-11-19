@@ -19,7 +19,7 @@ const VIEWPORTS = [
   { name: 'wide-1920', width: 1920, height: 1080 }
 ];
 const PAGES = [
-  { name: 'dashboard', file: 'dashboard.html', ready: '#paiements-body tr:not(.row-skeleton)', charts: ['chart-evolution', 'chart-repartition'] },
+  { name: 'dashboard', file: 'dashboard.html', ready: '#dernieres-factures-body tr:not(.row-skeleton)', charts: ['chart-evolution', 'chart-repartition'] },
   { name: 'clients', file: 'clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
   { name: 'produits', file: 'produits.html', ready: '#produits-body tr:not(.row-skeleton)' },
   { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
@@ -62,12 +62,17 @@ function makeFixtures() {
     return {
       dashboard: {
         chiffre_affaires: 0,
+        factures_emises: 0,
+        nouveaux_clients: 0,
+        valeur_stock: 0,
         tresorerie: 0,
         factures_payees: { n: 0, total: 0 },
         factures_en_attente: { n: 0, total: 0 },
         factures_en_retard: { n: 0, total: 0 },
+        repartition_ventes: [],
         derniers_clients: [],
-        derniers_paiements: []
+        derniers_paiements: [],
+        dernieres_factures: []
       },
       ventes: [],
       clients: [],
@@ -93,11 +98,11 @@ function makeFixtures() {
   ];
 
   const produits = [
-    { id: 1, nom: makeLong('Matériel informatique professionnel — lot complet avec installation et maintenance ', 188), reference: 'REF-2026-ULTRA-LONGUE-REFERENCE-001', prix_ht: 999999999999.99, prix_achat: 600000000000, tva: 18, stock: 999999999 },
-    { id: 2, nom: 'Prestation de démonstration', reference: 'PRESTA-TEST-002', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 12 },
-    { id: 3, nom: 'Bougie parfumée ambre et bois de santal', reference: 'BOUGIE-AMB-001', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 54 },
-    { id: 4, nom: 'Service de maintenance annuelle', reference: 'SERV-MAINT-2026', prix_ht: 1250000, prix_achat: 300000, tva: 18, stock: 0 },
-    { id: 5, nom: 'Produit avec stock faible', reference: 'STOCK-LOW-1', prix_ht: 1000, prix_achat: 500, tva: 0, stock: 1 }
+    { id: 1, type_catalogue: 'produit', nom: makeLong('Matériel informatique professionnel — lot complet avec installation et maintenance ', 188), reference: 'REF-2026-ULTRA-LONGUE-REFERENCE-001', prix_ht: 999999999999.99, prix_achat: 600000000000, tva: 18, stock: 999999999 },
+    { id: 2, type_catalogue: 'service', nom: 'Prestation de démonstration', reference: 'PRESTA-TEST-002', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 0 },
+    { id: 3, type_catalogue: 'non_classe', nom: 'Bougie parfumée ambre et bois de santal', reference: 'BOUGIE-AMB-001', prix_ht: 8500, prix_achat: 4200, tva: 18, stock: 54 },
+    { id: 4, type_catalogue: 'service', nom: 'Service de maintenance annuelle', reference: 'SERV-MAINT-2026', prix_ht: 1250000, prix_achat: 300000, tva: 18, stock: 0 },
+    { id: 5, type_catalogue: 'produit', nom: 'Produit avec stock faible', reference: 'STOCK-LOW-1', prix_ht: 1000, prix_achat: 500, tva: 0, stock: 1 }
   ];
 
   const factures = [
@@ -111,10 +116,22 @@ function makeFixtures() {
   return {
     dashboard: {
       chiffre_affaires: normal ? 1250000 : 999999999999.99,
+      factures_emises: normal ? 42 : 999999,
+      nouveaux_clients: normal ? 3 : 999999,
+      valeur_stock: normal ? 1875000 : 999999999999.99,
       tresorerie: normal ? 475000 : 999999999999.99,
       factures_payees: { n: normal ? 12 : 999999, total: normal ? 850000 : 999999999999.99 },
       factures_en_attente: { n: normal ? 4 : 999999, total: normal ? 350000 : 888888888888.88 },
       factures_en_retard: { n: normal ? 1 : 999999, total: normal ? 50000 : 777777777777.77 },
+      repartition_ventes: normal ? [
+        { type_catalogue: 'produit', total_ttc: 850000, nombre_lignes: 9 },
+        { type_catalogue: 'service', total_ttc: 350000, nombre_lignes: 4 },
+        { type_catalogue: 'non_classe', total_ttc: 50000, nombre_lignes: 2 }
+      ] : [
+        { type_catalogue: 'produit', total_ttc: 999999999999.99, nombre_lignes: 999999 },
+        { type_catalogue: 'service', total_ttc: 888888888888.88, nombre_lignes: 999999 },
+        { type_catalogue: 'non_classe', total_ttc: 777777777777.77, nombre_lignes: 999999 }
+      ],
       derniers_clients: clients.slice(0, 5).map((c) => ({ id: c.id, nom: c.nom, email: c.email, telephone: c.telephone })),
       derniers_paiements: factures.slice(0, 5).map((f, index) => ({
         numero: f.numero,
@@ -122,6 +139,13 @@ function makeFixtures() {
         methode: index % 2 ? 'Virement bancaire' : 'Wave',
         date_paiement: '2026-11-12 10:15:00',
         montant: f.total
+      })),
+      dernieres_factures: factures.slice(0, 5).map(f => ({
+        numero: f.numero,
+        client_nom: f.client_nom,
+        date_emission: f.date_emission,
+        statut: f.statut,
+        total: f.total
       }))
     },
     ventes: Array.from({ length: 14 }, (_, index) => ({
@@ -253,6 +277,9 @@ const CHART_STUB = [
 function fixtureFor(pathname, fixtures) {
   if (pathname === '/api/factures-recurrentes') return { recurrentes: [] };
   if (pathname === '/api/dashboard') return fixtures.dashboard;
+  if (pathname === '/api/pro/inventory/valuation') {
+    return { valeur_totale: fixtures.dashboard.valeur_stock ?? 0, devise: 'FCFA' };
+  }
   if (pathname === '/api/rapports/ventes') return { rows: fixtures.ventes };
   if (pathname === '/api/clients') return {
     clients: fixtures.clients,
@@ -512,6 +539,16 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     throw new Error(pageDefinition.name + ' indisponible; diagnostic=' +
       JSON.stringify({ ...diagnostic, apiRequests: page.__visualApiRequests, pageErrors }) +
       '; cause=' + error.message);
+  }
+  if (pageDefinition.name === 'produits') {
+    const catalogue = await page.evaluate(() => [...document.querySelectorAll('#produits-body tr')].map(row => ({
+      type: row.querySelector('[data-label="Type"]')?.textContent.trim() || '',
+      stock: row.querySelector('[data-label="Stock"]')?.textContent.trim() || ''
+    })));
+    assert.deepEqual(catalogue.map(row => row.type).sort(), ['Non classé', 'Produit', 'Produit', 'Service', 'Service'].sort(),
+      'La recette du catalogue doit couvrir les trois types de fiche.');
+    assert.ok(catalogue.filter(row => row.type === 'Service').every(row => row.stock === '—'),
+      'Un service ne doit jamais afficher de quantité de stock physique.');
   }
   if (pageDefinition.name === 'groupe-entreprise') {
     const groupUi = await page.evaluate(() => {
@@ -810,6 +847,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
         : null,
       contentPaddingLeft: main ? Math.round(parseFloat(getComputedStyle(main).paddingLeft) || 0) : null,
       expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim(),
+      expectedExpandedWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim(),
       enterpriseToolbar: (() => {
         const toolbar = document.querySelector('.enterprise-console-topbar');
         const heading = document.querySelector('.enterprise-dashboard-heading');
@@ -836,13 +874,16 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     };
   });
   if (!pageDefinition.public && viewport.width >= 901) {
-    assert.equal(navigationGeometry.sidebarCollapsed, true,
-      pageDefinition.name + ' : le menu de bureau doit démarrer compact.');
-    const compactWidth = Number.parseFloat(navigationGeometry.expectedCompactWidth);
-    assert.equal(navigationGeometry.sidebarWidth, compactWidth,
-      pageDefinition.name + ' : le rail desktop doit respecter sa largeur responsive : ' + JSON.stringify(navigationGeometry));
-    assert.equal(navigationGeometry.mainMargin, compactWidth,
-      pageDefinition.name + ' : la marge du contenu doit suivre exactement la largeur du rail : ' + JSON.stringify(navigationGeometry));
+    const expectedCollapsed = pageDefinition.name !== 'dashboard';
+    assert.equal(navigationGeometry.sidebarCollapsed, expectedCollapsed,
+      pageDefinition.name + ' : l’état initial du menu desktop doit respecter la page de référence.');
+    const expectedWidth = Number.parseFloat(expectedCollapsed
+      ? navigationGeometry.expectedCompactWidth
+      : navigationGeometry.expectedExpandedWidth);
+    assert.equal(navigationGeometry.sidebarWidth, expectedWidth,
+      pageDefinition.name + ' : la largeur initiale du menu desktop doit être cohérente : ' + JSON.stringify(navigationGeometry));
+    assert.equal(navigationGeometry.mainMargin, expectedWidth,
+      pageDefinition.name + ' : la marge du contenu doit suivre exactement la largeur du menu : ' + JSON.stringify(navigationGeometry));
     assert.ok(navigationGeometry.mainLeft >= navigationGeometry.sidebarWidth &&
       navigationGeometry.mainLeft <= navigationGeometry.sidebarWidth + 16,
       pageDefinition.name + ' : le conteneur principal ne doit pas chevaucher le rail : ' + JSON.stringify(navigationGeometry));
@@ -921,8 +962,8 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       body: document.body.scrollWidth,
       page: location.pathname,
       xssMarker: window.__visualXss || false,
-      paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
-        ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
+      invoiceLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
+        ? Array.from(document.querySelectorAll('#dernieres-factures-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
         : null,
       proWorkspaceNavigation: location.pathname.includes('professionnel')
         ? (() => {
@@ -1078,9 +1119,70 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       JSON.stringify(layout));
   }
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
+  if (pageDefinition.name === 'finances') {
+    const financeLabels = await page.$$eval('#stats-grid .stat-label', elements =>
+      elements.map(element => element.textContent.trim())
+    );
+    assert.deepEqual(financeLabels, [
+      'Écart cumulé paiements - dépenses',
+      'Écart du mois paiements - dépenses',
+      'Estimation des ventes mois prochain',
+      "Objectif d'encaissements"
+    ], 'Les indicateurs financiers doivent refléter les sommes réellement calculées.');
+    const financeNote = await page.$eval('.finance-accounting-note', element => element.textContent.trim());
+    assert.match(financeNote, /ni un solde bancaire ni un bénéfice comptable/);
+    assert.match(financeNote, /date d’émission des factures/);
+    assert.match(financeNote, /remboursements ne sont pas déduits automatiquement/);
+  }
+  if (pageDefinition.name === 'rapports') {
+    const accountingLabels = await page.$$eval('.reports-kpi-grid .stat-label', elements =>
+      elements.map(element => element.textContent.trim())
+    );
+    assert.deepEqual(accountingLabels, [
+      'Paiements enregistrés', 'Dépenses', 'Écart paiements - dépenses', 'TVA inscrite sur factures'
+    ], 'Le rapport doit distinguer les paiements, les dépenses, leur écart et la TVA inscrite sur facture.');
+    const accountingNote = await page.$eval('.reports-accounting-note', element => element.textContent.trim());
+    assert.match(accountingNote, /date d’émission des factures/);
+    assert.match(accountingNote, /y compris celles marquées annulées/);
+    assert.match(accountingNote, /remboursements ne sont pas déduits automatiquement/);
+  }
+  if (pageDefinition.name === 'dashboard') {
+    await page.waitForFunction(() => {
+      const logo = document.querySelector('#app-sidebar .sidebar-brand .mark img');
+      return Boolean(logo && logo.complete);
+    }, { timeout: 5000 });
+    const brandLogo = await page.$eval('#app-sidebar .sidebar-brand .mark img', image => ({
+      src: image.getAttribute('src'),
+      naturalWidth: image.naturalWidth
+    }));
+    assert.ok(brandLogo.naturalWidth > 0,
+      'Le logo Sunupilot de la navigation doit charger une image valide : ' + JSON.stringify(brandLogo));
+    const kpiLabels = await page.$$eval('#stats-grid .dashboard-kpi-label', elements =>
+      elements.map(element => element.textContent.trim())
+    );
+    assert.deepEqual(kpiLabels, ['Encaissements cumulés', 'Factures émises', 'Nouveaux clients', 'Valeur du stock'],
+      'Le dashboard doit afficher les quatre KPI métier attendus.');
+    const kpiValuesFit = await page.$$eval('#stats-grid .dashboard-kpi-value', elements =>
+      elements.every(element => {
+        const card = element.closest('.dashboard-kpi');
+        return card &&
+          element.clientWidth > 0 &&
+          element.scrollWidth <= element.clientWidth + 1 &&
+          element.getBoundingClientRect().right <= card.getBoundingClientRect().right + 1;
+      })
+    );
+    assert.equal(kpiValuesFit, true,
+      'Les valeurs des KPI doivent rester entièrement lisibles, même avec les données extrêmes.');
+    await page.waitForFunction(() => {
+      const canvas = document.getElementById('chart-evolution');
+      const select = document.getElementById('dashboard-period-select');
+      return Boolean(canvas?.dataset.dashboardPeriod === '6m' &&
+        canvas.dataset.dashboardMonthCount === '6' && select?.value === '6m');
+    }, { timeout: 15000 });
+  }
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
-    assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
-      'Chaque information d’un encaissement doit rester nommée et visible sur mobile.');
+    assert.deepEqual(metrics.invoiceLabels, ['N° facture', 'Client', 'Émission', 'Statut', 'Total TTC'],
+      'Chaque information d’une facture doit rester nommée et visible sur mobile.');
   }
   assert.deepEqual(pageErrors, [],
     pageDefinition.name + ' a généré des erreurs JavaScript: ' + pageErrors.join(' | '));
@@ -1256,6 +1358,32 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'La touche Échap doit fermer l’aperçu et rendre le focus à son déclencheur.');
   }
 
+  if (pageDefinition.name === 'dashboard' && viewport.name === 'mobile-320') {
+    const legendMetrics = await page.evaluate(() => {
+      const legend = document.querySelector('.dashboard-legend');
+      const items = Array.from(legend?.querySelectorAll('.dashboard-legend-item') || []);
+      return {
+        columns: legend
+          ? getComputedStyle(legend).gridTemplateColumns.trim().split(/\\s+/).length
+          : 0,
+        itemCount: items.length,
+        valuesFit: items.every(item => {
+          const content = item.querySelector(':scope > div');
+          const amount = content?.querySelector('strong');
+          return Boolean(content && amount &&
+            content.scrollWidth <= content.clientWidth + 1 &&
+            getComputedStyle(amount).whiteSpace === 'nowrap');
+        })
+      };
+    });
+    assert.equal(legendMetrics.columns, 1,
+      'La légende du donut doit passer sur une seule colonne à 320 px : ' + JSON.stringify(legendMetrics));
+    assert.equal(legendMetrics.itemCount, 3,
+      'Les trois catégories de ventes doivent rester visibles sur mobile.');
+    assert.equal(legendMetrics.valuesFit, true,
+      'Les montants TTC doivent tenir sur leur ligne en vue mobile : ' + JSON.stringify(legendMetrics));
+  }
+
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
   await page.screenshot({
     path: path.join(screenshots, filename),
@@ -1297,23 +1425,32 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   const normalPage = await preparePage(browser, baseUrl, fixtures, false);
   await normalPage.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await normalPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await normalPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await normalPage.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   await normalPage.waitForFunction(() => document.getElementById('chart-evolution')?.dataset.sfChartAnimation);
   const chartAnimation = await normalPage.$eval('#chart-evolution', (canvas) => canvas.dataset.sfChartAnimation);
   assert.equal(chartAnimation, 'disabled', 'Le graphique fonctionnel doit rester sans animation.');
 
-  const button = await normalPage.$('[data-periode="week"]');
-  const bounds = await button.boundingBox();
+  const periodSelect = await normalPage.$('#dashboard-period-select');
+  assert.ok(periodSelect, 'Le sélecteur de période doit être présent.');
+  await periodSelect.select('12m');
+  await normalPage.waitForFunction(() =>
+    document.getElementById('chart-evolution')?.dataset.dashboardPeriod === '12m'
+  );
+  await periodSelect.select('6m');
+  await normalPage.waitForFunction(() =>
+    document.getElementById('chart-evolution')?.dataset.dashboardPeriod === '6m'
+  );
+  const bounds = await periodSelect.boundingBox();
   await normalPage.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await normalPage.mouse.down();
   // Laisser la transition de 130 ms atteindre son état final avant de lire la matrice.
   await new Promise((resolve) => setTimeout(resolve, 180));
-  const buttonState = await button.evaluate((element) => ({
+  const buttonState = await periodSelect.evaluate((element) => ({
     active: element.matches(':active'),
     transform: getComputedStyle(element).transform
   }));
   await normalPage.mouse.up();
-  assert.equal(buttonState.active, true, 'Le pointeur doit maintenir le bouton pressé pendant la mesure.');
+  assert.equal(buttonState.active, true, 'Le sélecteur de période doit rester actif pendant la mesure.');
   const pressMatrix = buttonState.transform.match(/^matrix\(([^)]+)\)$/);
   const pressScale = pressMatrix ? pressMatrix[1].split(',').map(Number) : [];
   assert.ok(pressScale.length === 6 &&
@@ -1327,7 +1464,7 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   const reducedPage = await preparePage(browser, baseUrl, fixtures, true);
   await reducedPage.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await reducedPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await reducedPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await reducedPage.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   await reducedPage.evaluate(() => showToast('Notification de vérification', 'info'));
   await reducedPage.waitForSelector('.toast');
   const reduced = await reducedPage.$eval('.toast', (element) => {
@@ -1414,7 +1551,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   });
   await page.setViewport({ width: 320, height: 844, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await page.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   const initialNotifications = await page.evaluate(() => ({
     badgeHidden: document.getElementById('workspace-notification-badge')?.hidden,
     expanded: document.getElementById('workspace-notification-toggle')?.getAttribute('aria-expanded'),
@@ -1590,7 +1727,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   const mobile = await preparePage(browser, baseUrl, fixtures, false);
   await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await mobile.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await mobile.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await mobile.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   await mobile.setViewport({ width: 320, height: 812, deviceScaleFactor: 1 });
   const narrowToolbar = await mobile.evaluate(() => {
     const selectors = [
@@ -1704,9 +1841,9 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
   const page = await preparePage(browser, baseUrl, fixtures, false);
   await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await page.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
 
-  const compact = await page.evaluate(() => ({
+  const expanded = await page.evaluate(() => ({
     collapsed: document.getElementById('app-sidebar')?.classList.contains('is-collapsed'),
     sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
     mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
@@ -1734,42 +1871,57 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
       return Boolean(quick && logout && quick.right <= logout.left + 1);
     })()
   }));
-  assert.deepEqual(compact, {
-    collapsed: true,
-    sidebarWidth: 96,
-    mainMargin: 96,
-    bodyState: true,
+  assert.deepEqual(expanded, {
+    collapsed: false,
+    sidebarWidth: 248,
+    mainMargin: 248,
+    bodyState: false,
     labelsVisible: true,
     promoRemoved: true,
-    toggleExpanded: 'false',
+    toggleExpanded: 'true',
     headingFont: '"IBM Plex Sans", sans-serif',
     bodyFont: '"IBM Plex Sans", sans-serif',
     iconsConsistent: true,
     iconsLegible: true,
     topbarQuickActionsDoNotOverlap: true
-  }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
+  }, 'Le tableau de bord doit démarrer avec la navigation complète, la typographie et les icônes cohérentes.');
 
   await page.click('#sidebar-collapse-toggle');
   await new Promise(resolve => setTimeout(resolve, 240));
-  const expanded = await page.evaluate(() => ({
+  const compact = await page.evaluate(() => ({
     collapsed: document.getElementById('app-sidebar')?.classList.contains('is-collapsed'),
     sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
     mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
     toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded')
   }));
-  assert.deepEqual(expanded, {
+  assert.deepEqual(compact, {
+    collapsed: true,
+    sidebarWidth: 96,
+    mainMargin: 96,
+    toggleExpanded: 'false'
+  }, 'Le bouton doit réduire la navigation et réaligner la zone de travail.');
+
+  await page.click('#sidebar-collapse-toggle');
+  await new Promise(resolve => setTimeout(resolve, 240));
+  const expandedAgain = await page.evaluate(() => ({
+    collapsed: document.getElementById('app-sidebar')?.classList.contains('is-collapsed'),
+    sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
+    mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
+    toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded')
+  }));
+  assert.deepEqual(expandedAgain, {
     collapsed: false,
     sidebarWidth: 248,
     mainMargin: 248,
     toggleExpanded: 'true'
-  }, 'Le bouton doit élargir la navigation et réaligner la zone de travail.');
+  }, 'Le bouton doit pouvoir restaurer le menu complet et réaligner la zone de travail.');
 
   await page.click('#sidebar-collapse-toggle');
   await new Promise(resolve => setTimeout(resolve, 240));
   assert.equal(await page.evaluate(() => localStorage.getItem('sf-sidebar-collapsed')), 'true',
     'La préférence compacte doit être mémorisée.');
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await page.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   assert.equal(await page.$eval('#app-sidebar', element => element.classList.contains('is-collapsed')), true,
     'La navigation doit conserver le mode compact après un changement de page.');
 
@@ -1783,10 +1935,8 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     mobileToggleVisible: true,
     desktopToggleHidden: true,
     mainMargin: 0
-  }, 'À la largeur tablette, le menu mobile doit prendre le relais sans marge latérale.');
-
+  }, 'Sur tablette, le tiroir mobile prend le relais sans marge desktop.');
   await page.close();
-  return { desktopCompact: 'ok', desktopExpandCollapse: 'ok', preferencePersistence: 'ok', tabletNavigation: 'ok' };
 }
 
 function contrastRatio(foreground, background) {
@@ -2103,17 +2253,14 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   await darkPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
   await darkPage.evaluate(() => localStorage.setItem('sf_theme', 'dark'));
   await darkPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await darkPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await darkPage.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   await darkPage.waitForFunction(() =>
     document.getElementById('chart-repartition')?.dataset.sfChartType === 'doughnut'
   );
-  const expectedInvoiceTotal = [
-    fixtures.dashboard.factures_payees?.n,
-    fixtures.dashboard.factures_en_attente?.n,
-    fixtures.dashboard.factures_en_retard?.n
-  ].reduce((sum, value) => sum + Number(value || 0), 0);
-  const donutCountMetrics = await darkPage.evaluate(() => {
-    const value = document.getElementById('invoice-total');
+  const expectedSalesTotal = (fixtures.dashboard.repartition_ventes || [])
+    .reduce((sum, row) => sum + Number(row.total_ttc || 0), 0);
+  const salesMetrics = await darkPage.evaluate(() => {
+    const value = document.getElementById('sales-total');
     const canvas = document.getElementById('chart-repartition');
     const valueRect = value?.getBoundingClientRect();
     const canvasRect = canvas?.getBoundingClientRect();
@@ -2128,19 +2275,23 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   const expectedCompactTotal = new Intl.NumberFormat('fr-FR', {
     notation: 'compact',
     maximumFractionDigits: 1
-  }).format(expectedInvoiceTotal);
-  assert.equal(donutCountMetrics.display, expectedCompactTotal,
-    'Le total central du graphique doit être compact pour les grands volumes.');
-  assert.ok(donutCountMetrics.valueWidth > 0 &&
-    donutCountMetrics.valueWidth <= donutCountMetrics.canvasWidth * 0.69,
-  'Le total compact doit tenir dans l’ouverture du graphique : ' + JSON.stringify(donutCountMetrics));
-  assert.ok(donutCountMetrics.accessibleLabel.includes(String(expectedInvoiceTotal)),
-    'Le libellé accessible du graphique doit conserver le total exact.');
-  assert.deepEqual(donutCountMetrics.sampleFormats, [
+  }).format(expectedSalesTotal);
+  assert.equal(salesMetrics.display, expectedCompactTotal,
+    'Le montant TTC central doit rester compact, même pour des volumes élevés.');
+  assert.ok(salesMetrics.valueWidth > 0 &&
+    salesMetrics.valueWidth <= salesMetrics.canvasWidth * 0.69,
+  'Le montant compact doit tenir dans l’ouverture du graphique : ' + JSON.stringify(salesMetrics));
+  assert.ok(salesMetrics.accessibleLabel.includes('Répartition des ventes') &&
+    salesMetrics.accessibleLabel.includes('Produits') &&
+    salesMetrics.accessibleLabel.includes('Services') &&
+    salesMetrics.accessibleLabel.includes('Non classés') &&
+    salesMetrics.accessibleLabel.includes('Montant total TTC'),
+  'Le libellé accessible doit décrire la répartition des trois types de catalogue.');
+  assert.deepEqual(salesMetrics.sampleFormats, [
     '0', '42', '9 999', '10 k', '3 M'
-  ], 'Le formateur doit préserver les petits nombres et compacter les grands volumes en français.');
+  ], 'Le formateur de volumes doit préserver les petits nombres et compacter les grands volumes en français.');
   await darkPage.screenshot({
-    path: path.join(OUTPUT_DIR, 'dashboard-donut-volumes-eleves-1440.png'),
+    path: path.join(OUTPUT_DIR, 'dashboard-repartition-ventes-1440.png'),
     fullPage: true
   });
   const darkMetrics = await darkPage.evaluate(() => ({
@@ -2197,7 +2348,7 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   const zoomPage = await preparePage(browser, baseUrl, fixtures, false);
   await zoomPage.setViewport({ width: 720, height: 900, deviceScaleFactor: 1 });
   await zoomPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await zoomPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await zoomPage.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   const zoomMetrics = await zoomPage.evaluate(() => ({
     viewport: window.innerWidth,
     document: document.documentElement.scrollWidth,
@@ -3423,6 +3574,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.equal(String(payload.client_id), '1', 'Le client sélectionné doit figurer dans le payload.');
     assert.equal(payload.lignes.length, 1, 'Une ligne produit doit figurer dans le document.');
     assert.equal(payload.lignes[0].designation, 'Prestation de démonstration');
+    assert.equal(payload.lignes[0].produit_id, 2, 'Le service choisi dans le catalogue doit conserver son identifiant sur la ligne de facture.');
     assert.equal(payload.lignes[0].quantite, 2);
     assert.equal(payload.remise, 1000);
     assert.equal(payload.frais_livraison, 1500);

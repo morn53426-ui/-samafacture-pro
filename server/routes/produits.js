@@ -3,6 +3,7 @@ const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage, nonNegativeQuantity } = require('../utils/validation');
+const { normalizeCatalogueType, isStockManagedType } = require('../utils/catalogue-type');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 
 const router = express.Router();
@@ -79,6 +80,7 @@ router.get('/', async (req, res, next) => {
  *             required: [nom]
  *             properties:
  *               nom: { type: string }
+ *               type_catalogue: { type: string, enum: [produit, service, non_classe] }
  *               reference: { type: string }
  *               prix_ht: { type: number }
  *               tva: { type: number, description: 'Pourcentage, ex: 18' }
@@ -92,16 +94,32 @@ router.get('/', async (req, res, next) => {
  */
 router.post('/', async (req, res, next) => {
   try {
-    const { nom, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
+    const { nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
     if (!nom) return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
 
+    // Les clients API historiques qui n'envoient pas encore type_catalogue restent
+    // compatibles ; le formulaire récent transmet explicitement produit ou service.
+    const catalogueType = normalizeCatalogueType(type_catalogue);
+    if (!catalogueType) {
+      return res.status(400).json({ error: 'Le type doit être produit, service ou non classé.' });
+    }
+    const stockManaged = isStockManagedType(catalogueType);
+    if (!stockManaged && (nonNegativeQuantity(stock) > 0 || nonNegativeQuantity(stock_minimum) > 0)) {
+      return res.status(400).json({ error: 'Un service ne peut pas avoir de quantité ni de seuil de stock.' });
+    }
+    const quantity = stockManaged ? nonNegativeQuantity(stock) : 0;
+    const minimumQuantity = stockManaged ? nonNegativeQuantity(stock_minimum) : 0;
+
     const [result] = await pool.query(
-      `INSERT INTO produits (user_id, nom, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.tenantId, nom, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), nonNegativeQuantity(stock), nonNegativeQuantity(stock_minimum), categorie || null, description || null, image || null]
+      `INSERT INTO produits (user_id, nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.tenantId, nom, catalogueType, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), quantity, minimumQuantity, categorie || null, description || null, image || null]
     );
 
-    await initialiserStockEntrepotPrincipal(pool, req.tenantId, result.insertId, nonNegativeQuantity(stock));
+    // Un service n'entre pas dans les stocks physiques ni dans les entrepôts.
+    if (stockManaged) {
+      await initialiserStockEntrepotPrincipal(pool, req.tenantId, result.insertId, quantity);
+    }
     const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ produit: rows[0] });
   } catch (err) { next(err); }
@@ -111,7 +129,7 @@ router.post('/', async (req, res, next) => {
  * @openapi
  * /produits/{id}:
  *   put:
- *     summary: Met à jour un produit (champs fournis uniquement)
+ *     summary: Met à jour une fiche produit ou service (champs fournis uniquement)
  *     tags: [Produits]
  *     parameters:
  *       - in: path
@@ -133,19 +151,66 @@ router.put('/:id', async (req, res, next) => {
     const existing = existingRows[0];
     if (!existing) { await conn.rollback(); return res.status(404).json({ error: 'Produit introuvable.' }); }
 
-    const { nom, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
+    const { nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
     if (nom !== undefined && !nom) {
       await conn.rollback();
       return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
     }
 
-    let nextStock = stock !== undefined ? nonNegativeQuantity(stock, Number(existing.stock)) : Number(existing.stock);
+    const existingType = normalizeCatalogueType(existing.type_catalogue, 'non_classe');
+    const nextType = normalizeCatalogueType(type_catalogue, existingType);
+    if (!nextType) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le type doit être produit, service ou non classé.' });
+    }
+    const stockManaged = isStockManagedType(nextType);
+    let nextStock = stockManaged
+      ? (stock !== undefined ? nonNegativeQuantity(stock, Number(existing.stock)) : Number(existing.stock))
+      : 0;
     let stockMovement = null;
-    const [warehouses] = await conn.query(
-      "SELECT id, nom FROM pro_entrepots WHERE user_id = ? AND code = 'PRINCIPAL' LIMIT 1",
-      [req.tenantId]
-    );
-    if (stock !== undefined && warehouses.length) {
+    let warehouses = [];
+
+    if (!stockManaged) {
+      if ((stock !== undefined && nonNegativeQuantity(stock) > 0) ||
+          (stock_minimum !== undefined && nonNegativeQuantity(stock_minimum) > 0)) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Un service ne peut pas avoir de quantité ni de seuil de stock.' });
+      }
+      // La conversion n'est autorisée qu'après sortie réelle du stock : ne pas effacer
+      // silencieusement des quantités d'entrepôt ou un stock catalogue historique.
+      if (isStockManagedType(existingType)) {
+        const [[stockTotals]] = await conn.query(
+          'SELECT COALESCE(SUM(ABS(quantite)), 0) AS total FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?',
+          [req.tenantId, existing.id]
+        );
+        if (Number(existing.stock || 0) > 0 || Number(stockTotals?.total || 0) > 0) {
+          await conn.rollback();
+          return res.status(409).json({ error: 'Impossible de convertir cet article en service tant qu’il reste une quantité en stock. Ajustez d’abord les stocks dans Achats & stocks.' });
+        }
+
+        const [[pendingPurchase]] = await conn.query(
+          `SELECT COALESCE(SUM(GREATEST(l.quantite - l.quantite_recue, 0)), 0) AS total
+           FROM pro_commandes_fournisseurs_lignes l
+           JOIN pro_commandes_fournisseurs o
+             ON o.id = l.commande_id AND o.user_id = l.user_id
+           WHERE l.user_id = ? AND l.produit_id = ?
+             AND o.statut NOT IN ('annulee', 'recue')`,
+          [req.tenantId, existing.id]
+        );
+        if (Number(pendingPurchase?.total || 0) > 0) {
+          await conn.rollback();
+          return res.status(409).json({ error: 'Impossible de convertir cet article en service tant qu’une commande fournisseur reste à réceptionner.' });
+        }
+      }
+    } else {
+      const [warehouseRows] = await conn.query(
+        "SELECT id, nom FROM pro_entrepots WHERE user_id = ? AND code = 'PRINCIPAL' LIMIT 1",
+        [req.tenantId]
+      );
+      warehouses = warehouseRows;
+    }
+
+    if (stockManaged && stock !== undefined && warehouses.length) {
       // Une fois les stocks multi-entrepôts activés, un changement du stock catalogue
       // est traité comme un delta sur le dépôt principal afin de conserver le total.
       const warehouseId = Number(warehouses[0].id);
@@ -174,18 +239,26 @@ router.put('/:id', async (req, res, next) => {
     }
 
     await conn.query(
-      'UPDATE produits SET nom=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, stock_minimum=?, categorie=?, description=?, image=? WHERE id = ? AND user_id = ?',
+      'UPDATE produits SET nom=?, type_catalogue=?, reference=?, prix_ht=?, prix_achat=?, tva=?, stock=?, stock_minimum=?, categorie=?, description=?, image=? WHERE id = ? AND user_id = ?',
       [
-        nom ?? existing.nom, reference ?? existing.reference,
+        nom ?? existing.nom, nextType, reference ?? existing.reference,
         prix_ht !== undefined ? positiveNumber(prix_ht, existing.prix_ht) : existing.prix_ht,
         prix_achat !== undefined ? positiveNumber(prix_achat, existing.prix_achat) : existing.prix_achat,
         tva !== undefined ? percentage(tva, existing.tva) : existing.tva,
         nextStock,
-        stock_minimum !== undefined ? nonNegativeQuantity(stock_minimum, existing.stock_minimum) : existing.stock_minimum,
+        stockManaged
+          ? (stock_minimum !== undefined ? nonNegativeQuantity(stock_minimum, existing.stock_minimum) : existing.stock_minimum)
+          : 0,
         categorie ?? existing.categorie, description ?? existing.description, image ?? existing.image,
         existing.id, req.tenantId
       ]
     );
+
+    // Lorsqu'un service redevient un produit, réintégrer une ligne à zéro dans
+    // l'entrepôt principal si celui-ci existe ; aucun mouvement n'est inventé.
+    if (!isStockManagedType(existingType) && stockManaged) {
+      await initialiserStockEntrepotPrincipal(conn, req.tenantId, existing.id, nextStock);
+    }
     if (stockMovement && stockMovement.delta !== 0) {
       await conn.query(
         "INSERT INTO pro_mouvements_stock (user_id, produit_id, produit_nom, entrepot_id, entrepot_nom, type, quantite, cout_unitaire, motif) VALUES (?, ?, ?, ?, ?, 'ajustement_catalogue', ?, ?, ?)",

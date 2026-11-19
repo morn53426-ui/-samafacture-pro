@@ -60,6 +60,71 @@ describe('Rapports', () => {
     assert.equal(Number(res.body.rows[0].total), 2360);
   });
 
+  test('exclude_cancelled=true retire uniquement les factures annulées sans changer le comportement historique', async () => {
+    const factureAnnulee = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        lignes: [{ designation: 'Vente annulée de test', quantite: 1, prix_unitaire: 1000, tva: 18 }]
+      });
+    const factureAnnuleeId = factureAnnulee.body.facture?.id;
+    assert.ok(factureAnnuleeId, 'la facture de test doit être créée');
+
+    try {
+      const paiementAnnule = await request(app)
+        .post(`/api/factures/${factureAnnuleeId}/paiements`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ montant: 1180, methode: 'Espèces' });
+      assert.equal(paiementAnnule.status, 201);
+      await pool.query(
+        "UPDATE factures SET statut = 'annulee' WHERE id = ? AND user_id = ?",
+        [factureAnnuleeId, userId]
+      );
+      const comptabilite = await request(app)
+        .get('/api/rapports/comptabilite')
+        .set('Authorization', `Bearer ${token}`);
+      assert.equal(comptabilite.status, 200);
+      assert.equal(Number(comptabilite.body.recettes), 3540,
+        'le paiement déjà enregistré reste agrégé après annulation de la facture');
+      assert.equal(Number(comptabilite.body.tva_collectee), 540,
+        'le calcul conserve la TVA inscrite sur la facture annulée');
+      const tableauBord = await request(app)
+        .get('/api/dashboard')
+        .set('Authorization', `Bearer ${token}`);
+      assert.equal(tableauBord.status, 200);
+      assert.equal(tableauBord.body.evolution_mensuelle.reduce((sum, row) => sum + Number(row.total), 0), 2360,
+        'la prévision financière exclut les factures annulées de ses ventes mensuelles');
+
+      const historique = await request(app)
+        .get('/api/rapports/ventes?group_by=month')
+        .set('Authorization', `Bearer ${token}`);
+      const ventesActives = await request(app)
+        .get('/api/rapports/ventes?group_by=month&exclude_cancelled=true')
+        .set('Authorization', `Bearer ${token}`);
+      const clientsActifs = await request(app)
+        .get('/api/rapports/ventes?group_by=client&exclude_cancelled=true')
+        .set('Authorization', `Bearer ${token}`);
+
+      const totalHistorique = historique.body.rows.reduce((sum, row) => sum + Number(row.total), 0);
+      const totalActif = ventesActives.body.rows.reduce((sum, row) => sum + Number(row.total), 0);
+      const totalClientsActifs = clientsActifs.body.rows.reduce((sum, row) => sum + Number(row.total), 0);
+
+      assert.equal(historique.status, 200);
+      assert.equal(ventesActives.status, 200);
+      assert.equal(clientsActifs.status, 200);
+      assert.equal(totalHistorique, 3540, 'sans option, conserver les totaux historiques');
+      assert.equal(totalActif, 2360, 'avec option, exclure la facture annulée');
+      assert.equal(totalClientsActifs, 2360, 'le filtre doit aussi fonctionner par client');
+    } finally {
+      await pool.query(
+        'DELETE FROM factures WHERE id = ? AND user_id = ?',
+        [factureAnnuleeId, userId]
+      );
+    }
+  });
+
   test('GET /rapports/comptabilite calcule recettes, dépenses, bénéfice et TVA collectée', async () => {
     const res = await request(app).get('/api/rapports/comptabilite').set('Authorization', `Bearer ${token}`);
     assert.equal(res.status, 200);

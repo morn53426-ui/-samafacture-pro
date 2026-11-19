@@ -75,3 +75,12 @@ body.workspace-modal-open{overflow:hidden}
   .workspace-modal-panel .workspace-modal-actions{display:flex;flex-direction:column-reverse;align-items:stretch}
   .workspace-modal-panel .workspace-modal-actions>.btn{width:100%;justify-content:center}
 }
+
+
+/* Les définitions comptables utilisées par le récapitulatif doivent rester visibles. */
+.reports-accounting-note{
+  margin:-4px 0 18px;
+  color:var(--ink-soft,#6b7280);
+  font-size:.82rem;
+  line-height:1.55
+}

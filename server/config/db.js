@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 15;
+const CURRENT_SCHEMA_VERSION = 16;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -169,6 +169,7 @@ async function runMigrations(conn) {
   // v14 : preuve email à usage unique pour les invitations classiques d’équipe (migration 009).
   // v15 : fondation des abonnements SaaS (prix versionnés, consentements, mandats,
   // périodes, tentatives, inbox webhook et audit) ; aucune donnée ni paiement créé.
+  // v16 : type structuré des fiches catalogue ; les anciennes fiches restent non classées.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -198,6 +199,7 @@ async function runMigrations(conn) {
     { table: 'users', column: 'format_date', definition: "VARCHAR(20) NOT NULL DEFAULT 'dd/MM/yyyy'" },
     { table: 'users', column: 'regime_fiscal', definition: "VARCHAR(30) NOT NULL DEFAULT 'standard'" },
     { table: 'factures', column: 'devise', definition: "VARCHAR(10) NOT NULL DEFAULT 'FCFA'" },
+    { table: 'produits', column: 'type_catalogue', definition: "VARCHAR(20) NOT NULL DEFAULT 'non_classe' AFTER nom" },
     { table: 'produits', column: 'stock_minimum', definition: 'DECIMAL(14,3) NOT NULL DEFAULT 0' },
     { table: 'users', column: 'facture_personnalisation', definition: 'TEXT' },
     { table: 'users', column: 'entreprise_rccm', definition: 'VARCHAR(80)' },

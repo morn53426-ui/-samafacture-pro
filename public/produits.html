@@ -26,21 +26,21 @@
         <h1>Produits & services</h1>
         <p>Votre catalogue pour créer des factures plus rapidement</p>
       </div>
-      <button class="btn btn-primary" onclick="openModal()"><i class="ic" data-icon="plus"></i> Nouveau produit</button>
+      <button class="btn btn-primary" onclick="openModal()"><i class="ic" data-icon="plus"></i> Nouvelle fiche</button>
     </div>
 
     <div class="card workspace-data-card" style="padding:0;">
       <div class="workspace-data-heading">
-        <div><h2>Catalogue produits & services</h2><p>Tarifs, références, fiscalité et niveaux de stock</p></div>
+        <div><h2>Catalogue produits & services</h2><p>Tarifs, références et fiscalité ; stock pour les biens physiques</p></div>
         <span class="workspace-data-type"><i class="ic" data-icon="file-stack"></i> Données du compte</span>
       </div>
       <table class="table-stack products-table">
-        <thead><tr><th>Produit</th><th>Référence</th><th>Prix HT</th><th>Prix d'achat</th><th>TVA</th><th>Stock</th><th></th></tr></thead>
+        <thead><tr><th>Nom</th><th>Type</th><th>Référence</th><th>Prix HT</th><th>Prix d'achat</th><th>TVA</th><th>Stock</th><th></th></tr></thead>
         <tbody id="produits-body">
-          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
-          <tr class="row-skeleton"><td colspan="7"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="8"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="8"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="8"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
+          <tr class="row-skeleton"><td colspan="8"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
         </tbody>
       </table>
     </div>
@@ -54,6 +54,15 @@
     <div id="modal-error" role="alert" aria-live="assertive"></div>
     <form id="produit-form">
       <input type="hidden" id="produit-id" />
+      <div class="field">
+        <label for="type_catalogue">Type de fiche *</label>
+        <select id="type_catalogue" required>
+          <option value="produit">Produit — bien physique</option>
+          <option value="service">Service — prestation</option>
+          <option value="non_classe">Non classé — fiche historique</option>
+        </select>
+        <small class="helper">Ce choix distingue les ventes de biens et de prestations sans deviner la nature des anciennes fiches.</small>
+      </div>
       <div class="field"><label for="nom">Nom *</label><input type="text" id="nom" required /></div>
       <div class="field"><label for="reference">Référence</label><input type="text" id="reference" /></div>
       <div class="workspace-modal-fields" style="display:flex; gap:12px;">
@@ -61,8 +70,10 @@
         <div class="field" style="flex:1;"><label for="tva">TVA (%)</label><input type="number" id="tva" min="0" max="100" step="1" value="0" /></div>
       </div>
       <div class="field"><label for="prix_achat">Prix d’achat (FCFA)</label><input type="number" id="prix_achat" min="0" step="1" value="0" /><small class="helper">Utilisé pour estimer la marge. Laissez 0 si le coût est inconnu.</small></div>
-      <div class="field"><label for="stock">Stock disponible</label><input type="number" id="stock" min="0" step="0.001" value="0" /></div>
-      <div class="field"><label for="stock_minimum">Seuil minimum de stock</label><input type="number" id="stock_minimum" min="0" step="0.001" value="0" /><small class="helper">Une alerte peut être envoyée lorsque le stock atteint ce seuil.</small></div>
+      <div id="stock-fields">
+        <div class="field"><label for="stock">Stock disponible</label><input type="number" id="stock" min="0" step="0.001" value="0" /></div>
+        <div class="field"><label for="stock_minimum">Seuil minimum de stock</label><input type="number" id="stock_minimum" min="0" step="0.001" value="0" /><small class="helper">Une alerte peut être envoyée lorsque le stock atteint ce seuil.</small></div>
+      </div>
       <div class="field"><label for="categorie">Catégorie</label><input type="text" id="categorie" /></div>
       <div class="field"><label for="description">Description</label><textarea id="description"></textarea></div>
       <div class="workspace-modal-actions" style="display:flex; gap:10px; justify-content:flex-end;">
@@ -90,34 +101,52 @@
     document.getElementById('produits-body').innerHTML = produits.length ? produits.map(p => `
       <tr class="row-clickable" tabindex="0" role="button" aria-label="Modifier ${escapeHtml(p.nom)}"
           onclick="editProduit(${p.id})" onkeydown="if(event.key==='Enter') editProduit(${p.id})">
-        <td data-label="Produit" class="product-name">${escapeHtml(p.nom)}</td>
+        <td data-label="Nom" class="product-name">${escapeHtml(p.nom)}</td>
+        <td data-label="Type">${p.type_catalogue === 'produit' ? 'Produit' : p.type_catalogue === 'service' ? 'Service' : 'Non classé'}</td>
         <td data-label="Référence" class="mono">${escapeHtml(p.reference) || '—'}</td>
         <td data-label="Prix HT" class="mono">${formatMontant(p.prix_ht)}</td>
         <td data-label="Prix d'achat" class="mono">${formatMontant(p.prix_achat || 0)}</td>
         <td data-label="TVA" class="mono">${p.tva}%</td>
-        <td data-label="Stock" class="mono">${p.stock}</td>
+        <td data-label="Stock" class="mono">${p.type_catalogue === 'service' ? '—' : p.stock}</td>
         <td data-label="Actions" style="text-align:right;" onclick="event.stopPropagation();">
           <button class="btn btn-sm btn-outline" onclick='editProduit(${p.id})'>${Icon('edit-3')} Modifier</button>
           <button class="btn btn-sm btn-danger" onclick="deleteProduit(${p.id})">${Icon('trash-2')} Supprimer</button>
         </td>
       </tr>
-    `).join('') : `<tr><td colspan="7"><div class="empty-state"><div class="ic">${Icon('package')}</div>Aucun produit. Ajoutez votre catalogue !</div></td></tr>`;
+    `).join('') : `<tr><td colspan="8"><div class="empty-state"><div class="ic">${Icon('package')}</div>Aucune fiche dans le catalogue. Ajoutez un produit ou un service !</div></td></tr>`;
     renderPagination('pagination', pagination, (p) => load(p));
   }
 
+  function syncCatalogueTypeFields() {
+    const isService = document.getElementById('type_catalogue').value === 'service';
+    const stockFields = document.getElementById('stock-fields');
+    stockFields.hidden = isService;
+    stockFields.setAttribute('aria-hidden', String(isService));
+    for (const fieldId of ['stock', 'stock_minimum']) {
+      const field = document.getElementById(fieldId);
+      field.disabled = isService;
+      if (isService) field.value = '0';
+    }
+  }
+
+  document.getElementById('type_catalogue').addEventListener('change', syncCatalogueTypeFields);
+
   function openModal() {
-    document.getElementById('modal-title').textContent = 'Nouveau produit';
+    document.getElementById('modal-title').textContent = 'Nouvelle fiche du catalogue';
     document.getElementById('produit-form').reset();
     document.getElementById('produit-id').value = '';
+    document.getElementById('type_catalogue').value = 'produit';
     document.getElementById('modal-error').innerHTML = '';
+    syncCatalogueTypeFields();
     document.getElementById('modal').style.display = 'flex';
   }
   function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
   function editProduit(id) {
     const p = produits.find(p => p.id === id);
-    document.getElementById('modal-title').textContent = 'Modifier le produit';
+    document.getElementById('modal-title').textContent = 'Modifier la fiche du catalogue';
     document.getElementById('produit-id').value = p.id;
+    document.getElementById('type_catalogue').value = p.type_catalogue || 'non_classe';
     document.getElementById('nom').value = p.nom || '';
     document.getElementById('reference').value = p.reference || '';
     document.getElementById('prix_ht').value = p.prix_ht;
@@ -127,6 +156,7 @@
     document.getElementById('stock_minimum').value = p.stock_minimum || 0;
     document.getElementById('categorie').value = p.categorie || '';
     document.getElementById('description').value = p.description || '';
+    syncCatalogueTypeFields();
     document.getElementById('modal').style.display = 'flex';
   }
 
@@ -143,14 +173,16 @@
   document.getElementById('produit-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const id = document.getElementById('produit-id').value;
+    const catalogueType = document.getElementById('type_catalogue').value;
     const payload = {
       nom: document.getElementById('nom').value,
+      type_catalogue: catalogueType,
       reference: document.getElementById('reference').value,
       prix_ht: parseFloat(document.getElementById('prix_ht').value) || 0,
       prix_achat: parseFloat(document.getElementById('prix_achat').value) || 0,
       tva: parseFloat(document.getElementById('tva').value) || 0,
-      stock: parseFloat(document.getElementById('stock').value) || 0,
-      stock_minimum: parseFloat(document.getElementById('stock_minimum').value) || 0,
+      stock: catalogueType === 'service' ? 0 : (parseFloat(document.getElementById('stock').value) || 0),
+      stock_minimum: catalogueType === 'service' ? 0 : (parseFloat(document.getElementById('stock_minimum').value) || 0),
       categorie: document.getElementById('categorie').value,
       description: document.getElementById('description').value
     };

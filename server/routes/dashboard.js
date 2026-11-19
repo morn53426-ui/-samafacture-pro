@@ -29,14 +29,19 @@ function pruneDashboardCache(now = Date.now()) {
 function emptyDashboard() {
   return {
     chiffre_affaires: 0,
+    factures_emises: 0,
+    nouveaux_clients: 0,
+    valeur_stock: 0,
     factures_payees: { n: 0, total: 0 },
     factures_en_attente: { n: 0, total: 0 },
     factures_en_retard: { n: 0, total: 0 },
     derniers_paiements: [],
+    dernieres_factures: [],
     derniers_clients: [],
     evolution_mensuelle: [],
     top_clients: [],
     top_produits: [],
+    repartition_ventes: [],
     tresorerie: 0
   };
 }
@@ -52,6 +57,9 @@ async function buildDashboard(userId) {
 
   // One summary query replaces the old factures + depenses queries. It also gives us
   // invoice_count so a brand-new account does not needlessly execute four more joins.
+  // Le champ historique chiffre_affaires reste exposé pour compatibilité API : il mesure
+  // les paiements enregistrés (y compris ceux d'une facture annulée ensuite), pas les ventes facturées.
+  // Aucun flux de remboursement n'est modélisé ici ; ne pas présenter cette somme comme un solde bancaire.
   const [summaryRows] = await pool.query(
     `SELECT
        COUNT(*) AS invoice_count,
@@ -62,18 +70,34 @@ async function buildDashboard(userId) {
        COALESCE(SUM(CASE WHEN statut = 'en_attente' AND (date_echeance IS NULL OR date_echeance >= ?) THEN total ELSE 0 END),0) AS attente_total,
        COALESCE(SUM(CASE WHEN statut = 'en_retard' OR (statut = 'en_attente' AND date_echeance IS NOT NULL AND date_echeance < ?) THEN 1 ELSE 0 END),0) AS retard_n,
        COALESCE(SUM(CASE WHEN statut = 'en_retard' OR (statut = 'en_attente' AND date_echeance IS NOT NULL AND date_echeance < ?) THEN total ELSE 0 END),0) AS retard_total,
+       SUM(CASE WHEN statut <> 'annulee' THEN 1 ELSE 0 END) AS factures_emises,
+       (SELECT COUNT(*) FROM clients c WHERE c.user_id = ? AND c.created_at >= DATE_SUB(?, INTERVAL 30 DAY)) AS nouveaux_clients,
+       (SELECT COALESCE(SUM(GREATEST(0, COALESCE(stocks.quantite, p.stock)) * p.prix_achat),0)
+          FROM produits p
+          LEFT JOIN (
+            SELECT produit_id, SUM(quantite) AS quantite
+              FROM pro_stocks_entrepots
+             WHERE user_id = ?
+             GROUP BY produit_id
+          ) stocks ON stocks.produit_id = p.id
+         WHERE p.user_id = ?) AS valeur_stock,
        (SELECT COALESCE(SUM(d.montant),0) FROM depenses d WHERE d.user_id = ?) AS total_depenses
      FROM factures
      WHERE user_id = ? AND type = 'facture'`,
-    [localToday, localToday, localToday, localToday, userId, userId]
+    [localToday, localToday, localToday, localToday, userId, localToday, userId, userId, userId, userId]
   );
   const summary = summaryRows?.[0] || {};
 
   const base = {
     chiffre_affaires: Number(summary?.chiffre_affaires || 0),
+    factures_emises: Number(summary?.factures_emises || 0),
+    nouveaux_clients: Number(summary?.nouveaux_clients || 0),
+    valeur_stock: Number(summary?.valeur_stock || 0),
     factures_payees: { n: Number(summary?.payees_n || 0), total: Number(summary?.payees_total || 0) },
     factures_en_attente: { n: Number(summary?.attente_n || 0), total: Number(summary?.attente_total || 0) },
     factures_en_retard: { n: Number(summary?.retard_n || 0), total: Number(summary?.retard_total || 0) },
+    // Champ historique conservé pour compatibilité : écart cumulé paiements enregistrés - dépenses,
+    // pas un solde bancaire (les remboursements et autres mouvements ne sont pas modélisés).
     tresorerie: Number(summary?.chiffre_affaires || 0) - Number(summary?.total_depenses || 0)
   };
 
@@ -93,10 +117,10 @@ async function buildDashboard(userId) {
       [userId]
     );
     const derniersClients = (rows || []).map(({ row_type, ...client }) => client);
-    return { ...base, derniers_paiements: [], derniers_clients: derniersClients, evolution_mensuelle: [], top_clients: [], top_produits: [] };
+    return { ...base, derniers_paiements: [], dernieres_factures: [], derniers_clients: derniersClients, evolution_mensuelle: [], top_clients: [], top_produits: [], repartition_ventes: [] };
   }
 
-  // These five reads are independent and are deliberately kept as separate result sets:
+  // These independent reads are deliberately kept as separate result sets:
   // this preserves compatibility with existing MySQL/WAMP installations without enabling
   // multipleStatements globally. They execute concurrently, but only after the inexpensive
   // summary has established that the user actually has invoice data.
@@ -105,7 +129,9 @@ async function buildDashboard(userId) {
     [derniersClients],
     [evolutionMensuelle],
     [topClients],
-    [topProduits]
+    [topProduits],
+    [dernieresFactures],
+    [repartitionVentes]
   ] = await Promise.all([
     pool.query(
       `SELECT p.*, f.numero, c.nom as client_nom FROM paiements p
@@ -116,9 +142,11 @@ async function buildDashboard(userId) {
     pool.query(`SELECT * FROM clients WHERE user_id = ? ORDER BY created_at DESC LIMIT 5`, [userId]),
     pool.query(
       `SELECT DATE_FORMAT(date_emission, '%Y-%m') as mois, COALESCE(SUM(total),0) as total
-       FROM factures WHERE user_id = ? AND type = 'facture' AND date_emission >= DATE_SUB(?, INTERVAL 6 MONTH)
+       FROM factures
+       WHERE user_id = ? AND type = 'facture' AND statut <> 'annulee'
+         AND date_emission >= DATE_SUB(DATE_FORMAT(?, '%Y-%m-01'), INTERVAL 5 MONTH) AND date_emission <= ?
        GROUP BY mois ORDER BY mois`,
-      [userId, localToday]
+      [userId, localToday, localToday]
     ),
     pool.query(
       `SELECT c.id, c.nom, COUNT(f.id) as nb_factures, COALESCE(SUM(f.total),0) as total
@@ -133,16 +161,49 @@ async function buildDashboard(userId) {
        WHERE f.user_id = ? AND f.type = 'facture'
        GROUP BY fl.designation ORDER BY total DESC LIMIT 5`,
       [userId]
+    ),
+    pool.query(
+      `SELECT f.id, f.numero, f.date_emission, f.statut, f.total, c.nom AS client_nom
+       FROM factures f
+       LEFT JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id
+       WHERE f.user_id = ? AND f.type = 'facture'
+       ORDER BY f.date_emission DESC, f.id DESC
+       LIMIT 5`,
+      [userId]
+    ),
+    pool.query(
+      `SELECT
+         CASE
+           WHEN p.id IS NULL THEN 'non_classe'
+           WHEN p.type_catalogue = 'service' THEN 'service'
+           WHEN p.type_catalogue = 'produit' THEN 'produit'
+           ELSE 'non_classe'
+         END AS type_catalogue,
+         COALESCE(SUM(fl.total_ligne), 0) AS total_ttc,
+         COUNT(*) AS nombre_lignes
+       FROM facture_lignes fl
+       JOIN factures f ON f.id = fl.facture_id
+       LEFT JOIN produits p ON p.id = fl.produit_id AND p.user_id = f.user_id
+       WHERE f.user_id = ? AND f.type = 'facture' AND f.statut <> 'annulee'
+       GROUP BY CASE
+         WHEN p.id IS NULL THEN 'non_classe'
+         WHEN p.type_catalogue = 'service' THEN 'service'
+         WHEN p.type_catalogue = 'produit' THEN 'produit'
+         ELSE 'non_classe'
+       END`,
+      [userId]
     )
   ]);
 
   return {
     ...base,
     derniers_paiements: derniersPaiements || [],
+    dernieres_factures: dernieresFactures || [],
     derniers_clients: derniersClients || [],
     evolution_mensuelle: evolutionMensuelle || [],
     top_clients: topClients || [],
-    top_produits: topProduits || []
+    top_produits: topProduits || [],
+    repartition_ventes: repartitionVentes || []
   };
 }
 
@@ -150,7 +211,7 @@ async function buildDashboard(userId) {
  * @openapi
  * /dashboard:
  *   get:
- *     summary: Statistiques du tableau de bord (trésorerie, factures en retard, évolution mensuelle des ventes...)
+ *     summary: Indicateurs de paiements enregistrés, factures, ventes facturées et stock
  *     tags: [Tableau de bord]
  *     responses:
  *       200:
