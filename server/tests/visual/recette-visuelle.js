@@ -3131,9 +3131,35 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           parts.unshift(current.tagName.toLowerCase() + ':nth-child(' + index + ')');
           current = current.parentElement;
         }
+        const indicatorFor = candidate => {
+          const style = getComputedStyle(candidate);
+          const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
+          const shadow = Boolean(style.boxShadow && style.boxShadow !== 'none');
+          return { visible: Boolean(outline || shadow), outline: style.outline, boxShadow: style.boxShadow };
+        };
+        // Certains composants placent l'indicateur sur leur enveloppe : le focus
+        // réel reste sur le champ, tandis que le contour est rendu par :focus-within.
+        let indicatorOwner = null;
+        let ancestor = element;
+        while (ancestor && ancestor !== document.body) {
+          if (ancestor === element || ancestor.matches(':focus-within')) {
+            const indicator = indicatorFor(ancestor);
+            if (indicator.visible) {
+              indicatorOwner = {
+                selector: ancestor.tagName.toLowerCase() +
+                  (ancestor.id ? '#' + ancestor.id : '') +
+                  (typeof ancestor.className === 'string' && ancestor.className.trim()
+                    ? '.' + ancestor.className.trim().split(/\\s+/).slice(0, 2).join('.')
+                    : ''),
+                ...indicator
+              };
+              break;
+            }
+          }
+          ancestor = ancestor.parentElement;
+        }
         const style = getComputedStyle(element);
-        const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
-        const shadow = style.boxShadow && style.boxShadow !== 'none';
+        const directIndicator = indicatorFor(element);
         return {
           key: parts.join('>'),
           selector: element.tagName.toLowerCase() +
@@ -3144,7 +3170,8 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           text: String(element.innerText || element.textContent || element.getAttribute('aria-label') || '')
             .replace(/\\s+/g, ' ').trim().slice(0, 80),
           focusVisible: element.matches(':focus-visible'),
-          hasIndicator: Boolean(outline || shadow),
+          hasIndicator: Boolean(indicatorOwner),
+          indicatorOwner,
           outline: style.outline,
           boxShadow: style.boxShadow
         };

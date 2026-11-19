@@ -101,3 +101,10 @@ Elle ne prétend pas simuler la restitution vocale d'un vrai lecteur d'écran : 
 manuelle VoiceOver (Safari/iOS/macOS) et NVDA (Firefox/Windows) demeure requise avant
 une certification d'accessibilité.
 
+
+### Indicateurs de focus portés par un conteneur
+
+Le contrôle clavier accepte un indicateur rendu soit directement sur l'élément focalisé,
+soit sur un ancêtre correspondant à `:focus-within` (par exemple une barre de recherche
+dont le contour et l'ombre sont dessinés sur son conteneur). Le rapport indique
+`indicatorOwner` pour distinguer la cible clavier du composant qui dessine l'indicateur.
