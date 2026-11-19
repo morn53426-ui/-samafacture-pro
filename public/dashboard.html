@@ -471,7 +471,7 @@
       }
     });
     canvas.setAttribute('aria-label',
-      'Répartition des montants TTC facturés par type de catalogue, hors factures annulées. Montant total TTC : ' +
+      'Répartition des ventes : montants TTC facturés par type de catalogue, hors factures annulées. Montant total TTC : ' +
       formatMontant(total) + '. ' +
       rows.map(row => row.label + ' : ' + formatMontant(row.value)).join('; ') + '.');
   }
