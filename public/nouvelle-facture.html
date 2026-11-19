@@ -219,9 +219,10 @@
       const pu = parseFloat(row.querySelector('.ligne-pu').value) || 0;
       const tva = parseFloat(row.querySelector('.ligne-tva').value) || 0;
       const designation = row.querySelector('.ligne-designation').value;
+      const produitId = row.querySelector('.ligne-produit').value;
       const total = round2(qte * pu * (1 + tva / 100));
       row.querySelector('.ligne-total').textContent = formatMontant(total);
-      return { designation, quantite: qte, prix_unitaire: pu, tva, total_ligne: total };
+      return { produit_id: produitId ? Number(produitId) : null, designation, quantite: qte, prix_unitaire: pu, tva, total_ligne: total };
     });
   }
 
