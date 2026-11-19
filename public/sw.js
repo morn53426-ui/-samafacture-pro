@@ -1,5 +1,5 @@
-// v5 : invalide le cache de l'ancienne identité visuelle et charge le nouveau kit de marque.
-const CACHE_NAME = 'sunupilot-shell-v5';
+// v6 : actualise le shell partagé pour servir la navigation et l'identité Sunupilot corrigées.
+const CACHE_NAME = 'sunupilot-shell-v6';
 
 // Fichiers statiques de l'interface (l'API n'est jamais mise en cache : les données doivent
 // toujours être à jour).
