@@ -463,6 +463,13 @@ test('associer une ligne d’achat saisie libre à un produit permet sa récepti
     .set('Authorization', 'Bearer ' + tokenA)
     .send({ nom: 'Fournisseur ligne libre' });
   assert.equal(supplier.status, 201, supplier.text);
+  const malformedProduct = await request(app).post('/api/pro/purchase-orders')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ fournisseur_id: supplier.body.id, lignes: [{
+      produit_id: 'identifiant-invalide', designation: 'Produit mal référencé', quantite: 1, prix_unitaire: 400, tva: 18
+    }] });
+  assert.equal(malformedProduct.status, 400, malformedProduct.text);
+
   const order = await request(app).post('/api/pro/purchase-orders')
     .set('Authorization', 'Bearer ' + tokenA)
     .send({ fournisseur_id: supplier.body.id, lignes: [{
