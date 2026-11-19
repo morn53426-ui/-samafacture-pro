@@ -15,6 +15,26 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /Bienvenue sur Sunupilot/);
   });
 
+  test('les quatre KPI utilisent les bons indicateurs et la valorisation de stock reste explicite si indisponible', () => {
+    assert.match(dashboard, /Chiffre d'affaires/);
+    assert.match(dashboard, /Factures émises/);
+    assert.match(dashboard, /Nouveaux clients/);
+    assert.match(dashboard, /Valeur du stock/);
+    assert.match(dashboard, /Ajoutés sur les 30 derniers jours/);
+    assert.match(dashboard, /Api\.get\('\/pro\/inventory\/valuation'\)\.catch\(\(\) => null\)/);
+    assert.match(dashboard, /stats\.valeur_stock_disponible \? formatMontant/);
+    assert.match(dashboard, /Données de stock indisponibles/);
+  });
+
+  test('le tableau de bord affiche les dernières factures avec statut et total TTC', () => {
+    assert.match(dashboard, /Dernières factures/);
+    assert.match(dashboard, /N° facture/);
+    assert.match(dashboard, /Émission/);
+    assert.match(dashboard, /Statut/);
+    assert.match(dashboard, /Total TTC/);
+    assert.match(dashboard, /renderRecentInvoices\(stats\.dernieres_factures \|\| \[\]\)/);
+  });
+
   test('les cinq cartes de modules pointent vers les pages métier existantes', () => {
     const expected = [
       ['crm.html', 'CRM &amp; suivi client'],

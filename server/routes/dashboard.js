@@ -29,10 +29,13 @@ function pruneDashboardCache(now = Date.now()) {
 function emptyDashboard() {
   return {
     chiffre_affaires: 0,
+    factures_emises: 0,
+    nouveaux_clients: 0,
     factures_payees: { n: 0, total: 0 },
     factures_en_attente: { n: 0, total: 0 },
     factures_en_retard: { n: 0, total: 0 },
     derniers_paiements: [],
+    dernieres_factures: [],
     derniers_clients: [],
     evolution_mensuelle: [],
     top_clients: [],
@@ -62,15 +65,19 @@ async function buildDashboard(userId) {
        COALESCE(SUM(CASE WHEN statut = 'en_attente' AND (date_echeance IS NULL OR date_echeance >= ?) THEN total ELSE 0 END),0) AS attente_total,
        COALESCE(SUM(CASE WHEN statut = 'en_retard' OR (statut = 'en_attente' AND date_echeance IS NOT NULL AND date_echeance < ?) THEN 1 ELSE 0 END),0) AS retard_n,
        COALESCE(SUM(CASE WHEN statut = 'en_retard' OR (statut = 'en_attente' AND date_echeance IS NOT NULL AND date_echeance < ?) THEN total ELSE 0 END),0) AS retard_total,
+       SUM(CASE WHEN statut <> 'annulee' THEN 1 ELSE 0 END) AS factures_emises,
+       (SELECT COUNT(*) FROM clients c WHERE c.user_id = ? AND c.created_at >= DATE_SUB(?, INTERVAL 30 DAY)) AS nouveaux_clients,
        (SELECT COALESCE(SUM(d.montant),0) FROM depenses d WHERE d.user_id = ?) AS total_depenses
      FROM factures
      WHERE user_id = ? AND type = 'facture'`,
-    [localToday, localToday, localToday, localToday, userId, userId]
+    [localToday, localToday, localToday, localToday, userId, localToday, userId, userId]
   );
   const summary = summaryRows?.[0] || {};
 
   const base = {
     chiffre_affaires: Number(summary?.chiffre_affaires || 0),
+    factures_emises: Number(summary?.factures_emises || 0),
+    nouveaux_clients: Number(summary?.nouveaux_clients || 0),
     factures_payees: { n: Number(summary?.payees_n || 0), total: Number(summary?.payees_total || 0) },
     factures_en_attente: { n: Number(summary?.attente_n || 0), total: Number(summary?.attente_total || 0) },
     factures_en_retard: { n: Number(summary?.retard_n || 0), total: Number(summary?.retard_total || 0) },
@@ -93,7 +100,7 @@ async function buildDashboard(userId) {
       [userId]
     );
     const derniersClients = (rows || []).map(({ row_type, ...client }) => client);
-    return { ...base, derniers_paiements: [], derniers_clients: derniersClients, evolution_mensuelle: [], top_clients: [], top_produits: [] };
+    return { ...base, derniers_paiements: [], dernieres_factures: [], derniers_clients: derniersClients, evolution_mensuelle: [], top_clients: [], top_produits: [] };
   }
 
   // These five reads are independent and are deliberately kept as separate result sets:
@@ -105,7 +112,8 @@ async function buildDashboard(userId) {
     [derniersClients],
     [evolutionMensuelle],
     [topClients],
-    [topProduits]
+    [topProduits],
+    [dernieresFactures]
   ] = await Promise.all([
     pool.query(
       `SELECT p.*, f.numero, c.nom as client_nom FROM paiements p
@@ -133,12 +141,22 @@ async function buildDashboard(userId) {
        WHERE f.user_id = ? AND f.type = 'facture'
        GROUP BY fl.designation ORDER BY total DESC LIMIT 5`,
       [userId]
+    ),
+    pool.query(
+      `SELECT f.id, f.numero, f.date_emission, f.statut, f.total, c.nom AS client_nom
+       FROM factures f
+       LEFT JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id
+       WHERE f.user_id = ? AND f.type = 'facture'
+       ORDER BY f.date_emission DESC, f.id DESC
+       LIMIT 5`,
+      [userId]
     )
   ]);
 
   return {
     ...base,
     derniers_paiements: derniersPaiements || [],
+    dernieres_factures: dernieresFactures || [],
     derniers_clients: derniersClients || [],
     evolution_mensuelle: evolutionMensuelle || [],
     top_clients: topClients || [],

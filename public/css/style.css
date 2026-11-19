@@ -7503,3 +7503,21 @@ a.btn .icon {
 @media (prefers-reduced-motion: reduce) {
   .dashboard-module-card { transition: none; }
 }
+
+
+/* Tableau de bord : alignement centré et cohérent sur écrans ultra-larges. */
+@media (min-width: 1900px) {
+  body .main-content.workspace-page.page-dashboard > :not(.app-topbar):not(#topbar-root) {
+    width: min(100%, 1580px) !important;
+    max-width: 1580px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
+/* Statut des dernières factures : libellés courts, contrastés et lisibles. */
+.dashboard-invoice-status { display: inline-flex; align-items: center; max-width: 100%; padding: 4px 8px; border: 1px solid transparent; border-radius: 999px; font-size: .72rem; font-weight: 650; line-height: 1.25; white-space: nowrap; }
+.dashboard-invoice-status.is-paid { color: var(--emerald); background: color-mix(in srgb, var(--emerald) 9%, var(--paper)); border-color: color-mix(in srgb, var(--emerald) 20%, var(--line)); }
+.dashboard-invoice-status.is-pending { color: var(--gold-text); background: color-mix(in srgb, var(--gold) 11%, var(--paper)); border-color: color-mix(in srgb, var(--gold) 23%, var(--line)); }
+.dashboard-invoice-status.is-overdue { color: var(--clay); background: color-mix(in srgb, var(--clay) 9%, var(--paper)); border-color: color-mix(in srgb, var(--clay) 20%, var(--line)); }
+.dashboard-invoice-status.is-cancelled, .dashboard-invoice-status.is-unknown { color: var(--ink-soft); background: color-mix(in srgb, var(--ink-soft) 7%, var(--paper)); border-color: var(--line); }

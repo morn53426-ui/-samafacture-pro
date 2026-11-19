@@ -26,6 +26,19 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.match(source, /dashboardInFlight\.set\(key, pending\)/);
   });
 
+  test('les KPI factures émises et nouveaux clients sont calculés sur le compte courant', () => {
+    assert.match(source, /SUM\(CASE WHEN statut <> 'annulee' THEN 1 ELSE 0 END\) AS factures_emises/);
+    assert.match(source, /SELECT COUNT\(\*\) FROM clients c WHERE c\.user_id = \? AND c\.created_at >= DATE_SUB\(\?, INTERVAL 30 DAY\)/);
+    assert.match(source, /factures_emises: Number\(summary\?\.factures_emises \|\| 0\)/);
+    assert.match(source, /nouveaux_clients: Number\(summary\?\.nouveaux_clients \|\| 0\)/);
+  });
+
+  test('les dernières factures sont limitées au locataire et excluent les devis', () => {
+    assert.match(source, /dernieres_factures: dernieresFactures \|\| \[\]/);
+    assert.match(source, /f\.user_id = \? AND f\.type = 'facture'[\s\S]*?ORDER BY f\.date_emission DESC, f\.id DESC[\s\S]*?LIMIT 5/);
+    assert.match(source, /LEFT JOIN clients c ON c\.id = f\.client_id AND c\.user_id = f\.user_id/);
+  });
+
   test('le cache est borné et temporaire', () => {
     assert.match(source, /DASHBOARD_CACHE_TTL_MS/);
     assert.match(source, /DASHBOARD_CACHE_MAX/);

@@ -113,14 +113,14 @@
         <header class="dashboard-panel-head">
           <div class="dashboard-panel-title">
             <i class="ic" data-icon="file-text"></i>
-            <div><h2>Encaissements récents</h2><p class="dashboard-panel-subtitle">Derniers paiements enregistrés</p></div>
+            <div><h2>Dernières factures</h2><p class="dashboard-panel-subtitle">Derniers documents commerciaux émis</p></div>
           </div>
           <a href="factures.html" class="dashboard-chip">Voir les factures <i class="ic" data-icon="arrow-up-right"></i></a>
         </header>
         <div class="dashboard-table-wrap">
           <table class="dashboard-table">
-            <thead><tr><th>Référence</th><th>Client</th><th>Méthode</th><th>Date</th><th>Montant</th></tr></thead>
-            <tbody id="paiements-body">
+            <thead><tr><th>N° facture</th><th>Client</th><th>Émission</th><th>Statut</th><th>Total TTC</th></tr></thead>
+            <tbody id="dernieres-factures-body">
               <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
               <tr class="row-skeleton"><td colspan="5"><div class="skeleton-bar" style="width:100%;"></div></td></tr>
             </tbody>
@@ -194,30 +194,38 @@
         <span class="dashboard-kpi-note">Encaissements cumulés enregistrés</span>
       </article>
       <article class="dashboard-kpi green">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('check-circle')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${value(stats.factures_payees?.n).toLocaleString('fr-FR')}</strong><span class="dashboard-kpi-label">Factures payées</span></div></div>
-        <span class="dashboard-kpi-note">${formatMontant(value(stats.factures_payees?.total))} réglés</span>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('file-check')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatDashboardCount(stats.factures_emises)}</strong><span class="dashboard-kpi-label">Factures émises</span></div></div>
+        <span class="dashboard-kpi-note">Factures actives, hors devis et annulations</span>
       </article>
       <article class="dashboard-kpi purple">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('clock')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${value(stats.factures_en_attente?.n).toLocaleString('fr-FR')}</strong><span class="dashboard-kpi-label">Factures en attente</span></div></div>
-        <span class="dashboard-kpi-note">${formatMontant(value(stats.factures_en_attente?.total))} à recevoir</span>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('user-plus')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatDashboardCount(stats.nouveaux_clients)}</strong><span class="dashboard-kpi-label">Nouveaux clients</span></div></div>
+        <span class="dashboard-kpi-note">Ajoutés sur les 30 derniers jours</span>
       </article>
       <article class="dashboard-kpi amber">
-        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('wallet')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${formatMontant(value(stats.tresorerie))}</strong><span class="dashboard-kpi-label">Solde net estimé</span></div></div>
-        <span class="dashboard-kpi-note">Encaissements moins dépenses</span>
+        <div class="dashboard-kpi-top"><span class="dashboard-kpi-icon">${Icon('package')}</span><div class="dashboard-kpi-copy"><strong class="dashboard-kpi-value">${stats.valeur_stock_disponible ? formatMontant(value(stats.valeur_stock)) : '—'}</strong><span class="dashboard-kpi-label">Valeur du stock</span></div></div>
+        <span class="dashboard-kpi-note">${stats.valeur_stock_disponible ? 'Valorisation au coût d’achat' : 'Données de stock indisponibles'}</span>
       </article>
     `;
   }
 
-  function renderRecentPayments(rows) {
-    const body = document.getElementById('paiements-body');
-    body.innerHTML = rows?.length ? rows.map(p => `
-      <tr>
-        <td data-label="Référence" class="mono">${escapeHtml(p.numero || '—')}</td>
-        <td data-label="Client">${escapeHtml(p.client_nom || '—')}</td>
-        <td data-label="Méthode">${escapeHtml(p.methode || '—')}</td>
-        <td data-label="Date">${p.date_paiement ? formatDate(p.date_paiement) : '—'}</td>
-        <td data-label="Montant" class="mono">${formatMontant(p.montant)}</td>
-      </tr>`).join('') : `<tr><td colspan="5"><div class="dashboard-empty"><i class="ic">${Icon('wallet')}</i><br>Aucun paiement enregistré pour l'instant.</div></td></tr>`;
+  function renderRecentInvoices(rows) {
+    const body = document.getElementById('dernieres-factures-body');
+    const statuses = {
+      payee: { label: 'Payée', className: 'is-paid' },
+      en_attente: { label: 'En attente', className: 'is-pending' },
+      en_retard: { label: 'En retard', className: 'is-overdue' },
+      annulee: { label: 'Annulée', className: 'is-cancelled' }
+    };
+    body.innerHTML = rows?.length ? rows.map(invoice => {
+      const status = statuses[invoice.statut] || { label: 'Non renseigné', className: 'is-unknown' };
+      return '<tr>' +
+        '<td data-label="N° facture" class="mono">' + escapeHtml(invoice.numero || '—') + '</td>' +
+        '<td data-label="Client">' + escapeHtml(invoice.client_nom || '—') + '</td>' +
+        '<td data-label="Émission">' + (invoice.date_emission ? formatDate(invoice.date_emission) : '—') + '</td>' +
+        '<td data-label="Statut"><span class="dashboard-invoice-status ' + status.className + '">' + status.label + '</span></td>' +
+        '<td data-label="Total TTC" class="mono">' + formatMontant(invoice.total) + '</td>' +
+        '</tr>';
+    }).join('') : '<tr><td colspan="5"><div class="dashboard-empty"><i class="ic">' + Icon('file-text') + '</i><br>Aucune facture émise pour l\'instant.</div></td></tr>';
   }
 
   function renderRecentClients(rows) {
@@ -233,10 +241,16 @@
   }
 
   async function load() {
-    const stats = await Api.get('/dashboard');
+    const [stats, stockResult] = await Promise.all([
+      Api.get('/dashboard'),
+      Api.get('/pro/inventory/valuation').catch(() => null)
+    ]);
+    const stockValue = Number(stockResult?.valeur_totale);
+    stats.valeur_stock_disponible = Boolean(stockResult) && Number.isFinite(stockValue);
+    stats.valeur_stock = stats.valeur_stock_disponible ? stockValue : null;
     lastDashboardStats = stats;
     renderKpis(stats);
-    renderRecentPayments(stats.derniers_paiements || []);
+    renderRecentInvoices(stats.dernieres_factures || []);
     renderRecentClients(stats.derniers_clients || []);
     await renderStatusChart(stats);
     await loadChart(periode);
