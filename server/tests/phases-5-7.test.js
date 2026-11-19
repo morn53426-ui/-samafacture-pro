@@ -210,6 +210,55 @@ test('seuil minimum de stock : la fiche produit conserve le seuil utilisable par
   assert.equal(Number(stored.stock_minimum), 3);
 });
 
+test('une commande fournisseur en attente bloque la conversion en service et reste réceptionnable', async () => {
+  const product = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Article avec commande ouverte', prix_ht: 1000, prix_achat: 500, stock: 0 });
+  assert.equal(product.status, 201, product.text);
+
+  const supplier = await request(app).post('/api/pro/suppliers')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ nom: 'Fournisseur commande ouverte' });
+  assert.equal(supplier.status, 201, supplier.text);
+
+  const order = await request(app).post('/api/pro/purchase-orders')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({
+      fournisseur_id: supplier.body.id,
+      lignes: [{
+        produit_id: product.body.produit.id,
+        designation: 'Article à recevoir',
+        quantite: 3,
+        prix_unitaire: 500,
+        tva: 18
+      }]
+    });
+  assert.equal(order.status, 201, order.text);
+
+  const conversion = await request(app).put('/api/produits/' + product.body.produit.id)
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({ type_catalogue: 'service' });
+  assert.equal(conversion.status, 409, conversion.text);
+  assert.match(conversion.body.error, /commande fournisseur reste à réceptionner/);
+
+  const details = await request(app).get('/api/pro/purchase-orders/' + order.body.id)
+    .set('Authorization', 'Bearer ' + tokenA);
+  assert.equal(details.status, 200, details.text);
+  assert.equal(details.body.lignes.length, 1);
+
+  const receipt = await request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
+    .set('Authorization', 'Bearer ' + tokenA)
+    .send({
+      lignes: [{ ligne_id: details.body.lignes[0].id, quantite: 3 }]
+    });
+  assert.equal(receipt.status, 200, receipt.text);
+
+  const stored = await request(app).get('/api/produits')
+    .set('Authorization', 'Bearer ' + tokenA);
+  const receivedProduct = stored.body.produits.find(item => Number(item.id) === Number(product.body.produit.id));
+  assert.equal(Number(receivedProduct.stock), 3, 'la réception fournisseur doit alimenter le stock du produit');
+});
+
 test('automatisations : créer, lister, désactiver et supprimer les règles autorisées', async () => {
   const rules = [
     { type: 'relance_impayes_email', nom: 'Relance impayés test', configuration: { jours_retard: 10, frequence_jours: 5 } },
