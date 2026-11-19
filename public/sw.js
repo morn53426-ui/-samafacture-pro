@@ -8,6 +8,7 @@ const SHELL_FILES = [
   '/js/api.js',
   '/js/sidebar.js',
   '/js/auth-slider.js',
+  '/js/pwa.js',
   '/js/landing-slider.js',
   '/manifest.json',
   '/images/icon-192.png',
