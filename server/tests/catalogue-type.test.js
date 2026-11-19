@@ -8,7 +8,7 @@ const helper = require('../utils/catalogue-type');
 const route = fs.readFileSync(path.join(root, 'routes', 'produits.js'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'config', 'db.js'), 'utf8');
 const schema = fs.readFileSync(path.join(root, 'database', 'schema.sql'), 'utf8');
-const page = fs.readFileSync(path.join(root, '..', '..', 'public', 'produits.html'), 'utf8');
+const page = fs.readFileSync(path.join(root, '..', 'public', 'produits.html'), 'utf8');
 
 describe('Catalogue — distinction produit/service', () => {
   test('les types acceptés sont explicites et normalisés', () => {
