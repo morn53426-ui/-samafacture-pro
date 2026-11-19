@@ -2359,7 +2359,7 @@ async function ensureDefaultWarehouse(uid) {
   );
   const [[warehouse]] = await pool.query('SELECT id FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1', [uid, 'PRINCIPAL']);
   await pool.query(
-    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0)) FROM produits p LEFT JOIN (SELECT user_id, produit_id, SUM(quantite) AS total FROM pro_stocks_entrepots GROUP BY user_id, produit_id) existing ON existing.user_id = p.user_id AND existing.produit_id = p.id WHERE p.user_id = ?',
+    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0)) FROM produits p LEFT JOIN (SELECT user_id, produit_id, SUM(quantite) AS total FROM pro_stocks_entrepots GROUP BY user_id, produit_id) existing ON existing.user_id = p.user_id AND existing.produit_id = p.id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service'",
     [warehouse.id, uid]
   );
   return Number(warehouse.id);
@@ -2461,9 +2461,12 @@ router.post('/purchase-orders', async (req, res, next) => {
     const normalized = [];
     const productIds = [...new Set(lines.map(line => Number(line.produit_id)).filter(Boolean))];
     if (productIds.length) {
-      const [owned] = await pool.query(`SELECT id FROM produits WHERE user_id = ? AND id IN (${productIds.map(() => '?').join(',')})`, [uid, ...productIds]);
-      const set = new Set(owned.map(row => Number(row.id)));
-      if (productIds.some(id => !set.has(id))) return res.status(400).json({ error: 'Un produit référencé ne appartient pas à cette entreprise.' });
+      const [owned] = await pool.query(`SELECT id, type_catalogue FROM produits WHERE user_id = ? AND id IN (${productIds.map(() => '?').join(',')})`, [uid, ...productIds]);
+      const ownedById = new Map(owned.map(row => [Number(row.id), row]));
+      if (productIds.some(id => !ownedById.has(id))) return res.status(400).json({ error: 'Un produit référencé ne appartient pas à cette entreprise.' });
+      if (productIds.some(id => ownedById.get(id).type_catalogue === 'service')) {
+        return res.status(400).json({ error: 'Les services ne peuvent pas être commandés via Achats & stocks.' });
+      }
     }
     for (const line of lines) {
       const designation = String(line.designation || '').trim().slice(0, 255);
@@ -2528,8 +2531,9 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
         throw new Error('Quantité reçue invalide ou supérieure au reliquat de commande.');
       }
       if (!line.produit_id) throw new Error('La ligne "' + line.designation + '" doit être associée à un produit du catalogue avant de mettre à jour le stock.');
-      const [productRows] = await conn.query('SELECT id FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [line.produit_id, uid]);
+      const [productRows] = await conn.query('SELECT id, type_catalogue FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [line.produit_id, uid]);
       if (!productRows.length) throw new Error('Produit supprimé ou non autorisé.');
+      if (productRows[0].type_catalogue === 'service') throw new Error('Un service ne peut pas être réceptionné dans le stock physique.');
       await conn.query(
         'INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0) ON DUPLICATE KEY UPDATE id = id',
         [uid, warehouseId, line.produit_id]
@@ -2557,7 +2561,7 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
     res.status(201).json({ reception_id: receipt.insertId, reference, statut: status });
   } catch (err) {
     if (conn) await conn.rollback();
-    if (/Quantité reçue|associée à un produit|Produit supprimé/.test(err.message || '')) return res.status(400).json({ error: err.message });
+    if (/Quantité reçue|associée à un produit|Produit supprimé|service ne peut pas être réceptionné/.test(err.message || '')) return res.status(400).json({ error: err.message });
     next(err);
   } finally { if (conn) conn.release(); }
 });
@@ -2566,7 +2570,7 @@ router.get('/inventory/stock', async (req, res, next) => {
   try {
     await ensureDefaultWarehouse(owner(req));
     const [rows] = await pool.query(
-      'SELECT p.id AS produit_id, p.nom, p.reference, p.prix_achat, p.prix_ht, COALESCE(SUM(s.quantite),0) AS quantite, COUNT(DISTINCT s.entrepot_id) AS nb_entrepots FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? GROUP BY p.id ORDER BY p.nom',
+      'SELECT p.id AS produit_id, p.nom, p.reference, p.prix_achat, p.prix_ht, COALESCE(SUM(s.quantite),0) AS quantite, COUNT(DISTINCT s.entrepot_id) AS nb_entrepots FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service' GROUP BY p.id ORDER BY p.nom',
       [owner(req)]
     );
     res.json({ stocks: rows });
@@ -2591,9 +2595,10 @@ router.post('/inventory/adjustments', async (req, res, next) => {
     if (!idOk(productId) || !Number.isFinite(delta) || !delta || Math.abs(delta) > 10000000 || !reason) return res.status(400).json({ error: 'Produit, quantité non nulle et motif obligatoires.' });
     conn = await pool.getConnection();
     await conn.beginTransaction();
-    const [products] = await conn.query('SELECT id, nom, prix_achat FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
+    const [products] = await conn.query('SELECT id, nom, prix_achat, type_catalogue FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
     const [warehouses] = await conn.query('SELECT id, nom FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1', [warehouseId, uid]);
     if (!products.length || !warehouses.length) { await conn.rollback(); return res.status(404).json({ error: 'Produit ou entrepôt introuvable.' }); }
+    if (products[0].type_catalogue === 'service') { await conn.rollback(); return res.status(409).json({ error: 'Un service ne peut pas recevoir de mouvement de stock.' }); }
     await conn.query('INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0) ON DUPLICATE KEY UPDATE id = id', [uid, warehouseId, productId]);
     const [[stock]] = await conn.query('SELECT quantite FROM pro_stocks_entrepots WHERE user_id = ? AND entrepot_id = ? AND produit_id = ? FOR UPDATE', [uid, warehouseId, productId]);
     const next = Math.round((Number(stock.quantite) + delta) * 1000) / 1000;
@@ -2624,9 +2629,10 @@ router.post('/inventory/transfers', async (req, res, next) => {
     if (!idOk(productId) || !idOk(fromId) || !idOk(toId) || fromId === toId || !Number.isFinite(qty) || qty <= 0 || qty > 10000000) return res.status(400).json({ error: 'Produit, deux entrepôts différents et quantité positive obligatoires.' });
     conn = await pool.getConnection();
     await conn.beginTransaction();
-    const [productRows] = await conn.query('SELECT id, nom, prix_achat FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
+    const [productRows] = await conn.query('SELECT id, nom, prix_achat, type_catalogue FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, uid]);
     const [warehouseRows] = await conn.query('SELECT id, nom FROM pro_entrepots WHERE id IN (?, ?) AND user_id = ? AND actif = 1', [fromId, toId, uid]);
     if (!productRows.length || warehouseRows.length !== 2) { await conn.rollback(); return res.status(404).json({ error: 'Produit ou entrepôt introuvable.' }); }
+    if (productRows[0].type_catalogue === 'service') { await conn.rollback(); return res.status(409).json({ error: 'Un service ne peut pas être transféré entre entrepôts.' }); }
     await conn.query('INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0), (?, ?, ?, 0) ON DUPLICATE KEY UPDATE id = id', [uid, fromId, productId, uid, toId, productId]);
     const [stocks] = await conn.query('SELECT entrepot_id, quantite FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ? AND entrepot_id IN (?, ?) FOR UPDATE', [uid, productId, fromId, toId]);
     const source = stocks.find(row => Number(row.entrepot_id) === fromId);
@@ -2651,7 +2657,7 @@ router.get('/inventory/valuation', async (req, res, next) => {
   try {
     await ensureDefaultWarehouse(owner(req));
     const [rows] = await pool.query(
-      'SELECT p.id, p.nom, p.reference, p.prix_achat, COALESCE(SUM(s.quantite),0) AS quantite, COALESCE(SUM(s.quantite * p.prix_achat),0) AS valeur FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? GROUP BY p.id ORDER BY p.nom',
+      'SELECT p.id, p.nom, p.reference, p.prix_achat, COALESCE(SUM(s.quantite),0) AS quantite, COALESCE(SUM(s.quantite * p.prix_achat),0) AS valeur FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service' GROUP BY p.id ORDER BY p.nom',
       [owner(req)]
     );
     const total = rows.reduce((sum, row) => sum + Number(row.valeur), 0);
