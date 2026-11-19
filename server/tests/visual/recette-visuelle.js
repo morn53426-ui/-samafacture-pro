@@ -810,6 +810,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
         : null,
       contentPaddingLeft: main ? Math.round(parseFloat(getComputedStyle(main).paddingLeft) || 0) : null,
       expectedCompactWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-collapsed-w').trim(),
+      expectedExpandedWidth: getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w').trim(),
       enterpriseToolbar: (() => {
         const toolbar = document.querySelector('.enterprise-console-topbar');
         const heading = document.querySelector('.enterprise-dashboard-heading');
@@ -836,13 +837,16 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     };
   });
   if (!pageDefinition.public && viewport.width >= 901) {
-    assert.equal(navigationGeometry.sidebarCollapsed, true,
-      pageDefinition.name + ' : le menu de bureau doit démarrer compact.');
-    const compactWidth = Number.parseFloat(navigationGeometry.expectedCompactWidth);
-    assert.equal(navigationGeometry.sidebarWidth, compactWidth,
-      pageDefinition.name + ' : le rail desktop doit respecter sa largeur responsive : ' + JSON.stringify(navigationGeometry));
-    assert.equal(navigationGeometry.mainMargin, compactWidth,
-      pageDefinition.name + ' : la marge du contenu doit suivre exactement la largeur du rail : ' + JSON.stringify(navigationGeometry));
+    const expectedCollapsed = pageDefinition.name !== 'dashboard';
+    assert.equal(navigationGeometry.sidebarCollapsed, expectedCollapsed,
+      pageDefinition.name + ' : l’état initial du menu desktop doit respecter la page de référence.');
+    const expectedWidth = Number.parseFloat(expectedCollapsed
+      ? navigationGeometry.expectedCompactWidth
+      : navigationGeometry.expectedExpandedWidth);
+    assert.equal(navigationGeometry.sidebarWidth, expectedWidth,
+      pageDefinition.name + ' : la largeur initiale du menu desktop doit être cohérente : ' + JSON.stringify(navigationGeometry));
+    assert.equal(navigationGeometry.mainMargin, expectedWidth,
+      pageDefinition.name + ' : la marge du contenu doit suivre exactement la largeur du menu : ' + JSON.stringify(navigationGeometry));
     assert.ok(navigationGeometry.mainLeft >= navigationGeometry.sidebarWidth &&
       navigationGeometry.mainLeft <= navigationGeometry.sidebarWidth + 16,
       pageDefinition.name + ' : le conteneur principal ne doit pas chevaucher le rail : ' + JSON.stringify(navigationGeometry));
@@ -1706,7 +1710,7 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
   await page.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
 
-  const compact = await page.evaluate(() => ({
+  const expanded = await page.evaluate(() => ({
     collapsed: document.getElementById('app-sidebar')?.classList.contains('is-collapsed'),
     sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
     mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
@@ -1734,35 +1738,50 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
       return Boolean(quick && logout && quick.right <= logout.left + 1);
     })()
   }));
-  assert.deepEqual(compact, {
-    collapsed: true,
-    sidebarWidth: 96,
-    mainMargin: 96,
-    bodyState: true,
+  assert.deepEqual(expanded, {
+    collapsed: false,
+    sidebarWidth: 248,
+    mainMargin: 248,
+    bodyState: false,
     labelsVisible: true,
     promoRemoved: true,
-    toggleExpanded: 'false',
+    toggleExpanded: 'true',
     headingFont: '"IBM Plex Sans", sans-serif',
     bodyFont: '"IBM Plex Sans", sans-serif',
     iconsConsistent: true,
     iconsLegible: true,
     topbarQuickActionsDoNotOverlap: true
-  }, 'La navigation de bureau, la typographie et les icônes doivent rester compactes et cohérentes.');
+  }, 'Le tableau de bord doit démarrer avec la navigation complète, la typographie et les icônes cohérentes.');
 
   await page.click('#sidebar-collapse-toggle');
   await new Promise(resolve => setTimeout(resolve, 240));
-  const expanded = await page.evaluate(() => ({
+  const compact = await page.evaluate(() => ({
     collapsed: document.getElementById('app-sidebar')?.classList.contains('is-collapsed'),
     sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
     mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
     toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded')
   }));
-  assert.deepEqual(expanded, {
+  assert.deepEqual(compact, {
+    collapsed: true,
+    sidebarWidth: 76,
+    mainMargin: 76,
+    toggleExpanded: 'false'
+  }, 'Le bouton doit réduire la navigation et réaligner la zone de travail.');
+
+  await page.click('#sidebar-collapse-toggle');
+  await new Promise(resolve => setTimeout(resolve, 240));
+  const expandedAgain = await page.evaluate(() => ({
+    collapsed: document.getElementById('app-sidebar')?.classList.contains('is-collapsed'),
+    sidebarWidth: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().width || 0),
+    mainMargin: Math.round(parseFloat(getComputedStyle(document.querySelector('.main-content')).marginLeft) || 0),
+    toggleExpanded: document.getElementById('sidebar-collapse-toggle')?.getAttribute('aria-expanded')
+  }));
+  assert.deepEqual(expandedAgain, {
     collapsed: false,
     sidebarWidth: 248,
     mainMargin: 248,
     toggleExpanded: 'true'
-  }, 'Le bouton doit élargir la navigation et réaligner la zone de travail.');
+  }, 'Le bouton doit pouvoir restaurer le menu complet et réaligner la zone de travail.');
 
   await page.click('#sidebar-collapse-toggle');
   await new Promise(resolve => setTimeout(resolve, 240));
@@ -1783,35 +1802,8 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
     mobileToggleVisible: true,
     desktopToggleHidden: true,
     mainMargin: 0
-  }, 'À la largeur tablette, le menu mobile doit prendre le relais sans marge latérale.');
-
+  }, 'Sur tablette, le tiroir mobile prend le relais sans marge desktop.');
   await page.close();
-  return { desktopCompact: 'ok', desktopExpandCollapse: 'ok', preferencePersistence: 'ok', tabletNavigation: 'ok' };
-}
-
-function contrastRatio(foreground, background) {
-  function luminance(color) {
-    let channels;
-    const rgb = color.match(/[\d.]+/g);
-    if (rgb && rgb.length >= 3) {
-      channels = rgb.slice(0, 3).map(Number);
-    } else {
-      const hex = color.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-      if (!hex) throw new Error('Format de couleur non pris en charge pour le contraste : ' + color);
-      const value = hex[1].length === 3
-        ? hex[1].split('').map(character => parseInt(character + character, 16))
-        : hex[1].match(/.{2}/g).map(channel => parseInt(channel, 16));
-      channels = value;
-    }
-    const linear = channels.map(value => {
-      const normalized = value / 255;
-      return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
-  }
-  const a = luminance(foreground);
-  const b = luminance(background);
-  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
 async function verifyThemeConsistency(browser, baseUrl, fixtures) {
