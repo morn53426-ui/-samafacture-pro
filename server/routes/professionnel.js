@@ -1778,7 +1778,7 @@ router.get('/company-group/dashboard', async (req, res, next) => {
          WHERE user_id IN (${slots})
          GROUP BY user_id, produit_id
        ) s ON s.user_id = p.user_id AND s.produit_id = p.id
-       WHERE p.user_id IN (${slots})
+       WHERE p.user_id IN (${slots}) AND COALESCE(p.type_catalogue, 'non_classe') <> 'service'
        GROUP BY p.user_id, u.devise`,
       [...ids, ...ids]
     );
@@ -2359,7 +2359,7 @@ async function ensureDefaultWarehouse(uid) {
   );
   const [[warehouse]] = await pool.query('SELECT id FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1', [uid, 'PRINCIPAL']);
   await pool.query(
-    'INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0)) FROM produits p LEFT JOIN (SELECT user_id, produit_id, SUM(quantite) AS total FROM pro_stocks_entrepots GROUP BY user_id, produit_id) existing ON existing.user_id = p.user_id AND existing.produit_id = p.id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service'",
+    `INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0)) FROM produits p LEFT JOIN (SELECT user_id, produit_id, SUM(quantite) AS total FROM pro_stocks_entrepots GROUP BY user_id, produit_id) existing ON existing.user_id = p.user_id AND existing.produit_id = p.id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service'`",
     [warehouse.id, uid]
   );
   return Number(warehouse.id);
@@ -2570,7 +2570,7 @@ router.get('/inventory/stock', async (req, res, next) => {
   try {
     await ensureDefaultWarehouse(owner(req));
     const [rows] = await pool.query(
-      'SELECT p.id AS produit_id, p.nom, p.reference, p.prix_achat, p.prix_ht, COALESCE(SUM(s.quantite),0) AS quantite, COUNT(DISTINCT s.entrepot_id) AS nb_entrepots FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service' GROUP BY p.id ORDER BY p.nom',
+      `SELECT p.id AS produit_id, p.nom, p.reference, p.prix_achat, p.prix_ht, COALESCE(SUM(s.quantite),0) AS quantite, COUNT(DISTINCT s.entrepot_id) AS nb_entrepots FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service' GROUP BY p.id ORDER BY p.nom`,
       [owner(req)]
     );
     res.json({ stocks: rows });
@@ -2657,7 +2657,7 @@ router.get('/inventory/valuation', async (req, res, next) => {
   try {
     await ensureDefaultWarehouse(owner(req));
     const [rows] = await pool.query(
-      'SELECT p.id, p.nom, p.reference, p.prix_achat, COALESCE(SUM(s.quantite),0) AS quantite, COALESCE(SUM(s.quantite * p.prix_achat),0) AS valeur FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service' GROUP BY p.id ORDER BY p.nom',
+      `SELECT p.id, p.nom, p.reference, p.prix_achat, COALESCE(SUM(s.quantite),0) AS quantite, COALESCE(SUM(s.quantite * p.prix_achat),0) AS valeur FROM produits p LEFT JOIN pro_stocks_entrepots s ON s.produit_id = p.id AND s.user_id = p.user_id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service' GROUP BY p.id ORDER BY p.nom`,
       [owner(req)]
     );
     const total = rows.reduce((sum, row) => sum + Number(row.valeur), 0);
