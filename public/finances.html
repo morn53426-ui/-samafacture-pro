@@ -22,45 +22,46 @@
   <div id="sidebar-root"></div>
   <main class="main-content workspace-page page-finances" id="main-content" tabindex="-1">
     <div class="page-header">
-      <div><div class="workspace-page-kicker">PILOTAGE FINANCIER</div><h1>Tableau de bord financier</h1><p>Trésorerie, rentabilité, prévisions et suivi de vos objectifs.</p></div>
+      <div><div class="workspace-page-kicker">PILOTAGE FINANCIER</div><h1>Tableau de bord financier</h1><p>Suivi des paiements enregistrés, des dépenses, des ventes facturées et des objectifs.</p></div>
     </div>
 
     <div class="grid grid-4" id="stats-grid" style="margin-bottom:22px;">
       <div class="card stat-card card-skeleton">
         <div class="stat-icon icon-navy"><i class="ic" data-icon="landmark"></i></div>
-        <div class="stat-label">Trésorerie</div>
+        <div class="stat-label">Écart cumulé paiements - dépenses</div>
         <div class="stat-value mono" id="stat-tresorerie">···</div>
       </div>
       <div class="card stat-card card-skeleton">
         <div class="stat-icon icon-emerald"><i class="ic" data-icon="trending-up"></i></div>
-        <div class="stat-label">Bénéfice net</div>
+        <div class="stat-label">Écart du mois paiements - dépenses</div>
         <div class="stat-value mono" id="stat-benefice">···</div>
       </div>
       <div class="card stat-card card-skeleton">
         <div class="stat-icon icon-gold"><i class="ic" data-icon="sparkles"></i></div>
-        <div class="stat-label">Prévision mois prochain</div>
+        <div class="stat-label">Estimation des ventes mois prochain</div>
         <div class="stat-value mono" id="stat-prevision">···</div>
       </div>
       <div class="card stat-card card-skeleton">
         <div class="stat-icon icon-clay"><i class="ic" data-icon="target"></i></div>
-        <div class="stat-label">Objectif du mois</div>
+        <div class="stat-label">Objectif d'encaissements</div>
         <div class="stat-value mono" id="stat-objectif">···</div>
       </div>
     </div>
+    <p class="finance-accounting-note" role="note" style="margin:-8px 0 20px;font-size:.82rem;line-height:1.55;color:var(--ink-soft);">Les écarts comparent les paiements enregistrés aux dépenses : ils ne représentent ni un solde bancaire ni un bénéfice comptable certifié. Les paiements sont rattachés à la date d’émission des factures ; les remboursements ne sont pas déduits automatiquement.</p>
 
     <div class="grid grid-2 workspace-finance-grid">
       <div class="card">
-        <h3 style="margin-top:0;">Évolution &amp; prévision (6 derniers mois + 1 mois estimé)</h3>
-        <canvas id="chart-finances" height="130" role="img" aria-label="Évolution des recettes et estimation de la prochaine période."></canvas>
+        <h3 style="margin-top:0;">Ventes facturées et estimation (6 derniers mois + 1 mois estimé)</h3>
+        <canvas id="chart-finances" height="130" role="img" aria-label="Évolution des ventes TTC facturées hors annulations et estimation de la prochaine période."></canvas>
         <p style="margin:10px 0 0; font-size:0.78rem; color:var(--ink-soft);">
-          La prévision est une estimation simple basée sur la moyenne des 3 derniers mois de chiffre d'affaires. Ce n'est pas un engagement comptable.
+          L’estimation utilise la moyenne des trois derniers mois calendaires de ventes TTC facturées, hors annulations (les mois sans vente comptent pour zéro). Ce n’est pas une prévision de trésorerie ni un engagement comptable.
         </p>
       </div>
 
       <div class="card">
-        <h3 style="margin-top:0;">Objectif mensuel</h3>
+        <h3 style="margin-top:0;">Objectif mensuel d'encaissements</h3>
         <p style="font-size:0.85rem; color:var(--ink-soft); margin-top:0;">
-          Fixez un objectif de chiffre d'affaires pour le mois en cours. <i data-icon="alert-triangle" style="color:var(--gold); vertical-align:-0.15em;"></i> Fonctionnalité en aperçu : l'objectif est enregistré uniquement sur cet appareil (aucune synchronisation serveur pour le moment).
+          Fixez un objectif de paiements enregistrés sur les factures émises depuis le début du mois. Les montants suivent la date d’émission des factures, pas la date réelle du règlement. <i data-icon="alert-triangle" style="color:var(--gold); vertical-align:-0.15em;"></i> Fonctionnalité en aperçu : l’objectif est enregistré uniquement sur cet appareil.
         </p>
         <div class="field">
           <label for="objectif-input">Objectif (<span id="objectif-devise">FCFA</span>)</label>
@@ -97,10 +98,11 @@
     // et /rapports/comptabilite (bénéfice net calculé sur le mois en cours).
     const now = new Date();
     const debutMois = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const dateDuJour = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const [dash, compta] = await Promise.all([
       Api.get('/dashboard'),
-      Api.get('/rapports/comptabilite?from=' + debutMois)
+      Api.get('/rapports/comptabilite?from=' + debutMois + '&to=' + dateDuJour)
     ]);
 
     document.getElementById('stat-tresorerie').textContent = formatMontant(dash.tresorerie);
@@ -108,18 +110,29 @@
 
     document.querySelectorAll('#stats-grid .card-skeleton').forEach(c => c.classList.remove('card-skeleton'));
 
-    renderPrevision(dash.evolution_mensuelle || []);
+    renderPrevision(dash.evolution_mensuelle || [], now);
     renderObjectif(compta.recettes || 0);
   }
 
-  function renderPrevision(evolution) {
-    const totals = evolution.map(m => Number(m.total) || 0);
+  function financeMonthSeries(evolution, referenceDate) {
+    const byMonth = new Map(evolution.map(row => [row.mois, Number(row.total) || 0]));
+    const monthStart = new Date(Date.UTC(referenceDate.getFullYear(), referenceDate.getMonth(), 1));
+    return Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() - 5 + index, 1));
+      const key = date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
+      return { mois: key, total: byMonth.get(key) || 0 };
+    });
+  }
+
+  function renderPrevision(evolution, referenceDate) {
+    const series = financeMonthSeries(evolution, referenceDate);
+    const totals = series.map(month => month.total);
     const dernierMois = totals.slice(-3);
-    const moyenne = dernierMois.length ? dernierMois.reduce((a, b) => a + b, 0) / dernierMois.length : 0;
+    const moyenne = dernierMois.reduce((a, b) => a + b, 0) / 3;
 
     document.getElementById('stat-prevision').textContent = formatMontant(moyenne);
 
-    const labels = evolution.map(m => m.mois);
+    const labels = series.map(month => month.mois);
     const values = totals.slice();
     // Ajoute un point de prévision à la suite des données réelles
     const previsionLabel = 'Estimation';
@@ -152,7 +165,7 @@
       data: {
         labels: labels.length ? labels : ['—'],
         datasets: [{
-          label: "Chiffre d'affaires",
+          label: 'Ventes TTC facturées',
           data: values.length ? values : [0],
           backgroundColor: labels.map(l => l === previsionLabel ? forecastColor : salesColor),
           borderRadius: 6,
@@ -203,7 +216,7 @@
     document.getElementById('objectif-progress-label').textContent = pct + ' %';
     document.getElementById('objectif-progress-bar').style.width = pct + '%';
     document.getElementById('objectif-detail').textContent = objectif
-      ? `${formatMontant(recettesMoisEnCours)} encaissés sur ${formatMontant(objectif)} visés ce mois-ci.`
+      ? `${formatMontant(recettesMoisEnCours)} de paiements enregistrés sur ${formatMontant(objectif)} visés ce mois-ci.`
       : `Aucun objectif défini pour l'instant.`;
   }
 
