@@ -31,7 +31,7 @@
 
     <div class="card workspace-data-card" style="padding:0;">
       <div class="workspace-data-heading">
-        <div><h2>Catalogue produits & services</h2><p>Tarifs, références, fiscalité et niveaux de stock</p></div>
+        <div><h2>Catalogue produits & services</h2><p>Tarifs, références et fiscalité ; stock pour les biens physiques</p></div>
         <span class="workspace-data-type"><i class="ic" data-icon="file-stack"></i> Données du compte</span>
       </div>
       <table class="table-stack products-table">
@@ -107,7 +107,7 @@
         <td data-label="Prix HT" class="mono">${formatMontant(p.prix_ht)}</td>
         <td data-label="Prix d'achat" class="mono">${formatMontant(p.prix_achat || 0)}</td>
         <td data-label="TVA" class="mono">${p.tva}%</td>
-        <td data-label="Stock" class="mono">${p.stock}</td>
+        <td data-label="Stock" class="mono">${p.type_catalogue === 'service' ? '—' : p.stock}</td>
         <td data-label="Actions" style="text-align:right;" onclick="event.stopPropagation();">
           <button class="btn btn-sm btn-outline" onclick='editProduit(${p.id})'>${Icon('edit-3')} Modifier</button>
           <button class="btn btn-sm btn-danger" onclick="deleteProduit(${p.id})">${Icon('trash-2')} Supprimer</button>
