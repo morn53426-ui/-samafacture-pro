@@ -19,7 +19,7 @@ const VIEWPORTS = [
   { name: 'wide-1920', width: 1920, height: 1080 }
 ];
 const PAGES = [
-  { name: 'dashboard', file: 'dashboard.html', ready: '#paiements-body tr:not(.row-skeleton)', charts: ['chart-evolution', 'chart-repartition'] },
+  { name: 'dashboard', file: 'dashboard.html', ready: '#dernieres-factures-body tr:not(.row-skeleton)', charts: ['chart-evolution', 'chart-repartition'] },
   { name: 'clients', file: 'clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
   { name: 'produits', file: 'produits.html', ready: '#produits-body tr:not(.row-skeleton)' },
   { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
@@ -62,12 +62,16 @@ function makeFixtures() {
     return {
       dashboard: {
         chiffre_affaires: 0,
+        factures_emises: 0,
+        nouveaux_clients: 0,
+        valeur_stock: 0,
         tresorerie: 0,
         factures_payees: { n: 0, total: 0 },
         factures_en_attente: { n: 0, total: 0 },
         factures_en_retard: { n: 0, total: 0 },
         derniers_clients: [],
-        derniers_paiements: []
+        derniers_paiements: [],
+        dernieres_factures: []
       },
       ventes: [],
       clients: [],
@@ -111,6 +115,9 @@ function makeFixtures() {
   return {
     dashboard: {
       chiffre_affaires: normal ? 1250000 : 999999999999.99,
+      factures_emises: normal ? 42 : 999999,
+      nouveaux_clients: normal ? 3 : 999999,
+      valeur_stock: normal ? 1875000 : 999999999999.99,
       tresorerie: normal ? 475000 : 999999999999.99,
       factures_payees: { n: normal ? 12 : 999999, total: normal ? 850000 : 999999999999.99 },
       factures_en_attente: { n: normal ? 4 : 999999, total: normal ? 350000 : 888888888888.88 },
@@ -122,6 +129,13 @@ function makeFixtures() {
         methode: index % 2 ? 'Virement bancaire' : 'Wave',
         date_paiement: '2026-11-12 10:15:00',
         montant: f.total
+      })),
+      dernieres_factures: factures.slice(0, 5).map(f => ({
+        numero: f.numero,
+        client_nom: f.client_nom,
+        date_emission: f.date_emission,
+        statut: f.statut,
+        total: f.total
       }))
     },
     ventes: Array.from({ length: 14 }, (_, index) => ({
@@ -253,6 +267,9 @@ const CHART_STUB = [
 function fixtureFor(pathname, fixtures) {
   if (pathname === '/api/factures-recurrentes') return { recurrentes: [] };
   if (pathname === '/api/dashboard') return fixtures.dashboard;
+  if (pathname === '/api/pro/inventory/valuation') {
+    return { valeur_totale: fixtures.dashboard.valeur_stock ?? 0, devise: 'FCFA' };
+  }
   if (pathname === '/api/rapports/ventes') return { rows: fixtures.ventes };
   if (pathname === '/api/clients') return {
     clients: fixtures.clients,
@@ -925,8 +942,8 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       body: document.body.scrollWidth,
       page: location.pathname,
       xssMarker: window.__visualXss || false,
-      paymentLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
-        ? Array.from(document.querySelectorAll('#paiements-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
+      invoiceLabels: location.pathname.includes('dashboard') && window.innerWidth <= 640
+        ? Array.from(document.querySelectorAll('#dernieres-factures-body tr:not(.row-skeleton):first-child td')).map(cell => cell.dataset.label || '')
         : null,
       proWorkspaceNavigation: location.pathname.includes('professionnel')
         ? (() => {
@@ -1082,9 +1099,16 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       JSON.stringify(layout));
   }
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
+  if (pageDefinition.name === 'dashboard') {
+    const kpiLabels = await page.$eval('#stats-grid .dashboard-kpi-label', elements =>
+      elements.map(element => element.textContent.trim())
+    );
+    assert.deepEqual(kpiLabels, ["Chiffre d'affaires", 'Factures émises', 'Nouveaux clients', 'Valeur du stock'],
+      'Le dashboard doit afficher les quatre KPI métier attendus.');
+  }
   if (pageDefinition.name === 'dashboard' && viewport.width <= 640 && DATASET !== 'empty') {
-    assert.deepEqual(metrics.paymentLabels, ['Référence', 'Client', 'Méthode', 'Date', 'Montant'],
-      'Chaque information d’un encaissement doit rester nommée et visible sur mobile.');
+    assert.deepEqual(metrics.invoiceLabels, ['N° facture', 'Client', 'Émission', 'Statut', 'Total TTC'],
+      'Chaque information d’une facture doit rester nommée et visible sur mobile.');
   }
   assert.deepEqual(pageErrors, [],
     pageDefinition.name + ' a généré des erreurs JavaScript: ' + pageErrors.join(' | '));
@@ -1301,7 +1325,7 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   const normalPage = await preparePage(browser, baseUrl, fixtures, false);
   await normalPage.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await normalPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await normalPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await normalPage.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   await normalPage.waitForFunction(() => document.getElementById('chart-evolution')?.dataset.sfChartAnimation);
   const chartAnimation = await normalPage.$eval('#chart-evolution', (canvas) => canvas.dataset.sfChartAnimation);
   assert.equal(chartAnimation, 'disabled', 'Le graphique fonctionnel doit rester sans animation.');
@@ -1331,7 +1355,7 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   const reducedPage = await preparePage(browser, baseUrl, fixtures, true);
   await reducedPage.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await reducedPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await reducedPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await reducedPage.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   await reducedPage.evaluate(() => showToast('Notification de vérification', 'info'));
   await reducedPage.waitForSelector('.toast');
   const reduced = await reducedPage.$eval('.toast', (element) => {
@@ -1418,7 +1442,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   });
   await page.setViewport({ width: 320, height: 844, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await page.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   const initialNotifications = await page.evaluate(() => ({
     badgeHidden: document.getElementById('workspace-notification-badge')?.hidden,
     expanded: document.getElementById('workspace-notification-toggle')?.getAttribute('aria-expanded'),
@@ -1594,7 +1618,7 @@ async function verifyWorkspaceShell(browser, baseUrl, fixtures) {
   const mobile = await preparePage(browser, baseUrl, fixtures, false);
   await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
   await mobile.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await mobile.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await mobile.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   await mobile.setViewport({ width: 320, height: 812, deviceScaleFactor: 1 });
   const narrowToolbar = await mobile.evaluate(() => {
     const selectors = [
@@ -1708,7 +1732,7 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
   const page = await preparePage(browser, baseUrl, fixtures, false);
   await page.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
   await page.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await page.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
 
   const expanded = await page.evaluate(() => ({
     collapsed: document.getElementById('app-sidebar')?.classList.contains('is-collapsed'),
@@ -1788,7 +1812,7 @@ async function verifyCompactSidebar(browser, baseUrl, fixtures) {
   assert.equal(await page.evaluate(() => localStorage.getItem('sf-sidebar-collapsed')), 'true',
     'La préférence compacte doit être mémorisée.');
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await page.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   assert.equal(await page.$eval('#app-sidebar', element => element.classList.contains('is-collapsed')), true,
     'La navigation doit conserver le mode compact après un changement de page.');
 
@@ -2120,7 +2144,7 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   await darkPage.setViewport({ width: 1440, height: 1000, deviceScaleFactor: 1 });
   await darkPage.evaluate(() => localStorage.setItem('sf_theme', 'dark'));
   await darkPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await darkPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await darkPage.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   await darkPage.waitForFunction(() =>
     document.getElementById('chart-repartition')?.dataset.sfChartType === 'doughnut'
   );
@@ -2214,7 +2238,7 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   const zoomPage = await preparePage(browser, baseUrl, fixtures, false);
   await zoomPage.setViewport({ width: 720, height: 900, deviceScaleFactor: 1 });
   await zoomPage.goto(baseUrl + '/dashboard.html', { waitUntil: 'domcontentloaded' });
-  await zoomPage.waitForSelector('#paiements-body tr:not(.row-skeleton)', { timeout: 15000 });
+  await zoomPage.waitForSelector('#dernieres-factures-body tr:not(.row-skeleton)', { timeout: 15000 });
   const zoomMetrics = await zoomPage.evaluate(() => ({
     viewport: window.innerWidth,
     document: document.documentElement.scrollWidth,
