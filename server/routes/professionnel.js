@@ -2353,16 +2353,77 @@ router.get('/checkouts/:reference/status', async (req, res, next) => {
 
 /* ------------------------- FOURNISSEURS & ACHATS ------------------------ */
 async function ensureDefaultWarehouse(uid) {
-  await pool.query(
-    "INSERT IGNORE INTO pro_entrepots (user_id, code, nom, par_defaut) VALUES (?, 'PRINCIPAL', 'Magasin principal', 1)",
-    [uid]
-  );
-  const [[warehouse]] = await pool.query('SELECT id FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1', [uid, 'PRINCIPAL']);
-  await pool.query(
-    `INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0)) FROM produits p LEFT JOIN (SELECT user_id, produit_id, SUM(quantite) AS total FROM pro_stocks_entrepots GROUP BY user_id, produit_id) existing ON existing.user_id = p.user_id AND existing.produit_id = p.id WHERE p.user_id = ? AND COALESCE(p.type_catalogue, 'non_classe') <> 'service'`,
-    [warehouse.id, uid]
-  );
-  return Number(warehouse.id);
+  const userId = Number(uid);
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    throw new Error('Identifiant utilisateur invalide pour initialiser le magasin principal.');
+  }
+
+  // Plusieurs requêtes métier peuvent demander le magasin principal en même temps.
+  // Le verrou nommé MySQL sérialise le backfill par entreprise, sur tous les workers.
+  const lockName = 'sunupilot:default-warehouse:' + userId;
+  const conn = await pool.getConnection();
+  let lockAcquired = false;
+  let transactionStarted = false;
+  try {
+    const [[lock]] = await conn.query('SELECT GET_LOCK(?, 10) AS acquired', [lockName]);
+    if (Number(lock?.acquired) !== 1) {
+      throw new Error('Impossible de verrouiller l’initialisation du magasin principal. Réessayez.');
+    }
+    lockAcquired = true;
+
+    await conn.beginTransaction();
+    transactionStarted = true;
+    await conn.query(
+      "INSERT IGNORE INTO pro_entrepots (user_id, code, nom, par_defaut) VALUES (?, 'PRINCIPAL', 'Magasin principal', 1)",
+      [userId]
+    );
+    const [[warehouse]] = await conn.query(
+      'SELECT id FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1 FOR UPDATE',
+      [userId, 'PRINCIPAL']
+    );
+    if (!warehouse) throw new Error('Impossible de retrouver le magasin principal après son initialisation.');
+
+    // Ne tente d’insérer que les produits sans ligne de stock dans ce magasin.
+    // Cela évite de verrouiller inutilement toutes les clés déjà présentes à chaque appel.
+    await conn.query(
+      `INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite)
+       SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0))
+       FROM produits p
+       LEFT JOIN (
+         SELECT user_id, produit_id, SUM(quantite) AS total
+         FROM pro_stocks_entrepots
+         GROUP BY user_id, produit_id
+       ) existing ON existing.user_id = p.user_id AND existing.produit_id = p.id
+       LEFT JOIN pro_stocks_entrepots principal
+         ON principal.user_id = p.user_id
+         AND principal.entrepot_id = ?
+         AND principal.produit_id = p.id
+       WHERE p.user_id = ?
+         AND COALESCE(p.type_catalogue, 'non_classe') <> 'service'
+         AND principal.id IS NULL`,
+      [warehouse.id, warehouse.id, userId]
+    );
+
+    await conn.commit();
+    transactionStarted = false;
+    return Number(warehouse.id);
+  } catch (err) {
+    if (transactionStarted) {
+      try { await conn.rollback(); } catch (_) { /* Conserver l'erreur initiale. */ }
+    }
+    throw err;
+  } finally {
+    if (lockAcquired) {
+      try {
+        await conn.query('SELECT RELEASE_LOCK(?)', [lockName]);
+      } catch (releaseError) {
+        // Ne jamais remettre au pool une connexion qui pourrait conserver le verrou.
+        conn.destroy();
+        throw releaseError;
+      }
+    }
+    conn.release();
+  }
 }
 
 router.get('/suppliers', async (req, res, next) => {
@@ -2639,9 +2700,9 @@ router.put('/purchase-orders/:id/lines/:lineId/product', async (req, res, next) 
 router.post('/purchase-orders/:id/receive', async (req, res, next) => {
   let conn;
   try {
-    await ensureDefaultWarehouse(owner(req));
-    const uid = owner(req), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
-    const warehouseId = Number(req.body.entrepot_id) || await ensureDefaultWarehouse(uid);
+    const uid = owner(req), defaultWarehouseId = await ensureDefaultWarehouse(uid);
+    const lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
+    const warehouseId = Number(req.body.entrepot_id) || defaultWarehouseId;
     if (!lines.length || lines.length > 100) return res.status(400).json({ error: 'Indiquez au moins une ligne à réceptionner.' });
     const normalizedLines = lines.map(line => ({
       ligne_id: Number(line.ligne_id),
