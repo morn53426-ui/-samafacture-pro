@@ -57,7 +57,7 @@ function assertPngIntegrity(png, label) {
 }
 
 function loadServiceWorker({
-  cacheNames = ['old-cache', 'sunupilot-shell-v8'],
+  cacheNames = ['old-cache', 'sunupilot-shell-v9'],
   onAddAll = async () => {},
   onDelete = async () => true,
   onSkipWaiting = async () => {},
@@ -182,6 +182,7 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
 
     for (const required of [
       '/css/style.css',
+      '/css/workspace-polish.css',
       '/js/api.js',
       '/js/sidebar.js',
       '/js/pwa.js',
@@ -226,7 +227,7 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
     await installPromise;
 
     assert.deepEqual(harness.events, [
-      'caches.open:sunupilot-shell-v8',
+      'caches.open:sunupilot-shell-v9',
       'cache.addAll',
       'skipWaiting'
     ]);
@@ -251,7 +252,7 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
     const deletedCaches = [];
     let claimCompleted = false;
     const harness = loadServiceWorker({
-      cacheNames: ['old-cache', 'sunupilot-shell-v4', 'sunupilot-shell-v5', 'sunupilot-shell-v6', 'sunupilot-shell-v8'],
+      cacheNames: ['old-cache', 'sunupilot-shell-v4', 'sunupilot-shell-v5', 'sunupilot-shell-v6', 'sunupilot-shell-v8', 'sunupilot-shell-v9'],
       onDelete: async (name) => {
         deletedCaches.push(name);
         await Promise.resolve();
@@ -266,7 +267,7 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
 
     await activatePromise;
 
-    assert.deepEqual(deletedCaches, ['old-cache', 'sunupilot-shell-v4', 'sunupilot-shell-v5', 'sunupilot-shell-v6']);
+    assert.deepEqual(deletedCaches, ['old-cache', 'sunupilot-shell-v4', 'sunupilot-shell-v5', 'sunupilot-shell-v6', 'sunupilot-shell-v8']);
     assert.equal(claimCompleted, true);
   });
 
