@@ -42,12 +42,13 @@
         <header class="dashboard-panel-head">
           <div class="dashboard-panel-title">
             <i class="ic" data-icon="bar-chart"></i>
-            <div><h2>Évolution des ventes</h2><p class="dashboard-panel-subtitle">Montant des factures par période</p></div>
+            <div><h2>Évolution du chiffre d'affaires</h2><p class="dashboard-panel-subtitle">Montant TTC des factures par mois</p></div>
           </div>
-          <div class="dashboard-periods" role="group" aria-label="Période du graphique">
-            <button type="button" class="btn btn-sm btn-outline" data-periode="day" onclick="setPeriode('day')">Jour</button>
-            <button type="button" class="btn btn-sm btn-primary" data-periode="week" onclick="setPeriode('week')">Semaine</button>
-            <button type="button" class="btn btn-sm btn-outline" data-periode="month" onclick="setPeriode('month')">Mois</button>
+          <div class="dashboard-periods">
+            <select id="dashboard-period-select" class="btn btn-sm btn-outline dashboard-period-select" aria-label="Période du graphique" onchange="setPeriode(this.value)">
+              <option value="6m">6 derniers mois</option>
+              <option value="12m">12 derniers mois</option>
+            </select>
           </div>
         </header>
         <div class="dashboard-chart-wrap" id="chart-wrap">
@@ -171,7 +172,7 @@
 
   let chart;
   let salesChart;
-  let periode = 'week';
+  let periode = '6m';
   let lastDashboardStats = null;
 
   function dashboardThemeColor(token, fallback) {
@@ -251,17 +252,77 @@
     await loadChart(periode);
   }
 
-  async function loadChart(period) {
-    periode = period;
-    document.querySelectorAll('[data-periode]').forEach(button => {
-      const active = button.dataset.periode === period;
-      button.classList.toggle('btn-primary', active);
-      button.classList.toggle('btn-outline', !active);
-      button.setAttribute('aria-pressed', String(active));
-    });
+  function dashboardDateParts(date = new Date()) {
+    const timeZone = user.fuseau_horaire || 'Africa/Dakar';
+    const options = { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' };
+    let parts;
+    try {
+      parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(date);
+    } catch {
+      parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Africa/Dakar', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(date);
+    }
+    const values = Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]));
+    return { year: Number(values.year), month: Number(values.month), day: Number(values.day) };
+  }
 
-    const titleByPeriod = { day: 'Évolution quotidienne', week: 'Évolution hebdomadaire', month: 'Évolution mensuelle' };
-    const { rows } = await Api.get('/rapports/ventes?group_by=' + encodeURIComponent(period));
+  function dashboardMonthRange(period) {
+    const monthCount = period === '12m' ? 12 : 6;
+    const today = dashboardDateParts();
+    const currentMonthIndex = today.year * 12 + today.month - 1;
+    const firstMonthIndex = currentMonthIndex - monthCount + 1;
+    const firstYear = Math.floor(firstMonthIndex / 12);
+    const firstMonth = firstMonthIndex % 12 + 1;
+    const pad = value => String(value).padStart(2, '0');
+    return {
+      from: firstYear + '-' + pad(firstMonth) + '-01',
+      to: today.year + '-' + pad(today.month) + '-' + pad(today.day) + ' 23:59:59',
+      monthCount,
+      firstMonthIndex
+    };
+  }
+
+  function buildDashboardMonthSeries(rows, period) {
+    const range = dashboardMonthRange(period);
+    const totalsByMonth = new Map((Array.isArray(rows) ? rows : []).map(row => {
+      const value = Number(row.total);
+      return [String(row.label || ''), Number.isFinite(value) ? value : 0];
+    }));
+    const labels = [];
+    const values = [];
+    const labelOptions = period === '12m'
+      ? { month: 'short', year: '2-digit', timeZone: 'UTC' }
+      : { month: 'short', timeZone: 'UTC' };
+
+    for (let offset = 0; offset < range.monthCount; offset++) {
+      const monthIndex = range.firstMonthIndex + offset;
+      const year = Math.floor(monthIndex / 12);
+      const month = monthIndex % 12;
+      const key = year + '-' + String(month + 1).padStart(2, '0');
+      const labelDate = new Date(Date.UTC(year, month, 15, 12));
+      const rawLabel = new Intl.DateTimeFormat('fr-FR', labelOptions).format(labelDate);
+      labels.push(rawLabel.charAt(0).toLocaleUpperCase('fr-FR') + rawLabel.slice(1));
+      values.push(totalsByMonth.get(key) ?? 0);
+    }
+
+    return { labels, values, monthCount: range.monthCount };
+  }
+
+  async function loadChart(period) {
+    period = period === '12m' ? '12m' : '6m';
+    periode = period;
+    const periodSelect = document.getElementById('dashboard-period-select');
+    if (periodSelect && periodSelect.value !== period) periodSelect.value = period;
+
+    const range = dashboardMonthRange(period);
+    const params = new URLSearchParams({
+      group_by: 'month',
+      from: range.from,
+      to: range.to
+    });
+    const { rows } = await Api.get('/rapports/ventes?' + params.toString());
+    const series = buildDashboardMonthSeries(rows, period);
     const canvas = document.getElementById('chart-evolution');
     try {
       await window.chartReady;
@@ -284,16 +345,16 @@
     chart = new Chart(canvas, {
       type: 'line',
       data: {
-        labels: rows?.length ? rows.map(row => row.label) : ['Aucune donnée'],
+        labels: series.labels,
         datasets: [{
-          label: 'Ventes',
-          data: rows?.length ? rows.map(row => Number(row.total || 0)) : [0],
+          label: "Chiffre d'affaires",
+          data: series.values,
           borderColor: accent,
           backgroundColor: gradient,
           borderWidth: 3,
           fill: true,
           tension: 0.35,
-          pointRadius: rows?.length ? 3 : 0,
+          pointRadius: series.values.some(value => value !== 0) ? 3 : 0,
           pointHoverRadius: 5,
           pointBackgroundColor: surface,
           pointBorderColor: accent,
@@ -321,7 +382,10 @@
         }
       }
     });
-    canvas.setAttribute('aria-label', titleByPeriod[period] + '. Les montants détaillés sont disponibles dans les rapports.');
+    canvas.dataset.dashboardPeriod = period;
+    canvas.dataset.dashboardMonthCount = String(series.monthCount);
+    canvas.setAttribute('aria-label',
+      "Évolution du chiffre d'affaires sur " + range.monthCount + " mois. Montants TTC des factures par mois.");
   }
 
   function formatDashboardCount(value) {
