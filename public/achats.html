@@ -224,14 +224,41 @@ function createReceiptOperationId(){
   return Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
 }
 
+function renderReceiptLines(){
+  if(!activeReceipt)return;
+  const lines=activeReceipt.lignes||[];
+  $('receipt-lines').innerHTML='<div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:760px"><thead><tr><th>Produit / Désignation</th><th>Commandé</th><th>Déjà reçu</th><th>Reste</th><th>À réceptionner</th></tr></thead><tbody>'+lines.map(l=>{
+    const remaining=Math.max(0,Number(l.quantite)-Number(l.quantite_recue));
+    const canAssociate=!l.produit_id&&Number(l.quantite_recue)<=0;
+    const association=canAssociate?'<div class="receipt-product-association"><select class="receipt-product" aria-label="Produit catalogue pour '+escapeHtml(l.designation)+'"><option value="">Sélectionner un produit</option>'+products.map(p=>opt(p.id,p.nom+' · '+(p.reference||'sans réf.'))).join('')+'</select><button type="button" class="btn btn-outline btn-sm" data-associate-purchase-line="'+Number(l.id)+'" aria-label="Associer un produit à '+escapeHtml(l.designation)+'">Associer</button></div>':(!l.produit_id?'<span class="pro-note">Produit non associé ; ligne déjà réceptionnée, association verrouillée.</span>':'');
+    return '<tr data-line="'+Number(l.id)+'"><td><div>'+escapeHtml(l.designation)+association+'</div></td><td>'+Number(l.quantite)+'</td><td>'+Number(l.quantite_recue)+'</td><td>'+remaining+'</td><td><input class="receive-qty" type="number" min="0" max="'+remaining+'" step="0.001" value="0" '+(l.produit_id&&remaining>0?'':'disabled')+'></td></tr>';
+  }).join('')+'</tbody></table></div>';
+  $('submit-receipt').hidden=!lines.some(line=>Number(line.produit_id)>0&&Number(line.quantite)-Number(line.quantite_recue)>0);
+}
+
 $('load-receipt-lines').addEventListener('click',async()=>{
   const id=$('receipt-order').value;if(!id){showToast('Choisissez une commande.','error');return;}
   try{
     const data=await Api.get('/pro/purchase-orders/'+id);activeReceipt={...data,operationId:createReceiptOperationId(),submitting:false};
-    const lines=data.lignes||[];
-    $('receipt-lines').innerHTML='<div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:650px"><thead><tr><th>Produit / Désignation</th><th>Commandé</th><th>Déjà reçu</th><th>Reste</th><th>À réceptionner</th></tr></thead><tbody>'+lines.map(l=>'<tr data-line="'+l.id+'"><td>'+escapeHtml(l.designation)+(l.produit_id?'':' <span class="pro-note">— associez un produit avant réception</span>')+'</td><td>'+Number(l.quantite)+'</td><td>'+Number(l.quantite_recue)+'</td><td>'+Math.max(0,Number(l.quantite)-Number(l.quantite_recue))+'</td><td><input class="receive-qty" type="number" min="0" max="'+Math.max(0,Number(l.quantite)-Number(l.quantite_recue))+'" step="0.001" value="0" '+(l.produit_id?'':'disabled')+'></td></tr>').join('')+'</tbody></table></div>';
-    $('submit-receipt').hidden=false;
+    renderReceiptLines();
   }catch(err){showToast(err.message,'error');}
+});
+$('receipt-lines').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-associate-purchase-line]');
+  if(!button||!activeReceipt||activeReceipt.submitting)return;
+  const row=button.closest('tr[data-line]');
+  const productId=Number(row?.querySelector('.receipt-product')?.value);
+  const lineId=Number(button.dataset.associatePurchaseLine);
+  if(!Number.isSafeInteger(productId)||productId<=0){showToast('Sélectionnez un produit du catalogue.','error');return;}
+  const orderId=Number(activeReceipt.commande.id);
+  button.disabled=true;
+  try{
+    await Api.put('/pro/purchase-orders/'+orderId+'/lines/'+lineId+'/product',{produit_id:productId});
+    const data=await Api.get('/pro/purchase-orders/'+orderId);
+    activeReceipt={...data,operationId:activeReceipt.operationId,submitting:false};
+    renderReceiptLines();
+    showToast('Produit associé à la ligne.','success');
+  }catch(err){button.disabled=false;showToast(err.message,'error');}
 });
 $('submit-receipt').addEventListener('click',async()=>{
   if(!activeReceipt||activeReceipt.submitting)return;
