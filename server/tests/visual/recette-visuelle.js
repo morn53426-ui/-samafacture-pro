@@ -1100,7 +1100,17 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   }
   assert.equal(metrics.xssMarker, false, 'Une donnée de test ne doit pas exécuter de script.');
   if (pageDefinition.name === 'dashboard') {
-    const kpiLabels = await page.$$eval('#stats-grid .dashboard-kpi-label', elements =>
+    await page.waitForFunction(() => {
+      const logo = document.querySelector('#app-sidebar .sidebar-brand .mark img');
+      return Boolean(logo && logo.complete);
+    }, { timeout: 5000 });
+    const brandLogo = await page.$eval('#app-sidebar .sidebar-brand .mark img', image => ({
+      src: image.getAttribute('src'),
+      naturalWidth: image.naturalWidth
+    }));
+    assert.ok(brandLogo.naturalWidth > 0,
+      'Le logo Sunupilot de la navigation doit charger une image valide : ' + JSON.stringify(brandLogo));
+    const kpiLabels = await page.$eval('#stats-grid .dashboard-kpi-label', elements =>
       elements.map(element => element.textContent.trim())
     );
     assert.deepEqual(kpiLabels, ["Chiffre d'affaires", 'Factures émises', 'Nouveaux clients', 'Valeur du stock'],
