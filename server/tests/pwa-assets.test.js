@@ -4,6 +4,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const PUBLIC_DIR = path.resolve(__dirname, '../../public');
 const manifest = JSON.parse(fs.readFileSync(path.join(PUBLIC_DIR, 'manifest.json'), 'utf8'));
@@ -18,6 +19,59 @@ function publicFile(relativePath) {
   );
   assert.ok(fs.existsSync(absolute), 'Ressource PWA absente : ' + relativePath);
   return absolute;
+}
+
+function loadServiceWorker({
+  cacheNames = ['old-cache', 'sunupilot-shell-v5'],
+  onAddAll = async () => {},
+  onDelete = async () => true,
+  onSkipWaiting = async () => {},
+  onClaim = async () => {}
+} = {}) {
+  const handlers = new Map();
+  const events = [];
+  const context = {
+    Promise,
+    URL,
+    self: {
+      addEventListener(type, listener) {
+        handlers.set(type, listener);
+      },
+      skipWaiting() {
+        events.push('skipWaiting');
+        return onSkipWaiting();
+      },
+      clients: {
+        claim() {
+          events.push('clients.claim');
+          return onClaim();
+        }
+      }
+    },
+    caches: {
+      open(name) {
+        events.push('caches.open:' + name);
+        return Promise.resolve({
+          addAll(files) {
+            events.push('cache.addAll');
+            return onAddAll(files);
+          }
+        });
+      },
+      keys() {
+        events.push('caches.keys');
+        return Promise.resolve(cacheNames);
+      },
+      delete(name) {
+        events.push('caches.delete:' + name);
+        return onDelete(name);
+      }
+    },
+    fetch: async () => ({ status: 200, clone() { return this; } })
+  };
+
+  vm.runInNewContext(serviceWorker, context, { filename: 'public/sw.js' });
+  return { handlers, events };
 }
 
 describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
@@ -115,6 +169,69 @@ describe('PWA SUNUPILOT — manifeste, icônes et cache', () => {
       'L’activation doit purger les anciennes versions du cache.');
     assert.match(serviceWorker, /self\.skipWaiting\(\)/);
     assert.match(serviceWorker, /self\.clients\.claim\(\)/);
+  });
+
+  test('l’installation attend le précache complet avant de prendre le contrôle', async () => {
+    let precacheCompleted = false;
+    const harness = loadServiceWorker({
+      onAddAll: async (files) => {
+        assert.ok(files.includes('/js/pwa.js'));
+        await Promise.resolve();
+        precacheCompleted = true;
+      },
+      onSkipWaiting: async () => {
+        assert.equal(precacheCompleted, true,
+          'skipWaiting ne doit être appelé qu’après le précache complet.');
+      }
+    });
+    let installPromise;
+    harness.handlers.get('install')({ waitUntil(promise) { installPromise = promise; } });
+
+    await installPromise;
+
+    assert.deepEqual(harness.events, [
+      'caches.open:sunupilot-shell-v5',
+      'cache.addAll',
+      'skipWaiting'
+    ]);
+  });
+
+  test('un échec du précache fait échouer l’installation sans activer le service worker', async () => {
+    const precacheError = new Error('précache incomplet');
+    let skipWaitingCalled = false;
+    const harness = loadServiceWorker({
+      onAddAll: async () => { throw precacheError; },
+      onSkipWaiting: async () => { skipWaitingCalled = true; }
+    });
+    let installPromise;
+    harness.handlers.get('install')({ waitUntil(promise) { installPromise = promise; } });
+
+    await assert.rejects(installPromise, precacheError);
+    assert.equal(skipWaitingCalled, false);
+    assert.ok(!harness.events.includes('skipWaiting'));
+  });
+
+  test('l’activation attend le nettoyage des anciens caches et clients.claim', async () => {
+    const deletedCaches = [];
+    let claimCompleted = false;
+    const harness = loadServiceWorker({
+      cacheNames: ['old-cache', 'sunupilot-shell-v4', 'sunupilot-shell-v5'],
+      onDelete: async (name) => {
+        deletedCaches.push(name);
+        await Promise.resolve();
+      },
+      onClaim: async () => {
+        await Promise.resolve();
+        claimCompleted = true;
+      }
+    });
+    let activatePromise;
+    harness.handlers.get('activate')({ waitUntil(promise) { activatePromise = promise; } });
+
+    await activatePromise;
+
+    assert.deepEqual(deletedCaches, ['old-cache', 'sunupilot-shell-v4']);
+    assert.equal(claimCompleted, true);
   });
 
   test('le script gère l’installation native et enregistre le service worker sans bloquer la page', () => {
