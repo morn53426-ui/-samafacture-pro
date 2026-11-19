@@ -2459,15 +2459,7 @@ router.post('/purchase-orders', async (req, res, next) => {
     if (!supplier) return res.status(400).json({ error: 'Fournisseur inconnu ou inactif.' });
     let totalHt = 0, totalTax = 0;
     const normalized = [];
-    const productIds = [...new Set(lines.map(line => Number(line.produit_id)).filter(Boolean))];
-    if (productIds.length) {
-      const [owned] = await pool.query(`SELECT id, type_catalogue FROM produits WHERE user_id = ? AND id IN (${productIds.map(() => '?').join(',')})`, [uid, ...productIds]);
-      const ownedById = new Map(owned.map(row => [Number(row.id), row]));
-      if (productIds.some(id => !ownedById.has(id))) return res.status(400).json({ error: 'Un produit référencé ne appartient pas à cette entreprise.' });
-      if (productIds.some(id => ownedById.get(id).type_catalogue === 'service')) {
-        return res.status(400).json({ error: 'Les services ne peuvent pas être commandés via Achats & stocks.' });
-      }
-    }
+    const productIds = [...new Set(lines.map(line => Number(line.produit_id)).filter(Boolean))].sort((a, b) => a - b);
     for (const line of lines) {
       const designation = String(line.designation || '').trim().slice(0, 255);
       const qty = Math.round(Number(line.quantite) * 1000) / 1000, price = Math.round(Number(line.prix_unitaire) * 100) / 100, tax = Math.round(Number(line.tva || 0) * 100) / 100;
@@ -2484,6 +2476,23 @@ router.post('/purchase-orders', async (req, res, next) => {
     const numero = randomRef('ACH');
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    if (productIds.length) {
+      const [owned] = await conn.query(
+        `SELECT id, type_catalogue FROM produits
+         WHERE user_id = ? AND id IN (${productIds.map(() => '?').join(',')})
+         ORDER BY id FOR UPDATE`,
+        [uid, ...productIds]
+      );
+      const ownedById = new Map(owned.map(row => [Number(row.id), row]));
+      if (productIds.some(id => !ownedById.has(id))) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Un produit référencé n’appartient pas à cette entreprise.' });
+      }
+      if (productIds.some(id => ownedById.get(id).type_catalogue === 'service')) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Les services ne peuvent pas être commandés via Achats & stocks.' });
+      }
+    }
     const [created] = await conn.query(
       "INSERT INTO pro_commandes_fournisseurs (user_id, fournisseur_id, numero, statut, date_commande, date_livraison_prevue, devise, total_ht, total_tva, total_ttc, notes) VALUES (?, ?, ?, 'confirmee', ?, ?, ?, ?, ?, ?, ?)",
       [uid, supplierId, numero, await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, orderCurrency, totalHt, totalTax, totalHt + totalTax, optionalText(req.body.notes, 5000)]
