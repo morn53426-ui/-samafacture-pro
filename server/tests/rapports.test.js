@@ -5,7 +5,7 @@ const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardown
 
 // /api/rapports (ventes, comptabilité, export Excel) n'était couvert par aucun test jusqu'ici.
 describe('Rapports', () => {
-  let userId, token, clientId;
+  let userId, token, clientId, factureAnnuleeId;
 
   before(async () => {
     await setupTestDatabase();
@@ -31,6 +31,17 @@ describe('Rapports', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ montant: 2360, methode: 'Espèces' });
 
+    const factureAnnulee = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        lignes: [{ designation: 'Prestation annulée', quantite: 1, prix_unitaire: 1000, tva: 18 }]
+      });
+    factureAnnuleeId = factureAnnulee.body.facture.id;
+    await pool.query("UPDATE factures SET statut = 'annulee' WHERE id = ?", [factureAnnuleeId]);
+
     await request(app)
       .post('/api/depenses')
       .set('Authorization', `Bearer ${token}`)
@@ -47,7 +58,16 @@ describe('Rapports', () => {
     assert.equal(res.body.group_by, 'month');
     assert.ok(Array.isArray(res.body.rows));
     const totalVentes = res.body.rows.reduce((s, r) => s + Number(r.total), 0);
-    assert.equal(totalVentes, 2360);
+    assert.equal(totalVentes, 3540, 'Le comportement historique conserve les factures annulées par défaut.');
+  });
+
+  test('GET /rapports/ventes?exclude_cancelled=true exclut les factures annulées', async () => {
+    const res = await request(app)
+      .get('/api/rapports/ventes?exclude_cancelled=true')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(res.status, 200);
+    const totalVentes = res.body.rows.reduce((sum, row) => sum + Number(row.total), 0);
+    assert.equal(totalVentes, 2360, 'Le graphique de chiffre d’affaires ne doit pas compter les factures annulées.');
   });
 
   test('GET /rapports/ventes?group_by=client regroupe par client', async () => {
@@ -57,7 +77,7 @@ describe('Rapports', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.rows.length, 1);
     assert.equal(res.body.rows[0].label, 'Client Rapports');
-    assert.equal(Number(res.body.rows[0].total), 2360);
+    assert.equal(Number(res.body.rows[0].total), 3540);
   });
 
   test('exclude_cancelled=true retire uniquement les factures annulées sans changer le comportement historique', async () => {

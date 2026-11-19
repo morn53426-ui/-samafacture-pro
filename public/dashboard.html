@@ -277,7 +277,7 @@
     const pad = value => String(value).padStart(2, '0');
     return {
       from: firstYear + '-' + pad(firstMonth) + '-01',
-      to: today.year + '-' + pad(today.month) + '-' + pad(today.day) + ' 23:59:59',
+      to: today.year + '-' + pad(today.month) + '-' + pad(today.day),
       monthCount,
       firstMonthIndex
     };
@@ -320,6 +320,7 @@
       group_by: 'month',
       from: range.from,
       to: range.to,
+      exclude_cancelled: 'true',
       exclude_cancelled: 'true'
     });
     const { rows } = await Api.get('/rapports/ventes?' + params.toString());

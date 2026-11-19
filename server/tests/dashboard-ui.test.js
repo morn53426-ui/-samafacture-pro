@@ -24,6 +24,8 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /function buildDashboardMonthSeries\(rows, period\)/);
     assert.match(dashboard, /totalsByMonth\.get\(key\) \?\? 0/);
     assert.match(dashboard, /group_by: 'month'/);
+    assert.match(dashboard, /exclude_cancelled: 'true'/);
+    assert.match(dashboard, /to: today\.year \+ '-' \+ pad\(today\.month\) \+ '-' \+ pad\(today\.day\),/);
     assert.match(dashboard, /canvas\.dataset\.dashboardMonthCount = String\(series\.monthCount\)/);
     assert.match(dashboard, /exclude_cancelled: 'true'/);
   });
@@ -36,6 +38,11 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /Ajoutés sur les 30 derniers jours/);
     assert.match(dashboard, /amount\(stats\.valeur_stock\)/);
     assert.doesNotMatch(dashboard, /Api\.get\('\/pro\/inventory\/valuation'/);
+  });
+
+  test('la légende des ventes passe en colonne unique sur mobile', () => {
+    assert.match(styles, /@media \\(max-width: 640px\\)[\\s\\S]*?\\.dashboard-legend \\{ grid-template-columns:minmax\\(0,1fr\\)/);
+    assert.match(styles, /\\.dashboard-legend-item strong \\{[\\s\\S]*?white-space:nowrap/);
   });
 
   test('le tableau de bord affiche les dernières factures avec statut et total TTC', () => {

@@ -3627,9 +3627,26 @@ thead th { background: #F2F6FD; color: #52627D; }
   .dashboard-panel { padding:15px 13px; }
   .dashboard-donut-wrap { grid-template-columns:minmax(0,1fr); gap:4px; }
   .dashboard-donut-wrap canvas { max-height:180px; }
-  .dashboard-legend { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
-  .dashboard-legend-item { gap:5px; font-size:.65rem; }
-  .dashboard-legend-item strong { font-size:.73rem; }
+  .dashboard-legend { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .dashboard-legend-item {
+    display:grid;
+    grid-template-columns:10px minmax(0,1fr);
+    align-items:center;
+    gap:8px;
+    font-size:.72rem;
+  }
+  .dashboard-legend-item > div {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    min-width:0;
+  }
+  .dashboard-legend-item strong {
+    flex:0 0 auto;
+    font-size:.76rem;
+    white-space:nowrap;
+  }
   .dashboard-chart-wrap { min-height:205px; }
   .dashboard-actions { gap:7px; }
   .dashboard-action { min-height:78px; font-size:.67rem; }

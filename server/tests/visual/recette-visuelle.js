@@ -1331,6 +1331,32 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'La touche Échap doit fermer l’aperçu et rendre le focus à son déclencheur.');
   }
 
+  if (pageDefinition.name === 'dashboard' && viewport.name === 'mobile-320') {
+    const legendMetrics = await page.evaluate(() => {
+      const legend = document.querySelector('.dashboard-legend');
+      const items = Array.from(legend?.querySelectorAll('.dashboard-legend-item') || []);
+      return {
+        columns: legend
+          ? getComputedStyle(legend).gridTemplateColumns.trim().split(/\\s+/).length
+          : 0,
+        itemCount: items.length,
+        valuesFit: items.every(item => {
+          const content = item.querySelector(':scope > div');
+          const amount = content?.querySelector('strong');
+          return Boolean(content && amount &&
+            content.scrollWidth <= content.clientWidth + 1 &&
+            getComputedStyle(amount).whiteSpace === 'nowrap');
+        })
+      };
+    });
+    assert.equal(legendMetrics.columns, 1,
+      'La légende du donut doit passer sur une seule colonne à 320 px : ' + JSON.stringify(legendMetrics));
+    assert.equal(legendMetrics.itemCount, 3,
+      'Les trois catégories de ventes doivent rester visibles sur mobile.');
+    assert.equal(legendMetrics.valuesFit, true,
+      'Les montants TTC doivent tenir sur leur ligne en vue mobile : ' + JSON.stringify(legendMetrics));
+  }
+
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
   await page.screenshot({
     path: path.join(screenshots, filename),
