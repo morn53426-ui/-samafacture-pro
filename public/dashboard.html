@@ -59,15 +59,15 @@
         <header class="dashboard-panel-head">
           <div class="dashboard-panel-title">
             <i class="ic" data-icon="bar-chart"></i>
-            <div><h2>Factures par statut</h2><p class="dashboard-panel-subtitle">Répartition du nombre de factures</p></div>
+            <div><h2>Répartition des ventes</h2><p class="dashboard-panel-subtitle">Montants TTC des lignes facturées par type</p></div>
           </div>
         </header>
         <div class="dashboard-donut-wrap">
           <div class="dashboard-donut-graphic">
-            <canvas id="chart-repartition" role="img" aria-label="Graphique de répartition des factures payées, en attente et en retard."></canvas>
-            <div class="dashboard-donut-center" aria-hidden="true"><strong id="invoice-total">0</strong><span>Factures</span></div>
+            <canvas id="chart-repartition" role="img" aria-label="Graphique de répartition des ventes par type de catalogue."></canvas>
+            <div class="dashboard-donut-center" aria-hidden="true"><strong id="sales-total">0</strong><span>Montant TTC</span></div>
           </div>
-          <div class="dashboard-legend" id="invoice-legend" aria-live="polite">
+          <div class="dashboard-legend" id="sales-legend" aria-live="polite">
             <div class="dashboard-empty">Chargement des données…</div>
           </div>
         </div>
@@ -172,7 +172,7 @@
   renderTopbar('Tableau de bord', "Vue d'ensemble de votre activité");
 
   let chart;
-  let statusChart;
+  let salesChart;
   let periode = 'week';
   let lastDashboardStats = null;
 
@@ -249,7 +249,7 @@
     renderKpis(stats);
     renderRecentInvoices(stats.dernieres_factures || []);
     renderRecentClients(stats.derniers_clients || []);
-    await renderStatusChart(stats);
+    await renderSalesChart(stats);
     await loadChart(periode);
   }
 
@@ -335,19 +335,36 @@
     }).format(count);
   }
 
-  async function renderStatusChart(stats) {
+  function formatDashboardCompactAmount(value) {
+    const amount = Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
+    return new Intl.NumberFormat('fr-FR', {
+      notation: 'compact',
+      maximumFractionDigits: 1
+    }).format(amount);
+  }
+
+  async function renderSalesChart(stats) {
+    const amounts = new Map(
+      (Array.isArray(stats.repartition_ventes) ? stats.repartition_ventes : [])
+        .map(row => [String(row.type_catalogue || ''), Number(row.total_ttc || 0)])
+    );
+    const chartAmount = type => {
+      const value = amounts.get(type);
+      return Number.isFinite(value) ? Math.max(0, value) : 0;
+    };
     const rows = [
-      { label: 'Payées', value: Number(stats.factures_payees?.n || 0), color: dashboardThemeColor('--emerald', '#087A57') },
-      { label: 'En attente', value: Number(stats.factures_en_attente?.n || 0), color: dashboardThemeColor('--gold', '#96713E') },
-      { label: 'En retard', value: Number(stats.factures_en_retard?.n || 0), color: dashboardThemeColor('--clay', '#B64D48') }
+      { label: 'Produits', value: chartAmount('produit'), color: dashboardThemeColor('--emerald', '#087A57') },
+      { label: 'Services', value: chartAmount('service'), color: dashboardThemeColor('--navy-800', '#29265E') },
+      { label: 'Non classés', value: chartAmount('non_classe'), color: dashboardThemeColor('--ink-soft', '#80796F') }
     ];
     const total = rows.reduce((sum, row) => sum + row.value, 0);
-    document.getElementById('invoice-total').textContent = formatDashboardCount(total);
-    document.getElementById('invoice-legend').innerHTML = rows.map(row => `
-      <div class="dashboard-legend-item">
-        <span class="dashboard-legend-dot" style="background:${row.color};"></span>
-        <div>${row.label}<strong>${row.value.toLocaleString('fr-FR')}</strong></div>
-      </div>`).join('');
+    document.getElementById('sales-total').textContent = formatDashboardCompactAmount(total);
+    document.getElementById('sales-legend').innerHTML = rows.map(row =>
+      '<div class="dashboard-legend-item">' +
+        '<span class="dashboard-legend-dot" style="background:' + row.color + ';"></span>' +
+        '<div>' + row.label + '<strong>' + formatMontant(row.value) + '</strong></div>' +
+      '</div>'
+    ).join('');
     const canvas = document.getElementById('chart-repartition');
     try {
       await window.chartReady;
@@ -356,8 +373,8 @@
       if (graphic) graphic.innerHTML = '<div class="dashboard-empty">Le graphique est indisponible sans accès au service de graphiques.</div>';
       return;
     }
-    if (statusChart) statusChart.destroy();
-    statusChart = new Chart(canvas, {
+    if (salesChart) salesChart.destroy();
+    salesChart = new Chart(canvas, {
       type: 'doughnut',
       data: {
         labels: rows.map(row => row.label),
@@ -382,14 +399,19 @@
             titleColor: dashboardThemeColor('--ink', '#24211D'),
             bodyColor: dashboardThemeColor('--ink', '#24211D'),
             borderColor: dashboardThemeColor('--line', '#E6DED2'),
-            borderWidth: 1
+            borderWidth: 1,
+            callbacks: {
+              label: context => context.label + ': ' + formatMontant(context.parsed)
+            }
           }
         }
       }
     });
     canvas.setAttribute('aria-label', total
-      ? 'Répartition de ' + total + ' factures : ' + rows.map(row => row.label + ' ' + row.value).join(', ')
-      : 'Aucune facture enregistrée.');
+      ? 'Répartition des ventes par type de catalogue. Montant total TTC : ' +
+        formatMontant(total) + '. ' +
+        rows.map(row => row.label + ' : ' + formatMontant(row.value)).join('; ') + '.'
+      : 'Aucune ligne de facture enregistrée pour la répartition des ventes.');
   }
 
   function setPeriode(period) {
@@ -399,7 +421,7 @@
   document.addEventListener('sf:theme-change', () => {
     loadChart(periode).catch(error => showFatalError(error.message));
     if (lastDashboardStats) {
-      renderStatusChart(lastDashboardStats).catch(error => showFatalError(error.message));
+      renderSalesChart(lastDashboardStats).catch(error => showFatalError(error.message));
     }
   });
 

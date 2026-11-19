@@ -41,6 +41,7 @@ function emptyDashboard() {
     evolution_mensuelle: [],
     top_clients: [],
     top_produits: [],
+    repartition_ventes: [],
     tresorerie: 0
   };
 }
@@ -111,7 +112,7 @@ async function buildDashboard(userId) {
       [userId]
     );
     const derniersClients = (rows || []).map(({ row_type, ...client }) => client);
-    return { ...base, derniers_paiements: [], dernieres_factures: [], derniers_clients: derniersClients, evolution_mensuelle: [], top_clients: [], top_produits: [] };
+    return { ...base, derniers_paiements: [], dernieres_factures: [], derniers_clients: derniersClients, evolution_mensuelle: [], top_clients: [], top_produits: [], repartition_ventes: [] };
   }
 
   // These five reads are independent and are deliberately kept as separate result sets:
@@ -124,7 +125,8 @@ async function buildDashboard(userId) {
     [evolutionMensuelle],
     [topClients],
     [topProduits],
-    [dernieresFactures]
+    [dernieresFactures],
+    [repartitionVentes]
   ] = await Promise.all([
     pool.query(
       `SELECT p.*, f.numero, c.nom as client_nom FROM paiements p
@@ -161,6 +163,24 @@ async function buildDashboard(userId) {
        ORDER BY f.date_emission DESC, f.id DESC
        LIMIT 5`,
       [userId]
+    ),
+    pool.query(
+      `SELECT
+         CASE
+           WHEN p.id IS NULL THEN 'non_classe'
+           WHEN p.type_catalogue = 'service' THEN 'service'
+           WHEN p.type_catalogue = 'produit' THEN 'produit'
+           ELSE 'non_classe'
+         END AS type_catalogue,
+         COALESCE(SUM(fl.total_ligne), 0) AS total_ttc,
+         COUNT(*) AS nombre_lignes
+       FROM facture_lignes fl
+       JOIN factures f ON f.id = fl.facture_id
+       LEFT JOIN produits p ON p.id = fl.produit_id AND p.user_id = f.user_id
+       WHERE f.user_id = ? AND f.type = 'facture' AND f.statut <> 'annulee'
+       GROUP BY type_catalogue
+       ORDER BY FIELD(type_catalogue, 'produit', 'service', 'non_classe')`,
+      [userId]
     )
   ]);
 
@@ -171,7 +191,8 @@ async function buildDashboard(userId) {
     derniers_clients: derniersClients || [],
     evolution_mensuelle: evolutionMensuelle || [],
     top_clients: topClients || [],
-    top_produits: topProduits || []
+    top_produits: topProduits || [],
+    repartition_ventes: repartitionVentes || []
   };
 }
 

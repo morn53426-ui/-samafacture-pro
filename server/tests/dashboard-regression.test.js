@@ -42,6 +42,15 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.match(source, /LEFT JOIN clients c ON c\.id = f\.client_id AND c\.user_id = f\.user_id/);
   });
 
+  test('la répartition des ventes utilise les montants TTC et respecte l’isolation entreprise', () => {
+    assert.match(source, /repartition_ventes: \[\]/);
+    assert.match(source, /repartition_ventes: repartitionVentes \|\| \[\]/);
+    assert.match(source, /WHEN p\.id IS NULL THEN 'non_classe'[\s\S]*WHEN p\.type_catalogue = 'service' THEN 'service'[\s\S]*WHEN p\.type_catalogue = 'produit' THEN 'produit'/);
+    assert.match(source, /COALESCE\(SUM\(fl\.total_ligne\), 0\) AS total_ttc/);
+    assert.match(source, /LEFT JOIN produits p ON p\.id = fl\.produit_id AND p\.user_id = f\.user_id/);
+    assert.match(source, /WHERE f\.user_id = \? AND f\.type = 'facture' AND f\.statut <> 'annulee'/);
+  });
+
   test('le cache est borné et temporaire', () => {
     assert.match(source, /DASHBOARD_CACHE_TTL_MS/);
     assert.match(source, /DASHBOARD_CACHE_MAX/);

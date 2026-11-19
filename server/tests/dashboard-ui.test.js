@@ -49,6 +49,15 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.equal((dashboard.match(/class="dashboard-module-card /g) || []).length, 5);
   });
 
+  test('la répartition des ventes affiche les montants TTC par type de catalogue', () => {
+    assert.match(dashboard, /Répartition des ventes/);
+    assert.match(dashboard, /Montants TTC des lignes facturées par type/);
+    assert.match(dashboard, /id="sales-total"/);
+    assert.match(dashboard, /id="sales-legend"/);
+    assert.match(dashboard, /stats\.repartition_ventes/);
+    assert.match(dashboard, /formatMontant\(row\.value\)/);
+  });
+
   test('les cartes sont accessibles au clavier et adaptatives', () => {
     assert.match(dashboard, /<nav class="dashboard-modules" aria-label="Modules Sunupilot">/);
     assert.match(styles, /\.dashboard-module-card:focus-visible/);

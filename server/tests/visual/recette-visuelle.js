@@ -69,6 +69,7 @@ function makeFixtures() {
         factures_payees: { n: 0, total: 0 },
         factures_en_attente: { n: 0, total: 0 },
         factures_en_retard: { n: 0, total: 0 },
+        repartition_ventes: [],
         derniers_clients: [],
         derniers_paiements: [],
         dernieres_factures: []
@@ -122,6 +123,15 @@ function makeFixtures() {
       factures_payees: { n: normal ? 12 : 999999, total: normal ? 850000 : 999999999999.99 },
       factures_en_attente: { n: normal ? 4 : 999999, total: normal ? 350000 : 888888888888.88 },
       factures_en_retard: { n: normal ? 1 : 999999, total: normal ? 50000 : 777777777777.77 },
+      repartition_ventes: normal ? [
+        { type_catalogue: 'produit', total_ttc: 850000, nombre_lignes: 9 },
+        { type_catalogue: 'service', total_ttc: 350000, nombre_lignes: 4 },
+        { type_catalogue: 'non_classe', total_ttc: 50000, nombre_lignes: 2 }
+      ] : [
+        { type_catalogue: 'produit', total_ttc: 999999999999.99, nombre_lignes: 999999 },
+        { type_catalogue: 'service', total_ttc: 888888888888.88, nombre_lignes: 999999 },
+        { type_catalogue: 'non_classe', total_ttc: 777777777777.77, nombre_lignes: 999999 }
+      ],
       derniers_clients: clients.slice(0, 5).map((c) => ({ id: c.id, nom: c.nom, email: c.email, telephone: c.telephone })),
       derniers_paiements: factures.slice(0, 5).map((f, index) => ({
         numero: f.numero,
@@ -2179,13 +2189,10 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   await darkPage.waitForFunction(() =>
     document.getElementById('chart-repartition')?.dataset.sfChartType === 'doughnut'
   );
-  const expectedInvoiceTotal = [
-    fixtures.dashboard.factures_payees?.n,
-    fixtures.dashboard.factures_en_attente?.n,
-    fixtures.dashboard.factures_en_retard?.n
-  ].reduce((sum, value) => sum + Number(value || 0), 0);
-  const donutCountMetrics = await darkPage.evaluate(() => {
-    const value = document.getElementById('invoice-total');
+  const expectedSalesTotal = (fixtures.dashboard.repartition_ventes || [])
+    .reduce((sum, row) => sum + Number(row.total_ttc || 0), 0);
+  const salesMetrics = await darkPage.evaluate(() => {
+    const value = document.getElementById('sales-total');
     const canvas = document.getElementById('chart-repartition');
     const valueRect = value?.getBoundingClientRect();
     const canvasRect = canvas?.getBoundingClientRect();
@@ -2200,19 +2207,23 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
   const expectedCompactTotal = new Intl.NumberFormat('fr-FR', {
     notation: 'compact',
     maximumFractionDigits: 1
-  }).format(expectedInvoiceTotal);
-  assert.equal(donutCountMetrics.display, expectedCompactTotal,
-    'Le total central du graphique doit être compact pour les grands volumes.');
-  assert.ok(donutCountMetrics.valueWidth > 0 &&
-    donutCountMetrics.valueWidth <= donutCountMetrics.canvasWidth * 0.69,
-  'Le total compact doit tenir dans l’ouverture du graphique : ' + JSON.stringify(donutCountMetrics));
-  assert.ok(donutCountMetrics.accessibleLabel.includes(String(expectedInvoiceTotal)),
-    'Le libellé accessible du graphique doit conserver le total exact.');
-  assert.deepEqual(donutCountMetrics.sampleFormats, [
+  }).format(expectedSalesTotal);
+  assert.equal(salesMetrics.display, expectedCompactTotal,
+    'Le montant TTC central doit rester compact, même pour des volumes élevés.');
+  assert.ok(salesMetrics.valueWidth > 0 &&
+    salesMetrics.valueWidth <= salesMetrics.canvasWidth * 0.69,
+  'Le montant compact doit tenir dans l’ouverture du graphique : ' + JSON.stringify(salesMetrics));
+  assert.ok(salesMetrics.accessibleLabel.includes('Répartition des ventes') &&
+    salesMetrics.accessibleLabel.includes('Produits') &&
+    salesMetrics.accessibleLabel.includes('Services') &&
+    salesMetrics.accessibleLabel.includes('Non classés') &&
+    salesMetrics.accessibleLabel.includes('Montant total TTC'),
+  'Le libellé accessible doit décrire la répartition des trois types de catalogue.');
+  assert.deepEqual(salesMetrics.sampleFormats, [
     '0', '42', '9 999', '10 k', '3 M'
-  ], 'Le formateur doit préserver les petits nombres et compacter les grands volumes en français.');
+  ], 'Le formateur de volumes doit préserver les petits nombres et compacter les grands volumes en français.');
   await darkPage.screenshot({
-    path: path.join(OUTPUT_DIR, 'dashboard-donut-volumes-eleves-1440.png'),
+    path: path.join(OUTPUT_DIR, 'dashboard-repartition-ventes-1440.png'),
     fullPage: true
   });
   const darkMetrics = await darkPage.evaluate(() => ({
