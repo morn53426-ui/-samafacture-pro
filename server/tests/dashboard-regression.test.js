@@ -90,6 +90,7 @@ describe('Dashboard — régression et scalabilité', () => {
 
   test('les migrations 17 et 18 mémorisent l’entrepôt des factures et rendent le backfill historique idempotent', () => {
     const dbSource = fs.readFileSync(path.join(__dirname, '..', 'config', 'db.js'), 'utf8');
+    const professionalSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'professionnel.js'), 'utf8');
     const schemaSource = fs.readFileSync(path.join(__dirname, '..', 'database', 'schema.sql'), 'utf8');
     assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 18/);
     assert.match(dbSource, /v17 : entrepôt de sortie mémorisé sur les factures/);
@@ -97,7 +98,8 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.match(schemaSource, /entrepot_id INT UNSIGNED NULL/);
     assert.match(dbSource, /COLUMN_NAME = 'backfill_stock_termine'/);
     assert.match(dbSource, /ADD COLUMN backfill_stock_termine TINYINT\(1\) NOT NULL DEFAULT 0/);
-    assert.match(dbSource, /backfill_stock_termine\) !== 1/);
+    assert.match(professionalSource, /if \(Number\(warehouse\.backfill_stock_termine\) !== 1\)/);
+    assert.match(professionalSource, /UPDATE pro_entrepots SET backfill_stock_termine = 1/);
   });
 
   test('la migration garantit la colonne facture_personnalisation sur les bases existantes', () => {
