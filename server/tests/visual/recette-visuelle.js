@@ -445,7 +445,7 @@ function fixtureFor(pathname, fixtures) {
   return {};
 }
 
-async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
+async function preparePage(browser, baseUrl, fixtures, reduceMotion, apiFailures = {}) {
   const page = await browser.newPage();
   page.__visualApiRequests = [];
   page.on('requestfailed', request => {
@@ -465,6 +465,15 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion) {
       let response = {};
       try {
         const requestUrl = new URL(url);
+        const apiFailure = apiFailures[requestUrl.pathname];
+        if (apiFailure) {
+          request.respond({
+            status: apiFailure.status || 503,
+            contentType: 'application/json',
+            body: JSON.stringify(apiFailure.body || { error: 'Service temporairement indisponible' })
+          }).catch(() => {});
+          return;
+        }
         if (request.method() === 'POST' && requestUrl.pathname === '/api/factures') {
           response = { facture: { id: 987, numero: 'FAC-VISUAL-0987' } };
         } else {
@@ -3604,6 +3613,54 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
 
   await prepareDocument('facture');
   await prepareDocument('devis');
+
+  // Une panne de l'API entrepôts doit bloquer les factures sans empêcher les devis.
+  const warehouseOutagePage = await preparePage(browser, baseUrl, fixtures, false, {
+    '/api/pro/warehouses': { status: 503, body: { error: 'Service entrepôts indisponible' } }
+  });
+  await warehouseOutagePage.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
+  const outageSubmissions = [];
+  warehouseOutagePage.on('request', request => {
+    if (request.url().includes('/api/factures') && request.method() === 'POST') {
+      try { outageSubmissions.push(JSON.parse(request.postData() || '{}')); } catch (error) { outageSubmissions.push(null); }
+    }
+  });
+  await warehouseOutagePage.goto(baseUrl + '/nouvelle-facture.html', { waitUntil: 'domcontentloaded' });
+  await warehouseOutagePage.waitForSelector('#l1 .ligne-produit', { timeout: 15000 });
+  const warehouseOutageState = await warehouseOutagePage.evaluate(() => ({
+    disabled: document.getElementById('entrepot_id').disabled,
+    option: document.getElementById('entrepot_id').selectedOptions[0]?.textContent,
+    help: document.getElementById('invoice-warehouse-help').textContent
+  }));
+  assert.deepEqual(warehouseOutageState, {
+    disabled: true,
+    option: 'Entrepôts indisponibles',
+    help: 'Le service des entrepôts est momentanément indisponible. Vous pouvez toujours créer un devis ; une facture nécessite un entrepôt actif.'
+  }, 'Une panne des entrepôts doit afficher un état récupérable sans fataliser le formulaire.');
+  await warehouseOutagePage.select('#client_id', '1');
+  await warehouseOutagePage.select('#l1 .ligne-produit', '2');
+  await warehouseOutagePage.$eval('#l1 .ligne-qte', element => {
+    element.value = '2';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await warehouseOutagePage.click('#submit-facture-btn');
+  await warehouseOutagePage.waitForFunction(() =>
+    document.getElementById('error-box')?.textContent.includes('Veuillez sélectionner un entrepôt de sortie du stock.')
+  );
+  assert.equal(outageSubmissions.length, 0, 'Une facture ne doit pas être envoyée sans entrepôt valide.');
+  await warehouseOutagePage.$eval('input[name="doc_type"][value="devis"]', element => {
+    element.checked = true;
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await warehouseOutagePage.click('#submit-facture-btn');
+  await warehouseOutagePage.waitForFunction(() =>
+    location.pathname.endsWith('/factures.html') && location.search.includes('highlight=987'),
+    { timeout: 15000 }
+  );
+  assert.equal(outageSubmissions.length, 1, 'Le devis doit rester enregistrable lorsque l’API entrepôts échoue.');
+  assert.equal(outageSubmissions[0].type, 'devis');
+  assert.equal(outageSubmissions[0].entrepot_id, null);
+  await warehouseOutagePage.close();
 
   // Vérifier le choix d'entrepôt pendant la conversion, le focus clavier et Échap.
   await page.goto(baseUrl + '/devis.html', { waitUntil: 'domcontentloaded' });

@@ -132,19 +132,30 @@
   document.getElementById('date_emission').value = dateCivileAujourdhui();
 
   async function init() {
-    const [{ clients: c }, { produits: p }, { entrepots }] = await Promise.all([
-      Api.get('/clients'), Api.get('/produits'), Api.get('/pro/warehouses')
+    const [{ clients: c }, { produits: p }] = await Promise.all([
+      Api.get('/clients'), Api.get('/produits')
     ]);
     clients = c; produits = p;
     document.getElementById('client_id').innerHTML = '<option value="">Sélectionner un client</option>' +
       clients.map(cl => `<option value="${cl.id}">${escapeHtml(cl.nom)}</option>`).join('');
-    const activeWarehouses = (entrepots || []).filter(entrepot => Number(entrepot.actif) === 1);
+
+    // Le chargement des entrepôts est indépendant : une panne de ce service ne doit pas
+    // empêcher la création d'un devis, qui ne déclenche aucun mouvement de stock.
     const warehouseSelect = document.getElementById('entrepot_id');
-    warehouseSelect.innerHTML = '<option value="">Sélectionner un entrepôt</option>' +
-      activeWarehouses.map(entrepot => `<option value="${Number(entrepot.id)}">${escapeHtml(entrepot.nom)}${Number(entrepot.par_defaut) === 1 ? ' (principal)' : ''}</option>`).join('');
-    const defaultWarehouse = activeWarehouses.find(entrepot => Number(entrepot.par_defaut) === 1) || activeWarehouses[0];
-    if (defaultWarehouse) warehouseSelect.value = String(defaultWarehouse.id);
-    warehouseSelect.disabled = activeWarehouses.length === 0;
+    try {
+      const { entrepots } = await Api.get('/pro/warehouses');
+      const activeWarehouses = (entrepots || []).filter(entrepot => Number(entrepot.actif) === 1);
+      warehouseSelect.innerHTML = '<option value="">Sélectionner un entrepôt</option>' +
+        activeWarehouses.map(entrepot => `<option value="${Number(entrepot.id)}">${escapeHtml(entrepot.nom)}${Number(entrepot.par_defaut) === 1 ? ' (principal)' : ''}</option>`).join('');
+      const defaultWarehouse = activeWarehouses.find(entrepot => Number(entrepot.par_defaut) === 1) || activeWarehouses[0];
+      if (defaultWarehouse) warehouseSelect.value = String(defaultWarehouse.id);
+      warehouseSelect.disabled = activeWarehouses.length === 0;
+    } catch {
+      warehouseSelect.innerHTML = '<option value="">Entrepôts indisponibles</option>';
+      warehouseSelect.disabled = true;
+      document.getElementById('invoice-warehouse-help').textContent =
+        'Le service des entrepôts est momentanément indisponible. Vous pouvez toujours créer un devis ; une facture nécessite un entrepôt actif.';
+    }
     addLigne();
 
     const syncDocumentType = () => {
