@@ -81,3 +81,30 @@ La recette Chromium inclut un diagnostic dédié sur chaque page métier, à 128
 - éléments cliquables non sémantiques à examiner.
 
 Les résultats sont ajoutés au rapport `rapport-recette-visuelle.json` sous la clé `accessibility`, avec une capture par page. Les fonds en dégradé sont comptés séparément et ne sont pas déclarés conformes sur la base d’une estimation trompeuse. Ce diagnostic sert à identifier les correctifs ; il ne remplace pas une revue avec lecteur d’écran (NVDA/VoiceOver), clavier complet, ni les essais sur Safari iOS et Chrome Android.
+
+## Audit clavier et contraste des deux thèmes
+
+L'audit d'accessibilité s'exécute sur les 17 pages métier en thème clair et sombre
+(34 passages Chromium, 1280 × 900). Il complète les vérifications sémantiques avec :
+- contrôle de `data-theme` et `color-scheme` pour chaque thème ;
+- parcours séquentiel avec `Tab` et `Maj+Tab`, en vérifiant que tous les éléments
+  tabulables visibles sont atteignables et disposent d'un indicateur de focus ;
+- aucun retour circulaire n'est exigé au niveau de la page entière : le navigateur doit
+  pouvoir quitter le document après le dernier arrêt ; les composants modaux, lorsqu'ils
+  existent, doivent faire l'objet d'un contrôle dédié du confinement du focus ;
+- mesure du contraste WCAG AA (4,5:1 texte courant ; 3:1 grand texte), y compris
+  aux arrêts de couleur déclarés dans les dégradés CSS ;
+- captures distinctes `accessibilite-light-*.png` et `accessibilite-dark-*.png`.
+
+Cette recette valide l'arbre sémantique et les comportements clavier dans Chromium.
+Elle ne prétend pas simuler la restitution vocale d'un vrai lecteur d'écran : une recette
+manuelle VoiceOver (Safari/iOS/macOS) et NVDA (Firefox/Windows) demeure requise avant
+une certification d'accessibilité.
+
+
+### Indicateurs de focus portés par un conteneur
+
+Le contrôle clavier accepte un indicateur rendu soit directement sur l'élément focalisé,
+soit sur un ancêtre correspondant à `:focus-within` (par exemple une barre de recherche
+dont le contour et l'ombre sont dessinés sur son conteneur). Le rapport indique
+`indicatorOwner` pour distinguer la cible clavier du composant qui dessine l'indicateur.
