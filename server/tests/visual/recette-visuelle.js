@@ -275,6 +275,10 @@ const CHART_STUB = [
 ].join('\n');
 
 function fixtureFor(pathname, fixtures) {
+  if (pathname === '/api/pro/warehouses') return { entrepots: [
+    { id: 1, code: 'PRINCIPAL', nom: 'Magasin principal', actif: 1, par_defaut: 1 },
+    { id: 2, code: 'SECONDAIRE', nom: 'Dépôt secondaire', actif: 1, par_defaut: 0 }
+  ] };
   if (pathname === '/api/factures-recurrentes') return { recurrentes: [] };
   if (pathname === '/api/dashboard') return fixtures.dashboard;
   if (pathname === '/api/pro/inventory/valuation') {
@@ -3553,7 +3557,17 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     });
     const total = await page.$eval('#rec-total', element => element.textContent.replace(/\s+/g, ' ').trim());
     assert.equal(total, '20 380 FCFA', 'Le total doit inclure la remise, la TVA sur le net et les frais de livraison.');
+    const warehouseField = await page.evaluate(() => ({
+      hidden: document.getElementById('invoice-warehouse-field').hidden,
+      value: document.getElementById('entrepot_id').value,
+      options: document.getElementById('entrepot_id').options.length
+    }));
+    if (type === 'facture') {
+      assert.deepEqual(warehouseField, { hidden: false, value: '1', options: 3 },
+        'Une facture doit proposer les entrepôts actifs et présélectionner PRINCIPAL.');
+    }
     if (type === 'devis') {
+      assert.equal(warehouseField.hidden, true, 'Un devis ne doit pas afficher de dépôt de sortie.');
       const fields = await page.evaluate(() => ({
         dueHidden: document.getElementById('invoice-due-field').hidden,
         validityHidden: document.getElementById('quote-validity-field').hidden,
@@ -3578,6 +3592,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.equal(payload.lignes[0].quantite, 2);
     assert.equal(payload.remise, 1000);
     assert.equal(payload.frais_livraison, 1500);
+    assert.equal(payload.entrepot_id, type === 'facture' ? 1 : null,
+      'Seule une facture doit transmettre le dépôt sélectionné.');
     if (type === 'devis') {
       assert.equal(payload.date_validite, '2026-12-15');
       assert.equal(payload.date_echeance, null);
@@ -3588,6 +3604,30 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
 
   await prepareDocument('facture');
   await prepareDocument('devis');
+
+  // Vérifier le choix d'entrepôt pendant la conversion, le focus clavier et Échap.
+  await page.goto(baseUrl + '/devis.html', { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#devis-body button.btn-primary', { timeout: 15000 });
+  await page.$eval('#devis-body button.btn-primary', button => button.click());
+  await page.waitForFunction(() => {
+    const modal = document.getElementById('quote-warehouse-modal');
+    return modal && getComputedStyle(modal).display !== 'none' &&
+      document.activeElement?.id === 'quote-warehouse-select';
+  }, { timeout: 10000 });
+  const quoteWarehouseDialog = await page.evaluate(() => ({
+    role: document.getElementById('quote-warehouse-modal').getAttribute('role'),
+    modal: document.getElementById('quote-warehouse-modal').getAttribute('aria-modal'),
+    hidden: document.getElementById('quote-warehouse-modal').getAttribute('aria-hidden'),
+    value: document.getElementById('quote-warehouse-select').value,
+    options: document.getElementById('quote-warehouse-select').options.length
+  }));
+  assert.deepEqual(quoteWarehouseDialog, {
+    role: 'dialog', modal: 'true', hidden: 'false', value: '1', options: 3
+  }, 'La conversion doit proposer un dialogue accessible avec PRINCIPAL présélectionné.');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('quote-warehouse-modal')).display === 'none');
+  assert.equal(await page.evaluate(() => document.body.classList.contains('workspace-modal-open')), false,
+    'Échap doit fermer le dialogue et libérer le verrou de focus.');
 
   async function verifyDocumentPdf(documentId, type) {
     // Revenir au média écran avant de capturer l’aperçu de chaque document.

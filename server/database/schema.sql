@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS factures (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
   client_id INT UNSIGNED NOT NULL,
+  entrepot_id INT UNSIGNED NULL,
   numero VARCHAR(50) NOT NULL,
   type VARCHAR(20) NOT NULL DEFAULT 'facture', -- facture | devis
   date_emission DATE NOT NULL,

@@ -35,7 +35,7 @@ describe('Catalogue — distinction produit/service', () => {
   test('la migration attribue non_classe aux fiches historiques sans deviner leur nature', () => {
     assert.match(migration, /column: 'type_catalogue', definition: "VARCHAR\(20\) NOT NULL DEFAULT 'non_classe' AFTER nom"/);
     assert.match(schema, /type_catalogue VARCHAR\(20\) NOT NULL DEFAULT 'non_classe'/);
-    assert.match(migration, /CURRENT_SCHEMA_VERSION = 16/);
+    assert.match(migration, /CURRENT_SCHEMA_VERSION = 18/);
     assert.doesNotMatch(migration, /UPDATE produits SET type_catalogue/);
   });
 
@@ -88,7 +88,7 @@ describe('Catalogue — distinction produit/service', () => {
     assert.match(invoices, /SELECT id FROM produits[\s\S]*?COALESCE\(type_catalogue, 'non_classe'\) <> 'service'/);
     assert.match(invoices, /const stockManagedIds = new Set\(stockManagedRows\.map\(row => Number\(row\.id\)\)\)/);
     assert.match(invoices, /if \(!stockManagedIds\.has\(productId\)\) continue/);
-    assert.match(invoices, /appliquerAjustementsStock\(conn, req\.tenantId, computedLignes/);
+    assert.ok(invoices.includes('await appliquerAjustementsStock(conn, req.tenantId, invoiceWarehouseId, computedLignes.map'));
     assert.match(invoices, /lignesDevis\.map\(\(l\) => \(\{ produit_id: l\.produit_id, delta: -l\.quantite \}\)\)/);
   });
 

@@ -99,9 +99,9 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v16 sans perdre les données existantes', async () => {
-  // Simule strictement l'état de main : schéma v8 sans colonne/index v9-v10,
-  // ni tables multi-sociétés v11, outbox v12, preuves v13-v14 et abonnements v15 ; la colonne catalogue non classée v16.
+test('une base v8 reçoit les migrations v9 à v18 sans perdre les données existantes', async () => {
+  // Simule strictement une base v8 : schéma v8 sans les migrations v9-v18
+  // (échéances récurrentes, multi-sociétés, outbox, preuves email, abonnements, catalogue et entrepôt facture).
   await pool.query('DROP TABLE IF EXISTS email_outbox');
   await pool.query('DROP TABLE IF EXISTS pro_team_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitation_verifications');
@@ -134,6 +134,19 @@ test('une base v8 reçoit les migrations v9 à v16 sans perdre les données exis
     await pool.query('ALTER TABLE factures_recurrentes DROP COLUMN jour_ancre');
   }
 
+  const [warehouseColumnBefore] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures' AND COLUMN_NAME = 'entrepot_id'`
+  );
+  if (warehouseColumnBefore.length) await pool.query('ALTER TABLE factures DROP COLUMN entrepot_id');
+
+  const [backfillMarkerBefore] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_entrepots'
+       AND COLUMN_NAME = 'backfill_stock_termine'`
+  );
+  if (backfillMarkerBefore.length) await pool.query('ALTER TABLE pro_entrepots DROP COLUMN backfill_stock_termine');
+
   const [[beforeUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
     [groupOwnerId]
@@ -143,10 +156,10 @@ test('une base v8 reçoit les migrations v9 à v16 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v16 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v18 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 16, 'la version doit inclure la migration catalogue v16 après les migrations v8 à v15');
+  assert.equal(Number(meta.version), 18, 'la version doit inclure la migration entrepôt v18 après les migrations v8 à v16');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -187,8 +200,21 @@ test('une base v8 reçoit les migrations v9 à v16 sans perdre les données exis
       'saas_subscription_payment_attempts', 'saas_subscription_periods', 'saas_subscription_price_versions',
       'saas_subscription_webhook_events', 'saas_subscriptions'
     ].sort(),
-    'les tables v11-v15, dont les huit tables du moteur SaaS, doivent être créées avant la colonne catalogue v16'
+    'les tables v11-v15, dont les huit tables du moteur SaaS, doivent être créées avant les migrations catalogue v16 et entrepôt facture v18'
   );
+
+  const [warehouseColumnsAfter] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures' AND COLUMN_NAME = 'entrepot_id'`
+  );
+  assert.equal(warehouseColumnsAfter.length, 1, 'la migration v17 doit ajouter entrepot_id sans supprimer les factures existantes');
+
+  const [backfillMarkerAfter] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_entrepots'
+       AND COLUMN_NAME = 'backfill_stock_termine'`
+  );
+  assert.equal(backfillMarkerAfter.length, 1, 'la migration v18 doit ajouter le marqueur de reprise des stocks.');
 });
 
 

@@ -2373,20 +2373,20 @@ async function ensureDefaultWarehouse(uid) {
 
     await conn.beginTransaction();
     transactionStarted = true;
-    const [warehouseInsert] = await conn.query(
+    await conn.query(
       "INSERT IGNORE INTO pro_entrepots (user_id, code, nom, par_defaut) VALUES (?, 'PRINCIPAL', 'Magasin principal', 1)",
       [userId]
     );
     const [[warehouse]] = await conn.query(
-      'SELECT id FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1 FOR UPDATE',
+      'SELECT id, backfill_stock_termine FROM pro_entrepots WHERE user_id = ? AND code = ? LIMIT 1 FOR UPDATE',
       [userId, 'PRINCIPAL']
     );
     if (!warehouse) throw new Error('Impossible de retrouver le magasin principal après son initialisation.');
 
-    // Le backfill historique est nécessaire uniquement à la création du magasin.
-    // Sur les appels suivants, ne pas rescanner/verrouiller le stock pendant les transferts
-    // ou les réceptions concurrents. La création de produit initialise sa propre ligne.
-    if (Number(warehouseInsert.affectedRows) === 1) {
+    // Un autre parcours (ex. facture récurrente) peut avoir créé le magasin avant cet appel.
+    // Le marqueur représente l'état réel du backfill, et non le résultat de INSERT IGNORE.
+    // Le verrou nommé + la transaction rendent la reprise unique, atomique et réessayable.
+    if (Number(warehouse.backfill_stock_termine) !== 1) {
       await conn.query(
         `INSERT IGNORE INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite)
          SELECT p.user_id, ?, p.id, GREATEST(0, p.stock - COALESCE(existing.total, 0))
@@ -2400,6 +2400,10 @@ async function ensureDefaultWarehouse(uid) {
          WHERE p.user_id = ?
            AND COALESCE(p.type_catalogue, 'non_classe') <> 'service'`,
         [warehouse.id, userId, userId]
+      );
+      await conn.query(
+        'UPDATE pro_entrepots SET backfill_stock_termine = 1 WHERE id = ? AND user_id = ?',
+        [warehouse.id, userId]
       );
     }
 
