@@ -78,11 +78,11 @@ describe('Dashboard — régression et scalabilité', () => {
 
   test('une panne du service entrepôts ne bloque pas la création des devis', () => {
     const invoiceForm = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'nouvelle-facture.html'), 'utf8');
-    assert.match(invoiceForm, /const \\[\\{ clients: c \\}, \\{ produits: p \\}\\] = await Promise\\.all/);
-    assert.match(invoiceForm, /try \\{\\s*const \\{ entrepots \\} = await Api\\.get\\('\\/pro\\/warehouses'\\)/);
-    assert.match(invoiceForm, /catch \\{\\s*warehouseSelect\\.innerHTML/);
-    assert.match(invoiceForm, /Entrepôts indisponibles/);
-    assert.match(invoiceForm, /Vous pouvez toujours créer un devis/);
+    assert.ok(invoiceForm.includes("const [{ clients: c }, { produits: p }] = await Promise.all(["));
+    assert.ok(invoiceForm.includes("try {\\n      const { entrepots } = await Api.get('/pro/warehouses');"));
+    assert.ok(invoiceForm.includes("catch {\\n      warehouseSelect.innerHTML = '<option value=\"\">Entrepôts indisponibles</option>';"));
+    assert.ok(invoiceForm.includes('Entrepôts indisponibles'));
+    assert.ok(invoiceForm.includes('Vous pouvez toujours créer un devis'));
   });
 
   test('la conversion d’un devis demande un entrepôt et transmet son identifiant à l’API', () => {
