@@ -581,6 +581,60 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       JSON.stringify({ ...diagnostic, apiRequests: page.__visualApiRequests, pageErrors }) +
       '; cause=' + error.message);
   }
+  if (pageDefinition.standaloneDocument && viewport.width <= 640) {
+    await page.waitForFunction(() => {
+      const qr = document.querySelector('.invoice-doc .sf-doc-footer img[alt="QR code de vérification"]');
+      return qr && qr.complete && qr.naturalWidth > 0;
+    }, { timeout: 10000 });
+
+    const footerGeometry = await page.evaluate(() => {
+      const documentNode = document.querySelector('.invoice-doc');
+      const footer = documentNode?.querySelector('.sf-doc-footer');
+      const stamp = footer?.querySelector('.stamp');
+      const qr = footer?.querySelector('img[alt="QR code de vérification"]');
+      if (!documentNode || !footer || !stamp || !qr) return { found: false };
+      const documentRect = documentNode.getBoundingClientRect();
+      const documentStyle = getComputedStyle(documentNode);
+      const stampRect = stamp.getBoundingClientRect();
+      const qrRect = qr.getBoundingClientRect();
+      const contentLeft = documentRect.left +
+        (parseFloat(documentStyle.borderLeftWidth) || 0) +
+        (parseFloat(documentStyle.paddingLeft) || 0);
+      const contentRight = documentRect.right -
+        (parseFloat(documentStyle.borderRightWidth) || 0) -
+        (parseFloat(documentStyle.paddingRight) || 0);
+      return {
+        found: true,
+        flexWrap: getComputedStyle(footer).flexWrap,
+        contentLeft,
+        contentRight,
+        stampLeft: stampRect.left,
+        stampRight: stampRect.right,
+        stampWidth: stampRect.width,
+        stampHeight: stampRect.height,
+        qrLeft: qrRect.left,
+        qrRight: qrRect.right,
+        qrWidth: qrRect.width,
+        qrHeight: qrRect.height
+      };
+    });
+    assert.equal(footerGeometry.found, true,
+      pageDefinition.name + ' : le QR code et le cachet du pied de page doivent être présents.');
+    assert.equal(footerGeometry.flexWrap, 'wrap',
+      pageDefinition.name + ' : le pied de page doit pouvoir passer sur deux lignes sur mobile.');
+    assert.ok(footerGeometry.stampWidth > 0 && footerGeometry.stampHeight > 0,
+      pageDefinition.name + ' : le cachet de paiement doit rester visible.');
+    assert.ok(footerGeometry.stampLeft >= footerGeometry.contentLeft - 1 &&
+      footerGeometry.stampRight <= footerGeometry.contentRight + 1,
+      pageDefinition.name + ' : le cachet circulaire ne doit pas être rogné par les marges du document à ' +
+      viewport.width + 'px : ' + JSON.stringify(footerGeometry));
+    assert.ok(footerGeometry.qrWidth > 0 && footerGeometry.qrHeight > 0 &&
+      footerGeometry.qrLeft >= footerGeometry.contentLeft - 1 &&
+      footerGeometry.qrRight <= footerGeometry.contentRight + 1,
+      pageDefinition.name + ' : le QR code doit rester visible dans le pied de page à ' +
+      viewport.width + 'px : ' + JSON.stringify(footerGeometry));
+  }
+
   if (pageDefinition.name === 'produits') {
     const catalogue = await page.evaluate(() => [...document.querySelectorAll('#produits-body tr')].map(row => ({
       type: row.querySelector('[data-label="Type"]')?.textContent.trim() || '',
