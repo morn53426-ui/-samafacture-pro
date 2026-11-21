@@ -92,23 +92,40 @@ Fournis les cinq captures ordinateur (et éventuellement les vues mobiles). Vér
 
 Les captures seront remplacées dans le montage à la place des reconstructions actuelles. La vidéo sera ensuite réexportée et les sous-titres recontrôlés.
 
-## 7. Valider le fichier vidéo final avant intégration
+## 7. Intégrer et valider le fichier vidéo final
 
-Quand le master final est disponible, copie-le dans le dépôt sous le chemin exact :
+Le pack `Sunupilot-Video-Integration-Pack-CORRIGE.zip` contient exactement les chemins attendus par le dépôt, à la racine de l'archive :
+- `public/videos/sunupilot-presentation.mp4` ;
+- `public/videos/sunupilot-presentation-fr.vtt` ;
+- `public/images/sunupilot-presentation-poster.svg`.
 
-`public/videos/sunupilot-presentation.mp4`
-
-Conserve également le fichier de sous-titres `public/videos/sunupilot-presentation-fr.vtt` et l'affiche `public/images/sunupilot-presentation-poster.svg`. Le nom du MP4 est utilisé directement par le lecteur de la page d'accueil.
-
-Depuis le dossier `server`, exécute :
+Depuis PowerShell, place-toi à la racine du dépôt (le dossier qui contient `.git` et `server`) et extrais le ZIP directement dans ce dossier :
 
 ```powershell
-npm run validate:video-asset
+Expand-Archive -LiteralPath "$env:USERPROFILE\Downloads\Sunupilot-Video-Integration-Pack-CORRIGE.zip" -DestinationPath . -Force
+git status --short
 ```
 
-Le contrôle vérifie la présence des trois fichiers, la signature du conteneur MP4, les boîtes `moov` et `mdat`, la taille du fichier (100 Ko à 80 Mio) ainsi que l'en-tête et les repères temporels WebVTT. Il s'agit d'un contrôle d'intégrité avant commit ; il ne remplace pas une lecture réelle dans Chrome, Safari et sur téléphone.
+Les dossiers doivent être `public/videos` et `public/images` à la racine du dépôt, sans dossier d'emballage supplémentaire. Depuis le même dossier racine, lance le contrôle :
 
-Pour l'instant, tant que le MP4 n'est pas ajouté au dépôt, le lecteur utilise volontairement la présentation animée de secours. N'annonce pas la vidéo comme intégrée tant que cette commande ne passe pas et que la lecture locale n'a pas été vérifiée.
+```powershell
+cd server
+npm run validate:video-asset
+cd ..
+```
+
+Le contrôle vérifie la présence des trois fichiers, la signature du conteneur MP4, les boîtes `moov` et `mdat`, la taille du fichier (100 Ko à 80 Mio), l'en-tête et les repères temporels WebVTT. Le pack corrigé a été extrait dans un dossier propre et validé : **5 771 481 octets, 7 repères WebVTT, validation réussie**.
+
+Si la validation réussit, ajoute uniquement les trois fichiers média, sur la branche de la PR #126 :
+
+```powershell
+git add public/videos/sunupilot-presentation.mp4 public/videos/sunupilot-presentation-fr.vtt public/images/sunupilot-presentation-poster.svg
+git commit -m "feat(landing): add Sunupilot presentation video"
+git push origin integration/sunupilot-video-main-20261121
+```
+
+Ce contrôle d'intégrité ne remplace pas une lecture réelle dans Chrome, Safari et sur téléphone. Tant que le MP4 n'est pas ajouté à la branche et lu localement, le lecteur conserve volontairement la présentation animée de secours. Ne fusionne pas la PR avant cette recette.
+
 
 ## Données incluses
 
