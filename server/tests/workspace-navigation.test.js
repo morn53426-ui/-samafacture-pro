@@ -112,18 +112,20 @@ describe('Navigation et structure des pages métier', () => {
   });
   test('l’espace professionnel relie les domaines aux modules OHADA et Achats existants', () => {
     const html = readPage('professionnel.html');
-    const nav = html.match(/<nav class="pro-workspace-guide"[^>]*>([\\s\\S]*?)<\\/nav>/);
-    assert.ok(nav, 'Le guide des domaines doit être présent.');
-    const groups = [...nav[1].matchAll(/class="pro-workspace-guide-group"/g)];
+    const navStart = html.indexOf('<nav class="pro-workspace-guide"');
+    const navEnd = html.indexOf('</nav>', navStart);
+    assert.ok(navStart >= 0 && navEnd > navStart, 'Le guide des domaines doit être présent.');
+    const navHtml = html.slice(navStart, navEnd);
+    const groups = [...navHtml.matchAll(/class="pro-workspace-guide-group"/g)];
     assert.equal(groups.length, 6, 'Les six domaines de gestion doivent être visibles.');
-    const links = [...nav[1].matchAll(/href="([^"]+)"/g)].map(match => match[1]);
+    const links = [...navHtml.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
     assert.equal(links.length, 11, 'Les onze accès directs doivent être présents.');
     for (const destination of ['comptabilite.html', 'achats.html']) {
       assert.ok(links.includes(destination), 'La destination ' + destination + ' doit être accessible.');
       assert.ok(fs.existsSync(path.join(PUBLIC_DIR, destination)), 'La page ' + destination + ' doit exister.');
     }
     for (const destination of links.filter(value => value.startsWith('#'))) {
-      assert.match(html, new RegExp('\\\\bid="' + destination.slice(1) + '"'),
+      assert.ok(html.includes('id="' + destination.slice(1) + '"'),
         'Le raccourci ' + destination + ' doit pointer vers un module existant.');
     }
   });
