@@ -4239,6 +4239,11 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       assert.ok(pdf.length > 5000,
         type + '/' + template + ' : le PDF doit contenir le document complet.');
       const pdfPages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
+      if (pdfPages > 3) {
+        const diagnosticName = 'diagnostic-template-' + type + '-' + template + '-pages-' + pdfPages + '.pdf';
+        fs.writeFileSync(path.join(OUTPUT_DIR, diagnosticName), pdf);
+        console.error('PDF de diagnostic enregistré : ' + diagnosticName);
+      }
       assert.ok(pdfPages >= 2,
         type + '/' + template + ' : 28 lignes doivent occuper plusieurs pages A4 (pages=' + pdfPages + ').');
       assert.ok(pdfPages <= 3,
