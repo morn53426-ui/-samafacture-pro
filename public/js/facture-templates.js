@@ -1211,7 +1211,7 @@ function createFactureTemplates(helpers) {
 
   function renderTech(user, facture, lignes, isDevis, qrCode, personnalisation) {
     return [
-      '<div style="margin:-40px -40px 25px;padding:24px 40px 23px;background:#10253F;color:#fff;border-left:8px solid #31B8D4;">',
+      '<div class="sf-tech-header" style="margin:-40px -40px 25px;padding:24px 40px 23px;background:#10253F;color:#fff;border-left:8px solid #31B8D4;">',
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px;">',
           '<div><div style="color:#74D8E8;font-size:.62rem;font-weight:800;letter-spacing:.2em;">TECH / BUSINESS</div>' +
             '<div style="margin-top:8px;font-size:1.23rem;font-weight:800;">' + escapeHtml(user.entreprise_nom || user.nom) + '</div>' +
@@ -1221,14 +1221,14 @@ function createFactureTemplates(helpers) {
             '<div style="margin-top:4px;font-family:monospace;font-size:.82rem;">' + escapeHtml(facture.numero) + '</div></div>',
         '</div>',
       '</div>',
-      '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:22px;">',
+      '<div class="sf-tech-meta" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:22px;">',
         '<div style="padding:11px 12px;border:1px solid #D7E4EE;background:#F4F8FB;"><div style="color:#648099;font-size:.59rem;font-weight:800;letter-spacing:.1em;">ÉMISSION</div><strong style="display:block;margin-top:5px;color:#183A57;font-size:.78rem;">' + formatDate(facture.date_emission) + '</strong></div>',
         '<div style="padding:11px 12px;border:1px solid #D7E4EE;background:#F4F8FB;"><div style="color:#648099;font-size:.59rem;font-weight:800;letter-spacing:.1em;">' + (isDevis ? 'VALIDITÉ' : 'ÉCHÉANCE') + '</div><strong style="display:block;margin-top:5px;color:#183A57;font-size:.78rem;">' + formatDate(facture.date_echeance) + '</strong></div>',
         '<div style="padding:11px 12px;border:1px solid #D7E4EE;background:#F4F8FB;"><div style="color:#648099;font-size:.59rem;font-weight:800;letter-spacing:.1em;">STATUT</div><div style="margin-top:4px;">' + statutBadge(facture.statut) + '</div></div>',
       '</div>',
-      '<div style="margin-bottom:22px;padding:13px 16px;border:1px solid #D7E4EE;border-left:4px solid #31B8D4;border-radius:6px;"><div style="color:#3289A4;font-size:.63rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:7px;">Destinataire</div>' + clientBlockHtml(facture) + '</div>',
-      '<table><thead><tr><th style="background:#183A57;color:#fff;">Désignation</th><th style="background:#183A57;color:#fff;">Qté</th><th style="background:#183A57;color:#fff;">Prix U.</th><th style="background:#183A57;color:#fff;">TVA</th><th style="background:#183A57;color:#fff;text-align:right;">Total</th></tr></thead><tbody>' + lignesRowsHtml(lignes) + '</tbody></table>',
-      '<div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:300px;padding:14px 17px;border:1px solid #C6DDE8;border-radius:6px;background:#F4F8FB;">' + totalsRowsHtml(facture,'#183A57',personnalisation) + '</div></div>',
+      '<div class="sf-tech-client" style="margin-bottom:22px;padding:13px 16px;border:1px solid #D7E4EE;border-left:4px solid #31B8D4;border-radius:6px;"><div style="color:#3289A4;font-size:.63rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:7px;">Destinataire</div>' + clientBlockHtml(facture) + '</div>',
+      '<table class="sf-tech-table"><thead><tr><th style="background:#183A57;color:#fff;">Désignation</th><th style="background:#183A57;color:#fff;">Qté</th><th style="background:#183A57;color:#fff;">Prix U.</th><th style="background:#183A57;color:#fff;">TVA</th><th style="background:#183A57;color:#fff;text-align:right;">Total</th></tr></thead><tbody>' + lignesRowsHtml(lignes) + '</tbody></table>',
+      '<div class="sf-tech-totals" style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:300px;padding:14px 17px;border:1px solid #C6DDE8;border-radius:6px;background:#F4F8FB;">' + totalsRowsHtml(facture,'#183A57',personnalisation) + '</div></div>',
       footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)
     ].join('');
   }
