@@ -2,7 +2,7 @@
 
 **Date de référence :** 21 novembre 2026  
 **Branche de référence :** `main`  
-**Commit de référence :** `5478809ee73e25f381503a20712893e6cc6c8a2b`  
+**Commit de référence :** `f49d352125352d009da9abebd2ceecbb122c6d6b`  
 **Règle de travail :** toute évolution passe par une branche et une Pull Request. Ne pas modifier directement `main`, ne pas fusionner une PR dont les contrôles requis échouent et ne pas déployer sans validation dédiée.
 
 Ce document est un plan de travail vivant. Les états ci-dessous reflètent les preuves GitHub consultées à la date de référence ; « en cours » ou « à vérifier » ne signifie pas « résolu ».
@@ -11,11 +11,11 @@ Ce document est un plan de travail vivant. Les états ci-dessous reflètent les 
 
 | Nº | Priorité | Chantier | État au 21/11/2026 |
 |---:|---|---|---|
-| 1 | P1 | Identification des factures/devis sur chaque page PDF | PR #112 : CI #1207 réussie ; nouvelle CI après intégration des préférences de profil |
+| 1 | P1 | Identification des factures/devis sur chaque page PDF | PR #112 fusionnée dans main ; CI #1216 verte après intégration du profil headless |
 | 2 | P1 | Recette exhaustive des 31 modèles facture et 31 modèles devis | Géométrie des bandeaux validée sur main ; recette visuelle complète à étendre |
-| 3 | P1 | Invariants financiers, TVA, remises et arrondis | Suite existante verte sur main ; audit transversal à compléter |
-| 4 | P1 | Qualité d'impression et fidélité aperçu/PDF | Débordement des bandeaux corrigé via PR #111 ; identité multipages et formatage headless intégrés dans la PR #112, validation combinée en cours |
-| 5 | P2 | Accessibilité clavier, clair/sombre et contrastes | PR #110 en cours de revalidation |
+| 3 | P1 | Invariants financiers, TVA, remises et arrondis | Tests facture/paiement/partie double présents ; PR #115 ajoute dépense, idempotence et isolation tenant (CI en cours) |
+| 4 | P1 | Qualité d'impression et fidélité aperçu/PDF | PR #111 et #112 fusionnées ; recette Chromium et PDF multipages passée, inspection humaine d'un échantillon encore à faire |
+| 5 | P2 | Accessibilité clavier, clair/sombre et contrastes | Badge de marque corrigé (contraste calculé 6,10:1–9,15:1) ; CI #44917515326 en cours |
 | 6 | P2 | Routage des stocks et annulations par entrepôt | PR #106 fusionnée dans main ; scénario vente/annulation multi-entrepôts intégré |
 | 7 | P2 | Responsive, zoom et performances | Recette responsive main réussie ; profilage de performance non réalisé |
 | 8 | P2 | Durcissement sécurité, sessions et sauvegardes | CSP et jeton localStorage encore à faire évoluer |
@@ -26,11 +26,11 @@ Ce document est un plan de travail vivant. Les états ci-dessous reflètent les 
 
 ## 1. Impression PDF multipages — P1
 
-**État :** en cours — PR #112.
+**État :** intégré dans `main` par la PR #112 ; vérification automatisée réussie, échantillon PDF à inspecter manuellement.
 
 La PR #111 a corrigé les marges négatives historiques des bandeaux et a été fusionnée dans `main`. Sa CI a validé la géométrie des bandeaux sur 31 modèles facture et 31 modèles devis, avec génération PDF A4 via Chromium.
 
-La PR #112 ajoute des zones de marge CSS Paged Media pour répéter le nom de l'entreprise, le type de document et sa référence sur les pages de continuation. Elle doit être validée sur le commit courant de sa branche avant toute fusion.
+La PR #112 a été fusionnée dans `main` le 21 novembre 2026 (commit `f49d352`). Elle ajoute les zones de marge CSS Paged Media qui répètent le nom de l'entreprise, le type de document et sa référence sur les pages suivantes, et transmet le profil retourné par `/auth/me` aux formateurs de dates et montants pour le rendu headless. La CI #1216 a validé les tests, ESLint, le packaging et la recette visuelle multipages ; l'artefact PDF a été généré, mais une inspection humaine d'un échantillon reste requise.
 
 **Critères d'acceptation**
 - Le nom de l'entreprise, FACTURE/DEVIS et le numéro sont visibles sur chaque page de continuation.
@@ -42,7 +42,7 @@ La PR #112 ajoute des zones de marge CSS Paged Media pour répéter le nom de l'
 
 **Tests requis :** ESLint, tests Node/MySQL, recette Chromium, PDF A4 facture et devis multipages, restauration sauvegarde chiffrée, smoke MySQL/Redis, packaging ZIP.
 
-**Références :** PR #111 (fusionnée), PR #112 (ouverte, brouillon).
+**Références :** PR #111 (fusionnée), PR #112 (fusionnée dans `main`, commit `f49d352`).
 
 ## 2. Recette exhaustive des modèles — P1
 
@@ -61,7 +61,7 @@ La vérification des bandeaux historiques couvre 31 modèles de factures et 31 m
 
 ## 3. Invariants financiers — P1
 
-**État :** tests existants présents ; audit transversal à compléter.
+**État :** les tests couvrent facture, paiement, écriture déséquilibrée et balance ; la PR #115 ajoute les écritures de dépense, le rejeu idempotent, le grand livre et l'isolation entre entreprises. La validation CI reste en cours.
 
 Préserver strictement les montants déjà calculés lors des améliorations visuelles ou de génération PDF.
 
@@ -77,7 +77,7 @@ Préserver strictement les montants déjà calculés lors des améliorations vis
 
 ## 4. Qualité d'impression et fidélité aperçu/PDF — P1
 
-**État :** les débordements historiques des bandeaux sont corrigés sur main ; la recette multipages reste à terminer.
+**État :** PR #111 et #112 intégrées ; la géométrie des 31 modèles facture et 31 modèles devis ainsi que la recette PDF multipages passent en CI. Il reste une revue humaine des artefacts et un contrôle d'impression sur navigateurs réels.
 
 **Critères d'acceptation**
 - Format A4 stable, marges prévisibles et largeur utile constante.
@@ -93,7 +93,7 @@ Préserver strictement les montants déjà calculés lors des améliorations vis
 
 ## 5. Accessibilité et thèmes — P2
 
-**État :** PR #110 en cours de revalidation ; les résultats d'une exécution antérieure étaient en échec sur le parcours clavier de Rapports.
+**État :** la CI précédente a détecté un vrai défaut de contraste sur le badge `PILOT` (texte vert sur dégradé doré). Le badge conserve son fond doré avec un texte bleu nuit ; les ratios calculés sur les deux extrémités sont de 6,10:1 et 9,15:1. La nouvelle CI (#44917515326) doit encore confirmer le parcours complet des 17 pages en clair et sombre.
 
 **Critères d'acceptation**
 - Les 17 pages métier sont vérifiées en thème clair et sombre.
@@ -110,7 +110,7 @@ Préserver strictement les montants déjà calculés lors des améliorations vis
 
 ## 6. Achats et stocks — P2
 
-**État :** PR #106 avec CI complète réussie ; revue fonctionnelle à terminer avant fusion.
+**État :** PR #106 fusionnée dans `main` ; vente et annulation testées avec le dépôt PRINCIPAL, le dépôt secondaire restant inchangé.
 
 **Critères d'acceptation**
 - Une vente sans dépôt explicitement choisi débite uniquement le Magasin principal (PRINCIPAL), conformément au comportement documenté.
@@ -198,11 +198,12 @@ Préserver strictement les montants déjà calculés lors des améliorations vis
 ## Journal de référence
 
 - **PR #111 :** fusionnée dans main ; correction des marges négatives des bandeaux et recette géométrique des 31 modèles facture et 31 modèles devis passée.
-- **PR #112 :** ouverte ; identification des pages PDF de continuation en validation.
-- **Ancienne PR #113 :** son correctif de profil headless (date, fuseau et devise) a été réintégré dans la branche de la PR #112 avec des tests dédiés ; la PR séparée est redondante et doit être clôturée comme remplacée après confirmation de la CI combinée.
-- **PR #110 :** ouverte ; recette clavier et clair/sombre en revalidation.
+- **PR #112 :** fusionnée dans `main` le 21 novembre 2026 (commit `f49d352`) ; tests, ESLint, packaging et recette visuelle multipages réussis.
+- **PR #113 :** fermée comme doublon après vérification que ses quatre fichiers et ses tests headless sont présents dans la PR #112 fusionnée.
+- **PR #110 :** ouverte ; correction du contraste du badge `PILOT` poussée sur la branche, tests automatisés en cours sur le commit `3e349715`.
 - **PR #106 :** fusionnée dans main par le commit `5478809e` ; la vente et son annulation sont vérifiées avec un entrepôt secondaire isolé.
 - **PR #99 :** ouverte ; conflits et contraste à corriger, validation juridique requise.
 - **PR #102 :** ancienne campagne d'accessibilité à consolider avec #110.
+- **PR #115 :** tests de comptabilisation des dépenses, anti-doublon, grand livre et isolation multi-entreprise ; CI en cours.
 
 Ce journal doit être mis à jour à chaque nouvel audit en distinguant les changements réels, les résultats de CI et les vérifications non exécutées.
