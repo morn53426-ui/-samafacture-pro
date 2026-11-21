@@ -3927,7 +3927,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
 
       assert.equal(geometry.documentFound, true, type + '/' + template + ' : document introuvable.');
       assert.ok(geometry.documentWidth > 0, type + '/' + template + ' : largeur imprimée nulle.');
-      assert.equal(geometry.titlePresent, true, type + '/' + template + ' : le titre ' + titleText + ' doit rester visible.');
+      assert.equal(geometry.titlePresent, true, type + '/' + template + ' : titre principal (' + titleLabels.join(' / ') + ') absent du bandeau.');
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
           type + '/' + template + ' : titre principal hors de la zone du document : ' + JSON.stringify({ bounds: geometry.titleBounds, candidates: geometry.titleCandidates }));
