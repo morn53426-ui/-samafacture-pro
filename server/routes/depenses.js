@@ -122,6 +122,7 @@ router.post('/', async (req, res, next) => {
  *     responses:
  *       200: { description: Dépense mise à jour. }
  *       404: { description: Dépense introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: Dépense déjà comptabilisée : modification refusée. }
  */
 router.put('/:id', async (req, res, next) => {
   let conn;
@@ -198,6 +199,7 @@ router.put('/:id', async (req, res, next) => {
  *     responses:
  *       200: { description: Dépense supprimée. }
  *       404: { description: Dépense introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: Dépense déjà comptabilisée : suppression refusée. }
  */
 router.delete('/:id', async (req, res, next) => {
   let conn;
