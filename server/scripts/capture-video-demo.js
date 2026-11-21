@@ -14,11 +14,11 @@ const OUTPUT_DIR = process.env.SUNUPILOT_CAPTURE_DIR ||
 const CONFIRM = process.env.SUNUPILOT_CAPTURE_CONFIRM;
 
 const PAGES = [
-  { name: '01-dashboard', path: '/dashboard.html', ready: '#stats-grid' },
-  { name: '02-facturation', path: '/factures.html', ready: '#billing-stats' },
-  { name: '03-devis', path: '/devis.html', ready: '#devis-body' },
-  { name: '04-clients', path: '/clients.html', ready: '#clients-body' },
-  { name: '05-rapports', path: '/rapports.html', ready: '#rec-recettes' }
+  { name: '01-dashboard', path: '/dashboard.html', ready: '#dernieres-factures-body tr:not(.row-skeleton)' },
+  { name: '02-facturation', path: '/factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
+  { name: '03-devis', path: '/devis.html', ready: '#devis-body tr' },
+  { name: '04-clients', path: '/clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
+  { name: '05-rapports', path: '/rapports.html', ready: '#table-body tr' }
 ];
 
 function validateConfig() {
@@ -100,8 +100,8 @@ async function main() {
     }
 
     const mobilePages = [
-      { name: '06-dashboard-mobile', path: '/dashboard.html', ready: '#stats-grid' },
-      { name: '07-facturation-mobile', path: '/factures.html', ready: '#billing-stats' }
+      { name: '06-dashboard-mobile', path: '/dashboard.html', ready: '#dernieres-factures-body tr:not(.row-skeleton)' },
+      { name: '07-facturation-mobile', path: '/factures.html', ready: '#factures-body tr:not(.row-skeleton)' }
     ];
     for (const item of mobilePages) {
       await page.setViewport({
