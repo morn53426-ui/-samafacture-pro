@@ -248,6 +248,31 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     }
   });
 
+  test('les trente et un modèles portent l’identité de facture et de devis pour les pages imprimées', () => {
+    for (const template of TEMPLATES_ATTENDUS) {
+      for (const isDevis of [false, true]) {
+        const numero = isDevis ? 'DV-IDENTITE-2026-0988' : 'FAC-IDENTITE-2026-0987';
+        const html = templates.renderInvoiceHtml({
+          user: userDeTest({ entreprise_nom: 'SamaFacture Société & Fils' }),
+          facture: factureDeTest({ numero }),
+          lignes: lignesDeTest,
+          isDevis,
+          qrCode: null,
+          template
+        });
+        assert.match(html, /class="sf-print-continuation-header"/,
+          template + ' doit prévoir une ligne d’identification pour les pages imprimées.');
+        assert.ok(html.includes(
+          '<span class="sf-print-continuation-company">SamaFacture Société &amp; Fils</span>'
+        ), template + ' doit afficher le nom de l’entreprise de manière échappée.');
+        assert.ok(html.includes(
+          '<span class="sf-print-continuation-reference">' +
+          (isDevis ? 'DEVIS' : 'FACTURE') + ' · ' + numero + '</span>'
+        ), template + ' doit afficher le type et le numéro exact du document.');
+      }
+    }
+  });
+
   test('les trente et un modèles identifient clairement les dates de facture', () => {
     for (const template of TEMPLATES_ATTENDUS) {
       const html = templates.renderInvoiceHtml({
