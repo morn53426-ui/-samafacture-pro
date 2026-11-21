@@ -7820,3 +7820,50 @@ a.btn .icon {
   }
 }
 
+
+/* Platine A4: compacter l'en-tête, les lignes et le pied pour conserver
+   le panneau Bon pour accord sur la dernière page, sans réduire la typo du tableau. */
+@media print {
+  .invoice-doc .sf-platine-header {
+    padding-bottom: 12px !important;
+    margin-bottom: 14px !important;
+  }
+  .invoice-doc .sf-platine-meta {
+    margin-bottom: 12px !important;
+    column-gap: 14px !important;
+    row-gap: 8px !important;
+  }
+  .invoice-doc .sf-doc-meta-platine {
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+    padding: 7px 10px !important;
+  }
+  .invoice-doc .sf-platine-table th,
+  .invoice-doc .sf-platine-table td {
+    padding: 4px 5px !important;
+    font-size: 9pt !important;
+    line-height: 1.25 !important;
+  }
+  .invoice-doc .sf-platine-totals {
+    margin-top: 12px !important;
+  }
+  .invoice-doc .sf-platine-totals > div {
+    padding: 10px 14px !important;
+  }
+  .invoice-doc .sf-platine-footer {
+    margin-top: 16px !important;
+    gap: 12px !important;
+  }
+  .invoice-doc .sf-doc-extras-platine {
+    margin-top: 10px !important;
+    gap: 6px !important;
+  }
+  .invoice-doc .sf-doc-extras-platine .sf-acceptance-panel {
+    padding: 8px 10px !important;
+  }
+  .invoice-doc .sf-doc-extras-platine .sf-acceptance-copy {
+    margin-bottom: 8px !important;
+    line-height: 1.4 !important;
+  }
+}
+
