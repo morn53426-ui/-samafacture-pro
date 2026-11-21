@@ -7296,7 +7296,8 @@ a.btn .icon {
   border: 1px solid rgba(255,255,255,.16);
 }
 .sidebar-brand .mark img { object-fit: contain; }
-.sidebar-brand .brand-pro { color: #8DD0A7; }
+/* Le badge repose sur un dégradé doré : conserver un texte bleu nuit pour le contraste AA. */
+.sidebar-brand .brand-pro { color: #17233B; }
 .enterprise-console-brand strong { letter-spacing: -.025em; }
 .lp-header .brand { color: var(--brand-indigo); }
 .auth-form-card::before { background: linear-gradient(90deg, var(--brand-baobab), var(--brand-indigo)); }
