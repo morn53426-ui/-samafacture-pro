@@ -745,16 +745,20 @@ router.put('/plan', requireAuth, async (req, res, next) => {
     if (!targetPlan) return res.status(400).json({ error: 'Plan invalide.' });
 
     const [[account]] = await pool.query(
-      `SELECT trial_status, trial_ends_at,
+      `SELECT plan, trial_status, trial_ends_at,
               CASE WHEN trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP() THEN 1 ELSE 0 END AS trial_active
        FROM users WHERE id = ? LIMIT 1`,
       [req.user.id]
     );
     if (!account) return res.status(404).json({ error: 'Utilisateur introuvable.' });
 
-    let result;
+    let result = { affectedRows: 0 };
     if (account.trial_status === 'trialing' && Number(account.trial_active) === 1) {
-      if (targetPlan === 'gratuit') {
+      // Rechoisir la formule déjà active est idempotent : cela ne doit pas être
+      // interprété comme une expiration si MySQL ne compte aucune ligne modifiée.
+      if (targetPlan === account.plan && targetPlan !== 'gratuit') {
+        result = { affectedRows: 0 };
+      } else if (targetPlan === 'gratuit') {
         [result] = await pool.query(
           `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
            WHERE id = ? AND trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP()`,
@@ -767,7 +771,7 @@ router.put('/plan', requireAuth, async (req, res, next) => {
           [targetPlan, targetPlan, req.user.id]
         );
       }
-      if (!result.affectedRows) {
+      if (targetPlan !== account.plan && !result.affectedRows) {
         await pool.query(
           `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
            WHERE id = ? AND trial_status = 'trialing' AND (trial_ends_at IS NULL OR trial_ends_at <= UTC_TIMESTAMP())`,
