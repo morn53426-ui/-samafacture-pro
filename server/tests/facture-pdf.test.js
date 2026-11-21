@@ -445,12 +445,12 @@ describe('Génération PDF de facture', () => {
       assert.ok((res.headers['content-type'] || '').startsWith('application/pdf'));
       assert.equal(res.body.subarray(0, 5).toString('latin1'), '%PDF-');
       const pdfLatin1 = res.body.toString('latin1');
-      const mediaBox = pdfLatin1.match(/\\/MediaBox\\s*\\[\\s*0\\s+0\\s+([\\d.]+)\\s+([\\d.]+)\\s*\\]/);
+      const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
       assert.ok(mediaBox, 'Le PDF Executive doit déclarer sa zone A4.');
       assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
         Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
         'Le devis Executive doit être en A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
-      const pageCount = (pdfLatin1.match(/\\/Type\\s*\\/Page\\b/g) || []).length;
+      const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
       assert.ok(pageCount >= 2,
         'Les 28 lignes du devis Executive doivent produire plusieurs pages (pages=' + pageCount + ').');
       assert.ok(pageCount <= 3,
