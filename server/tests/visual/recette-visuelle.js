@@ -3636,10 +3636,18 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           const values = [luminance(first), luminance(second)].sort((a, b) => b - a);
           return (values[0] + 0.05) / (values[1] + 0.05);
         };
-        const textCandidates = Array.from(document.querySelectorAll(
-          'h1,h2,h3,h4,h5,h6,p,label,a,button,td,th,caption,legend,.stat-value,.nav-item,.field-label'
-        )).filter(element => isVisible(element) && textOf(element) &&
-          !element.closest('svg,[aria-hidden="true"],.ic,.icon'));
+        const textCandidateSelector =
+          'h1,h2,h3,h4,h5,h6,p,label,a,button,td,th,caption,legend,span,strong,em,b,i,.stat-value,.nav-item,.field-label';
+        const textCandidates = Array.from(document.querySelectorAll(textCandidateSelector))
+          .filter(element => isVisible(element) && textOf(element) &&
+            !element.closest('svg,[aria-hidden="true"],.ic,.icon'))
+          // Contrôler le nœud qui porte réellement le texte visible. Un bouton parent
+          // peut avoir un dégradé transparent et une couleur héritée, tandis que son
+          // libellé enfant possède son propre fond opaque et sa propre couleur.
+          // Mesurer les deux transforme à tort le fond transparent du parent en noir.
+          .filter(element => !Array.from(element.querySelectorAll(textCandidateSelector))
+            .some(child => isVisible(child) && textOf(child) &&
+              !child.closest('svg,[aria-hidden="true"],.ic,.icon')));
         const contrastIssues = [];
         const unmeasurableContrast = [];
         for (const element of textCandidates) {
