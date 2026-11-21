@@ -1,42 +1,57 @@
 # Vidéo de présentation — Sunupilot
 
-## Master publicitaire avec personnes
+## Master de présentation avec personnes
 
-- Master MP4 H.264, 1920 × 1080, 24 i/s, AAC stéréo 48 kHz.
-- Durée : 45,4 secondes.
-- Export mobile horizontal : MP4 H.264, 1280 × 720.
+- Master de référence : MP4 H.264, Full HD 1920 × 1080, 24 i/s, AAC stéréo 48 kHz, 45,4 secondes.
+- Export mobile : MP4 H.264, 1280 × 720, AAC stéréo.
 - Sept séquences : ouverture humaine, factures/devis, équipe au travail, clients, rapports, interface mobile et conclusion humaine.
-- Fondus enchaînés de 0,6 seconde, mouvement de caméra numérique discret, fondu d'ouverture et de fermeture.
-- Bande musicale instrumentale originale en stéréo.
-- Sous-titres français WebVTT.
-- Miniature vidéo livrée séparément dans le pack de production.
+- Transitions fondues et mouvements de caméra numériques discrets.
+- Bande instrumentale originale.
+- Narration française provisoire synchronisée (voix de synthèse hors ligne) pour validation du texte et du rythme.
+- Sous-titres français WebVTT synchronisés sur la narration.
 
 ## Identité de marque
 
-Le nom visible est exclusivement **Sunupilot**. L'emblème utilisé dans le montage provient de l'icône officielle du dépôt `public/images/icon-192.png`. Les couleurs suivent l'identité vert baobab et indigo.
+Le nom visible est exclusivement **Sunupilot**. Le lecteur et la présentation utilisent l'emblème officiel conservé dans `public/images/icon-192.png` et la palette vert baobab / indigo.
 
 ## Personnes et visuels
 
-Les personnes visibles sont des visuels générés pour illustrer des situations professionnelles. Elles ne représentent pas des clients, des employés ou des ambassadeurs réels de Sunupilot.
+Les personnes visibles sont des visuels générés pour illustrer des situations professionnelles. Elles ne représentent pas des clients, employés ou ambassadeurs réels.
 
-Les écrans de l'application sont des maquettes de démonstration construites à partir des fonctionnalités documentées. Ils sont identifiés comme démonstration et ne sont pas des captures d'une session réelle.
+Les vues applicatives sont des maquettes de démonstration construites à partir des fonctionnalités documentées, pas des captures d'une session réelle.
 
-## Périmètre fonctionnel
+## Périmètre produit
 
-Le montage présente uniquement des fonctions documentées : factures et devis, clients, produits, suivi des règlements reçus, dépenses, rapports et interface web responsive. Il ne promet ni paiement automatique ni souscription payante.
+Factures et devis, clients, produits, suivi des règlements reçus, dépenses, rapports et interface web responsive. Aucun paiement automatique ni abonnement payant n'est présenté comme disponible.
 
-## Voix off
+## Script de narration provisoire
 
-Le master inclut une bande instrumentale originale mais aucune voix off parlée. Le fichier WebVTT contient les sous-titres français et le kit livré contient un script de narration à enregistrer séparément.
+Au quotidien, vous gérez vos clients, vos documents et bien plus encore.
 
-## Intégration du lecteur web
+Avec Sunupilot, créez et suivez vos factures et vos devis en toute simplicité.
+
+Centralisez les informations de vos clients et retrouvez votre catalogue au même endroit.
+
+Enregistrez les règlements reçus pour garder une trace claire de vos encaissements.
+
+Suivez vos dépenses et consultez des rapports pour mieux comprendre votre activité.
+
+Retrouvez vos outils essentiels depuis votre ordinateur, votre tablette ou votre téléphone.
+
+Sunupilot. Votre entreprise, mieux pilotée.
+
+## Qualité audio — point à finaliser
+
+La piste parlée fournie pour cette étape est une **voix de synthèse française provisoire** (générée hors ligne), destinée à vérifier le minutage et la formulation. Elle ne doit pas être considérée comme la voix off studio définitive. Pour la version publicitaire finale, remplacer cette piste par un enregistrement humain professionnel, en gardant le script et les repères WebVTT.
+
+## Intégration web
 
 Le lecteur HTML5 de la page d'accueil attend :
 `public/videos/sunupilot-presentation.mp4`
 
-Les sous-titres sont chargés depuis :
+Les sous-titres se chargent depuis :
 `public/videos/sunupilot-presentation-fr.vtt`
 
-La miniature SVG déjà intégrée reste une couverture de secours. Le MP4 master et sa version mobile sont livrés séparément car le connecteur GitHub utilisé ne permet pas de téléverser directement le binaire vidéo dans cette session.
+La miniature SVG déjà ajoutée est la couverture de secours. Le MP4 master avec narration provisoire et sa variante mobile sont livrés séparément ; le connecteur GitHub disponible ici ne permet pas de téléverser le binaire vidéo dans cette session.
 
-Avant fusion, ajouter le master à l'emplacement attendu, puis tester lecture, son, sous-titres, plein écran, chargement mobile et fallback lorsque le MP4 est absent. Ne pas fusionner avant cette recette.
+Avant fusion, ajouter le master à l'emplacement indiqué et tester lecture, piste audio, sous-titres, plein écran, chargement mobile et fallback. Ne pas fusionner avant cette recette.
