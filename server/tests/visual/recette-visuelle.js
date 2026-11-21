@@ -3445,6 +3445,9 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
       const collectKeyboardTraversal = async reverse => {
         const stops = [];
         const seen = new Set();
+        const expected = new Set(focusableKeys);
+        const visitedExpected = new Set();
+        let consecutiveUntrackedSteps = 0;
         for (let step = 0; step < maxTabSteps; step++) {
           if (reverse) {
             await page.keyboard.down('Shift');
@@ -3457,14 +3460,25 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             await page.keyboard.press('Tab');
           }
           const stop = await readFocusStop();
-          if (!stop || !stop.focused) break;
+          if (!stop || !stop.focused) {
+            // Chromium peut exposer brièvement le focus d'un contrôle natif (notamment
+            // les sous-parties d'un input[type=date]) hors de l'arbre DOM. Ne pas
+            // interrompre le parcours au premier état non observable ; borner toutefois
+            // ces transitions pour ne pas masquer une sortie réelle de la page.
+            consecutiveUntrackedSteps += 1;
+            if (visitedExpected.size >= expected.size || consecutiveUntrackedSteps > 4) break;
+            continue;
+          }
+          consecutiveUntrackedSteps = 0;
           if (!seen.has(stop.key)) {
             seen.add(stop.key);
             stops.push(stop);
-          } else if (seen.size >= focusableKeys.length) {
-            // Retour au premier élément après avoir visité tous les arrêts attendus.
+            if (expected.has(stop.key)) visitedExpected.add(stop.key);
+          } else if (visitedExpected.size >= expected.size) {
+            // Retour au premier élément après avoir visité tous les arrêts DOM attendus.
             break;
           }
+          if (visitedExpected.size >= expected.size) break;
         }
         return stops;
       };
