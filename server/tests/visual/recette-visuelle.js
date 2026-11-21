@@ -4222,7 +4222,11 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.equal(metrics.totalsMarginTop, '12px', type + '/platine : marge du bloc des totaux.');
         assert.equal(metrics.footerMarginTop, '16px', type + '/platine : marge du bloc QR et signature.');
         assert.equal(metrics.extrasMarginTop, '10px', type + '/platine : marge des compléments.');
-        assert.equal(metrics.acceptancePaddingTop, '8px', type + '/platine : panneau d’acceptation compact.');
+        if (type === 'devis') {
+          assert.equal(metrics.acceptancePaddingTop, '8px', type + '/platine : panneau d’acceptation compact.');
+        } else {
+          assert.equal(metrics.acceptancePaddingTop, null, 'facture/platine : aucun panneau d’acceptation de devis ne doit être rendu.');
+        }
       }
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
