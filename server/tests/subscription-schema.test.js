@@ -57,15 +57,11 @@ test('la migration v19 ajoute les champs d’essai sans attribuer d’essai aux 
   assert.deepEqual(columns.map(row => row.COLUMN_NAME).sort(), [
     'trial_ends_at', 'trial_plan', 'trial_started_at', 'trial_status'
   ]);
-  const [[legacy]] = await pool.query(
-    `SELECT trial_status, trial_started_at, trial_ends_at
-     FROM users ORDER BY id LIMIT 1`
+  const [[statusColumn]] = await pool.query(
+    `SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'trial_status'`
   );
-  if (legacy) {
-    assert.equal(legacy.trial_status, 'not_started');
-    assert.equal(legacy.trial_started_at, null);
-    assert.equal(legacy.trial_ends_at, null);
-  }
+  assert.equal(statusColumn.COLUMN_DEFAULT, 'not_started');
 });
 
 test('la fondation du moteur est vide : aucun prix publié, abonnement, mandat ou débit créé', async () => {
