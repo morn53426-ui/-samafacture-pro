@@ -7954,3 +7954,54 @@ a.btn .icon {
     padding: 11px 14px !important;
   }
 }
+
+/* Modèle Majesté — préserver l'acceptation sur la troisième page des devis longs.
+   Le tableau conserve ses 9 pt ; seuls les espacements de fin de document diminuent. */
+@media print {
+  .invoice-doc.tpl-majeste .sf-doc-footer {
+    margin-top: 18px !important;
+    gap: 10px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-tax {
+    margin-top: 8px !important;
+    padding: 6px 9px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-tax-title {
+    margin-bottom: 3px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-tax-row {
+    padding: 2px 0 !important;
+  }
+  .invoice-doc.tpl-majeste .sf-total-row {
+    padding: 3px 0 !important;
+  }
+  .invoice-doc.tpl-majeste .sf-total-row.sf-total-grand {
+    margin-top: 3px !important;
+    padding-top: 6px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste {
+    margin-top: 6px !important;
+    gap: 4px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-extra-panel {
+    padding: 6px 9px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-extra-title {
+    margin-bottom: 3px !important;
+    line-height: 1.3 !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-acceptance-copy {
+    margin-bottom: 6px !important;
+    line-height: 1.35 !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-acceptance-grid {
+    gap: 8px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-sign-field {
+    gap: 8px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-sign-line {
+    height: 14px !important;
+  }
+}
+
