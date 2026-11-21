@@ -34,7 +34,7 @@ const ariaLabelledControlIds = [
 ];
 
 test('les paramètres proposent une navigation courte vers chaque groupe de réglages', () => {
-  const nav = html.match(/<nav class="workspace-section-nav settings-section-nav"[^>]*>([\\s\\S]*?)<\\/nav>/);
+  const nav = html.match(/<nav class="workspace-section-nav settings-section-nav"[^>]*>([\s\S]*?)<\/nav>/);
   assert.ok(nav, 'La navigation des paramètres doit être présente.');
   const links = [...nav[1].matchAll(/href="#([^"]+)"/g)].map(match => match[1]);
   assert.deepEqual(links, ['settings-company', 'settings-documents', 'settings-subscription', 'settings-data']);
