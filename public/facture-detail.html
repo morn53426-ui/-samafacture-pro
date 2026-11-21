@@ -163,8 +163,10 @@
     user = freshUser;
     window.__sfCurrentInvoice = facture;
     templates = createFactureTemplates({
-      escapeHtml, formatDate, statutBadge,
-      formatMontant: (n) => formatMontant(n, user.devise)
+      escapeHtml,
+      formatDate: (iso) => formatDate(iso, user),
+      statutBadge,
+      formatMontant: (n) => formatMontant(n, user.devise, user)
     });
 
     const isDevis = facture.type === 'devis';
