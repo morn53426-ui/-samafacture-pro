@@ -3982,7 +3982,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         type + '/' + template + ' : la génération PDF doit produire un vrai fichier.');
       assert.ok(pdf.length > 5000,
         type + '/' + template + ' : le PDF doit contenir le document complet.');
-      const pdfPages = (pdf.toString('latin1').match(/\\/Type\\s*\\/Page\\b/g) || []).length;
+      const pdfPages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
       assert.ok(pdfPages >= 2,
         type + '/' + template + ' : 28 lignes doivent occuper plusieurs pages A4 (pages=' + pdfPages + ').');
       assert.ok(pdfPages <= 4,
