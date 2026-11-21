@@ -7959,12 +7959,29 @@ a.btn .icon {
    Le tableau conserve ses 9 pt ; seuls les espacements de fin de document diminuent. */
 @media print {
   .invoice-doc.tpl-majeste .sf-doc-footer {
-    margin-top: 18px !important;
-    gap: 10px !important;
+    margin-top: 12px !important;
+    gap: 8px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-footer img[alt="QR code de vérification"] {
+    width: 52px !important;
+    height: 52px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-footer .stamp {
+    width: 64px !important;
+    height: 64px !important;
   }
   .invoice-doc.tpl-majeste .sf-doc-tax {
-    margin-top: 8px !important;
-    padding: 6px 9px !important;
+    margin-top: 6px !important;
+    padding: 5px 8px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-document-table th {
+    padding: 5px 5px !important;
+    font-size: 9pt !important;
+  }
+  .invoice-doc.tpl-majeste .sf-document-table tbody td {
+    padding: 2px 5px !important;
+    font-size: 9pt !important;
+    line-height: 1.25 !important;
   }
   .invoice-doc.tpl-majeste .sf-doc-tax-title {
     margin-bottom: 3px !important;
