@@ -33,6 +33,16 @@ const ariaLabelledControlIds = [
   'perso_couleur_texte'
 ];
 
+test('les paramètres proposent une navigation courte vers chaque groupe de réglages', () => {
+  const nav = html.match(/<nav class="workspace-section-nav settings-section-nav"[^>]*>([\\s\\S]*?)<\\/nav>/);
+  assert.ok(nav, 'La navigation des paramètres doit être présente.');
+  const links = [...nav[1].matchAll(/href="#([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(links, ['settings-company', 'settings-documents', 'settings-subscription', 'settings-data']);
+  for (const id of links) assert.match(html, new RegExp('\\bid="' + id + '"'));
+  assert.ok(html.includes('id="settings-company-title"'));
+  assert.ok(html.includes('id="settings-documents-title"'));
+});
+
 test('les champs de paramètres ont un label HTML explicitement associé', () => {
   for (const id of labelledControlIds) {
     const labelStart = html.indexOf('<label for="' + id + '">');
