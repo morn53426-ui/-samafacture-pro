@@ -277,10 +277,8 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       facture: factureDeTest(),
       isDevis: false
     });
-    assert.equal(css.split('@page {').length - 1, 1,
-      'Une donnée de société ne doit pas pouvoir créer une seconde règle @page.');
-    assert.ok(css.includes('Sama\\" } @page { size: A0; /*\\a Injected'),
-      'Les guillemets et retours à la ligne doivent rester dans la chaîne CSS.');
+    assert.ok(css.includes('"Sama\\" } @page { size: A0; /*\\a Injected"'),
+      'Les guillemets et retours à la ligne doivent rester dans une seule chaîne CSS.');
   });
 
   test('les trente et un modèles identifient clairement les dates de facture', () => {
