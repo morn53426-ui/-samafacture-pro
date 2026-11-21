@@ -7942,6 +7942,11 @@ a.btn .icon {
     font-size: 9.5pt !important;
     line-height: 15px !important;
   }
+  /* Le média print générique impose 9pt aux cellules. Ce sélecteur plus spécifique
+     conserve 9,5pt pour Tech, y compris après les règles communes du tableau. */
+  .invoice-doc .sf-document-table.sf-tech-table tbody td {
+    font-size: 9.5pt !important;
+  }
   .invoice-doc .sf-tech-totals {
     margin-top: 12px !important;
   }
