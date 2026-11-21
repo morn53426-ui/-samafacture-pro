@@ -17,6 +17,14 @@ describe('Décompte et restitution automatique du stock', () => {
     userId = inscription.body.user.id;
     token = inscription.body.token;
 
+    // Cette suite valide le routage du stock, pas le quota mensuel du plan Gratuit.
+    // Le compte éphémère utilise l'offre Starter, qui retire uniquement ce plafond.
+    const [planUpdate] = await require('./setup').pool.query(
+      "UPDATE users SET plan = 'starter' WHERE id = ?",
+      [userId]
+    );
+    assert.equal(planUpdate.affectedRows, 1, 'le compte de test doit être placé en Starter');
+
     const client = await request(app)
       .post('/api/clients')
       .set('Authorization', `Bearer ${token}`)
@@ -46,6 +54,55 @@ describe('Décompte et restitution automatique du stock', () => {
       .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Chaise', quantite: 3, prix_unitaire: 5000, tva: 18, produit_id: produitId }] });
 
     assert.equal(await stockActuel(), 17);
+  });
+
+
+  test('une vente et son annulation utilisent uniquement l’entrepôt principal', async () => {
+    const [warehouseRows] = await require('./setup').pool.query(
+      'SELECT id, code, nom FROM pro_entrepots WHERE user_id = ? ORDER BY par_defaut DESC, id',
+      [userId]
+    );
+    const principal = warehouseRows.find(w => w.code === 'PRINCIPAL');
+    assert.ok(principal, 'le magasin principal doit être initialisé par la première facture');
+
+    const secondary = await request(app)
+      .post('/api/pro/warehouses')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ code: 'TEST-SECOND', nom: 'Entrepôt secondaire test' });
+    assert.equal(secondary.status, 201, secondary.text);
+    const seeded = await request(app)
+      .post('/api/pro/inventory/adjustments')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ produit_id: produitId, entrepot_id: secondary.body.id, quantite: 10, motif: 'Stock secondaire de test' });
+    // L'endpoint d'ajustement applique une variation à un stock existant et retourne
+    // un résultat de commande (200), contrairement à la création de l'entrepôt (201).
+    assert.equal(seeded.status, 200, seeded.text);
+    assert.equal(seeded.body.success, true, seeded.text);
+    assert.equal(Number(seeded.body.stock_entrepot), 10, seeded.text);
+
+    async function balances(){
+      const [rows] = await require('./setup').pool.query(
+        'SELECT entrepot_id, quantite FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?',
+        [userId, produitId]
+      );
+      return Object.fromEntries(rows.map(row=>[Number(row.entrepot_id),Number(row.quantite)]));
+    }
+    const before=await balances();
+    const invoice=await request(app).post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({client_id:clientId,type:'facture',lignes:[{designation:'Chaise',quantite:2,prix_unitaire:5000,tva:18,produit_id:produitId}]});
+    assert.equal(invoice.status,201,invoice.text);
+    const afterSale=await balances();
+    assert.equal(afterSale[principal.id],before[principal.id]-2,'la vente doit sortir du magasin principal');
+    assert.equal(afterSale[secondary.body.id],before[secondary.body.id],'la vente ne doit pas toucher l’entrepôt secondaire');
+    assert.equal(await stockActuel(),afterSale[principal.id]+afterSale[secondary.body.id],'le stock catalogue doit rester la somme des entrepôts');
+
+    const cancel=await request(app).put(`/api/factures/${invoice.body.facture.id}/statut`)
+      .set('Authorization', `Bearer ${token}`).send({statut:'annulee'});
+    assert.equal(cancel.status,200,cancel.text);
+    const afterCancel=await balances();
+    assert.equal(afterCancel[principal.id],before[principal.id],'l’annulation restitue le stock dans le magasin principal');
+    assert.equal(afterCancel[secondary.body.id],before[secondary.body.id],'l’annulation ne touche pas l’entrepôt secondaire');
   });
 
   test('créer un devis (pas une facture) ne touche jamais le stock', async () => {
