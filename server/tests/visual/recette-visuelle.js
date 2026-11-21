@@ -589,6 +589,131 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       JSON.stringify({ ...diagnostic, apiRequests: page.__visualApiRequests, pageErrors }) +
       '; cause=' + error.message);
   }
+  if (pageDefinition.standaloneDocument && viewport.width <= 640) {
+    await page.waitForFunction(() => {
+      const qr = document.querySelector('.invoice-doc .sf-doc-footer img[alt="QR code de vérification"]');
+      return qr && qr.complete && qr.naturalWidth > 0;
+    }, { timeout: 10000 });
+
+    const footerGeometry = await page.evaluate(() => {
+      const documentNode = document.querySelector('.invoice-doc');
+      const footer = documentNode?.querySelector('.sf-doc-footer');
+      const stamp = footer?.querySelector('.stamp');
+      const qr = footer?.querySelector('img[alt="QR code de vérification"]');
+      if (!documentNode || !footer || !stamp || !qr) return { found: false };
+      const documentRect = documentNode.getBoundingClientRect();
+      const documentStyle = getComputedStyle(documentNode);
+      const stampRect = stamp.getBoundingClientRect();
+      const qrRect = qr.getBoundingClientRect();
+      const contentLeft = documentRect.left +
+        (parseFloat(documentStyle.borderLeftWidth) || 0) +
+        (parseFloat(documentStyle.paddingLeft) || 0);
+      const contentRight = documentRect.right -
+        (parseFloat(documentStyle.borderRightWidth) || 0) -
+        (parseFloat(documentStyle.paddingRight) || 0);
+      return {
+        found: true,
+        flexWrap: getComputedStyle(footer).flexWrap,
+        contentLeft,
+        contentRight,
+        stampLeft: stampRect.left,
+        stampRight: stampRect.right,
+        stampWidth: stampRect.width,
+        stampHeight: stampRect.height,
+        qrLeft: qrRect.left,
+        qrRight: qrRect.right,
+        qrWidth: qrRect.width,
+        qrHeight: qrRect.height
+      };
+    });
+    assert.equal(footerGeometry.found, true,
+      pageDefinition.name + ' : le QR code et le cachet du pied de page doivent être présents.');
+    assert.equal(footerGeometry.flexWrap, 'wrap',
+      pageDefinition.name + ' : le pied de page doit pouvoir passer sur deux lignes sur mobile.');
+    assert.ok(footerGeometry.stampWidth > 0 && footerGeometry.stampHeight > 0,
+      pageDefinition.name + ' : le cachet de paiement doit rester visible.');
+    assert.ok(footerGeometry.stampLeft >= footerGeometry.contentLeft - 1 &&
+      footerGeometry.stampRight <= footerGeometry.contentRight + 1,
+      pageDefinition.name + ' : le cachet circulaire ne doit pas être rogné par les marges du document à ' +
+      viewport.width + 'px : ' + JSON.stringify(footerGeometry));
+    assert.ok(footerGeometry.qrWidth > 0 && footerGeometry.qrHeight > 0 &&
+      footerGeometry.qrLeft >= footerGeometry.contentLeft - 1 &&
+      footerGeometry.qrRight <= footerGeometry.contentRight + 1,
+      pageDefinition.name + ' : le QR code doit rester visible dans le pied de page à ' +
+      viewport.width + 'px : ' + JSON.stringify(footerGeometry));
+
+    const mobileTableMetrics = await page.evaluate(() => {
+      const documentNode = document.querySelector('.invoice-doc');
+      const table = documentNode?.querySelector('.sf-document-table');
+      const tbody = table?.querySelector('tbody');
+      const rows = tbody ? Array.from(tbody.querySelectorAll(':scope > tr')) : [];
+      if (!documentNode || !table || !tbody || !rows.length) return { found: false };
+      const documentRect = documentNode.getBoundingClientRect();
+      const documentStyle = getComputedStyle(documentNode);
+      const contentLeft = documentRect.left +
+        (parseFloat(documentStyle.borderLeftWidth) || 0) +
+        (parseFloat(documentStyle.paddingLeft) || 0);
+      const contentRight = documentRect.right -
+        (parseFloat(documentStyle.borderRightWidth) || 0) -
+        (parseFloat(documentStyle.paddingRight) || 0);
+      const tableRect = table.getBoundingClientRect();
+      const cells = rows.flatMap(row =>
+        Array.from(row.querySelectorAll(':scope > td')).map(cell => {
+          const rect = cell.getBoundingClientRect();
+          return {
+            label: cell.getAttribute('data-label') || '',
+            pseudoLabel: getComputedStyle(cell, '::before').content,
+            width: rect.width,
+            height: rect.height,
+            left: rect.left,
+            right: rect.right,
+            text: (cell.textContent || '').trim()
+          };
+        })
+      );
+      return {
+        found: true,
+        tableLeft: tableRect.left,
+        tableRight: tableRect.right,
+        tableWidth: tableRect.width,
+        tableClientWidth: table.clientWidth,
+        tableScrollWidth: table.scrollWidth,
+        contentLeft,
+        contentRight,
+        rowDisplay: getComputedStyle(rows[0]).display,
+        theadPosition: getComputedStyle(table.querySelector('thead')).position,
+        rowCount: rows.length,
+        cellsPerRow: rows.map(row => row.querySelectorAll(':scope > td').length),
+        cells
+      };
+    });
+    assert.equal(mobileTableMetrics.found, true,
+      pageDefinition.name + ' : le tableau des lignes doit être présent sur mobile.');
+    assert.ok(mobileTableMetrics.tableWidth <= mobileTableMetrics.contentRight - mobileTableMetrics.contentLeft + 1,
+      pageDefinition.name + ' : le tableau doit tenir dans la largeur intérieure du document : ' +
+      JSON.stringify(mobileTableMetrics));
+    assert.ok(mobileTableMetrics.tableScrollWidth <= mobileTableMetrics.tableClientWidth + 1,
+      pageDefinition.name + ' : les colonnes ne doivent plus nécessiter de défilement horizontal : ' +
+      JSON.stringify(mobileTableMetrics));
+    assert.equal(mobileTableMetrics.rowDisplay, 'grid',
+      pageDefinition.name + ' : chaque ligne doit être présentée sous forme de carte à deux colonnes.');
+    assert.equal(mobileTableMetrics.theadPosition, 'absolute',
+      pageDefinition.name + ' : les en-têtes de tableau doivent rester accessibles sans prendre de place visuelle.');
+    assert.ok(mobileTableMetrics.cellsPerRow.every(count => count === 5),
+      pageDefinition.name + ' : les cinq cellules financières doivent être conservées pour chaque ligne.');
+    const expectedLabels = ['Désignation', 'Quantité', 'Prix unitaire HT', 'TVA', 'Montant TTC'];
+    assert.ok(mobileTableMetrics.cells.every((cell, index) =>
+      cell.label === expectedLabels[index % 5] &&
+      cell.pseudoLabel !== 'none' &&
+      cell.pseudoLabel !== 'normal' &&
+      cell.width > 0 &&
+      cell.height > 0 &&
+      cell.left >= mobileTableMetrics.tableLeft - 1 &&
+      cell.right <= mobileTableMetrics.tableRight + 1
+    ), pageDefinition.name + ' : désignation, quantité, prix, TVA et montant TTC doivent tous être visibles et étiquetés : ' +
+      JSON.stringify(mobileTableMetrics.cells));
+  }
+
   if (pageDefinition.name === 'produits') {
     const catalogue = await page.evaluate(() => [...document.querySelectorAll('#produits-body tr')].map(row => ({
       type: row.querySelector('[data-label="Type"]')?.textContent.trim() || '',
