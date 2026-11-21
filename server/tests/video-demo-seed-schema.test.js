@@ -5,25 +5,27 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const root = path.resolve(__dirname, '..', '..');
-const schema = fs.readFileSync(path.join(root, 'database', 'schema.sql'), 'utf8');
-const seed = fs.readFileSync(path.join(root, 'scripts', 'seed-video-demo.js'), 'utf8');
+const serverDir = path.resolve(__dirname, '..');
+const schema = fs.readFileSync(path.join(serverDir, 'database', 'schema.sql'), 'utf8');
+const seed = fs.readFileSync(path.join(serverDir, 'scripts', 'seed-video-demo.js'), 'utf8');
 
 function extractCreateTableBlocks(sql) {
+  // Strip MySQL single-line comments before balancing quotes and parentheses.
+  const cleanSql = sql.split(/\r?\n/).map(line => line.replace(/--.*$/, '')).join('\n');
   const tables = new Map();
   const pattern = /CREATE TABLE IF NOT EXISTS\s+`?(\w+)`?\s*\(/gi;
   let match;
 
-  while ((match = pattern.exec(sql))) {
+  while ((match = pattern.exec(cleanSql))) {
     const name = match[1];
     let depth = 1;
     let quote = null;
     let end = pattern.lastIndex;
 
-    while (end < sql.length && depth > 0) {
-      const char = sql[end];
+    while (end < cleanSql.length && depth > 0) {
+      const char = cleanSql[end];
       if (quote) {
-        if (char === quote && sql[end - 1] !== '\\') quote = null;
+        if (char === quote && cleanSql[end - 1] !== '\\') quote = null;
       } else if (char === "'" || char === '"' || char === '`') {
         quote = char;
       } else if (char === '(') {
@@ -35,7 +37,7 @@ function extractCreateTableBlocks(sql) {
     }
 
     assert.equal(depth, 0, 'unterminated CREATE TABLE for ' + name);
-    const body = sql.slice(pattern.lastIndex, end - 1);
+    const body = cleanSql.slice(pattern.lastIndex, end - 1);
     const columns = new Set();
 
     for (const line of body.split(/\r?\n/)) {
