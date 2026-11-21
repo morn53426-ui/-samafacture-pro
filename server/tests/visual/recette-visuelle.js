@@ -4031,8 +4031,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       const pdfPages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
       assert.ok(pdfPages >= 2,
         type + '/' + template + ' : 28 lignes doivent occuper plusieurs pages A4 (pages=' + pdfPages + ').');
-      assert.ok(pdfPages <= 4,
-        type + '/' + template + ' : la pagination longue ne doit pas créer plus de quatre pages (pages=' + pdfPages + ').');
+      assert.ok(pdfPages <= 3,
+        type + '/' + template + ' : la pagination longue ne doit pas créer plus de trois pages (pages=' + pdfPages + ').');
 
       bannersChecked += geometry.banners.length;
       templatesChecked.push({
