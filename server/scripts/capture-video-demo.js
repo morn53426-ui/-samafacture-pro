@@ -33,11 +33,19 @@ function validateConfig() {
   if (url.username || url.password || url.search || url.hash) {
     throw new Error('SUNUPILOT_CAPTURE_URL ne doit contenir ni identifiants, ni query, ni fragment.');
   }
+  if (EMAIL !== 'demo.video@sunupilot.test') throw new Error('Sécurité : seule l’adresse fictive demo.video@sunupilot.test peut être utilisée.');
   if (!PASSWORD) throw new Error('Définissez SUNUPILOT_DEMO_PASSWORD avec le mot de passe généré par le seed.');
   if (CONFIRM !== 'SUNUPILOT_LOCAL_CAPTURE_ONLY') {
     throw new Error('Confirmez la capture locale avec SUNUPILOT_CAPTURE_CONFIRM=SUNUPILOT_LOCAL_CAPTURE_ONLY.');
   }
   return url.origin;
+}
+
+function assertLocalPage(page, expectedOrigin) {
+  const current = new URL(page.url());
+  if (current.origin !== expectedOrigin) {
+    throw new Error('Sécurité : navigation hors du serveur local détectée. Capture annulée.');
+  }
 }
 
 async function waitForPage(page, selector) {
@@ -67,6 +75,7 @@ async function main() {
     });
 
     await page.goto(origin + '/login.html', { waitUntil: 'domcontentloaded' });
+    assertLocalPage(page, origin);
     await page.waitForSelector('#login-form');
     await page.locator('#email').fill(EMAIL);
     await page.locator('#password').fill(PASSWORD);
@@ -83,6 +92,7 @@ async function main() {
       if (!response || !response.ok()) {
         throw new Error('La page ' + item.path + ' a répondu avec une erreur HTTP.');
       }
+      assertLocalPage(page, origin);
       await waitForPage(page, item.ready);
       const destination = path.join(OUTPUT_DIR, item.name + '-1920x1080.png');
       await page.screenshot({ path: destination, type: 'png' });
