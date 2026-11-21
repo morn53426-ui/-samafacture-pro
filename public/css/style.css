@@ -1711,6 +1711,12 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--emerald);
   box-shadow: var(--focus-ring);
 }
+.reports-filter-card input[type="date"]:focus {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  border-color: var(--emerald);
+  box-shadow: 0 0 0 3px var(--emerald-light);
+}
 textarea { line-height: 1.55; }
 
 /* Modales plus nettes et mieux détachées du fond. */
@@ -3431,6 +3437,11 @@ textarea { line-height: 1.55; }
   font-size: .9rem;
 }
 .app-topbar-search input:focus { border: 0; box-shadow: none !important; }
+.app-topbar-search:focus-within {
+  border-color: var(--emerald);
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+}
 .app-topbar-search button {
   display: grid; place-items: center;
   width: 34px; height: 34px; border: 0; border-radius: 9px;
@@ -7285,7 +7296,8 @@ a.btn .icon {
   border: 1px solid rgba(255,255,255,.16);
 }
 .sidebar-brand .mark img { object-fit: contain; }
-.sidebar-brand .brand-pro { color: #8DD0A7; }
+/* Le badge repose sur un dégradé doré : conserver un texte bleu nuit pour le contraste AA. */
+.sidebar-brand .brand-pro { color: #17233B; }
 .enterprise-console-brand strong { letter-spacing: -.025em; }
 .lp-header .brand { color: var(--brand-indigo); }
 .auth-form-card::before { background: linear-gradient(90deg, var(--brand-baobab), var(--brand-indigo)); }
@@ -7541,6 +7553,13 @@ a.btn .icon {
 .dashboard-invoice-status.is-cancelled, .dashboard-invoice-status.is-unknown { color: var(--ink-soft); background: color-mix(in srgb, var(--ink-soft) 7%, var(--paper)); border-color: var(--line); }
 
 
+/* Badge Pro dans les en-têtes métier : respecter le fond du thème, pas celui du rail latéral. */
+.workspace-page .page-header .plan-badge {
+  background: var(--gold-light);
+  color: var(--gold-text);
+  border: 1px solid color-mix(in srgb, var(--gold-text) 24%, var(--line));
+}
+
 /* KPI : permettre au texte long de se replier sans être coupé par la carte. */
 .dashboard-kpi-top { min-width:0; }
 .dashboard-kpi-icon { flex:0 0 auto; }
@@ -7551,3 +7570,9 @@ a.btn .icon {
   overflow-wrap:normal;
   word-break:normal;
 }
+
+/* Contraste WCAG AA des badges de statut, dans les deux thèmes. */
+:root:not([data-theme="dark"]) .badge-attente { color: #76501E; }
+:root:not([data-theme="dark"]) .badge-retard { color: #A9413C; }
+:root[data-theme="dark"] .badge-attente { color: #E7BD6D; }
+:root[data-theme="dark"] .badge-retard { color: #F08B81; }
