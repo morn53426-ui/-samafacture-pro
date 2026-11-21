@@ -252,6 +252,102 @@ test('la comptabilité applique la partie double, publie la balance et empêche 
   assert.ok(entries.body.ecritures.length >= 2);
 });
 
+
+test('la comptabilisation des dépenses est équilibrée, idempotente et isolée par entreprise', async () => {
+  const expense = await request(app)
+    .post('/api/depenses')
+    .set('Authorization', 'Bearer ' + token)
+    .send({
+      libelle: 'Loyer du bureau — recette comptable',
+      montant: 875,
+      categorie: 'Loyer',
+      date_depense: '2026-11-13'
+    });
+  assert.equal(expense.status, 201, expense.text);
+  const expenseId = expense.body.depense.id;
+
+  const config = await request(app)
+    .get('/api/pro/accounting/config')
+    .set('Authorization', 'Bearer ' + token);
+  assert.equal(config.status, 200, config.text);
+  const expenseAccount = config.body.comptes.find(account => account.code === '622');
+  const cashAccount = config.body.comptes.find(account => account.code === '571');
+  assert.ok(expenseAccount, 'le compte de charges 622 doit être disponible');
+  assert.ok(cashAccount, 'le compte de caisse 571 doit être disponible');
+
+  const posted = await request(app)
+    .post('/api/pro/accounting/post-expense/' + expenseId)
+    .set('Authorization', 'Bearer ' + token)
+    .send({});
+  assert.equal(posted.status, 201, posted.text);
+  assert.equal(posted.body.duplicate, false);
+
+  const replay = await request(app)
+    .post('/api/pro/accounting/post-expense/' + expenseId)
+    .set('Authorization', 'Bearer ' + token)
+    .send({});
+  assert.equal(replay.status, 200, replay.text);
+  assert.equal(replay.body.duplicate, true, 'une dépense ne doit pas créer deux écritures');
+
+  const [expenseLedger, cashLedger] = await Promise.all([
+    request(app)
+      .get('/api/pro/accounting/ledger?compte_id=' + expenseAccount.id)
+      .set('Authorization', 'Bearer ' + token),
+    request(app)
+      .get('/api/pro/accounting/ledger?compte_id=' + cashAccount.id)
+      .set('Authorization', 'Bearer ' + token)
+  ]);
+  assert.equal(expenseLedger.status, 200, expenseLedger.text);
+  assert.equal(cashLedger.status, 200, cashLedger.text);
+  const debitLine = expenseLedger.body.ecritures.find(entry =>
+    entry.ecriture_libelle === 'Dépense Loyer du bureau — recette comptable'
+  );
+  const creditLine = cashLedger.body.ecritures.find(entry =>
+    entry.ecriture_libelle === 'Dépense Loyer du bureau — recette comptable'
+  );
+  assert.ok(debitLine, 'le journal des charges doit contenir la dépense');
+  assert.ok(creditLine, 'la contrepartie caisse doit être présente');
+  assert.equal(Number(debitLine.debit), 875);
+  assert.equal(Number(debitLine.credit), 0);
+  assert.equal(Number(creditLine.debit), 0);
+  assert.equal(Number(creditLine.credit), 875);
+
+  const balance = await request(app)
+    .get('/api/pro/accounting/trial-balance?from=2026-11-13&to=2026-11-13')
+    .set('Authorization', 'Bearer ' + token);
+  assert.equal(balance.status, 200, balance.text);
+  assert.equal(balance.body.equilibree, true);
+  assert.equal(Number(balance.body.total_debit), 875);
+  assert.equal(Number(balance.body.total_credit), 875);
+
+  const other = await request(app)
+    .post('/api/auth/register')
+    .send({
+      nom: 'Entreprise Comptabilité B',
+      email: emailDeTest('phases24-compta-b'),
+      password: 'motdepasse123',
+      acceptTerms: true
+    });
+  assert.equal(other.status, 201, other.text);
+  const otherToken = other.body.token;
+  try {
+    const isolated = await request(app)
+      .get('/api/pro/accounting/entries')
+      .set('Authorization', 'Bearer ' + otherToken);
+    assert.equal(isolated.status, 200, isolated.text);
+    assert.deepEqual(isolated.body.ecritures, [],
+      'une entreprise ne doit pas voir les écritures de la première entreprise');
+
+    const crossTenantExpense = await request(app)
+      .post('/api/pro/accounting/post-expense/' + expenseId)
+      .set('Authorization', 'Bearer ' + otherToken)
+      .send({});
+    assert.equal(crossTenantExpense.status, 404, crossTenantExpense.text);
+  } finally {
+    await nettoyerUtilisateur(other.body.user.id);
+  }
+});
+
 after(async () => {
   try {
     await nettoyerUtilisateur(userId);
