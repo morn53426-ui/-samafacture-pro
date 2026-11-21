@@ -1443,7 +1443,7 @@ function createFactureTemplates(helpers) {
       '    border-bottom: 0.25mm solid #cbd5e1;',
       '  }',
       '}'
-    ].join('\\n');
+    ].join('\n');
   }
 
   function renderInvoiceHtml({ user, facture, lignes, isDevis, qrCode, template, personnalisation }) {
