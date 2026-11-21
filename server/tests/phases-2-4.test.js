@@ -352,6 +352,19 @@ test('annulation et réactivation contre-passent chaque écriture facture sans d
   assert.deepEqual(await readLines(events[2].ecriture_id), reversalLines,
     'la seconde annulation doit de nouveau inverser la dernière écriture active');
 
+  const deletePostedInvoice = await request(app)
+    .delete('/api/factures/' + invoice.id)
+    .set('Authorization', 'Bearer ' + token);
+  assert.equal(deletePostedInvoice.status, 409, deletePostedInvoice.text);
+  assert.equal(deletePostedInvoice.body.code, 'FACTURE_COMPTABILISEE');
+  const [[retainedInvoice]] = await pool.query(
+    'SELECT id, statut FROM factures WHERE id = ? AND user_id = ?',
+    [invoice.id, userId]
+  );
+  assert.equal(Number(retainedInvoice.id), Number(invoice.id));
+  assert.equal(retainedInvoice.statut, 'annulee',
+    'une facture comptabilisée annulée doit rester consultable pour la piste d’audit');
+
   const unpostedInvoice = await creerFacture({ amount: 1200, tax: 0 });
   const cancelUnposted = await request(app)
     .put('/api/factures/' + unpostedInvoice.id + '/statut')
@@ -364,6 +377,12 @@ test('annulation et réactivation contre-passent chaque écriture facture sans d
   );
   assert.deepEqual(unpostedEvents, [],
     'une facture jamais comptabilisée ne doit pas générer de ligne de contrepassation');
+
+  const deleteUnpostedInvoice = await request(app)
+    .delete('/api/factures/' + unpostedInvoice.id)
+    .set('Authorization', 'Bearer ' + token);
+  assert.equal(deleteUnpostedInvoice.status, 200, deleteUnpostedInvoice.text,
+    'un document sans écriture comptable reste supprimable');
 });
 
 after(async () => {
