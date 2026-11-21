@@ -7563,3 +7563,9 @@ a.btn .icon {
   overflow-wrap:normal;
   word-break:normal;
 }
+
+/* Contraste WCAG AA des badges de statut, dans les deux thèmes. */
+:root:not([data-theme="dark"]) .badge-attente { color: #76501E; }
+:root:not([data-theme="dark"]) .badge-retard { color: #A9413C; }
+:root[data-theme="dark"] .badge-attente { color: #E7BD6D; }
+:root[data-theme="dark"] .badge-retard { color: #F08B81; }
