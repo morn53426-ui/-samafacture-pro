@@ -4288,7 +4288,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.equal(metrics.clientPaddingTop, '9px', type + '/tech : padding client.');
         assert.equal(metrics.clientMarginBottom, '12px', type + '/tech : marge après client.');
         assert.equal(metrics.tableFontSize, '12.6667px', type + '/tech : taille lisible de tableau 9.5 pt.');
-        assert.equal(metrics.tableLineHeight, '14.9333px', type + '/tech : interligne compact.');
+        assert.equal(metrics.tableLineHeight, '15px', type + '/tech : interligne compact.');
         assert.equal(metrics.tablePaddingTop, '2px', type + '/tech : padding vertical haut.');
         assert.equal(metrics.tablePaddingBottom, '2px', type + '/tech : padding vertical bas.');
         assert.equal(metrics.totalsMarginTop, '12px', type + '/tech : marge des totaux.');
