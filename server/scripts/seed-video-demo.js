@@ -2,6 +2,7 @@
 'use strict';
 // Seed a disposable Sunupilot demo tenant. Never deletes or updates existing rows.
 // Hard safety guard: DB_NAME must be samafacture_demo and confirmation env must be set.
+require('dotenv').config();
 const crypto = require('node:crypto');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
