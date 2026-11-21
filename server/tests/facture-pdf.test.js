@@ -361,6 +361,53 @@ describe('Génération PDF de facture', () => {
       'les conditions et l’acceptation doivent suivre les totaux sans créer une quatrième page isolée (pages=' + pageCount + ')');
   });
 
+  test('une facture volumineuse conserve son suivi de règlement et ses totaux sans page isolée', async () => {
+    await pool.query(
+      'UPDATE users SET facture_template = ? WHERE id = ?',
+      ['classique', userIdA]
+    );
+
+    const lignes = Array.from({ length: 28 }, (_, index) => ({
+      designation: 'Lot de maintenance, installation et fournitures pour les services administratifs — ' +
+        String(index + 1).padStart(2, '0') +
+        ' — vérification, mise en service, coordination opérationnelle et contrôle qualité',
+      quantite: index % 5 === 0 ? 2 : 1,
+      prix_unitaire: 10000 + index * 250,
+      tva: index % 4 === 0 ? 0 : 18
+    }));
+    const facture = await request(app)
+      .post('/api/factures')
+      .set('Authorization', 'Bearer ' + tokenA)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        objet: 'Facture détaillée de maintenance et fournitures',
+        date_echeance: '2026-12-17',
+        conditions_reglement: 'Règlement selon les conditions convenues. Le suivi du solde doit rester visible.',
+        lignes
+      });
+    assert.equal(facture.status, 201, facture.text);
+
+    const res = await request(app)
+      .get('/api/factures/' + facture.body.facture.id + '/pdf')
+      .set('Authorization', 'Bearer ' + tokenA)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks = [];
+        response.on('data', chunk => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      });
+
+    assert.equal(res.status, 200);
+    assert.ok((res.headers['content-type'] || '').startsWith('application/pdf'));
+    assert.equal(res.body.subarray(0, 5).toString('latin1'), '%PDF-');
+    const pageCount = (res.body.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
+    assert.ok(pageCount >= 2,
+      'Les 28 lignes longues doivent produire une facture réellement multi-pages (pages=' + pageCount + ')');
+    assert.ok(pageCount <= 3,
+      'Le suivi du règlement et les compléments ne doivent pas créer une quatrième page isolée (pages=' + pageCount + ')');
+  });
+
   test("un devis (pas une facture) télécharge un PDF nommé 'devis-...'", async () => {
     const client = await request(app)
       .post('/api/clients')
