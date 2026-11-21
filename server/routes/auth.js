@@ -10,6 +10,7 @@ const { isValidImageDataUrl } = require('../utils/validation');
 const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = require('../utils/plans');
 const { sendMail } = require('../config/mailer');
 const { incrementerTokenVersion, invaliderCacheVersion } = require('../utils/session');
+const { normalizeTrialPlan } = require('../utils/free-trial');
 
 function echapperHtml(valeur) {
   return String(valeur == null ? '' : valeur).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,6 +22,23 @@ const router = express.Router();
 const TERMS_VERSION = '2026-11-13';
 const PRIVACY_VERSION = '2026-11-13';
 const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
+
+// Un compte créé pour rejoindre une équipe ou un groupe de sociétés ne reçoit pas
+// un essai individuel concurrent : l'accès métier vient de l'entreprise invitante.
+async function hasPendingWorkspaceInvitation(email) {
+  const [rows] = await pool.query(
+    `SELECT 1 AS pending
+       FROM pro_team_invitations
+      WHERE LOWER(email) = ? AND statut = 'envoyee' AND expire_at > UTC_TIMESTAMP()
+     UNION ALL
+     SELECT 1 AS pending
+       FROM pro_company_group_invitations
+      WHERE LOWER(invited_email) = ? AND statut = 'envoyee' AND expire_at > UTC_TIMESTAMP()
+     LIMIT 1`,
+    [email, email]
+  );
+  return rows.length > 0;
+}
 
 // Personnalisation des modèles de facture (couleurs / logo / police) — voir la même liste de clés
 // et la même logique de validation côté client dans public/js/facture-templates.js
@@ -182,7 +200,7 @@ function definirCookieSession(res, token) {
  */
 router.post('/register', registerLimiter, async (req, res, next) => {
   try {
-    const { nom, email, password, entreprise_nom, acceptTerms } = req.body;
+    const { nom, email, password, entreprise_nom, acceptTerms, plan } = req.body;
 
     if (!nom || !email || !password) {
       return res.status(400).json({ error: 'Nom, email et mot de passe sont obligatoires.' });
@@ -194,17 +212,38 @@ router.post('/register', registerLimiter, async (req, res, next) => {
       return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' });
     }
 
-    const emailLower = email.toLowerCase();
+    const emailLower = email.trim().toLowerCase();
+    const requestedTrialPlan = plan === undefined ? null : normalizeTrialPlan(plan);
+    if (plan !== undefined && !requestedTrialPlan) {
+      return res.status(400).json({ error: 'Formule d’essai invalide. Choisissez Standard, Pro ou Entreprise.' });
+    }
+    const trialPlan = requestedTrialPlan && !(await hasPendingWorkspaceInvitation(emailLower))
+      ? requestedTrialPlan
+      : null;
     const [existingRows] = await pool.query('SELECT id FROM users WHERE email = ?', [emailLower]);
     if (existingRows.length) {
       return res.status(409).json({ error: 'Un compte existe déjà avec cet email.' });
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      `INSERT INTO users (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version) VALUES (?, ?, ?, ?, NOW(), ?, ?)`,
-      [nom, emailLower, hash, entreprise_nom || nom, TERMS_VERSION, PRIVACY_VERSION]
-    );
+    let result;
+    if (trialPlan) {
+      [result] = await pool.query(
+        `INSERT INTO users
+          (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version,
+           plan, trial_plan, trial_started_at, trial_ends_at, trial_status)
+         VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 DAY), 'trialing')`,
+        [nom, emailLower, hash, entreprise_nom || nom, TERMS_VERSION, PRIVACY_VERSION, trialPlan, trialPlan]
+      );
+    } else {
+      // Rétrocompatibilité API : les anciens clients qui n'envoient pas de plan
+      // restent sur Gratuit. L'inscription web propose toujours un plan d'essai.
+      [result] = await pool.query(
+        `INSERT INTO users (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version)
+         VALUES (?, ?, ?, ?, NOW(), ?, ?)`,
+        [nom, emailLower, hash, entreprise_nom || nom, TERMS_VERSION, PRIVACY_VERSION]
+      );
+    }
 
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
     const user = rows[0];
@@ -299,7 +338,7 @@ router.post('/google', async (req, res, next) => {
     if (!googleClient) {
       return res.status(503).json({ error: "La connexion Google n'est pas configurée sur ce serveur." });
     }
-    const { credential, acceptTerms } = req.body;
+    const { credential, acceptTerms, plan } = req.body;
     if (!credential) return res.status(400).json({ error: 'Jeton Google manquant.' });
 
     let payload;
@@ -344,12 +383,32 @@ router.post('/google', async (req, res, next) => {
       if (acceptTerms !== true) {
         return res.status(400).json({ error: 'Pour créer un compte avec Google, acceptez d’abord les conditions d’utilisation et confirmez avoir pris connaissance de la politique de confidentialité.' });
       }
-      // Nouveau compte : mot de passe aléatoire inutilisable (la connexion se fera via Google)
+      // Nouveau compte : mot de passe aléatoire inutilisable (la connexion se fera via Google).
+      // Le compte existant ou les invitations en cours ne réinitialisent jamais un essai.
+      const requestedTrialPlan = plan === undefined ? null : normalizeTrialPlan(plan);
+      if (plan !== undefined && !requestedTrialPlan) {
+        return res.status(400).json({ error: 'Formule d’essai invalide. Choisissez Standard, Pro ou Entreprise.' });
+      }
+      const trialPlan = requestedTrialPlan && !(await hasPendingWorkspaceInvitation(emailLower))
+        ? requestedTrialPlan
+        : null;
       const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-      const [result] = await pool.query(
-        `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)`,
-        [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION]
-      );
+      let result;
+      if (trialPlan) {
+        [result] = await pool.query(
+          `INSERT INTO users
+            (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version,
+             plan, trial_plan, trial_started_at, trial_ends_at, trial_status)
+           VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 DAY), 'trialing')`,
+          [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION, trialPlan, trialPlan]
+        );
+      } else {
+        [result] = await pool.query(
+          `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version)
+           VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)`,
+          [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION]
+        );
+      }
       [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
       user = rows[0];
     }
@@ -641,15 +700,14 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Cette route ne peut plus attribuer de plan payant. Les plans Starter, Pro et
-// Entreprise sont activés exclusivement par /abonnement/webhook/* après vérification
-// serveur-à-serveur du paiement. La route reste disponible uniquement pour revenir au
-// plan gratuit ; masquer le bouton dans le frontend ne constitue jamais une protection.
+// Un utilisateur peut changer de formule sans paiement uniquement pendant son essai
+// gratuit actif. Le changement conserve strictement la date initiale de fin ; hors essai,
+// l'activation d'un plan payant reste réservée à un paiement confirmé par webhook.
 /**
  * @openapi
  * /auth/plan:
  *   put:
- *     summary: Permet uniquement de revenir au plan Gratuit ; les plans payants exigent un paiement confirmé
+ *     summary: Permet de choisir une formule pendant l'essai actif ou de revenir au plan Gratuit
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -658,30 +716,63 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  *           schema:
  *             type: object
  *             required: [plan]
- *             properties: { plan: { type: string, enum: [gratuit, starter, pro, entreprise] } }
+ *             properties: { plan: { type: string, enum: [gratuit, standard, starter, pro, entreprise] } }
  *     responses:
- *       200: { description: Retour au plan Gratuit. }
- *       403: { description: Un paiement confirmé côté serveur est requis pour activer un plan payant. }
+ *       200: { description: Formule d'essai modifiée sans réinitialiser sa date d'expiration, ou retour au plan Gratuit. }
+ *       403: { description: Un paiement confirmé est requis hors essai actif. }
  */
 router.put('/plan', requireAuth, async (req, res, next) => {
   try {
-    const { plan } = req.body;
-    if (!['gratuit', 'starter', 'pro', 'entreprise'].includes(plan)) {
-      return res.status(400).json({ error: 'Plan invalide.' });
-    }
-    if (plan !== 'gratuit') {
-      return res.status(403).json({
-        error: 'Un plan payant ne peut être activé qu’après confirmation du paiement par le prestataire.',
-        code: 'PAIEMENT_REQUIS'
-      });
-    }
-    const [result] = await pool.query(
-      "UPDATE users SET plan = 'gratuit' WHERE id = ? AND plan <> 'gratuit'",
+    const requestedPlan = req.body && req.body.plan;
+    const targetPlan = requestedPlan === 'gratuit' ? 'gratuit' : normalizeTrialPlan(requestedPlan);
+    if (!targetPlan) return res.status(400).json({ error: 'Plan invalide.' });
+
+    const [[account]] = await pool.query(
+      `SELECT trial_status, trial_ends_at,
+              CASE WHEN trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP() THEN 1 ELSE 0 END AS trial_active
+       FROM users WHERE id = ? LIMIT 1`,
       [req.user.id]
     );
+    if (!account) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+
+    let result;
+    if (account.trial_status === 'trialing' && Number(account.trial_active) === 1) {
+      if (targetPlan === 'gratuit') {
+        [result] = await pool.query(
+          `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
+           WHERE id = ? AND trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP()`,
+          [req.user.id]
+        );
+      } else {
+        [result] = await pool.query(
+          `UPDATE users SET plan = ?, trial_plan = ?
+           WHERE id = ? AND trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP()`,
+          [targetPlan, targetPlan, req.user.id]
+        );
+      }
+      if (!result.affectedRows) {
+        await pool.query(
+          `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
+           WHERE id = ? AND trial_status = 'trialing' AND (trial_ends_at IS NULL OR trial_ends_at <= UTC_TIMESTAMP())`,
+          [req.user.id]
+        );
+        return res.status(403).json({ error: 'Votre période d’essai est terminée. Votre compte est repassé sur le plan Gratuit.', code: 'ESSAI_EXPIRE' });
+      }
+    } else {
+      if (targetPlan !== 'gratuit') {
+        return res.status(403).json({
+          error: 'Un plan payant ne peut être activé qu’après confirmation du paiement par le prestataire.',
+          code: 'PAIEMENT_REQUIS'
+        });
+      }
+      [result] = await pool.query(
+        "UPDATE users SET plan = 'gratuit' WHERE id = ? AND plan <> 'gratuit'",
+        [req.user.id]
+      );
+    }
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
     if (!rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
-    res.json({ user: sanitizeUser(rows[0]), changed: result.affectedRows > 0 });
+    res.json({ user: sanitizeUser(rows[0]), changed: Boolean(result && result.affectedRows > 0) });
   } catch (err) { next(err); }
 });
 
