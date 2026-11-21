@@ -7840,9 +7840,10 @@ a.btn .icon {
   }
   .invoice-doc .sf-platine-table th,
   .invoice-doc .sf-platine-table td {
-    padding: 4px 5px !important;
+    /* 9 pt conservés ; les lignes restent lisibles avec un interligne de 1,15. */
+    padding: 2px 5px !important;
     font-size: 9pt !important;
-    line-height: 1.25 !important;
+    line-height: 1.15 !important;
   }
   .invoice-doc .sf-platine-totals {
     margin-top: 12px !important;
