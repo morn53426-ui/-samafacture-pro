@@ -32,7 +32,10 @@ test('the player includes native controls, captions, and an accessible fallback'
   assert.match(html, /data-video-prev/);
   assert.match(html, /data-video-next/);
   assert.match(playerJs, /prefers-reduced-motion/);
+  assert.match(playerJs, /loadedmetadata/);
   assert.match(playerJs, /loadeddata/);
+  assert.match(playerJs, /canplay/);
+  assert.match(playerJs, /readyState >= 1/);
   assert.match(playerJs, /addEventListener\('error'/);
 });
 
