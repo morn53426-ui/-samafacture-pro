@@ -1442,6 +1442,12 @@ function createFactureTemplates(helpers) {
       '    padding-bottom: 1mm;',
       '    border-bottom: 0.25mm solid #cbd5e1;',
       '  }',
+      '}',
+      // Le bandeau complet du modèle identifie déjà la première page :
+      // réserver la ligne répétée aux feuilles de continuation.
+      '@page:first {',
+      '  @top-left { content: none; border: 0; }',
+      '  @top-right { content: none; border: 0; }',
       '}'
     ].join('\n');
   }
