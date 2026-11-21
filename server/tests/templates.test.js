@@ -261,6 +261,10 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
           template + ' doit répéter le nom de l’entreprise dans la marge A4.');
         assert.match(css, /@top-right/,
           template + ' doit répéter la référence dans la marge A4.');
+        assert.match(css, /@page:first/,
+          template + ' doit préserver le grand bandeau principal sur la première page.');
+        assert.match(css, /@top-left \\{ content: none; border: 0; \\}/,
+          template + ' doit masquer le rappel compact sur la première page.');
         assert.ok(css.includes('"SamaFacture Société & Fils"'),
           template + ' doit inclure le nom de l’entreprise.');
         assert.ok(css.includes(
