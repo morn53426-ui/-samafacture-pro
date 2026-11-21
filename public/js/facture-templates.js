@@ -1446,6 +1446,19 @@ function createFactureTemplates(helpers) {
     }
 
     html += documentSupplementHtml(user, facture, isDevis);
+    // En impression, Chromium répète les éléments positionnés en fixed sur chaque page.
+    // Cette ligne d'identité occupe la marge supérieure déjà réservée par @page (12 mm) :
+    // elle rend les feuilles détachées identifiables sans modifier les données métier.
+    const continuationCompany = escapeHtml(user?.entreprise_nom || user?.nom || 'SamaFacture');
+    const continuationKind = isDevis ? 'DEVIS' : 'FACTURE';
+    const continuationNumber = escapeHtml(facture.numero || '');
+    const continuationHeader =
+      '<div class="sf-print-continuation-header" aria-label="Identification du document">' +
+        '<span class="sf-print-continuation-company">' + continuationCompany + '</span>' +
+        '<span class="sf-print-continuation-reference">' + continuationKind + ' · ' + continuationNumber + '</span>' +
+      '</div>';
+    html = continuationHeader + html;
+
     // Le même tableau de lignes reçoit une classe stable pour la mise en page écran et A4.
     html = html.replace(/<table\b([^>]*)>/i, (match, attributes) => {
       const existingClass = attributes.match(/\bclass=["']([^"']*)["']/i);
