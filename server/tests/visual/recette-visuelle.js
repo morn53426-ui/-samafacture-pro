@@ -639,6 +639,77 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       footerGeometry.qrRight <= footerGeometry.contentRight + 1,
       pageDefinition.name + ' : le QR code doit rester visible dans le pied de page à ' +
       viewport.width + 'px : ' + JSON.stringify(footerGeometry));
+
+    const mobileTableMetrics = await page.evaluate(() => {
+      const documentNode = document.querySelector('.invoice-doc');
+      const table = documentNode?.querySelector('.sf-document-table');
+      const tbody = table?.querySelector('tbody');
+      const rows = tbody ? Array.from(tbody.querySelectorAll(':scope > tr')) : [];
+      if (!documentNode || !table || !tbody || !rows.length) return { found: false };
+      const documentRect = documentNode.getBoundingClientRect();
+      const documentStyle = getComputedStyle(documentNode);
+      const contentLeft = documentRect.left +
+        (parseFloat(documentStyle.borderLeftWidth) || 0) +
+        (parseFloat(documentStyle.paddingLeft) || 0);
+      const contentRight = documentRect.right -
+        (parseFloat(documentStyle.borderRightWidth) || 0) -
+        (parseFloat(documentStyle.paddingRight) || 0);
+      const tableRect = table.getBoundingClientRect();
+      const cells = rows.flatMap(row =>
+        Array.from(row.querySelectorAll(':scope > td')).map(cell => {
+          const rect = cell.getBoundingClientRect();
+          return {
+            label: cell.getAttribute('data-label') || '',
+            pseudoLabel: getComputedStyle(cell, '::before').content,
+            width: rect.width,
+            height: rect.height,
+            left: rect.left,
+            right: rect.right,
+            text: (cell.textContent || '').trim()
+          };
+        })
+      );
+      return {
+        found: true,
+        tableLeft: tableRect.left,
+        tableRight: tableRect.right,
+        tableWidth: tableRect.width,
+        tableClientWidth: table.clientWidth,
+        tableScrollWidth: table.scrollWidth,
+        contentLeft,
+        contentRight,
+        rowDisplay: getComputedStyle(rows[0]).display,
+        theadPosition: getComputedStyle(table.querySelector('thead')).position,
+        rowCount: rows.length,
+        cellsPerRow: rows.map(row => row.querySelectorAll(':scope > td').length),
+        cells
+      };
+    });
+    assert.equal(mobileTableMetrics.found, true,
+      pageDefinition.name + ' : le tableau des lignes doit être présent sur mobile.');
+    assert.ok(mobileTableMetrics.tableWidth <= mobileTableMetrics.contentRight - mobileTableMetrics.contentLeft + 1,
+      pageDefinition.name + ' : le tableau doit tenir dans la largeur intérieure du document : ' +
+      JSON.stringify(mobileTableMetrics));
+    assert.ok(mobileTableMetrics.tableScrollWidth <= mobileTableMetrics.tableClientWidth + 1,
+      pageDefinition.name + ' : les colonnes ne doivent plus nécessiter de défilement horizontal : ' +
+      JSON.stringify(mobileTableMetrics));
+    assert.equal(mobileTableMetrics.rowDisplay, 'grid',
+      pageDefinition.name + ' : chaque ligne doit être présentée sous forme de carte à deux colonnes.');
+    assert.equal(mobileTableMetrics.theadPosition, 'absolute',
+      pageDefinition.name + ' : les en-têtes de tableau doivent rester accessibles sans prendre de place visuelle.');
+    assert.ok(mobileTableMetrics.cellsPerRow.every(count => count === 5),
+      pageDefinition.name + ' : les cinq cellules financières doivent être conservées pour chaque ligne.');
+    const expectedLabels = ['Désignation', 'Quantité', 'Prix unitaire HT', 'TVA', 'Montant TTC'];
+    assert.ok(mobileTableMetrics.cells.every((cell, index) =>
+      cell.label === expectedLabels[index % 5] &&
+      cell.pseudoLabel !== 'none' &&
+      cell.pseudoLabel !== 'normal' &&
+      cell.width > 0 &&
+      cell.height > 0 &&
+      cell.left >= mobileTableMetrics.tableLeft - 1 &&
+      cell.right <= mobileTableMetrics.tableRight + 1
+    ), pageDefinition.name + ' : désignation, quantité, prix, TVA et montant TTC doivent tous être visibles et étiquetés : ' +
+      JSON.stringify(mobileTableMetrics.cells));
   }
 
   if (pageDefinition.name === 'produits') {
