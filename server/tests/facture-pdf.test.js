@@ -87,16 +87,16 @@ describe('Génération PDF de facture', () => {
       });
 
     assert.equal(res.status, 200, res.text);
-    assert.match(res.headers['content-type'] || '', /^application\\/pdf(?:;|$)/);
+    assert.match(res.headers['content-type'] || '', /^application\/pdf(?:;|$)/);
     assert.equal(res.body.subarray(0, 5).toString('latin1'), '%PDF-');
     const pdfLatin1 = res.body.toString('latin1');
-    const mediaBox = pdfLatin1.match(/\\/MediaBox\\s*\\[\\s*0\\s+0\\s+([\\d.]+)\\s+([\\d.]+)\\s*\\]/);
+    const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
     assert.ok(mediaBox, 'La facture courte doit déclarer une zone de page PDF.');
     assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
       Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
       'La facture courte doit être au format A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
 
-    const pageCount = (pdfLatin1.match(/\\/Type\\s*\\/Page\\b/g) || []).length;
+    const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
     assert.equal(pageCount, 1,
       'Une facture courte avec une seule ligne doit tenir sur une seule page A4 (pages=' + pageCount + ').');
   });
