@@ -23,8 +23,8 @@ const PAGES = [
   { name: 'clients', file: 'clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
   { name: 'produits', file: 'produits.html', ready: '#produits-body tr:not(.row-skeleton)' },
   { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
-  { name: 'facture-detail', file: 'facture-detail.html?id=987', ready: '.invoice-doc .sf-document-table tbody tr' },
-  { name: 'devis-detail', file: 'facture-detail.html?id=988', ready: '.invoice-doc .sf-document-table tbody tr' },
+  { name: 'facture-detail', file: 'facture-detail.html?id=987', ready: '.invoice-doc .sf-document-table tbody tr', standaloneDocument: true },
+  { name: 'devis-detail', file: 'facture-detail.html?id=988', ready: '.invoice-doc .sf-document-table tbody tr', standaloneDocument: true },
   { name: 'factures-recurrentes', file: 'factures-recurrentes.html', ready: '#recurrentes-body tr' },
   { name: 'devis', file: 'devis.html', ready: '#devis-body tr', responsiveTable: '#devis-body' },
   { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
@@ -554,6 +554,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   const pageErrors = [];
   const onPageError = (error) => pageErrors.push(error.message);
   page.on('pageerror', onPageError);
+  const workspacePage = !pageDefinition.public && !pageDefinition.standaloneDocument;
 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
   if (pageDefinition.plan) {
@@ -722,6 +723,39 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' contient des tabindex positifs qui perturbent l’ordre de tabulation : ' +
       JSON.stringify(accessibilityBaseline.positiveTabIndex));
   }
+  if (pageDefinition.standaloneDocument) {
+    const documentUi = await page.evaluate(() => {
+      const documentNode = document.querySelector('.invoice-doc');
+      const toolbar = document.querySelector('.toolbar');
+      const buttons = toolbar ? Array.from(toolbar.querySelectorAll('button')) : [];
+      return {
+        documentVisible: Boolean(documentNode && documentNode.getClientRects().length),
+        title: document.title,
+        tableRows: document.querySelectorAll('.invoice-doc .sf-document-table tbody tr').length,
+        toolbarVisible: Boolean(toolbar && getComputedStyle(toolbar).display !== 'none'),
+        visibleActions: buttons.filter(button => button.getClientRects().length && getComputedStyle(button).visibility !== 'hidden').length,
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+        toolbarWidth: toolbar?.scrollWidth || 0,
+        toolbarClientWidth: toolbar?.clientWidth || 0
+      };
+    });
+    assert.equal(documentUi.documentVisible, true,
+      pageDefinition.name + ' doit afficher le document commercial.');
+    assert.ok(documentUi.title.startsWith(pageDefinition.name === 'devis-detail' ? 'Devis' : 'Facture'),
+      pageDefinition.name + ' doit identifier le type du document : ' + JSON.stringify(documentUi));
+    assert.ok(documentUi.tableRows >= (pageDefinition.name === 'devis-detail' ? 28 : 8),
+      pageDefinition.name + ' doit afficher toutes les lignes de la recette : ' + JSON.stringify(documentUi));
+    assert.equal(documentUi.toolbarVisible, true,
+      pageDefinition.name + ' doit conserver sa barre d’actions dédiée.');
+    assert.equal(documentUi.visibleActions, 4,
+      pageDefinition.name + ' doit afficher les quatre actions du document : ' + JSON.stringify(documentUi));
+    assert.ok(documentUi.documentWidth <= documentUi.viewportWidth + 1,
+      pageDefinition.name + ' ne doit pas élargir la page sur petit écran : ' + JSON.stringify(documentUi));
+    assert.ok(documentUi.toolbarWidth <= documentUi.toolbarClientWidth + 1,
+      pageDefinition.name + ' : les actions doivent rester dans la barre dédiée : ' + JSON.stringify(documentUi));
+  }
+
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await new Promise((resolve) => setTimeout(resolve, 120));
 
@@ -763,7 +797,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'Aucun placeholder JavaScript brut ne doit apparaître dans la page.');
   }
 
-  if (!pageDefinition.public && viewport.width >= 901) {
+  if (workspacePage && viewport.width >= 901) {
     const geometry = await page.evaluate(() => ({
       sidebarRight: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().right || 0),
       headingLeft: Math.round(document.querySelector('main.workspace-page h1')?.getBoundingClientRect().left || 0)
@@ -772,7 +806,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' : le titre ne doit pas passer sous le rail latéral. ' + JSON.stringify(geometry));
   }
 
-  if (!pageDefinition.public) {
+  if (workspacePage) {
     const shell = await page.evaluate(() => ({
       toolbar: Boolean(document.querySelector('.app-topbar')),
       search: Boolean(document.querySelector('.app-topbar-search input#workspace-search')),
@@ -912,7 +946,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       })()
     };
   });
-  if (!pageDefinition.public && viewport.width >= 901) {
+  if (workspacePage && viewport.width >= 901) {
     const expectedCollapsed = pageDefinition.name !== 'dashboard';
     assert.equal(navigationGeometry.sidebarCollapsed, expectedCollapsed,
       pageDefinition.name + ' : l’état initial du menu desktop doit respecter la page de référence.');
@@ -952,7 +986,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     ), 'Les commandes du bandeau doivent rester dans sa rangée visible : ' + JSON.stringify(toolbar));
   }
 
-  if (!pageDefinition.public && viewport.width >= 1900) {
+  if (workspacePage && viewport.width >= 1900) {
     assert.ok(navigationGeometry.firstContentWidth <= 1721,
       pageDefinition.name + ' : le contenu métier doit être borné à 1 720 px sur écran ultra-large : ' +
       JSON.stringify(navigationGeometry));
@@ -2417,7 +2451,7 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
 
   for (const pageDefinition of pages) {
     const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -2588,7 +2622,7 @@ async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesLightThemeDesktop(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
 
   for (const pageDefinition of pages) {
     const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -2718,7 +2752,7 @@ async function verifyBusinessPagesLightThemeDesktop(browser, baseUrl, fixtures) 
 
 async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
   const viewports = [
     { name: 'mobile-320', width: 320, height: 812 },
     { name: 'mobile-390', width: 390, height: 844 }
@@ -2852,7 +2886,7 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
   const viewports = [
     { name: 'mobile-320', width: 320, height: 812 },
     { name: 'mobile-390', width: 390, height: 844 }
@@ -2987,7 +3021,7 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
   const viewport = { width: 720, height: 900 };
 
   for (const pageDefinition of pages) {
@@ -3118,7 +3152,7 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
   const viewport = { width: 720, height: 900 };
 
   for (const pageDefinition of pages) {
@@ -3262,7 +3296,7 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
 
   for (const pageDefinition of pages) {
     const page = await preparePage(browser, baseUrl, fixtures, false);
