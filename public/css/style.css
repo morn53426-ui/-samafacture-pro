@@ -5969,6 +5969,10 @@ a.btn .icon {
 }
 .invoice-doc .sf-doc-legal-mentions { margin-top: 3px; }
 
+/* Identification réservée à l'impression : la première page conserve son grand bandeau
+   de modèle, tandis que la ligne fixe est répétée par Chromium sur chaque feuille. */
+.invoice-doc .sf-print-continuation-header { display: none; }
+
 @media (max-width: 640px) {
   /* Le tableau reste lisible dans un défilement interne sur téléphone ; l'impression
      A4 repasse à 100 % de largeur dans le bloc @media print ci-dessous. */
@@ -5984,6 +5988,46 @@ a.btn .icon {
 }
 
 @media print {
+  .invoice-doc .sf-print-continuation-header {
+    position: fixed !important;
+    top: -7mm !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 9999;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    box-sizing: border-box;
+    height: 5mm;
+    padding: 0 0 1mm;
+    border-bottom: 0.25mm solid #cbd5e1;
+    background: #fff !important;
+    color: #475569 !important;
+    font-family: var(--font-body);
+    font-size: 7pt;
+    font-weight: 500;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .invoice-doc .sf-print-continuation-company {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .invoice-doc .sf-print-continuation-reference {
+    flex: 0 0 auto;
+    max-width: 55%;
+    overflow: hidden;
+    color: #334155 !important;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    text-align: right;
+  }
   .invoice-doc {
     box-sizing: border-box !important;
     width: 100% !important;
