@@ -404,7 +404,8 @@ function fixtureFor(pathname, fixtures) {
   if (pathname === '/api/auth/me') return {
     user: {
       id: 1, nom: 'Compte de recette SamaFacture', entreprise_nom: 'SamaFacture — Société de test',
-      entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro'
+      entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro',
+      locale: 'fr-FR', format_date: 'yyyy-MM-dd', fuseau_horaire: 'Africa/Dakar'
     }
   };
   if (pathname === '/api/pro/crm/overview') return {
@@ -3747,6 +3748,9 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     'Échap doit fermer le dialogue et libérer le verrou de focus.');
 
   async function verifyDocumentPdf(documentId, type) {
+    // Reproduire le contexte réel du serveur PDF : seul sf_token est injecté par Puppeteer.
+    // Le profil complet doit venir de GET /auth/me et alimenter les helpers de formatage.
+    await page.evaluate(() => localStorage.removeItem('sf_user'));
     // Revenir au média écran avant de capturer l’aperçu de chaque document.
     await page.emulateMediaType(null);
     await page.goto(baseUrl + '/facture-detail.html?id=' + documentId, { waitUntil: 'domcontentloaded' });
@@ -3772,10 +3776,15 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       taxTotalAmount: document.querySelector('.invoice-doc .sf-doc-tax-total strong')?.textContent || '',
       validityLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Validité du devis'),
       dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance'),
+      renderedDocumentText: document.querySelector('.invoice-doc')?.innerText || '',
       pageIdentityRulePresent: Boolean(document.getElementById('sf-print-page-identity')?.sheet)
     }));
     assert.equal(screenMetrics.pageIdentityRulePresent, true,
       type + ' : les règles d’identification des marges A4 doivent être préparées.');
+    assert.ok(screenMetrics.renderedDocumentText.includes('2026-11-15'),
+      type + ' : la date d’émission doit utiliser le format du profil récupéré par /auth/me.');
+    assert.ok(screenMetrics.renderedDocumentText.includes('2026-12-15'),
+      type + ' : la date d’échéance/validité doit utiliser le format du profil récupéré par /auth/me.');
     assert.equal(screenMetrics.title, type === 'devis' ? 'Devis — Sunupilot' : 'Facture — Sunupilot',
       type + ' : le titre du document et les métadonnées PDF doivent identifier le bon type.');
     assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),

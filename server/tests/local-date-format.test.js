@@ -66,6 +66,21 @@ test('un MySQL DATETIME UTC reste converti vers le fuseau du compte', () => {
   assert.equal(formatDate('2026-11-16 23:30:00'), '17/11/2026');
 });
 
+test('le PDF utilise le profil API pour les dates et montants même sans sf_user local', () => {
+  const { Api, formatDate, formatMontant } = loadFormatDate(null);
+  assert.equal(Api.currentUser(), null, 'Le scénario headless ne fournit pas sf_user.');
+
+  const profil = {
+    locale: 'en-US',
+    fuseau_horaire: 'Europe/Paris',
+    format_date: 'MM/dd/yyyy',
+    devise: 'USD'
+  };
+  assert.equal(formatDate('2026-11-16', profil), '11/16/2026');
+  assert.equal(formatDate('2026-11-16 23:30:00', profil), '11/17/2026');
+  assert.equal(formatMontant(1234.5, profil.devise, profil), '1,234.5 USD');
+});
+
 test('la date par défaut des formulaires suit le fuseau de l’entreprise', () => {
   const { dateCivileAujourdhui } = loadFormatDate({ fuseau_horaire: 'Africa/Dakar' });
   const instant = new Date('2026-11-16T23:30:00.000Z');

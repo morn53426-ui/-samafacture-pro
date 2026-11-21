@@ -133,17 +133,21 @@ function requireAuthPage() {
   }
 }
 
-function formatMontant(n, devise) {
-  const user = Api.currentUser() || {};
+function formatMontant(n, devise, userOverride) {
+  const user = userOverride && typeof userOverride === 'object'
+    ? userOverride
+    : Api.currentUser() || {};
   const currency = devise || user.devise || 'FCFA';
   const locale = user.locale || (user.langue === 'en' ? 'en' : 'fr-FR');
   const val = Number(n || 0).toLocaleString(locale, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   return currency === 'FCFA' || currency === 'XOF' ? `${val} ${currency}` : `${val} ${currency}`;
 }
 
-function formatDate(iso) {
+function formatDate(iso, userOverride) {
   if (!iso) return '—';
-  const user = Api.currentUser() || {};
+  const user = userOverride && typeof userOverride === 'object'
+    ? userOverride
+    : Api.currentUser() || {};
   const locale = user.locale || 'fr-FR';
   const timeZone = user.fuseau_horaire || 'UTC';
   const format = user.format_date || 'dd/MM/yyyy';
