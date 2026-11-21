@@ -3850,7 +3850,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
   }
 
   async function verifyAllTemplateBannerGeometry(documentId, type) {
-    const titleText = type === 'devis' ? 'DEVIS' : 'FACTURE';
+    const titleLabels = type === 'devis' ? ['DEVIS', 'PROPOSITION'] : ['FACTURE'];
     const bannerSelector = '[style*="margin:-40px -40px"], [style*="margin:-8px -8px"]';
     let bannersChecked = 0;
     const templatesChecked = [];
@@ -3865,7 +3865,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       { timeout: 15000 }, template);
       await page.emulateMediaType('print');
 
-      const geometry = await page.evaluate(({ selector, expectedTitle }) => {
+      const geometry = await page.evaluate(({ selector, expectedTitles }) => {
         const documentNode = document.querySelector('.invoice-doc');
         if (!documentNode) return { documentFound: false, banners: [], titlePresent: false, titleBounds: null };
         const bounds = documentNode.getBoundingClientRect();
@@ -3882,14 +3882,20 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
             width: Number(rect.width.toFixed(2))
           };
         });
-        const titleCandidates = Array.from(documentNode.querySelectorAll('*')).filter(element => {
+        // Le titre principal doit être mesuré dans le premier bandeau, pas dans
+        // un texte identique des mentions/pieds de page. Deux modèles devis
+        // utilisent intentionnellement « PROPOSITION » au lieu de « DEVIS ».
+        const headerNode = documentNode.firstElementChild || documentNode;
+        const titleCandidates = Array.from(headerNode.querySelectorAll('*')).filter(element => {
           if (element.children.length !== 0) return false;
-          // Certains modèles décorent le titre avec un emoji (ex. « ✨ DEVIS »).
-          // La décoration ne doit pas faire sélectionner un autre mot « DEVIS »
-          // présent dans les mentions ou le pied de page du document.
           const text = (element.textContent || '').trim().normalize('NFKD')
             .replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ0-9]+/, '').trim().toUpperCase();
-          return text.startsWith(expectedTitle);
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return expectedTitles.some(label => text.startsWith(label)) &&
+            style.display !== 'none' && style.visibility !== 'hidden' &&
+            Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+            element.getClientRects().length > 0;
         });
         titleCandidates.sort((a, b) =>
           Number.parseFloat(getComputedStyle(b).fontSize) - Number.parseFloat(getComputedStyle(a).fontSize)
@@ -3899,7 +3905,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         return {
           documentFound: true,
           documentWidth: Number(bounds.width.toFixed(2)),
-          titlePresent: (documentNode.innerText || '').toUpperCase().includes(expectedTitle),
+          titlePresent: titleCandidates.length > 0,
           titleCandidates: titleCandidates.slice(0, 5).map(element => {
             const rect = element.getBoundingClientRect();
             return {
@@ -3917,14 +3923,14 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
           } : null,
           banners
         };
-      }, { selector: bannerSelector, expectedTitle: titleText });
+      }, { selector: bannerSelector, expectedTitles: titleLabels });
 
       assert.equal(geometry.documentFound, true, type + '/' + template + ' : document introuvable.');
       assert.ok(geometry.documentWidth > 0, type + '/' + template + ' : largeur imprimée nulle.');
       assert.equal(geometry.titlePresent, true, type + '/' + template + ' : le titre ' + titleText + ' doit rester visible.');
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
-          type + '/' + template + ' : titre hors de la zone du document : ' + JSON.stringify(geometry.titleBounds));
+          type + '/' + template + ' : titre principal hors de la zone du document : ' + JSON.stringify({ bounds: geometry.titleBounds, candidates: geometry.titleCandidates }));
       }
       for (const banner of geometry.banners) {
         assert.ok(Math.abs(banner.marginTop) <= 0.5 && Math.abs(banner.marginLeft) <= 0.5 && Math.abs(banner.marginRight) <= 0.5,
