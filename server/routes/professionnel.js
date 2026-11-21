@@ -3280,14 +3280,25 @@ router.post('/accounting/post-payment/:id', async (req, res, next) => {
     conn = await pool.getConnection();
     await conn.beginTransaction();
     const [rows] = await conn.query(
-      'SELECT p.*, f.numero FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.id = ? AND p.user_id = ? AND f.user_id = ? FOR UPDATE',
-      [req.params.id, uid, uid]
+      'SELECT * FROM paiements WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, uid]
     );
     const payment = rows[0];
     if (!payment) {
       await conn.rollback();
       return res.status(404).json({ error: 'Paiement introuvable.' });
     }
+    // Lire le numéro de facture sans verrouiller celle-ci : le traitement du
+    // remboursement suit le même ordre de verrous (paiement, puis facture).
+    const [invoiceRows] = await conn.query(
+      'SELECT numero FROM factures WHERE id = ? AND user_id = ? LIMIT 1',
+      [payment.facture_id, uid]
+    );
+    if (!invoiceRows.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture du paiement introuvable.' });
+    }
+    const invoiceNumber = invoiceRows[0].numero;
     const bank = /wave|paydunya|orange|carte|virement/i.test(payment.methode || '');
     const result = await postSystemEntry(
       uid,
@@ -3295,11 +3306,11 @@ router.post('/accounting/post-payment/:id', async (req, res, next) => {
       'paiement',
       payment.id,
       String(payment.date_paiement).slice(0, 10),
-      'Encaissement facture ' + payment.numero,
+      'Encaissement facture ' + invoiceNumber,
       bank ? 'BQ' : 'CA',
       [
-        { code: bank ? '521' : '571', libelle: 'Règlement ' + payment.numero, debit: Number(payment.montant), credit: 0, paiement_id: payment.id },
-        { code: '411', libelle: 'Lettrage client ' + payment.numero, debit: 0, credit: Number(payment.montant), paiement_id: payment.id }
+        { code: bank ? '521' : '571', libelle: 'Règlement ' + invoiceNumber, debit: Number(payment.montant), credit: 0, paiement_id: payment.id },
+        { code: '411', libelle: 'Lettrage client ' + invoiceNumber, debit: 0, credit: Number(payment.montant), paiement_id: payment.id }
       ],
       conn
     );
