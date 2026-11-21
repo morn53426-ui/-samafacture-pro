@@ -7611,15 +7611,15 @@ a.btn .icon {
   font-size: clamp(.72rem, 1.5vw, 1rem);
   letter-spacing: -.02em;
 }
-.lp-video-mark {
-  display: grid;
-  width: 27px;
-  height: 27px;
-  place-items: center;
-  border: 1px solid rgba(164,230,189,.85);
-  border-radius: 50%;
-  background: #0a7a45;
-  color: white;
+.lp-video-fallback-brand img {
+  display: block;
+  width: clamp(27px, 3vw, 42px);
+  height: clamp(27px, 3vw, 42px);
+  flex: 0 0 auto;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #F6F7F5;
+  box-shadow: 0 3px 12px rgba(0,0,0,.18);
 }
 .lp-video-scenes { position: absolute; inset: 0; z-index: 1; }
 .lp-video-scene {
@@ -7756,7 +7756,7 @@ a.btn .icon {
 @media (max-width: 520px) {
   .lp-video-presentation { border-radius: 16px; }
   .lp-video-fallback-brand { gap: 6px; }
-  .lp-video-mark { width: 22px; height: 22px; }
+  .lp-video-fallback-brand img { width: 26px; height: 26px; }
   .lp-video-scene { padding-top: 20%; }
   .lp-video-kicker { letter-spacing: .07em; }
   .lp-video-fallback-controls button { width: 27px; height: 27px; flex-basis: 27px; }
