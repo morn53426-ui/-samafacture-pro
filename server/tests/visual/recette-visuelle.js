@@ -9,6 +9,12 @@ const puppeteer = require('puppeteer');
 const PUBLIC_DIR = path.resolve(__dirname, '../../../public');
 const OUTPUT_DIR = path.resolve(process.env.VISUAL_ARTIFACTS_DIR || path.join(__dirname, 'artifacts'));
 const DATASET = process.env.VISUAL_DATASET || 'worst';
+
+const DOCUMENT_IMAGE_FIXTURES = Object.freeze({
+  logo: 'data:image/png;base64,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',
+  signature: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAAAsCAYAAACHUEHxAAACGUlEQVR42u2c223DMAxFayFLZIIu1fG6VCfoGM6Xi8CVbIkvS/K5QP4SxZQuD0kh7bKu6wdC1kpsAcJYCGMhjIUQxkIYC2EshGz16PXBnp9ffxdsvz/fC0cFsUxNhTCWuTZSYTSMZUYryh/GgloNCXMX+qYeN382Wu1NdQdzDXHdMDK1Zp9uS2eStItuL2jVZqoZqHVE4GTtVKh1bKoZEmcPk1xMqYcDn41WteVvhtJeii9pF4da7aYaNYFa+sVksbjmwK+mleWkJmnUR6BWTelTGauHCceSWl7XADV78/6ekQhce+7JauMkB34lrUpJIj1kSSw9l0QJpUTG6imrtKX33QT7cp7b1Ii9sVrDo6RLEmCp+fOvFufWZq6WVpLPS6a12jiiY2k1paTn0xD1ISFFL9TaMrTmuVo2bFt7+1zp/dY9Z20src+QI9nZha02nlNiSSedGiJoH76VjpaE8zBVy3oaIxwRzgoeh8bSHshZplseSG4tyzKVo5k1xb0TxZqW6ub9is274k6pFHtpavSKoUQU7aQW2eYkjykl8oY8910em79fx8NULQNF77f3KQq1UbTyJEruasI7Dk9Keepfj2UZxN5Insaa6XdPOdKPFlOKqrmYqp/+J9xY1j1RVK8VWaIijTRCL9VUCj36qllpgipLoVfDi25urIhGFM2vhf9BioYkFsJYCGEshLEQxkIIYyGMhe6mF0uAKKO/+etDAAAAAElFTkSuQmCC',
+  qrCode: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIQAAACEAQMAAABrihHkAAAABlBMVEX///8YJlt4kCruAAAA90lEQVR42s2VsXElMQxDnzw/x3bw+y/rOnisAA527MQX3C0TM9JwJAwIEhT8tmgrNfY+fvy48W+ZOYdMeA9zDg9xXtABDnlLh8d8AOaC8X9f/S2TcK4FzgsO9sjFcHiq86EwX6Rgrqd8DkBP4M95XheY2ASSbHCaoq1gHusDEata0y741JhIExc4qm0MN9zjuiiEJmWns00ilOd+h0ZMU5JkwyeVmAQWOGnvHWa6mR+rMWh00S8SNIl2g2PVIrb6XJ97Fhtvgyx8UWMt6qJfgm2isvGpVWqldbnnJROvSXc47wOTuRhX/wUZMnIyq375Lfdufn5PfAJb98CAw+cV0AAAAABJRU5ErkJggg=='
+});
 const VIEWPORTS = [
   { name: 'mobile-320', width: 320, height: 812 },
   { name: 'mobile-360', width: 360, height: 800 },
@@ -309,7 +315,7 @@ function fixtureFor(pathname, fixtures) {
   };
   if (/^\/api\/factures\/(987|988)$/.test(pathname)) {
     const isQuote = pathname.endsWith('/988');
-    const lineCount = isQuote ? 28 : 8;
+    const lineCount = isQuote || DATASET === 'worst' ? 28 : 8;
     const lignes = Array.from({ length: lineCount }, (_, index) => ({
       designation: makeLong(
         (isQuote ? 'Lot de prestation et fournitures prévu au devis — ' : 'Prestation facturée — ') +
@@ -358,7 +364,7 @@ function fixtureFor(pathname, fixtures) {
         conditions_reglement: isQuote ? 'Offre valable 30 jours. Acompte de 40 % après validation.' : 'Règlement sous 15 jours.'
       },
       lignes,
-      qr_code: null
+      qr_code: DOCUMENT_IMAGE_FIXTURES.qrCode
     };
   }
   if (pathname === '/api/depenses') return { depenses: fixtures.depenses || [] };
@@ -404,6 +410,8 @@ function fixtureFor(pathname, fixtures) {
   if (pathname === '/api/auth/me') return {
     user: {
       id: 1, nom: 'Compte de recette SamaFacture', entreprise_nom: 'SamaFacture — Société de test',
+      entreprise_logo: DOCUMENT_IMAGE_FIXTURES.logo,
+      signature_default: DOCUMENT_IMAGE_FIXTURES.signature,
       entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro',
       locale: 'fr-FR', format_date: 'yyyy-MM-dd', fuseau_horaire: 'Africa/Dakar'
     }
@@ -3787,7 +3795,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       type + ' : la date d’échéance/validité doit utiliser le format du profil récupéré par /auth/me.');
     assert.equal(screenMetrics.title, type === 'devis' ? 'Devis — Sunupilot' : 'Facture — Sunupilot',
       type + ' : le titre du document et les métadonnées PDF doivent identifier le bon type.');
-    assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),
+    assert.ok(screenMetrics.lineCount >= (DATASET === 'worst' || type === 'devis' ? 28 : 8),
       type + ' : toutes les lignes doivent être rendues avant l’impression : ' + JSON.stringify(screenMetrics));
     assert.ok(screenMetrics.documentWidth <= screenMetrics.viewportWidth + 1,
       type + ' : l’aperçu écran ne doit pas élargir la page : ' + JSON.stringify(screenMetrics));
@@ -3869,9 +3877,10 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     const pdfSource = pdfBuffer.toString('latin1');
     const pages = (pdfSource.match(/\/Type\s*\/Page\b/g) || []).length;
     assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
-    if (type === 'devis') {
-      assert.ok(pages >= 2, 'Le devis long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
-      assert.ok(pages <= 3, 'Le devis long ne doit pas créer une quatrième page quasi vide. Pages détectées : ' + pages);
+    const documentDoitEtreMultiPage = type === 'devis' || (type === 'facture' && DATASET === 'worst');
+    if (documentDoitEtreMultiPage) {
+      assert.ok(pages >= 2, type + ' long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
+      assert.ok(pages <= 3, type + ' long ne doit pas créer une quatrième page quasi vide. Pages détectées : ' + pages);
     }
     fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdfBuffer);
     return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
@@ -3881,6 +3890,10 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     const titleLabels = type === 'devis' ? ['DEVIS', 'PROPOSITION'] : ['FACTURE'];
     const bannerSelector = '[style*="margin:-40px -40px"], [style*="margin:-8px -8px"]';
     let bannersChecked = 0;
+    let logosChecked = 0;
+    let qrCodesChecked = 0;
+    let signaturesChecked = 0;
+    let imagesChecked = 0;
     const templatesChecked = [];
 
     for (const template of DOCUMENT_TEMPLATES) {
@@ -3933,6 +3946,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         return {
           documentFound: true,
           documentWidth: Number(bounds.width.toFixed(2)),
+          lineCount: documentNode.querySelectorAll('.sf-document-table tbody tr').length,
           titlePresent: titleCandidates.length > 0,
           titleCandidates: titleCandidates.slice(0, 5).map(element => {
             const rect = element.getBoundingClientRect();
@@ -3955,6 +3969,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
 
       assert.equal(geometry.documentFound, true, type + '/' + template + ' : document introuvable.');
       assert.ok(geometry.documentWidth > 0, type + '/' + template + ' : largeur imprimée nulle.');
+      assert.ok(geometry.lineCount >= 28,
+        type + '/' + template + ' : les 28 lignes longues doivent être rendues avant impression (lignes=' + geometry.lineCount + ').');
       assert.equal(geometry.titlePresent, true, type + '/' + template + ' : titre principal (' + titleLabels.join(' / ') + ') absent du bandeau.');
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
@@ -3966,11 +3982,82 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.ok(banner.leftOverflow <= 0.5 && banner.rightOverflow <= 0.5 && banner.topOverflow <= 0.5,
           type + '/' + template + ' : bandeau hors de la zone imprimable : ' + JSON.stringify(banner));
       }
+      // Charger et mesurer les images embarquées (logo, QR code, signature).
+      // Les sources sont des PNG data: locaux : aucune dépendance réseau.
+      const imageMetrics = await page.evaluate(async () => {
+        const nodes = Array.from(document.querySelectorAll('.invoice-doc img'));
+        const images = await Promise.all(nodes.map(async image => {
+          if (typeof image.decode === 'function') {
+            try { await image.decode(); } catch (_) { /* l'assertion signale l'image invalide */ }
+          }
+          const rect = image.getBoundingClientRect();
+          return {
+            alt: image.alt || '',
+            complete: image.complete,
+            naturalWidth: image.naturalWidth,
+            naturalHeight: image.naturalHeight,
+            width: Number(rect.width.toFixed(2)),
+            height: Number(rect.height.toFixed(2))
+          };
+        }));
+        return {
+          images,
+          logos: images.filter(image => image.alt === 'Logo').length,
+          qrCodes: images.filter(image => image.alt === 'QR code de vérification').length,
+          signatures: images.filter(image => image.alt === 'Signature').length
+        };
+      });
+      assert.ok(imageMetrics.logos > 0,
+        type + '/' + template + ' : le logo réel de test doit être rendu.');
+      assert.ok(imageMetrics.images.every(image => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0 && image.width > 0 && image.height > 0),
+        type + '/' + template + ' : chaque logo, QR code ou signature présent doit être chargé et visible : ' + JSON.stringify(imageMetrics.images));
+      logosChecked += imageMetrics.logos;
+      qrCodesChecked += imageMetrics.qrCodes;
+      signaturesChecked += imageMetrics.signatures;
+      imagesChecked += imageMetrics.images.length;
+
+      // Générer le PDF réel de chaque modèle (pas seulement mesurer le DOM écran).
+      // La fixture worst contient 28 lignes longues pour les factures et les devis.
+      const pdf = Buffer.from(await page.pdf({
+        format: 'A4',
+        preferCSSPageSize: true,
+        printBackground: true,
+        scale: 1
+      }));
+      assert.equal(pdf.subarray(0, 5).toString('latin1'), '%PDF-',
+        type + '/' + template + ' : la génération PDF doit produire un vrai fichier.');
+      assert.ok(pdf.length > 5000,
+        type + '/' + template + ' : le PDF doit contenir le document complet.');
+      const pdfPages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
+      assert.ok(pdfPages >= 2,
+        type + '/' + template + ' : 28 lignes doivent occuper plusieurs pages A4 (pages=' + pdfPages + ').');
+      assert.ok(pdfPages <= 3,
+        type + '/' + template + ' : la pagination longue ne doit pas créer plus de trois pages (pages=' + pdfPages + ').');
+
       bannersChecked += geometry.banners.length;
-      templatesChecked.push({ template, banners: geometry.banners.length });
+      templatesChecked.push({
+        template,
+        banners: geometry.banners.length,
+        lineCount: geometry.lineCount,
+        logoImages: imageMetrics.logos,
+        qrCodes: imageMetrics.qrCodes,
+        signatureImages: imageMetrics.signatures,
+        imagesLoaded: imageMetrics.images.length,
+        pdfBytes: pdf.length,
+        pdfPages
+      });
     }
     assert.ok(bannersChecked > 0, type + ' : la recette doit avoir rencontré et mesuré les bandeaux historiques à marges négatives.');
-    return { templateCount: templatesChecked.length, bannersChecked, templates: templatesChecked };
+    assert.ok(logosChecked >= DOCUMENT_TEMPLATES.length,
+      type + ' : le logo doit être chargé sur chacun des modèles.');
+    assert.ok(qrCodesChecked > 0, type + ' : au moins un modèle doit charger et afficher le QR code.');
+    assert.ok(signaturesChecked > 0, type + ' : au moins un modèle doit charger et afficher la signature.');
+    return {
+      templateCount: templatesChecked.length,
+      bannersChecked,
+      images: { logosChecked, qrCodesChecked, signaturesChecked, imagesChecked },
+      templates: templatesChecked
+    };
   }
 
   const invoicePdf = await verifyDocumentPdf(987, 'facture');
