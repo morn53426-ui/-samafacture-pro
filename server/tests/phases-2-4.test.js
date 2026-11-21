@@ -453,6 +453,126 @@ test('les dépenses distinguent caisse et banque et deviennent immuables après 
   assert.ok(cashLines.some(line => line.code === '571' && Number(line.credit) === 1200));
 });
 
+test('un remboursement réellement exécuté contre-passe le journal du paiement sans doublon', async () => {
+  const createPayment = async (invoiceId, amount, method) => {
+    const response = await request(app)
+      .post('/api/factures/' + invoiceId + '/paiements')
+      .set('Authorization', 'Bearer ' + token)
+      .set('Idempotency-Key', 'phase24-refund-' + crypto.randomBytes(8).toString('hex'))
+      .send({ montant: amount, methode: method });
+    assert.equal(response.status, 201, response.text);
+    const [[paymentRow]] = await pool.query(
+      'SELECT id FROM paiements WHERE user_id = ? AND facture_id = ? ORDER BY id DESC LIMIT 1',
+      [userId, invoiceId]
+    );
+    return paymentRow;
+  };
+  const requestRefund = async (paymentId, amount, motif) => request(app)
+    .post('/api/pro/payments/' + paymentId + '/refunds')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ montant: amount, motif });
+  const completeRefund = async (refundId, reference) => request(app)
+    .put('/api/pro/refunds/' + refundId + '/status')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ statut: 'rembourse', reference_prestataire: reference });
+
+  // Virement bancaire : le remboursement doit créditer le même compte 521.
+  const bankInvoice = await creerFacture({ amount: 4000, tax: 0 });
+  const bankInvoiceEntry = await request(app)
+    .post('/api/pro/accounting/post-invoice/' + bankInvoice.id)
+    .set('Authorization', 'Bearer ' + token)
+    .send({});
+  assert.equal(bankInvoiceEntry.status, 201, bankInvoiceEntry.text);
+  const bankPayment = await createPayment(bankInvoice.id, 3000, 'virement');
+  const postedBankPayment = await request(app)
+    .post('/api/pro/accounting/post-payment/' + bankPayment.id)
+    .set('Authorization', 'Bearer ' + token)
+    .send({});
+  assert.equal(postedBankPayment.status, 201, postedBankPayment.text);
+
+  const bankRefundOne = await requestRefund(bankPayment.id, 800, 'Remboursement partiel test banque');
+  assert.equal(bankRefundOne.status, 201, bankRefundOne.text);
+  const completedBankRefundOne = await completeRefund(bankRefundOne.body.id, 'REF-BANK-001');
+  assert.equal(completedBankRefundOne.status, 200, completedBankRefundOne.text);
+
+  const bankRefundTwo = await requestRefund(bankPayment.id, 200, 'Deuxième remboursement partiel test banque');
+  assert.equal(bankRefundTwo.status, 201, bankRefundTwo.text);
+  const completedBankRefundTwo = await completeRefund(bankRefundTwo.body.id, 'REF-BANK-002');
+  assert.equal(completedBankRefundTwo.status, 200, completedBankRefundTwo.text);
+
+  const [[bankInvoiceAfter]] = await pool.query(
+    'SELECT montant_paye, statut FROM factures WHERE id = ? AND user_id = ?',
+    [bankInvoice.id, userId]
+  );
+  assert.equal(Number(bankInvoiceAfter.montant_paye), 2000);
+  assert.equal(bankInvoiceAfter.statut, 'en_attente');
+
+  const [bankRefundEntries] = await pool.query(
+    "SELECT e.id, e.source_id, e.total_debit, e.total_credit, j.code AS journal_code FROM pro_compta_ecritures e JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id WHERE e.user_id = ? AND e.source_type = 'remboursement' AND e.source_id IN (?, ?) ORDER BY e.source_id",
+    [userId, bankRefundOne.body.id, bankRefundTwo.body.id]
+  );
+  assert.equal(bankRefundEntries.length, 2);
+  for (const entry of bankRefundEntries) {
+    assert.equal(entry.journal_code, 'BQ');
+    assert.equal(Number(entry.total_debit), Number(entry.total_credit));
+  }
+  const [bankRefundLines] = await pool.query(
+    "SELECT c.code, SUM(l.debit) AS debit, SUM(l.credit) AS credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id JOIN pro_compta_ecritures e ON e.id = l.ecriture_id AND e.user_id = l.user_id WHERE l.user_id = ? AND e.source_type = 'remboursement' AND e.source_id IN (?, ?) GROUP BY c.code ORDER BY c.code",
+    [userId, bankRefundOne.body.id, bankRefundTwo.body.id]
+  );
+  assert.deepEqual(bankRefundLines.map(line => ({
+    code: line.code, debit: Number(line.debit), credit: Number(line.credit)
+  })), [
+    { code: '411', debit: 1000, credit: 0 },
+    { code: '521', debit: 0, credit: 1000 }
+  ]);
+
+  const replayRefund = await completeRefund(bankRefundOne.body.id, 'REF-BANK-001');
+  assert.equal(replayRefund.status, 404, replayRefund.text);
+  const [[refundCount]] = await pool.query(
+    "SELECT COUNT(*) AS n FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'remboursement' AND source_id = ?",
+    [userId, bankRefundOne.body.id]
+  );
+  assert.equal(Number(refundCount.n), 1, 'une demande remboursée ne doit pas être comptabilisée deux fois');
+
+  // Espèces : si l'encaissement initial n'a jamais été journalisé, il est
+  // d'abord comptabilisé puis contre-passé dans la même transaction.
+  const cashInvoice = await creerFacture({ amount: 1500, tax: 0 });
+  const cashPayment = await createPayment(cashInvoice.id, 1000, 'Espèces');
+  const cashRefund = await requestRefund(cashPayment.id, 400, 'Remboursement espèces test');
+  assert.equal(cashRefund.status, 201, cashRefund.text);
+  const completedCashRefund = await completeRefund(cashRefund.body.id, 'REF-CASH-001');
+  assert.equal(completedCashRefund.status, 200, completedCashRefund.text);
+
+  const [[autoPostedPayment]] = await pool.query(
+    "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'paiement' AND source_id = ?",
+    [userId, cashPayment.id]
+  );
+  assert.ok(autoPostedPayment, 'le paiement d’origine doit être journalisé avant la sortie de trésorerie');
+  const [[cashRefundEntry]] = await pool.query(
+    "SELECT e.id, e.total_debit, e.total_credit, j.code AS journal_code FROM pro_compta_ecritures e JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id WHERE e.user_id = ? AND e.source_type = 'remboursement' AND e.source_id = ?",
+    [userId, cashRefund.body.id]
+  );
+  assert.equal(cashRefundEntry.journal_code, 'CA');
+  assert.equal(Number(cashRefundEntry.total_debit), 400);
+  assert.equal(Number(cashRefundEntry.total_credit), 400);
+  const [cashRefundLines] = await pool.query(
+    "SELECT c.code, l.debit, l.credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id WHERE l.user_id = ? AND l.ecriture_id = ? ORDER BY c.code",
+    [userId, cashRefundEntry.id]
+  );
+  assert.deepEqual(cashRefundLines.map(line => ({
+    code: line.code, debit: Number(line.debit), credit: Number(line.credit)
+  })), [
+    { code: '411', debit: 400, credit: 0 },
+    { code: '571', debit: 0, credit: 400 }
+  ]);
+  const balance = await request(app)
+    .get('/api/pro/accounting/trial-balance')
+    .set('Authorization', 'Bearer ' + token);
+  assert.equal(balance.status, 200, balance.text);
+  assert.equal(balance.body.equilibree, true);
+});
+
 after(async () => {
   try {
     await nettoyerUtilisateur(userId);
