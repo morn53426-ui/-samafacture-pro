@@ -3431,8 +3431,10 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
 async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
   const results = [];
   const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
+  const themes = ['light', 'dark'];
 
-  for (const pageDefinition of pages) {
+  for (const theme of themes) {
+    for (const pageDefinition of pages) {
     const page = await preparePage(browser, baseUrl, fixtures, false);
     const pageErrors = [];
     page.on('pageerror', error => pageErrors.push(error.message));
@@ -3446,15 +3448,242 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           localStorage.setItem('sf_user', JSON.stringify(user));
         }, pageDefinition.plan);
       }
-      await page.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+      await page.evaluate(themeValue => localStorage.setItem('sf_theme', themeValue), theme);
       await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
       await page.evaluate(() => document.fonts && document.fonts.ready);
       await new Promise(resolve => setTimeout(resolve, 80));
 
-      // Vérifier le vrai parcours clavier (pas un focus() programmatique, qui ne
-      // déclenche pas nécessairement :focus-visible).
-      await page.keyboard.press('Tab');
+      // Recenser les éléments réellement visibles et tabulables, puis parcourir
+      // l'ordre clavier dans les deux sens. Une page entière ne doit pas enfermer
+      // le focus : le navigateur peut sortir du document après le dernier arrêt.
+      const { focusableKeys, nativeDateControls } = await page.evaluate(() => {
+        const isVisible = element => {
+          if (!element.getClientRects().length) return false;
+          let current = element;
+          while (current && current !== document.documentElement) {
+            const style = getComputedStyle(current);
+            const rect = current.getBoundingClientRect();
+            if (style.display === 'none' || style.visibility === 'hidden' ||
+                style.visibility === 'collapse' || Number(style.opacity) === 0 ||
+                rect.width <= 0 || rect.height <= 0) return false;
+            current = current.parentElement;
+          }
+          return true;
+        };
+        const keyFor = element => {
+          const parts = [];
+          let current = element;
+          while (current && current.parentElement) {
+            const index = Array.prototype.indexOf.call(current.parentElement.children, current) + 1;
+            parts.unshift(current.tagName.toLowerCase() + ':nth-child(' + index + ')');
+            current = current.parentElement;
+          }
+          return parts.join('>');
+        };
+        // Chromium délègue certaines sous-parties d'un input[type=date] à son
+        // sélecteur natif hors du DOM. On contrôle séparément son focusabilité et
+        // son indicateur, sans confondre ces sous-parties système avec des arrêts DOM.
+        const nativeDateControls = Array.from(document.querySelectorAll('input[type="date"]'))
+          .filter(isVisible)
+          .map(element => {
+            element.focus({ preventScroll: true });
+            const style = getComputedStyle(element);
+            const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
+            const shadow = Boolean(style.boxShadow && style.boxShadow !== 'none' &&
+              !style.boxShadow.includes('inset'));
+            return {
+              id: element.id || '',
+              tabIndex: element.tabIndex,
+              focused: document.activeElement === element,
+              hasIndicator: Boolean(outline || shadow)
+            };
+          });
+        const allRadios = Array.from(document.querySelectorAll('input[type="radio"]'));
+        const focusableKeys = Array.from(document.body.querySelectorAll('*'))
+          .filter(element => {
+            if (element.matches('input[type="date"]') ||
+                element.tabIndex < 0 || element.matches(':disabled') ||
+                element.closest('[inert]') || !isVisible(element)) return false;
+
+            // HTML place une seule radio d'un même groupe dans l'ordre Tab :
+            // la radio cochée, ou la première activée si aucune n'est cochée.
+            // Les autres choix se parcourent avec les flèches, pas avec Tab.
+            if (element.matches('input[type="radio"]') && element.name) {
+              const group = allRadios.filter(candidate =>
+                candidate.name === element.name &&
+                candidate.form === element.form &&
+                !candidate.matches(':disabled') &&
+                !candidate.closest('[inert]') &&
+                isVisible(candidate)
+              );
+              const tabStop = group.find(candidate => candidate.checked) || group[0];
+              return element === tabStop;
+            }
+            return true;
+          })
+          .map(keyFor);
+        return { focusableKeys, nativeDateControls };
+      });
+      const invalidNativeDateControls = nativeDateControls.filter(control =>
+        control.tabIndex < 0 || !control.focused || !control.hasIndicator
+      );
+      assert.deepEqual(invalidNativeDateControls, [],
+        pageDefinition.name + ' : les champs date natifs doivent rester focusables et afficher un indicateur : ' +
+        JSON.stringify(invalidNativeDateControls));
+      const focusableCount = focusableKeys.length;
+      // Les champs natifs (notamment input[type=date]) peuvent garder le même
+      // activeElement pendant qu'une touche Tab traverse leurs sous-segments.
+      // Prévoir une marge de répétitions, sans permettre une boucle infinie.
+      const maxTabSteps = Math.min(Math.max(focusableCount * 2 + 4, 4), 240);
+
+      const readFocusStop = () => page.evaluate(() => {
+        const element = document.activeElement;
+        if (!element || element === document.body || element === document.documentElement) return null;
+        const parts = [];
+        let current = element;
+        while (current && current.parentElement) {
+          const index = Array.prototype.indexOf.call(current.parentElement.children, current) + 1;
+          parts.unshift(current.tagName.toLowerCase() + ':nth-child(' + index + ')');
+          current = current.parentElement;
+        }
+        const indicatorFor = candidate => {
+          const style = getComputedStyle(candidate);
+          const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
+          const shadow = Boolean(style.boxShadow && style.boxShadow !== 'none' &&
+            !style.boxShadow.includes('inset'));
+          return { visible: Boolean(outline || shadow), outline: style.outline, boxShadow: style.boxShadow };
+        };
+        // Certains composants placent l'indicateur sur leur enveloppe : le focus
+        // réel reste sur le champ, tandis que le contour est rendu par :focus-within.
+        let indicatorOwner = null;
+        let ancestor = element;
+        while (ancestor && ancestor !== document.body) {
+          if (ancestor === element || ancestor.matches(':focus-within')) {
+            const indicator = indicatorFor(ancestor);
+            if (indicator.visible) {
+              indicatorOwner = {
+                selector: ancestor.tagName.toLowerCase() +
+                  (ancestor.id ? '#' + ancestor.id : '') +
+                  (typeof ancestor.className === 'string' && ancestor.className.trim()
+                    ? '.' + ancestor.className.trim().split(/\s+/).slice(0, 2).join('.')
+                    : ''),
+                ...indicator
+              };
+              break;
+            }
+          }
+          ancestor = ancestor.parentElement;
+        }
+        const style = getComputedStyle(element);
+        return {
+          key: parts.join('>'),
+          selector: element.tagName.toLowerCase() +
+            (element.id ? '#' + element.id : '') +
+            (typeof element.className === 'string' && element.className.trim()
+              ? '.' + element.className.trim().split(/\s+/).slice(0, 2).join('.')
+              : ''),
+          text: String(element.innerText || element.textContent || element.getAttribute('aria-label') || '')
+            .replace(/\s+/g, ' ').trim().slice(0, 80),
+          focusVisible: element.matches(':focus-visible'),
+          focused: element.matches(':focus'),
+          nativeDateControl: element.matches('input[type="date"]'),
+          hasIndicator: Boolean(indicatorOwner),
+          indicatorOwner,
+          outline: style.outline,
+          boxShadow: style.boxShadow
+        };
+      });
+
+      const collectKeyboardTraversal = async reverse => {
+        const stops = [];
+        const seen = new Set();
+        const expected = new Set(focusableKeys);
+        const visitedExpected = new Set();
+        let consecutiveUntrackedSteps = 0;
+        for (let step = 0; step < maxTabSteps; step++) {
+          if (reverse) {
+            await page.keyboard.down('Shift');
+            try {
+              await page.keyboard.press('Tab');
+            } finally {
+              await page.keyboard.up('Shift');
+            }
+          } else {
+            await page.keyboard.press('Tab');
+          }
+          const stop = await readFocusStop();
+          if (!stop || !stop.focused) {
+            // Chromium peut exposer brièvement le focus d'un contrôle natif (notamment
+            // les sous-parties d'un input[type=date]) hors de l'arbre DOM. Ne pas
+            // interrompre le parcours au premier état non observable ; borner toutefois
+            // ces transitions pour ne pas masquer une sortie réelle de la page.
+            consecutiveUntrackedSteps += 1;
+            if (visitedExpected.size >= expected.size || consecutiveUntrackedSteps > 4) break;
+            continue;
+          }
+          consecutiveUntrackedSteps = 0;
+          if (!seen.has(stop.key)) {
+            seen.add(stop.key);
+            stops.push(stop);
+            if (expected.has(stop.key)) visitedExpected.add(stop.key);
+          } else if (visitedExpected.size >= expected.size) {
+            // Retour au premier élément après avoir visité tous les arrêts DOM attendus.
+            break;
+          }
+          if (visitedExpected.size >= expected.size) break;
+        }
+        return stops;
+      };
+
+      const keyboardOriginReady = await page.evaluate(() => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active !== document.body) active.blur();
+        // Démarrer depuis body évite que le focus natif résiduel d'un input[type=date]
+        // soit repris comme premier arrêt et que Chromium quitte ensuite la page.
+        document.body.setAttribute('tabindex', '-1');
+        document.body.focus({ preventScroll: true });
+        return document.activeElement === document.body;
+      });
+      assert.ok(keyboardOriginReady,
+        pageDefinition.name + ' : impossible de réinitialiser le focus avant le parcours Tab.');
+      const keyboardTraversal = await collectKeyboardTraversal(false);
+      await page.evaluate(() => document.body.removeAttribute('tabindex'));
+      const forwardVisited = new Set(keyboardTraversal.map(stop => stop.key));
+      const missingForwardKeys = focusableKeys.filter(key => !forwardVisited.has(key));
+
+      const reverseAnchorKey = focusableKeys[focusableKeys.length - 1] || null;
+      const reverseAnchorFocused = await page.evaluate(() => {
+        const isVisible = element => {
+          if (!element.getClientRects().length) return false;
+          let current = element;
+          while (current && current !== document.documentElement) {
+            const style = getComputedStyle(current);
+            const rect = current.getBoundingClientRect();
+            if (style.display === 'none' || style.visibility === 'hidden' ||
+                style.visibility === 'collapse' || Number(style.opacity) === 0 ||
+                rect.width <= 0 || rect.height <= 0) return false;
+            current = current.parentElement;
+          }
+          return true;
+        };
+        const focusables = Array.from(document.body.querySelectorAll('*'))
+          .filter(element => !element.matches('input[type="date"]') &&
+            element.tabIndex >= 0 && !element.matches(':disabled') &&
+            !element.closest('[inert]') && isVisible(element));
+        const target = focusables[focusables.length - 1];
+        if (target instanceof HTMLElement) target.focus({ preventScroll: true });
+        return Boolean(target && document.activeElement === target);
+      });
+      assert.ok(reverseAnchorFocused,
+        pageDefinition.name + ' : impossible de positionner le point de départ du parcours Maj+Tab.');
+
+      const reverseTraversal = await collectKeyboardTraversal(true);
+      const reverseVisited = new Set(reverseTraversal.map(stop => stop.key));
+      if (reverseAnchorKey) reverseVisited.add(reverseAnchorKey);
+      const missingReverseKeys = focusableKeys.filter(key => !reverseVisited.has(key));
+      const reverseFocus = reverseTraversal[0] || null;
+
       const metrics = await page.evaluate(() => {
         const isVisible = element => {
           if (!element || !element.getClientRects().length) return false;
@@ -3560,23 +3789,35 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           const values = [luminance(first), luminance(second)].sort((a, b) => b - a);
           return (values[0] + 0.05) / (values[1] + 0.05);
         };
-        const textCandidates = Array.from(document.querySelectorAll(
-          'h1,h2,h3,h4,h5,h6,p,label,a,button,td,th,caption,legend,.stat-value,.nav-item,.field-label'
-        )).filter(element => isVisible(element) && textOf(element) &&
-          !element.closest('svg,[aria-hidden="true"],.ic,.icon'));
+        const textCandidateSelector =
+          'h1,h2,h3,h4,h5,h6,p,label,a,button,td,th,caption,legend,span,strong,em,b,i,.stat-value,.nav-item,.field-label';
+        const textCandidates = Array.from(document.querySelectorAll(textCandidateSelector))
+          .filter(element => isVisible(element) && textOf(element) &&
+            !element.closest('svg,[aria-hidden="true"],.ic,.icon'))
+          // Contrôler le nœud qui porte réellement le texte visible. Un bouton parent
+          // peut avoir un dégradé transparent et une couleur héritée, tandis que son
+          // libellé enfant possède son propre fond opaque et sa propre couleur.
+          // Mesurer les deux transforme à tort le fond transparent du parent en noir.
+          .filter(element => !Array.from(element.querySelectorAll(textCandidateSelector))
+            .some(child => isVisible(child) && textOf(child) &&
+              !child.closest('svg,[aria-hidden="true"],.ic,.icon')));
         const contrastIssues = [];
         const unmeasurableContrast = [];
         for (const element of textCandidates) {
           const ownStyle = getComputedStyle(element);
           const foreground = parseColor(ownStyle.color);
-          if (!foreground || foreground.a < 0.95) continue;
+          if (!foreground || foreground.a <= 0) continue;
+          const fontSize = Number.parseFloat(ownStyle.fontSize) || 15;
+          const fontWeight = Number.parseInt(ownStyle.fontWeight, 10) || 400;
+          const largeText = fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
+          const required = largeText ? 3 : 4.5;
           let ancestor = element;
           let background = null;
-          let gradient = false;
+          let gradientImage = null;
           while (ancestor) {
             const style = getComputedStyle(ancestor);
             if (style.backgroundImage && style.backgroundImage !== 'none') {
-              gradient = true;
+              gradientImage = style.backgroundImage;
               break;
             }
             const color = parseColor(style.backgroundColor);
@@ -3586,20 +3827,38 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             }
             ancestor = ancestor.parentElement;
           }
-          if (gradient || element.closest(
-            '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
-          )) {
-            unmeasurableContrast.push(selectorFor(element));
+          if (gradientImage) {
+            const gradientStops = Array.from(gradientImage.matchAll(/rgba?\(([^)]+)\)/g))
+              .map(match => parseColor('rgb(' + match[1] + ')'))
+              .filter(Boolean);
+            if (!gradientStops.length) {
+              unmeasurableContrast.push(selectorFor(element));
+              continue;
+            }
+            const ratios = gradientStops.map(stop => {
+              const renderedForeground = foreground.a < 1 ? composite(foreground, stop) : foreground;
+              return contrastRatio(renderedForeground, stop);
+            });
+            const ratio = Math.min(...ratios);
+            if (ratio + 0.01 < required) {
+              contrastIssues.push({
+                selector: selectorFor(element),
+                text: textOf(element).slice(0, 80),
+                foreground: ownStyle.color,
+                background: gradientImage,
+                ratio: Number(ratio.toFixed(2)),
+                required
+              });
+            }
             continue;
           }
           if (!background) background = parseColor(getComputedStyle(document.body).backgroundColor);
-          if (!background) continue;
+          if (!background) {
+            unmeasurableContrast.push(selectorFor(element));
+            continue;
+          }
           const renderedForeground = foreground.a < 1 ? composite(foreground, background) : foreground;
           const ratio = contrastRatio(renderedForeground, background);
-          const fontSize = Number.parseFloat(ownStyle.fontSize) || 15;
-          const fontWeight = Number.parseInt(ownStyle.fontWeight, 10) || 400;
-          const largeText = fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
-          const required = largeText ? 3 : 4.5;
           if (ratio + 0.01 < required) {
             contrastIssues.push({
               selector: selectorFor(element),
@@ -3627,16 +3886,27 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
 
         const gradientSurfaces = Array.from(document.querySelectorAll(
           '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
-        )).map(element => ({
-          className: element.className,
-          backgroundImage: getComputedStyle(element).backgroundImage,
-          labelColor: getComputedStyle(element.querySelector('.stat-label')).color,
-          valueColor: getComputedStyle(element.querySelector('.stat-value')).color
-        }));
+        )).map(element => {
+          const backgroundImage = getComputedStyle(element).backgroundImage;
+          const stops = Array.from(backgroundImage.matchAll(/rgba?\(([^)]+)\)/g))
+            .map(match => parseColor('rgb(' + match[1] + ')'))
+            .filter(Boolean);
+          const white = { r: 1, g: 1, b: 1, a: 1 };
+          return {
+            className: element.className,
+            backgroundImage,
+            labelColor: getComputedStyle(element.querySelector('.stat-label')).color,
+            valueColor: getComputedStyle(element.querySelector('.stat-value')).color,
+            minimumWhiteContrast: stops.length
+              ? Number(Math.min(...stops.map(stop => contrastRatio(white, stop))).toFixed(2))
+              : null
+          };
+        });
 
         return {
           viewport: window.innerWidth,
           theme: document.documentElement.getAttribute('data-theme'),
+          colorScheme: getComputedStyle(document.documentElement).colorScheme,
           gradientSurfaces,
           visibleControlCount: controls.length,
           unnamedControls,
@@ -3660,6 +3930,36 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
         };
       });
 
+      assert.equal(metrics.theme, theme,
+        pageDefinition.name + ' ne conserve pas le thème ' + theme + ' dans l’audit clavier.');
+      assert.equal(metrics.colorScheme, theme,
+        pageDefinition.name + ' ne conserve pas color-scheme: ' + theme + ' dans l’audit clavier.');
+      assert.deepEqual(missingForwardKeys, [],
+        pageDefinition.name + ' : certains éléments tabulables ne sont pas atteignables avec Tab : ' +
+        JSON.stringify({
+          missing: missingForwardKeys,
+          visited: keyboardTraversal.map(stop => ({ selector: stop.selector, text: stop.text }))
+        }));
+      assert.deepEqual(missingReverseKeys, [],
+        pageDefinition.name + ' : certains éléments tabulables ne sont pas atteignables avec Maj+Tab : ' +
+        JSON.stringify({
+          missing: missingReverseKeys,
+          visited: reverseTraversal.map(stop => ({ selector: stop.selector, text: stop.text }))
+        }));
+      const hasKeyboardFocusIndicator = stop => stop.hasIndicator &&
+        (stop.focusVisible || (stop.nativeDateControl && stop.focused));
+      assert.ok(keyboardTraversal.every(hasKeyboardFocusIndicator),
+        pageDefinition.name + ' : certains arrêts Tab n’ont pas de focus visible : ' +
+        JSON.stringify(keyboardTraversal.filter(stop => !hasKeyboardFocusIndicator(stop))));
+      assert.ok(reverseTraversal.every(hasKeyboardFocusIndicator),
+        pageDefinition.name + ' : certains arrêts Maj+Tab n’ont pas de focus visible : ' +
+        JSON.stringify(reverseTraversal.filter(stop => !hasKeyboardFocusIndicator(stop))));
+      assert.ok(reverseFocus && hasKeyboardFocusIndicator(reverseFocus),
+        pageDefinition.name + ' : Maj+Tab ne produit pas un premier focus visible : ' +
+        JSON.stringify(reverseFocus));
+      assert.deepEqual(pageErrors, [],
+        pageDefinition.name + ' a généré des erreurs JavaScript pendant l’audit ' + theme + ' : ' +
+        pageErrors.join(' | '));
       assert.equal(metrics.unnamedControls.length, 0,
         pageDefinition.name + ' contient des commandes sans nom accessible : ' + JSON.stringify(metrics.unnamedControls));
       assert.equal(metrics.unnamedImages.length, 0,
@@ -3688,13 +3988,26 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             'Les libellés des cartes KPI doivent être blancs à pleine opacité.');
           assert.equal(surface.valueColor, 'rgb(255, 255, 255)',
             'Les valeurs des cartes KPI doivent être blanches.');
+          assert.ok(surface.minimumWhiteContrast !== null && surface.minimumWhiteContrast >= 4.5,
+            'Le texte blanc du dégradé ' + surface.className +
+            ' doit respecter 4,5:1 sur toutes les couleurs du dégradé : ' + surface.minimumWhiteContrast);
         }
       }
 
-      const screenshot = 'accessibilite-' + pageDefinition.name + '-1280.png';
+      metrics.focus = keyboardTraversal[0] || null;
+      metrics.keyboard = {
+        focusableCount,
+        forwardVisitedStops: keyboardTraversal.length,
+        reverseVisitedStops: reverseVisited.size,
+        forwardCoverageComplete: missingForwardKeys.length === 0,
+        reverseCoverageComplete: missingReverseKeys.length === 0,
+        reverseFocus
+      };
+      const screenshot = 'accessibilite-' + theme + '-' + pageDefinition.name + '-1280.png';
       await page.screenshot({ path: path.join(OUTPUT_DIR, screenshot), fullPage: true });
       results.push({
         page: pageDefinition.name,
+        theme,
         screenshot,
         ...metrics,
         javascriptErrors: pageErrors
@@ -3702,10 +4015,13 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
     } finally {
       await page.close();
     }
+    }
   }
 
   return {
     pageCount: pages.length,
+    themeCount: themes.length,
+    runCount: results.length,
     viewportWidth: 1280,
     pages: results,
     totals: {
@@ -3717,6 +4033,11 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
       pagesWithoutH1: results.filter(page => page.visibleH1 < 1).length,
       pagesWithMultipleH1: results.filter(page => page.visibleH1 > 1).length,
       missingKeyboardFocus: results.filter(page => !page.focus?.focusVisible || !page.focus?.hasIndicator).length,
+      incompleteKeyboardTraversal: results.filter(page =>
+        !page.keyboard?.forwardCoverageComplete ||
+        !page.keyboard?.reverseCoverageComplete ||
+        page.keyboard.reverseVisitedStops < page.keyboard.focusableCount ||
+        !page.keyboard.reverseFocus?.focusVisible || !page.keyboard.reverseFocus?.hasIndicator).length,
       contrastIssues: results.reduce((sum, page) => sum + page.contrastIssueCount, 0),
       nonSemanticActions: results.reduce((sum, page) => sum + page.nonSemanticActions.length, 0),
       javascriptErrors: results.reduce((sum, page) => sum + page.javascriptErrors.length, 0)
