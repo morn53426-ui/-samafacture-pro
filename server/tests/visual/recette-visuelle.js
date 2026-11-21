@@ -4174,6 +4174,30 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
               acceptancePaddingTop: acceptance?.paddingTop || null
             };
           })(),
+          techPrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const header = style('.sf-tech-header');
+            const meta = style('.sf-tech-meta');
+            const client = style('.sf-tech-client');
+            const tableCell = style('.sf-tech-table tbody td');
+            const totals = style('.sf-tech-totals');
+            return {
+              headerPaddingTop: header?.paddingTop || null,
+              headerPaddingBottom: header?.paddingBottom || null,
+              headerMarginBottom: header?.marginBottom || null,
+              metaMarginBottom: meta?.marginBottom || null,
+              clientPaddingTop: client?.paddingTop || null,
+              clientMarginBottom: client?.marginBottom || null,
+              tableFontSize: tableCell?.fontSize || null,
+              tableLineHeight: tableCell?.lineHeight || null,
+              tablePaddingTop: tableCell?.paddingTop || null,
+              tablePaddingBottom: tableCell?.paddingBottom || null,
+              totalsMarginTop: totals?.marginTop || null
+            };
+          })(),
           luxePrintMetrics: (() => {
             const style = selector => {
               const node = documentNode.querySelector(selector);
@@ -4253,6 +4277,21 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         } else {
           assert.equal(metrics.acceptancePaddingTop, null, 'facture/platine : aucun panneau d’acceptation de devis ne doit être rendu.');
         }
+      }
+      if (template === 'tech') {
+        const metrics = geometry.techPrintMetrics;
+        assert.ok(metrics, type + '/tech : règles de compactage A4 ciblées présentes.');
+        assert.equal(metrics.headerPaddingTop, '17px', type + '/tech : padding haut du bandeau.');
+        assert.equal(metrics.headerPaddingBottom, '16px', type + '/tech : padding bas du bandeau.');
+        assert.equal(metrics.headerMarginBottom, '14px', type + '/tech : marge après bandeau.');
+        assert.equal(metrics.metaMarginBottom, '12px', type + '/tech : marge des métadonnées.');
+        assert.equal(metrics.clientPaddingTop, '9px', type + '/tech : padding client.');
+        assert.equal(metrics.clientMarginBottom, '12px', type + '/tech : marge après client.');
+        assert.equal(metrics.tableFontSize, '12.6667px', type + '/tech : taille lisible de tableau 9.5 pt.');
+        assert.equal(metrics.tableLineHeight, '14.9333px', type + '/tech : interligne compact.');
+        assert.equal(metrics.tablePaddingTop, '2px', type + '/tech : padding vertical haut.');
+        assert.equal(metrics.tablePaddingBottom, '2px', type + '/tech : padding vertical bas.');
+        assert.equal(metrics.totalsMarginTop, '12px', type + '/tech : marge des totaux.');
       }
       if (template === 'luxe') {
         const metrics = geometry.luxePrintMetrics;
