@@ -70,6 +70,36 @@ describe('Génération PDF de facture', () => {
     assert.equal(res.body.slice(0, 5).toString('latin1'), '%PDF-');
   });
 
+  test('une facture courte tient sur une seule page A4', async () => {
+    await pool.query(
+      'UPDATE users SET facture_template = ? WHERE id = ?',
+      ['classique', userIdA]
+    );
+
+    const res = await request(app)
+      .get(`/api/factures/${factureId}/pdf`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks = [];
+        response.on('data', chunk => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      });
+
+    assert.equal(res.status, 200, res.text);
+    assert.match(res.headers['content-type'] || '', /^application\\/pdf(?:;|$)/);
+    assert.equal(res.body.subarray(0, 5).toString('latin1'), '%PDF-');
+    const pdfLatin1 = res.body.toString('latin1');
+    const mediaBox = pdfLatin1.match(/\\/MediaBox\\s*\\[\\s*0\\s+0\\s+([\\d.]+)\\s+([\\d.]+)\\s*\\]/);
+    assert.ok(mediaBox, 'La facture courte doit déclarer une zone de page PDF.');
+    assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
+      Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
+      'La facture courte doit être au format A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
+
+    const pageCount = (pdfLatin1.match(/\\/Type\\s*\\/Page\\b/g) || []).length;
+    assert.equal(pageCount, 1,
+      'Une facture courte avec une seule ligne doit tenir sur une seule page A4 (pages=' + pageCount + ').');
+  });
   test('les trente et un modèles produisent un vrai PDF A4 avec Puppeteer', async () => {
     for (const modele of TOUS_LES_MODELES_FACTURE) {
       await pool.query(
