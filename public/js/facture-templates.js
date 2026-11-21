@@ -762,7 +762,7 @@ function createFactureTemplates(helpers) {
   // évidence — modèle "exclusif" réservé au plan Entreprise (voir plans.js ENTERPRISE_TEMPLATES) ---
   function renderPlatine(user, facture, lignes, isDevis, qrCode, personnalisation) {
     return `
-      <div style="text-align:center; padding-bottom:24px; margin-bottom:28px; border-bottom:1px solid #C7CBD6;">
+      <div class="sf-platine-header" style="text-align:center; padding-bottom:24px; margin-bottom:28px; border-bottom:1px solid #C7CBD6;">
         ${user.entreprise_logo ? `<div style="margin-bottom:12px;">${logoHtml(user, 72, personnalisation)}</div>` : ''}
         <div style="font-family:var(--font-display); font-weight:700; font-size:1.3rem; letter-spacing:0.03em;">${escapeHtml(user.entreprise_nom || user.nom)}</div>
         <div style="color:var(--ink-soft); font-size:0.8rem; margin-top:4px;">
@@ -773,7 +773,7 @@ function createFactureTemplates(helpers) {
         </div>
       </div>
 
-      <div class="grid grid-2" style="margin-bottom:24px;">
+      <div class="grid grid-2 sf-platine-meta" style="margin-bottom:24px;">
         <div>
           <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-soft); margin-bottom:6px;">Facturé à</div>
           ${clientBlockHtml(facture)}
@@ -790,11 +790,11 @@ function createFactureTemplates(helpers) {
         <tbody>${lignesRowsHtml(lignes)}</tbody>
       </table>
 
-      <div style="display:flex; justify-content:flex-end; margin-top:18px;">
+      <div class="sf-platine-totals" style="display:flex; justify-content:flex-end; margin-top:18px;">
         <div style="width:290px; border:1px solid var(--navy-950); border-radius:10px; padding:14px 18px;">${totalsRowsHtml(facture, 'var(--navy-950)', personnalisation)}</div>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
+      <div class="sf-platine-footer" style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
         <div style="max-width:50%; color:var(--ink-soft); font-size:0.85rem;">
           ${facture.commentaires ? `<div>${escapeHtml(facture.commentaires)}</div>` : ''}
           ${facture.mode_paiement ? `<div style="margin-top:6px;">Mode de paiement : ${escapeHtml(facture.mode_paiement)}</div>` : ''}
@@ -907,7 +907,7 @@ function createFactureTemplates(helpers) {
       if (!rendered.includes(email)) fields.push(['Email de l’entreprise', email]);
     }
     if (!fields.length) return '';
-    const variantClass = template === 'consolide' ? ' sf-doc-meta-consolide' : template === 'signature' ? ' sf-doc-meta-signature' : '';
+    const variantClass = template === 'consolide' ? ' sf-doc-meta-consolide' : template === 'signature' ? ' sf-doc-meta-signature' : template === 'platine' ? ' sf-doc-meta-platine' : '';
     return `
       <section class="sf-doc-meta${variantClass}" aria-label="Informations du document">
         ${fields.map(([label, value]) => `
@@ -970,7 +970,7 @@ function createFactureTemplates(helpers) {
       ? escapeHtml(user.entreprise_mentions_legales).replace(/\r?\n/g, '<br/>')
       : '';
 
-    const variantClass = template === 'consolide' ? ' sf-doc-extras-consolide' : template === 'signature' ? ' sf-doc-extras-signature' : '';
+    const variantClass = template === 'consolide' ? ' sf-doc-extras-consolide' : template === 'signature' ? ' sf-doc-extras-signature' : template === 'platine' ? ' sf-doc-extras-platine' : '';
     return `
       <div class="sf-doc-extras${variantClass}">
         ${!isDevis ? `
@@ -1510,11 +1510,12 @@ function createFactureTemplates(helpers) {
     // Le même tableau de lignes reçoit une classe stable pour la mise en page écran et A4.
     html = html.replace(/<table\b([^>]*)>/i, (match, attributes) => {
       const existingClass = attributes.match(/\bclass=["']([^"']*)["']/i);
+      const templateTableClass = template === 'platine' ? ' sf-platine-table' : '';
       if (existingClass) {
-        const nextClass = (existingClass[1] + ' sf-document-table').trim();
+        const nextClass = (existingClass[1] + ' sf-document-table' + templateTableClass).trim();
         return match.replace(existingClass[0], 'class="' + nextClass + '"').replace(/<table\b/i, '<table aria-label="Détail des lignes du document"');
       }
-      return '<table class="sf-document-table" aria-label="Détail des lignes du document"' + attributes + '>';
+      return '<table class="sf-document-table' + templateTableClass + '" aria-label="Détail des lignes du document"' + attributes + '>';
     });
 
     // Le même moteur sert à l'écran, à l'impression et au PDF serveur.
