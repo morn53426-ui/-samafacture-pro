@@ -7940,7 +7940,7 @@ a.btn .icon {
   .invoice-doc .sf-tech-table td {
     padding: 2px 5px !important;
     font-size: 9.5pt !important;
-    line-height: 1.18 !important;
+    line-height: 15px !important;
   }
   .invoice-doc .sf-tech-totals {
     margin-top: 12px !important;
