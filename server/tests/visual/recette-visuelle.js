@@ -4174,6 +4174,30 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
               acceptancePaddingTop: acceptance?.paddingTop || null
             };
           })(),
+          luxePrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const header = style('.sf-luxe-header');
+            const client = style('.sf-luxe-client-grid');
+            const clientPanel = style('.sf-luxe-client-grid > div:first-child');
+            const tableCell = style('.sf-luxe-table tbody td');
+            const totals = style('.sf-luxe-totals');
+            return {
+              headerPaddingTop: header?.paddingTop || null,
+              headerPaddingBottom: header?.paddingBottom || null,
+              headerMarginBottom: header?.marginBottom || null,
+              clientGap: client?.columnGap || client?.gap || null,
+              clientMarginBottom: client?.marginBottom || null,
+              clientPanelPaddingTop: clientPanel?.paddingTop || null,
+              tableFontSize: tableCell?.fontSize || null,
+              tableLineHeight: tableCell?.lineHeight || null,
+              tablePaddingTop: tableCell?.paddingTop || null,
+              tablePaddingBottom: tableCell?.paddingBottom || null,
+              totalsMarginTop: totals?.marginTop || null
+            };
+          })(),
           banners
         };
       }, { selector: bannerSelector, expectedTitles: titleLabels });
@@ -4229,6 +4253,21 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         } else {
           assert.equal(metrics.acceptancePaddingTop, null, 'facture/platine : aucun panneau d’acceptation de devis ne doit être rendu.');
         }
+      }
+      if (template === 'luxe') {
+        const metrics = geometry.luxePrintMetrics;
+        assert.ok(metrics, type + '/luxe : les règles A4 ciblées doivent être actives.');
+        assert.equal(metrics.headerPaddingTop, '20px', type + '/luxe : padding supérieur du bandeau.');
+        assert.equal(metrics.headerPaddingBottom, '18px', type + '/luxe : padding inférieur du bandeau.');
+        assert.equal(metrics.headerMarginBottom, '16px', type + '/luxe : marge après le bandeau.');
+        assert.equal(metrics.clientGap, '14px', type + '/luxe : espacement du bloc client.');
+        assert.equal(metrics.clientMarginBottom, '14px', type + '/luxe : marge après le bloc client.');
+        assert.equal(metrics.clientPanelPaddingTop, '10px', type + '/luxe : padding de la carte client.');
+        assert.equal(metrics.tableFontSize, '12px', type + '/luxe : conserver une typographie à 9 pt.');
+        assert.equal(metrics.tableLineHeight, '15px', type + '/luxe : interligne A4 compact et lisible.');
+        assert.equal(metrics.tablePaddingTop, '3px', type + '/luxe : padding supérieur compact des lignes.');
+        assert.equal(metrics.tablePaddingBottom, '3px', type + '/luxe : padding inférieur compact des lignes.');
+        assert.equal(metrics.totalsMarginTop, '14px', type + '/luxe : marge du bloc des totaux.');
       }
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
