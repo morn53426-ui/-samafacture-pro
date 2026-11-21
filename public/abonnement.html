@@ -184,7 +184,7 @@
       popular: true,
       comingSoon: true,
       features: [
-        'Tous les avantages Starter',
+        'Tous les avantages Standard',
         'Signature électronique',
         '3 modèles premium de facture',
         'Export Excel',
@@ -211,9 +211,7 @@
   function trialEndDate(value) {
     if (!value) return null;
     const text = String(value).trim();
-    const normalized = /^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(text)
-      ? text.replace(' ', 'T') + 'Z'
-      : text;
+    const normalized = text.includes(' ') ? text.replace(' ', 'T') + 'Z' : text;
     const date = new Date(normalized);
     return Number.isNaN(date.getTime()) ? null : date;
   }
