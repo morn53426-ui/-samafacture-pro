@@ -109,7 +109,7 @@
           </div>
         </td>
         <td data-label="Contact">${escapeHtml(c.telephone || c.email) || '—'}</td>
-        <td data-label="Montant dû" class="mono" style="color:${c.total_du > 0 ? 'var(--clay)' : 'var(--ink-soft)'};">${formatMontant(c.total_du)}</td>
+        <td data-label="Montant dû" class="mono" style="color:${c.total_du > 0 ? 'var(--clay-text)' : 'var(--ink-soft)'};">${formatMontant(c.total_du)}</td>
         <td data-label="Total facturé" class="mono">${formatMontant(c.total_facture)}</td>
         <td data-label="Actions" style="text-align:right;" onclick="event.stopPropagation();">
           <button class="btn btn-sm btn-outline" onclick='editClient(${c.id})'>${Icon('edit-3')} Modifier</button>
