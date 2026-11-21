@@ -4146,6 +4146,33 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
               panelPaddingTop: panel?.paddingTop || null
             };
           })(),
+          platinePrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const header = style('.sf-platine-header');
+            const meta = style('.sf-platine-meta');
+            const docMeta = style('.sf-doc-meta-platine');
+            const tableCell = style('.sf-platine-table tbody td');
+            const totals = style('.sf-platine-totals');
+            const footer = style('.sf-platine-footer');
+            const extras = style('.sf-doc-extras-platine');
+            const acceptance = style('.sf-doc-extras-platine .sf-acceptance-panel');
+            return {
+              headerPaddingBottom: header?.paddingBottom || null,
+              headerMarginBottom: header?.marginBottom || null,
+              metaMarginBottom: meta?.marginBottom || null,
+              docMetaPaddingTop: docMeta?.paddingTop || null,
+              tableFontSize: tableCell?.fontSize || null,
+              tableLineHeight: tableCell?.lineHeight || null,
+              tablePaddingTop: tableCell?.paddingTop || null,
+              totalsMarginTop: totals?.marginTop || null,
+              footerMarginTop: footer?.marginTop || null,
+              extrasMarginTop: extras?.marginTop || null,
+              acceptancePaddingTop: acceptance?.paddingTop || null
+            };
+          })(),
           banners
         };
       }, { selector: bannerSelector, expectedTitles: titleLabels });
@@ -4181,6 +4208,21 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.equal(metrics.docMetaPaddingTop, '8px', type + '/signature : padding des références communes.');
         assert.equal(metrics.extrasMarginTop, '10px', type + '/signature : marge des compléments.');
         assert.equal(metrics.panelPaddingTop, '8px', type + '/signature : padding des panneaux complémentaires.');
+      }
+      if (template === 'platine') {
+        const metrics = geometry.platinePrintMetrics;
+        assert.ok(metrics, type + '/platine : les règles A4 ciblées doivent être actives.');
+        assert.equal(metrics.headerPaddingBottom, '12px', type + '/platine : padding inférieur du bandeau.');
+        assert.equal(metrics.headerMarginBottom, '14px', type + '/platine : marge après le bandeau.');
+        assert.equal(metrics.metaMarginBottom, '12px', type + '/platine : marge des références client.');
+        assert.equal(metrics.docMetaPaddingTop, '7px', type + '/platine : padding des références documentaires.');
+        assert.equal(metrics.tableFontSize, '12px', type + '/platine : conserver une typographie de tableau à 9 pt.');
+        assert.equal(metrics.tableLineHeight, '15px', type + '/platine : interligne A4 compact mais lisible.');
+        assert.equal(metrics.tablePaddingTop, '4px', type + '/platine : padding vertical compact des lignes.');
+        assert.equal(metrics.totalsMarginTop, '12px', type + '/platine : marge du bloc des totaux.');
+        assert.equal(metrics.footerMarginTop, '16px', type + '/platine : marge du bloc QR et signature.');
+        assert.equal(metrics.extrasMarginTop, '10px', type + '/platine : marge des compléments.');
+        assert.equal(metrics.acceptancePaddingTop, '8px', type + '/platine : panneau d’acceptation compact.');
       }
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
