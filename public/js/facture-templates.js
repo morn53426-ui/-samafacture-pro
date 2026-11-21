@@ -1186,7 +1186,7 @@ function createFactureTemplates(helpers) {
 
   function renderLuxe(user, facture, lignes, isDevis, qrCode, personnalisation) {
     return [
-      '<div style="margin:-40px -40px 26px;padding:28px 40px 25px;background:#252321;color:#F9F5ED;border-bottom:3px solid #B99A62;">',
+      '<div class="sf-luxe-header" style="margin:-40px -40px 26px;padding:28px 40px 25px;background:#252321;color:#F9F5ED;border-bottom:3px solid #B99A62;">',
         '<div style="display:flex;justify-content:space-between;align-items:center;gap:18px;">',
           '<div><div style="color:#C9AE7B;font-size:.62rem;font-weight:800;letter-spacing:.24em;">COLLECTION LUXE</div>' +
             '<div style="margin-top:9px;font-family:Georgia,serif;font-size:1.42rem;font-weight:700;letter-spacing:.01em;">' + escapeHtml(user.entreprise_nom || user.nom) + '</div>' +
@@ -1197,14 +1197,14 @@ function createFactureTemplates(helpers) {
           '<div style="color:#D8BF8A;font-family:Georgia,serif;font-size:1.18rem;letter-spacing:.12em;">' + (isDevis ? 'PROPOSITION' : 'FACTURE') + '</div>' +
           '<div style="color:#F9F5ED;font-size:.78rem;font-weight:700;">N° ' + escapeHtml(facture.numero) + '</div></div>',
       '</div>',
-      '<div style="display:grid;grid-template-columns:1.15fr .85fr;gap:20px;margin-bottom:25px;">',
+      '<div class="sf-luxe-client-grid" style="display:grid;grid-template-columns:1.15fr .85fr;gap:20px;margin-bottom:25px;">',
         '<div style="padding:14px 16px;border:1px solid #E6DDCC;background:#FCFAF6;"><div style="color:#A18453;font-size:.63rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;margin-bottom:8px;">Client</div>' + clientBlockHtml(facture) + '</div>',
         '<div style="padding:13px 15px;background:#F5F1E9;color:#5E5649;font-size:.78rem;line-height:1.95;">' +
           '<div><span style="color:#96815F;">Date d’émission :</span> ' + formatDate(facture.date_emission) + '</div>' +
           '<div><span style="color:#96815F;">Échéance :</span> ' + formatDate(facture.date_echeance) + '</div><div style="margin-top:4px;">' + statutBadge(facture.statut) + '</div></div>',
       '</div>',
       '<table><thead><tr><th style="background:#3B3934;color:#F9F5ED;">Désignation</th><th style="background:#3B3934;color:#F9F5ED;">Qté</th><th style="background:#3B3934;color:#F9F5ED;">Prix U.</th><th style="background:#3B3934;color:#F9F5ED;">TVA</th><th style="background:#3B3934;color:#F9F5ED;text-align:right;">Total</th></tr></thead><tbody>' + lignesRowsHtml(lignes) + '</tbody></table>',
-      '<div style="display:flex;justify-content:flex-end;margin-top:22px;"><div style="width:300px;padding:15px 18px;border:1px solid #D8C59F;border-top:3px solid #B99A62;background:#FCFAF6;">' + totalsRowsHtml(facture,'#3B3934',personnalisation) + '</div></div>',
+      '<div class="sf-luxe-totals" style="display:flex;justify-content:flex-end;margin-top:22px;"><div style="width:300px;padding:15px 18px;border:1px solid #D8C59F;border-top:3px solid #B99A62;background:#FCFAF6;">' + totalsRowsHtml(facture,'#3B3934',personnalisation) + '</div></div>',
       footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)
     ].join('');
   }
@@ -1510,7 +1510,7 @@ function createFactureTemplates(helpers) {
     // Le même tableau de lignes reçoit une classe stable pour la mise en page écran et A4.
     html = html.replace(/<table\b([^>]*)>/i, (match, attributes) => {
       const existingClass = attributes.match(/\bclass=["']([^"']*)["']/i);
-      const templateTableClass = template === 'platine' ? ' sf-platine-table' : '';
+      const templateTableClass = template === 'platine' ? ' sf-platine-table' : (template === 'luxe' ? ' sf-luxe-table' : '');
       if (existingClass) {
         const nextClass = (existingClass[1] + ' sf-document-table' + templateTableClass).trim();
         return match.replace(existingClass[0], 'class="' + nextClass + '"').replace(/<table\b/i, '<table aria-label="Détail des lignes du document"');
