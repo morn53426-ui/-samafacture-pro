@@ -3772,10 +3772,10 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       taxTotalAmount: document.querySelector('.invoice-doc .sf-doc-tax-total strong')?.textContent || '',
       validityLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Validité du devis'),
       dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance'),
-      continuationHeaderDisplay: getComputedStyle(document.querySelector('.sf-print-continuation-header')).display
+      pageIdentityRulePresent: Boolean(document.getElementById('sf-print-page-identity')?.sheet)
     }));
-    assert.equal(screenMetrics.continuationHeaderDisplay, 'none',
-      type + ' : l’identité répétée ne doit pas modifier l’aperçu écran.');
+    assert.equal(screenMetrics.pageIdentityRulePresent, true,
+      type + ' : les règles d’identification des marges A4 doivent être préparées.');
     assert.equal(screenMetrics.title, type === 'devis' ? 'Devis — Sunupilot' : 'Facture — Sunupilot',
       type + ' : le titre du document et les métadonnées PDF doivent identifier le bon type.');
     assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),
@@ -3821,28 +3821,19 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       pageRule: getComputedStyle(document.querySelector('.invoice-doc')).breakInside,
       overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX,
       documentFontFamily: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily,
-      continuationHeaderDisplay: getComputedStyle(document.querySelector('.sf-print-continuation-header')).display,
-      continuationHeaderPosition: getComputedStyle(document.querySelector('.sf-print-continuation-header')).position,
-      continuationCompany: document.querySelector('.sf-print-continuation-company')?.textContent.trim() || '',
-      continuationReference: document.querySelector('.sf-print-continuation-reference')?.textContent.trim() || '',
-      continuationHeaderBounds: (() => {
-        const header = document.querySelector('.sf-print-continuation-header');
-        if (!header) return null;
-        const rect = header.getBoundingClientRect();
-        return { left: Number(rect.left.toFixed(2)), right: Number(rect.right.toFixed(2)),
-          top: Number(rect.top.toFixed(2)), width: Number(rect.width.toFixed(2)),
-          height: Number(rect.height.toFixed(2)) };
-      })()
+      pageIdentityRuleText: Array.from(
+        document.getElementById('sf-print-page-identity')?.sheet?.cssRules || []
+      ).map(rule => rule.cssText).join('\\n')
     }));
-    assert.equal(printMetrics.continuationHeaderDisplay, 'flex',
-      type + ' : l’identité doit être visible pendant l’impression.');
-    assert.equal(printMetrics.continuationHeaderPosition, 'fixed',
-      type + ' : l’identité doit être répétable par le navigateur sur chaque page.');
-    assert.equal(printMetrics.continuationCompany, 'SamaFacture — Société de test',
-      type + ' : le nom de l’entreprise doit être présent dans la ligne répétée.');
-    assert.match(printMetrics.continuationReference,
-      type === 'devis' ? /^DEVIS · DV-2026-0988$/ : /^FACTURE · FAC-2026-0987$/,
-      type + ' : le type et le numéro doivent identifier le document.');
+    assert.match(printMetrics.pageIdentityRuleText, /@top-left/,
+      type + ' : Chromium doit accepter la zone de marge supérieure gauche.');
+    assert.match(printMetrics.pageIdentityRuleText, /@top-right/,
+      type + ' : Chromium doit accepter la zone de marge supérieure droite.');
+    assert.ok(printMetrics.pageIdentityRuleText.includes('"SamaFacture — Société de test"'),
+      type + ' : le nom de l’entreprise doit être présent dans la marge répétée.');
+    assert.ok(printMetrics.pageIdentityRuleText.includes(
+      type === 'devis' ? '"DEVIS · DV-2026-0988"' : '"FACTURE · FAC-2026-0987"'
+    ), type + ' : le type et le numéro doivent être présents dans la marge répétée.');
     assert.equal(printMetrics.toolbarDisplay, 'none', type + ' : la barre d’outils ne doit jamais être imprimée.');
     assert.equal(printMetrics.themeToggleDisplay, 'none', type + ' : le sélecteur de thème ne doit jamais recouvrir le document imprimé.');
     assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
