@@ -3882,9 +3882,15 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
             width: Number(rect.width.toFixed(2))
           };
         });
-        const titleCandidates = Array.from(documentNode.querySelectorAll('*')).filter(element =>
-          element.children.length === 0 && (element.textContent || '').trim().toUpperCase().startsWith(expectedTitle)
-        );
+        const titleCandidates = Array.from(documentNode.querySelectorAll('*')).filter(element => {
+          if (element.children.length !== 0) return false;
+          // Certains modèles décorent le titre avec un emoji (ex. « ✨ DEVIS »).
+          // La décoration ne doit pas faire sélectionner un autre mot « DEVIS »
+          // présent dans les mentions ou le pied de page du document.
+          const text = (element.textContent || '').trim().normalize('NFKD')
+            .replace(/^[^\\p{L}\\p{N}]+/u, '').trim().toUpperCase();
+          return text.startsWith(expectedTitle);
+        });
         titleCandidates.sort((a, b) =>
           Number.parseFloat(getComputedStyle(b).fontSize) - Number.parseFloat(getComputedStyle(a).fontSize)
         );
@@ -3894,6 +3900,16 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
           documentFound: true,
           documentWidth: Number(bounds.width.toFixed(2)),
           titlePresent: (documentNode.innerText || '').toUpperCase().includes(expectedTitle),
+          titleCandidates: titleCandidates.slice(0, 5).map(element => {
+            const rect = element.getBoundingClientRect();
+            return {
+              text: (element.textContent || '').trim().slice(0, 80),
+              fontSize: getComputedStyle(element).fontSize,
+              left: Number(rect.left.toFixed(2)),
+              right: Number(rect.right.toFixed(2)),
+              top: Number(rect.top.toFixed(2))
+            };
+          }),
           titleBounds: titleRect ? {
             leftOverflow: Number((bounds.left - titleRect.left).toFixed(2)),
             rightOverflow: Number((titleRect.right - bounds.right).toFixed(2)),
