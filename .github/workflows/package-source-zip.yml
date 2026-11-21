@@ -2,7 +2,7 @@ name: Package complete source ZIP
 
 on:
   pull_request:
-    branches: [main, feat/enterprise-multi-company-foundation-20261116, 'fix/invoice-pdf-continuation-identity-20261121']
+    branches: [main, feat/enterprise-multi-company-foundation-20261116, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121']
     types: [opened, synchronize, reopened]
 
 permissions:
