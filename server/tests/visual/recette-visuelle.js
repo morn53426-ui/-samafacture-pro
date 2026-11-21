@@ -315,7 +315,7 @@ function fixtureFor(pathname, fixtures) {
   };
   if (/^\/api\/factures\/(987|988)$/.test(pathname)) {
     const isQuote = pathname.endsWith('/988');
-    const lineCount = isQuote ? 28 : 8;
+    const lineCount = isQuote || DATASET === 'worst' ? 28 : 8;
     const lignes = Array.from({ length: lineCount }, (_, index) => ({
       designation: makeLong(
         (isQuote ? 'Lot de prestation et fournitures prévu au devis — ' : 'Prestation facturée — ') +
@@ -410,6 +410,8 @@ function fixtureFor(pathname, fixtures) {
   if (pathname === '/api/auth/me') return {
     user: {
       id: 1, nom: 'Compte de recette SamaFacture', entreprise_nom: 'SamaFacture — Société de test',
+      entreprise_logo: DOCUMENT_IMAGE_FIXTURES.logo,
+      signature_default: DOCUMENT_IMAGE_FIXTURES.signature,
       entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro',
       locale: 'fr-FR', format_date: 'yyyy-MM-dd', fuseau_horaire: 'Africa/Dakar'
     }
@@ -3918,7 +3920,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       type + ' : la date d’échéance/validité doit utiliser le format du profil récupéré par /auth/me.');
     assert.equal(screenMetrics.title, type === 'devis' ? 'Devis — Sunupilot' : 'Facture — Sunupilot',
       type + ' : le titre du document et les métadonnées PDF doivent identifier le bon type.');
-    assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),
+    assert.ok(screenMetrics.lineCount >= (DATASET === 'worst' || type === 'devis' ? 28 : 8),
       type + ' : toutes les lignes doivent être rendues avant l’impression : ' + JSON.stringify(screenMetrics));
     assert.ok(screenMetrics.documentWidth <= screenMetrics.viewportWidth + 1,
       type + ' : l’aperçu écran ne doit pas élargir la page : ' + JSON.stringify(screenMetrics));
@@ -4000,9 +4002,10 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     const pdfSource = pdfBuffer.toString('latin1');
     const pages = (pdfSource.match(/\/Type\s*\/Page\b/g) || []).length;
     assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
-    if (type === 'devis') {
-      assert.ok(pages >= 2, 'Le devis long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
-      assert.ok(pages <= 3, 'Le devis long ne doit pas créer une quatrième page quasi vide. Pages détectées : ' + pages);
+    const documentDoitEtreMultiPage = type === 'devis' || (type === 'facture' && DATASET === 'worst');
+    if (documentDoitEtreMultiPage) {
+      assert.ok(pages >= 2, type + ' long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
+      assert.ok(pages <= 3, type + ' long ne doit pas créer une quatrième page quasi vide. Pages détectées : ' + pages);
     }
     fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdfBuffer);
     return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
@@ -4012,6 +4015,10 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     const titleLabels = type === 'devis' ? ['DEVIS', 'PROPOSITION'] : ['FACTURE'];
     const bannerSelector = '[style*="margin:-40px -40px"], [style*="margin:-8px -8px"]';
     let bannersChecked = 0;
+    let logosChecked = 0;
+    let qrCodesChecked = 0;
+    let signaturesChecked = 0;
+    let imagesChecked = 0;
     const templatesChecked = [];
 
     for (const template of DOCUMENT_TEMPLATES) {
@@ -4064,6 +4071,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         return {
           documentFound: true,
           documentWidth: Number(bounds.width.toFixed(2)),
+          lineCount: documentNode.querySelectorAll('.sf-document-table tbody tr').length,
           titlePresent: titleCandidates.length > 0,
           titleCandidates: titleCandidates.slice(0, 5).map(element => {
             const rect = element.getBoundingClientRect();
@@ -4086,6 +4094,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
 
       assert.equal(geometry.documentFound, true, type + '/' + template + ' : document introuvable.');
       assert.ok(geometry.documentWidth > 0, type + '/' + template + ' : largeur imprimée nulle.');
+      assert.ok(geometry.lineCount >= 28,
+        type + '/' + template + ' : les 28 lignes longues doivent être rendues avant impression (lignes=' + geometry.lineCount + ').');
       assert.equal(geometry.titlePresent, true, type + '/' + template + ' : titre principal (' + titleLabels.join(' / ') + ') absent du bandeau.');
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
@@ -4097,11 +4107,82 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.ok(banner.leftOverflow <= 0.5 && banner.rightOverflow <= 0.5 && banner.topOverflow <= 0.5,
           type + '/' + template + ' : bandeau hors de la zone imprimable : ' + JSON.stringify(banner));
       }
+      // Charger et mesurer les images embarquées (logo, QR code, signature).
+      // Les sources sont des PNG data: locaux : aucune dépendance réseau.
+      const imageMetrics = await page.evaluate(async () => {
+        const nodes = Array.from(document.querySelectorAll('.invoice-doc img'));
+        const images = await Promise.all(nodes.map(async image => {
+          if (typeof image.decode === 'function') {
+            try { await image.decode(); } catch (_) { /* l'assertion signale l'image invalide */ }
+          }
+          const rect = image.getBoundingClientRect();
+          return {
+            alt: image.alt || '',
+            complete: image.complete,
+            naturalWidth: image.naturalWidth,
+            naturalHeight: image.naturalHeight,
+            width: Number(rect.width.toFixed(2)),
+            height: Number(rect.height.toFixed(2))
+          };
+        }));
+        return {
+          images,
+          logos: images.filter(image => image.alt === 'Logo').length,
+          qrCodes: images.filter(image => image.alt === 'QR code de vérification').length,
+          signatures: images.filter(image => image.alt === 'Signature').length
+        };
+      });
+      assert.ok(imageMetrics.logos > 0,
+        type + '/' + template + ' : le logo réel de test doit être rendu.');
+      assert.ok(imageMetrics.images.every(image => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0 && image.width > 0 && image.height > 0),
+        type + '/' + template + ' : chaque logo, QR code ou signature présent doit être chargé et visible : ' + JSON.stringify(imageMetrics.images));
+      logosChecked += imageMetrics.logos;
+      qrCodesChecked += imageMetrics.qrCodes;
+      signaturesChecked += imageMetrics.signatures;
+      imagesChecked += imageMetrics.images.length;
+
+      // Générer le PDF réel de chaque modèle (pas seulement mesurer le DOM écran).
+      // La fixture worst contient 28 lignes longues pour les factures et les devis.
+      const pdf = Buffer.from(await page.pdf({
+        format: 'A4',
+        preferCSSPageSize: true,
+        printBackground: true,
+        scale: 1
+      }));
+      assert.equal(pdf.subarray(0, 5).toString('latin1'), '%PDF-',
+        type + '/' + template + ' : la génération PDF doit produire un vrai fichier.');
+      assert.ok(pdf.length > 5000,
+        type + '/' + template + ' : le PDF doit contenir le document complet.');
+      const pdfPages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
+      assert.ok(pdfPages >= 2,
+        type + '/' + template + ' : 28 lignes doivent occuper plusieurs pages A4 (pages=' + pdfPages + ').');
+      assert.ok(pdfPages <= 3,
+        type + '/' + template + ' : la pagination longue ne doit pas créer plus de trois pages (pages=' + pdfPages + ').');
+
       bannersChecked += geometry.banners.length;
-      templatesChecked.push({ template, banners: geometry.banners.length });
+      templatesChecked.push({
+        template,
+        banners: geometry.banners.length,
+        lineCount: geometry.lineCount,
+        logoImages: imageMetrics.logos,
+        qrCodes: imageMetrics.qrCodes,
+        signatureImages: imageMetrics.signatures,
+        imagesLoaded: imageMetrics.images.length,
+        pdfBytes: pdf.length,
+        pdfPages
+      });
     }
     assert.ok(bannersChecked > 0, type + ' : la recette doit avoir rencontré et mesuré les bandeaux historiques à marges négatives.');
-    return { templateCount: templatesChecked.length, bannersChecked, templates: templatesChecked };
+    assert.ok(logosChecked >= DOCUMENT_TEMPLATES.length,
+      type + ' : le logo doit être chargé sur chacun des modèles.');
+    assert.ok(qrCodesChecked > 0, type + ' : au moins un modèle doit charger et afficher le QR code.');
+    assert.ok(signaturesChecked > 0, type + ' : au moins un modèle doit charger et afficher la signature.');
+    return {
+      templateCount: templatesChecked.length,
+      bannersChecked,
+      images: { logosChecked, qrCodesChecked, signaturesChecked, imagesChecked },
+      templates: templatesChecked
+    };
   }
 
   const invoicePdf = await verifyDocumentPdf(987, 'facture');
