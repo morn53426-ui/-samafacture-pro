@@ -1155,9 +1155,6 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
   .invoice-doc.tpl-executive .sf-sign-field {
     gap: 10px !important;
   }
-  .invoice-doc.tpl-executive .sf-sign-line {
-    height: 18px !important;
-  }
 }
 
 @media (max-width: 640px) {
