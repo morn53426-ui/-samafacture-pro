@@ -3365,10 +3365,29 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
               hasIndicator: Boolean(outline || shadow)
             };
           });
+        const allRadios = Array.from(document.querySelectorAll('input[type="radio"]'));
         const focusableKeys = Array.from(document.body.querySelectorAll('*'))
-          .filter(element => !element.matches('input[type="date"]') &&
-            element.tabIndex >= 0 && !element.matches(':disabled') &&
-            !element.closest('[inert]') && isVisible(element))
+          .filter(element => {
+            if (element.matches('input[type="date"]') ||
+                element.tabIndex < 0 || element.matches(':disabled') ||
+                element.closest('[inert]') || !isVisible(element)) return false;
+
+            // HTML place une seule radio d'un même groupe dans l'ordre Tab :
+            // la radio cochée, ou la première activée si aucune n'est cochée.
+            // Les autres choix se parcourent avec les flèches, pas avec Tab.
+            if (element.matches('input[type="radio"]') && element.name) {
+              const group = allRadios.filter(candidate =>
+                candidate.name === element.name &&
+                candidate.form === element.form &&
+                !candidate.matches(':disabled') &&
+                !candidate.closest('[inert]') &&
+                isVisible(candidate)
+              );
+              const tabStop = group.find(candidate => candidate.checked) || group[0];
+              return element === tabStop;
+            }
+            return true;
+          })
           .map(keyFor);
         return { focusableKeys, nativeDateControls };
       });
