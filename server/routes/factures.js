@@ -14,6 +14,7 @@ const { genererPdfFacture } = require('../utils/pdf');
 const { notifierUtilisateur } = require('../realtime');
 const { enqueuePdfJob, getPdfJob, getPdfPath } = require('../pdf-queue');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
+const { recordInvoiceAccountingTransition } = require('../services/accounting-invoice-lifecycle');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -737,10 +738,25 @@ router.put('/:id/statut', async (req, res, next) => {
       [statut, existing.id, req.tenantId]
     );
 
+    let accountingTransition = null;
     if (existing.type === 'facture' && existing.statut !== 'annulee' && statut === 'annulee') {
       await ajusterStockFacture(conn, existing.id, req.tenantId, +1, existing.entrepot_id);
+      accountingTransition = 'annulation';
     } else if (existing.type === 'facture' && existing.statut === 'annulee' && statut !== 'annulee') {
       await ajusterStockFacture(conn, existing.id, req.tenantId, -1, existing.entrepot_id);
+      accountingTransition = 'reactivation';
+    }
+
+    // Une facture déjà comptabilisée est contre-passée dans la même transaction que
+    // son changement de statut et la restitution/redéduction du stock. Les devis et les
+    // factures jamais comptabilisées ne créent aucune écriture comptable automatique.
+    if (accountingTransition) {
+      await recordInvoiceAccountingTransition(conn, {
+        userId: req.tenantId,
+        actorUserId: req.actorId || req.user?.id || req.tenantId,
+        invoice: existing,
+        transition: accountingTransition
+      });
     }
 
     await conn.commit();
