@@ -79,3 +79,11 @@ Toutes les coordonnées, références et valeurs sont fictives. La présence d'u
 ## Nettoyage après l'enregistrement
 
 La base `samafacture_demo` est indépendante. Après validation des captures, arrête le serveur local. Tu peux conserver cette base pour de futurs tournages ou la supprimer manuellement via phpMyAdmin uniquement après avoir vérifié deux fois que la base sélectionnée est bien `samafacture_demo`. Ne supprime jamais la base `samafacture` ou une base de production.
+
+## Recette responsive déjà exécutée dans GitHub Actions
+
+Sur le commit vidéo précédent, la recette visuelle CI a généré 147 vues de 21 pages sur sept largeurs : 320, 360, 390, 768, 1024, 1440 et 1920 pixels. Le rapport `rapport-recette-visuelle.json` indique zéro débordement horizontal sur ces 147 vues.
+
+Les captures de ce rapport utilisent le jeu de données de stress `worst` (valeurs volontairement extrêmes) : elles servent à vérifier le responsive et ne doivent pas être utilisées dans le montage publicitaire.
+
+Le script de création des données de démonstration est également couvert par `server/tests/video-demo-seed.test.js`, qui vérifie la base dédiée, le jeton de confirmation, l'absence de requêtes destructrices, le caractère fictif des données et la syntaxe JavaScript.
