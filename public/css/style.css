@@ -1110,6 +1110,18 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
     -webkit-overflow-scrolling: touch;
   }
   .invoice-doc .head { flex-direction: column; gap: 16px; }
+  /* Le cachet circulaire est transformé en rotation : le pied de page doit
+     pouvoir passer sur deux lignes pour ne pas le rogner sur les petits écrans. */
+  .invoice-doc .sf-doc-footer {
+    flex-wrap: wrap;
+    row-gap: 16px;
+  }
+  .invoice-doc .sf-doc-footer > :last-child {
+    margin-left: auto;
+    max-width: 100%;
+    padding-right: 8px;
+    box-sizing: border-box;
+  }
   .invoice-doc table { min-width: 480px; }
 }
 
