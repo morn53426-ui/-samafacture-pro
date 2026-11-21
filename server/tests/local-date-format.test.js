@@ -67,8 +67,10 @@ test('un MySQL DATETIME UTC reste converti vers le fuseau du compte', () => {
 });
 
 test('le PDF utilise le profil API pour les dates et montants même sans sf_user local', () => {
-  const { Api, formatDate, formatMontant } = loadFormatDate(null);
-  assert.equal(Api.currentUser(), null, 'Le scénario headless ne fournit pas sf_user.');
+  const context = loadFormatDate(null);
+  const { formatDate, formatMontant } = context;
+  assert.equal(vm.runInNewContext('Api.currentUser()', context), null,
+    'Le scénario headless ne fournit pas sf_user.');
 
   const profil = {
     locale: 'en-US',
