@@ -4094,6 +4094,32 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
             rightOverflow: Number((titleRect.right - bounds.right).toFixed(2)),
             topOverflow: Number((bounds.top - titleRect.top).toFixed(2))
           } : null,
+          consolidePrintMetrics: (() => {
+            const header = documentNode.querySelector('.sf-consolide-header');
+            if (!header) return null;
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const headerStyle = getComputedStyle(header);
+            const metaStyle = style('.sf-consolide-meta');
+            const clientStyle = style('.sf-consolide-client');
+            const docMetaStyle = style('.sf-doc-meta-consolide');
+            const totalsStyle = style('.sf-consolide-totals');
+            const footerStyle = style('.sf-consolide-footer');
+            const extrasStyle = style('.sf-doc-extras-consolide');
+            return {
+              headerPaddingTop: headerStyle.paddingTop,
+              headerMarginBottom: headerStyle.marginBottom,
+              metaMarginBottom: metaStyle?.marginBottom || null,
+              clientMarginBottom: clientStyle?.marginBottom || null,
+              docMetaPaddingTop: docMetaStyle?.paddingTop || null,
+              totalsMarginTop: totalsStyle?.marginTop || null,
+              footerMarginTop: footerStyle?.marginTop || null,
+              extrasMarginTop: extrasStyle?.marginTop || null,
+              extrasGap: extrasStyle?.rowGap || extrasStyle?.gap || null
+            };
+          })(),
           banners
         };
       }, { selector: bannerSelector, expectedTitles: titleLabels });
@@ -4103,6 +4129,19 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       assert.ok(geometry.lineCount >= 28,
         type + '/' + template + ' : les 28 lignes longues doivent être rendues avant impression (lignes=' + geometry.lineCount + ').');
       assert.equal(geometry.titlePresent, true, type + '/' + template + ' : titre principal (' + titleLabels.join(' / ') + ') absent du bandeau.');
+      if (template === 'consolide') {
+        const metrics = geometry.consolidePrintMetrics;
+        assert.ok(metrics, type + '/consolide : les règles d’impression compactes doivent être actives.');
+        assert.equal(metrics.headerPaddingTop, '17px', type + '/consolide : padding du bandeau imprimé.');
+        assert.equal(metrics.headerMarginBottom, '15px', type + '/consolide : marge après le bandeau imprimé.');
+        assert.equal(metrics.metaMarginBottom, '12px', type + '/consolide : marge des cartes de métadonnées.');
+        assert.equal(metrics.clientMarginBottom, '12px', type + '/consolide : marge du bloc client.');
+        assert.equal(metrics.docMetaPaddingTop, '8px', type + '/consolide : padding des références du document.');
+        assert.equal(metrics.totalsMarginTop, '12px', type + '/consolide : marge du bloc des totaux.');
+        assert.equal(metrics.footerMarginTop, '20px', type + '/consolide : marge du pied de page.');
+        assert.equal(metrics.extrasMarginTop, '10px', type + '/consolide : marge des compléments.');
+        assert.equal(metrics.extrasGap, '6px', type + '/consolide : espacement des compléments.');
+      }
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
           type + '/' + template + ' : titre principal hors de la zone du document : ' + JSON.stringify({ bounds: geometry.titleBounds, candidates: geometry.titleCandidates }));

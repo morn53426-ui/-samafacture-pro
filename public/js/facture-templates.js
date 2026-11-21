@@ -163,9 +163,9 @@ function createFactureTemplates(helpers) {
     return paid > 0 ? 'Paiement partiel' : 'Non payée';
   }
 
-  function footerHtml(user, facture, isDevis, stampClass, qrCode, personnalisation) {
+  function footerHtml(user, facture, isDevis, stampClass, qrCode, personnalisation, extraClass = '') {
     return `
-      <div class="sf-doc-footer" style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
+      <div class="sf-doc-footer${extraClass ? ' ' + extraClass : ''}" style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:40px; gap:16px;">
         <div style="max-width:55%; color:var(--ink-soft); font-size:0.85rem;">
           ${facture.commentaires ? `<div>${escapeHtml(facture.commentaires)}</div>` : ''}
           ${facture.mode_paiement ? `<div style="margin-top:6px;">Mode de paiement : ${escapeHtml(facture.mode_paiement)}</div>` : ''}
@@ -886,7 +886,7 @@ function createFactureTemplates(helpers) {
     `;
   }
 
-  function documentMetaHtml(facture, isDevis, includeDates = false, user = null, renderedHtml = '') {
+  function documentMetaHtml(facture, isDevis, includeDates = false, user = null, renderedHtml = '', template = '') {
     const fields = [];
     if (facture.objet) fields.push(['Objet', escapeHtml(facture.objet)]);
     if (facture.reference_externe) fields.push(['Référence client / commande', escapeHtml(facture.reference_externe)]);
@@ -907,8 +907,9 @@ function createFactureTemplates(helpers) {
       if (!rendered.includes(email)) fields.push(['Email de l’entreprise', email]);
     }
     if (!fields.length) return '';
+    const variantClass = template === 'consolide' ? ' sf-doc-meta-consolide' : '';
     return `
-      <section class="sf-doc-meta" aria-label="Informations du document">
+      <section class="sf-doc-meta${variantClass}" aria-label="Informations du document">
         ${fields.map(([label, value]) => `
           <div class="sf-doc-meta-item">
             <div class="sf-doc-meta-label">${label}</div>
@@ -949,7 +950,7 @@ function createFactureTemplates(helpers) {
     `;
   }
 
-  function documentSupplementHtml(user, facture, isDevis) {
+  function documentSupplementHtml(user, facture, isDevis, template = '') {
     const total = Math.max(0, Number(facture.total) || 0);
     const paid = Math.min(total, Math.max(0, Number(facture.montant_paye) || 0));
     const remaining = Math.max(0, total - paid);
@@ -969,8 +970,9 @@ function createFactureTemplates(helpers) {
       ? escapeHtml(user.entreprise_mentions_legales).replace(/\r?\n/g, '<br/>')
       : '';
 
+    const variantClass = template === 'consolide' ? ' sf-doc-extras-consolide' : '';
     return `
-      <div class="sf-doc-extras">
+      <div class="sf-doc-extras${variantClass}">
         ${!isDevis ? `
           <section class="sf-extra-panel sf-payment-summary" aria-label="Situation du règlement">
             <div class="sf-payment-metric">
@@ -1108,7 +1110,7 @@ function createFactureTemplates(helpers) {
 
   function renderConsolide(user, facture, lignes, isDevis, qrCode, personnalisation) {
     return `
-      <div style="margin:-40px -40px 27px;padding:25px 40px 23px;background:#202E43;color:#fff;">
+      <div class="sf-consolide-header" style="margin:-40px -40px 27px;padding:25px 40px 23px;background:#202E43;color:#fff;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:18px;">
           <div><div style="color:#A9B8CA;font-size:.62rem;font-weight:800;letter-spacing:.2em;">ESPACE FINANCE & GESTION</div>
             <div style="margin-top:7px;font-family:var(--font-display);font-size:1.22rem;font-weight:800;">${escapeHtml(user.entreprise_nom || user.nom)}</div>
@@ -1118,16 +1120,16 @@ function createFactureTemplates(helpers) {
             <div style="margin-top:4px;font-size:.86rem;font-weight:700;">${escapeHtml(facture.numero)}</div></div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:23px;">
+      <div class="sf-consolide-meta" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:23px;">
         <div style="padding:10px;border:1px solid #DCE2E9;background:#F7F8FA;"><div style="color:#7A8797;font-size:.59rem;font-weight:800;letter-spacing:.08em;">ÉMISSION</div><strong style="display:block;margin-top:5px;color:#24364D;font-size:.72rem;">${formatDate(facture.date_emission)}</strong></div>
         <div style="padding:10px;border:1px solid #DCE2E9;background:#F7F8FA;"><div style="color:#7A8797;font-size:.59rem;font-weight:800;letter-spacing:.08em;">${isDevis ? 'VALIDITÉ' : 'ÉCHÉANCE'}</div><strong style="display:block;margin-top:5px;color:#24364D;font-size:.72rem;">${formatDate(isDevis ? facture.date_validite : facture.date_echeance)}</strong></div>
         <div style="padding:10px;border:1px solid #DCE2E9;background:#F7F8FA;"><div style="color:#7A8797;font-size:.59rem;font-weight:800;letter-spacing:.08em;">CLIENT</div><strong style="display:block;margin-top:5px;color:#24364D;font-size:.72rem;">${escapeHtml(facture.client_nom)}</strong></div>
         <div style="padding:10px;border:1px solid #DCE2E9;background:#F7F8FA;"><div style="color:#7A8797;font-size:.59rem;font-weight:800;letter-spacing:.08em;">STATUT</div><div style="margin-top:4px;">${statutBadge(facture.statut)}</div></div>
       </div>
-      <div style="margin-bottom:22px;padding:13px 16px;border-left:3px solid #5C789A;background:#F4F6F8;"><div style="color:#6C7D91;font-size:.64rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Coordonnées du client</div>${clientBlockHtml(facture)}</div>
+      <div class="sf-consolide-client" style="margin-bottom:22px;padding:13px 16px;border-left:3px solid #5C789A;background:#F4F6F8;"><div style="color:#6C7D91;font-size:.64rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;">Coordonnées du client</div>${clientBlockHtml(facture)}</div>
       <table><thead><tr><th style="background:#202E43;color:#fff;">Désignation</th><th style="background:#202E43;color:#fff;">Qté</th><th style="background:#202E43;color:#fff;">Prix U.</th><th style="background:#202E43;color:#fff;">TVA</th><th style="background:#202E43;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
-      <div style="display:flex;justify-content:flex-end;margin-top:19px;"><div style="width:300px;padding:14px 17px;border:1px solid #C9D2DE;border-radius:7px;background:#F7F8FA;">${totalsRowsHtml(facture,'#202E43',personnalisation)}</div></div>
-      ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
+      <div class="sf-consolide-totals" style="display:flex;justify-content:flex-end;margin-top:19px;"><div style="width:300px;padding:14px 17px;border:1px solid #C9D2DE;border-radius:7px;background:#F7F8FA;">${totalsRowsHtml(facture,'#202E43',personnalisation)}</div></div>
+      ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation,'sf-consolide-footer')}
     `;
   }
 
@@ -1487,7 +1489,7 @@ function createFactureTemplates(helpers) {
 
     // Le bloc de références est partagé par les 24 modèles modèles pour conserver les mêmes
     // informations métier dans chaque facture/devis et dans le PDF Puppeteer.
-    const meta = documentMetaHtml(facture, isDevis, template === 'minimaliste' || template === 'saveurs', user, html);
+    const meta = documentMetaHtml(facture, isDevis, template === 'minimaliste' || template === 'saveurs', user, html, template);
     const firstTable = html.indexOf('<table');
     if (meta && firstTable >= 0) html = html.slice(0, firstTable) + meta + html.slice(firstTable);
 
@@ -1504,7 +1506,7 @@ function createFactureTemplates(helpers) {
       html = html.slice(0, insertAt) + taxBreakdown + html.slice(insertAt);
     }
 
-    html += documentSupplementHtml(user, facture, isDevis);
+    html += documentSupplementHtml(user, facture, isDevis, template);
     // Le même tableau de lignes reçoit une classe stable pour la mise en page écran et A4.
     html = html.replace(/<table\b([^>]*)>/i, (match, attributes) => {
       const existingClass = attributes.match(/\bclass=["']([^"']*)["']/i);
