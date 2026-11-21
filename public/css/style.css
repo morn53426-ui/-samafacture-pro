@@ -7914,3 +7914,38 @@ a.btn .icon {
     padding: 12px 14px !important;
   }
 }
+
+/* Modèle Tech — pagination A4 longue : compactage ciblé, typographie conservée. */
+@media print {
+  .invoice-doc .sf-tech-header {
+    margin-bottom: 14px !important;
+    padding-top: 17px !important;
+    padding-bottom: 16px !important;
+  }
+  .invoice-doc .sf-tech-meta {
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+  }
+  .invoice-doc .sf-tech-meta > div {
+    padding: 8px 9px !important;
+  }
+  .invoice-doc .sf-tech-client {
+    margin-bottom: 12px !important;
+    padding: 9px 12px !important;
+  }
+  .invoice-doc .sf-tech-client > div:first-child {
+    margin-bottom: 4px !important;
+  }
+  .invoice-doc .sf-tech-table th,
+  .invoice-doc .sf-tech-table td {
+    padding: 2px 5px !important;
+    font-size: 9.5pt !important;
+    line-height: 1.18 !important;
+  }
+  .invoice-doc .sf-tech-totals {
+    margin-top: 12px !important;
+  }
+  .invoice-doc .sf-tech-totals > div {
+    padding: 11px 14px !important;
+  }
+}
