@@ -257,7 +257,10 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
           facture: factureDeTest({ numero }),
           isDevis
         });
-        assert.match(css, /@top-left/,
+        assert.ok(css.includes('@top-left { content: none; border: 0; }'),
+          template + ' doit masquer le rappel compact sur la première page.');
+        assert.ok(css.includes('@top-right { content: none; border: 0; }'),
+          template + ' doit masquer la référence compacte sur la première page.');
           template + ' doit répéter le nom de l’entreprise dans la marge A4.');
         assert.match(css, /@top-right/,
           template + ' doit répéter la référence dans la marge A4.');
