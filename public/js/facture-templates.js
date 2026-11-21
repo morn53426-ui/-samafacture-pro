@@ -1026,7 +1026,7 @@ function createFactureTemplates(helpers) {
 
   function renderExecutive(user, facture, lignes, isDevis, qrCode, personnalisation) {
     return `
-      <div style="margin:-40px -40px 28px; padding:28px 40px 25px; background:#172840; border-bottom:4px solid #C8A96B; color:#fff; display:flex; justify-content:space-between; align-items:center; gap:18px;">
+      <div class="sf-executive-header" style="margin:-40px -40px 28px; padding:28px 40px 25px; background:#172840; border-bottom:4px solid #C8A96B; color:#fff; display:flex; justify-content:space-between; align-items:center; gap:18px;">
         <div style="display:flex; align-items:center; gap:15px; min-width:0;">
           ${user.entreprise_logo ? `<div style="width:58px;height:58px;display:grid;place-items:center;padding:5px;border-radius:8px;background:#fff;">${logoHtml(user,48,personnalisation)}</div>` : ''}
           <div><div style="font-family:var(--font-display);font-size:1.14rem;font-weight:800;">${escapeHtml(user.entreprise_nom || user.nom)}</div>
@@ -1037,11 +1037,11 @@ function createFactureTemplates(helpers) {
           <div style="margin-top:7px;font-family:var(--font-display);font-size:1.42rem;font-weight:800;letter-spacing:.08em;">${isDevis ? 'DEVIS' : 'FACTURE'}</div>
           <div style="margin-top:3px;color:#DCE4EF;font-size:.78rem;">N° ${escapeHtml(facture.numero)}</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-bottom:25px;">
-        <div style="padding:15px 17px;border-left:3px solid #C8A96B;background:#F6F7F9;">
+      <div class="sf-executive-meta" style="display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-bottom:25px;">
+        <div class="sf-executive-recipient" style="padding:15px 17px;border-left:3px solid #C8A96B;background:#F6F7F9;">
           <div style="color:#7A8492;font-size:.66rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin-bottom:8px;">Destinataire</div>${clientBlockHtml(facture)}
         </div>
-        <div style="padding:14px 16px;border:1px solid #E1E5EA;border-radius:8px;">
+        <div class="sf-executive-references" style="padding:14px 16px;border:1px solid #E1E5EA;border-radius:8px;">
           <div style="color:#7A8492;font-size:.66rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin-bottom:8px;">Références du document</div>
           <div style="font-size:.8rem;line-height:1.9;"><span style="color:#7A8492;">Date d’émission</span> ${formatDate(facture.date_emission)}</div>
           <div style="font-size:.8rem;line-height:1.9;"><span style="color:#7A8492;">${isDevis ? 'Validité du devis' : 'Échéance de paiement'}</span> ${formatDate(isDevis ? facture.date_validite : facture.date_echeance)}</div>
@@ -1049,7 +1049,7 @@ function createFactureTemplates(helpers) {
         </div>
       </div>
       <table><thead><tr><th style="background:#172840;color:#fff;">Désignation</th><th style="background:#172840;color:#fff;">Qté</th><th style="background:#172840;color:#fff;">Prix U.</th><th style="background:#172840;color:#fff;">TVA</th><th style="background:#172840;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
-      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:300px;padding:15px 18px;border-top:3px solid #C8A96B;background:#F5F6F8;">${totalsRowsHtml(facture,'#172840',personnalisation)}</div></div>
+      <div class="sf-executive-totals" style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:300px;padding:15px 18px;border-top:3px solid #C8A96B;background:#F5F6F8;">${totalsRowsHtml(facture,'#172840',personnalisation)}</div></div>
       ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
     `;
   }
