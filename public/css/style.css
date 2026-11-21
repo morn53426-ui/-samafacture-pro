@@ -1711,6 +1711,12 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--emerald);
   box-shadow: var(--focus-ring);
 }
+.reports-filter-card input[type="date"]:focus {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+  border-color: var(--emerald);
+  box-shadow: 0 0 0 3px var(--emerald-light);
+}
 textarea { line-height: 1.55; }
 
 /* Modales plus nettes et mieux détachées du fond. */
@@ -3431,6 +3437,11 @@ textarea { line-height: 1.55; }
   font-size: .9rem;
 }
 .app-topbar-search input:focus { border: 0; box-shadow: none !important; }
+.app-topbar-search:focus-within {
+  border-color: var(--emerald);
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+}
 .app-topbar-search button {
   display: grid; place-items: center;
   width: 34px; height: 34px; border: 0; border-radius: 9px;
