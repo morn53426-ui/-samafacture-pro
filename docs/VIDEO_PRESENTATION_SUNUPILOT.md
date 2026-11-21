@@ -33,4 +33,4 @@ La vidéo se limite aux fonctionnalités vérifiées dans le dépôt : factures 
 
 Les écrans présentés sont des compositions graphiques illustratives conçues à partir des fonctionnalités documentées ; ce ne sont pas des captures vidéo enregistrées dans une session réelle de l’application. Le MP4 est silencieux : la narration et les sous-titres sont fournis séparément pour un enregistrement voix-off professionnel.
 
-Le lecteur de la page d’accueil attend le fichier `public/videos/spark-sunupilot-presentation.mp4`. Le dépôt contient le lecteur et son mode de secours ; le MP4 doit être ajouté à ce chemin avant de pouvoir diffuser la vidéo hébergée sur le site.
+Le lecteur de la page d’accueil attend le fichier `public/videos/sunupilot-presentation.mp4`. Le dépôt contient le lecteur et son mode de secours ; le MP4 doit être ajouté à ce chemin avant de pouvoir diffuser la vidéo hébergée sur le site.
