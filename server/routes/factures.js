@@ -1233,6 +1233,7 @@ router.post('/:id/relancer', async (req, res, next) => {
  *     responses:
  *       200: { description: "Supprimé." }
  *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Suppression refusée car le document possède un historique comptable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.delete('/:id', async (req, res, next) => {
   const conn = await pool.getConnection();
@@ -1247,6 +1248,45 @@ router.delete('/:id', async (req, res, next) => {
     if (!existing) {
       await conn.rollback();
       return res.status(404).json({ error: 'Facture introuvable.' });
+    }
+
+    // Une pièce déjà inscrite au journal ne peut pas être effacée : l'écriture initiale,
+    // ses contrepassations et les règlements doivent rester traçables. Elle doit être
+    // conservée avec son statut annulé plutôt que supprimée définitivement.
+    const [accountingRows] = await conn.query(
+      `SELECT e.id
+       FROM pro_compta_ecritures e
+       WHERE e.user_id = ? AND (
+         (e.source_type = 'facture' AND e.source_id = ?)
+         OR (
+           e.source_type IN ('facture_annulation', 'facture_reactivation')
+           AND EXISTS (
+             SELECT 1 FROM pro_compta_facture_events event
+             WHERE event.user_id = e.user_id
+               AND event.facture_id = ?
+               AND event.id = e.source_id
+           )
+         )
+         OR (
+           e.source_type = 'paiement'
+           AND EXISTS (
+             SELECT 1 FROM paiements payment
+             WHERE payment.id = e.source_id
+               AND payment.user_id = e.user_id
+               AND payment.facture_id = ?
+           )
+         )
+       )
+       LIMIT 1
+       FOR UPDATE`,
+      [req.tenantId, existing.id, existing.id, existing.id]
+    );
+    if (accountingRows.length) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Cette facture possède un historique comptable. Conservez-la avec le statut Annulée pour préserver la piste d’audit.',
+        code: 'FACTURE_COMPTABILISEE'
+      });
     }
     // Restitue le stock déjà décompté avant de supprimer, sauf si la facture était déjà
     // annulée (son stock avait alors déjà été restitué par PUT /:id/statut — le restituer
