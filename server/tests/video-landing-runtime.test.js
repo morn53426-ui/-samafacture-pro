@@ -41,7 +41,7 @@ function makeElement(initialClasses = []) {
   };
 }
 
-function bootPlayer(readyState = 0) {
+function bootPlayer(readyState = 0, reduceMotion = false) {
   const video = makeElement();
   video.readyState = readyState;
   video.error = null;
@@ -74,7 +74,7 @@ function bootPlayer(readyState = 0) {
     addEventListener(name, callback) { documentListeners.set(name, callback); }
   };
   const window = {
-    matchMedia() { return { matches: true }; },
+    matchMedia() { return { matches: reduceMotion }; },
     clearInterval() { intervalCalls.cleared += 1; },
     setInterval() { intervalCalls.started += 1; return 1; }
   };
@@ -111,4 +111,10 @@ test('pauses fallback rotation while keyboard focus is inside the presentation',
 
   root.dispatch('focusout');
   assert.ok(intervalCalls.started > startedBeforeFocus, 'leaving focus should resume rotation when motion is allowed');
+});
+
+
+test('respects reduced-motion preference and does not start rotation', () => {
+  const { intervalCalls } = bootPlayer(0, true);
+  assert.equal(intervalCalls.started, 0);
 });
