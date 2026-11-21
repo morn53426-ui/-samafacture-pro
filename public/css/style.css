@@ -7584,3 +7584,8 @@ a.btn .icon {
   color: #17233B !important;
   border: 1px solid #B8872E !important;
 }
+
+
+/* Contraste WCAG AA des statuts de facture sur le fond sombre du tableau de bord. */
+:root[data-theme="dark"] .dashboard-invoice-status.is-paid { color: #9DE7BC; }
+:root[data-theme="dark"] .dashboard-invoice-status.is-overdue { color: #FF9B9B; }
