@@ -3176,18 +3176,50 @@ router.post('/accounting/post-payment/:id', async (req, res, next) => {
 });
 
 router.post('/accounting/post-expense/:id', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req);
-    const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, uid]);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    // Le verrou commun avec PUT/DELETE empêche une modification concurrente
+    // entre la lecture du mode de règlement et la création de l'écriture.
+    const [rows] = await conn.query(
+      'SELECT * FROM depenses WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, uid]
+    );
     const expense = rows[0];
-    if (!expense) return res.status(404).json({ error: 'Dépense introuvable.' });
+    if (!expense) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Dépense introuvable.' });
+    }
     const amount = Number(expense.montant);
-    const result = await postSystemEntry(uid, actor(req), 'depense', expense.id, expense.date_depense, 'Dépense ' + expense.libelle, 'CA', [
-      { code: '622', libelle: expense.categorie || expense.libelle, debit: amount, credit: 0 },
-      { code: '571', libelle: 'Règlement dépense', debit: 0, credit: amount }
-    ]);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Le montant de la dépense doit être positif avant comptabilisation.' });
+    }
+    const bank = expense.mode_reglement === 'banque';
+    const result = await postSystemEntry(
+      uid,
+      actor(req),
+      'depense',
+      expense.id,
+      expense.date_depense,
+      'Dépense ' + expense.libelle,
+      bank ? 'BQ' : 'CA',
+      [
+        { code: '622', libelle: expense.categorie || expense.libelle, debit: amount, credit: 0 },
+        { code: bank ? '521' : '571', libelle: bank ? 'Règlement bancaire dépense' : 'Règlement caisse dépense', debit: 0, credit: amount }
+      ],
+      conn
+    );
+    await conn.commit();
     res.status(result.duplicate ? 200 : 201).json(result);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 
