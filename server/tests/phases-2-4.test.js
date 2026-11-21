@@ -252,6 +252,120 @@ test('la comptabilité applique la partie double, publie la balance et empêche 
   assert.ok(entries.body.ecritures.length >= 2);
 });
 
+test('annulation et réactivation contre-passent chaque écriture facture sans doublon', async () => {
+  const invoice = await creerFacture({ amount: 5000, tax: 18 });
+  const posted = await request(app)
+    .post('/api/pro/accounting/post-invoice/' + invoice.id)
+    .set('Authorization', 'Bearer ' + token)
+    .send({});
+  assert.equal(posted.status, 201, posted.text);
+
+  const [[originalEntry]] = await pool.query(
+    "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?",
+    [userId, invoice.id]
+  );
+  assert.ok(originalEntry, 'l’écriture initiale de la facture doit exister');
+
+  const readLines = async entryId => {
+    const [rows] = await pool.query(
+      'SELECT c.code, l.debit, l.credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id WHERE l.user_id = ? AND l.ecriture_id = ? ORDER BY c.code',
+      [userId, entryId]
+    );
+    return rows.map(row => ({
+      code: row.code,
+      debit: Number(row.debit),
+      credit: Number(row.credit)
+    }));
+  };
+  const originalLines = await readLines(originalEntry.id);
+  assert.deepEqual(originalLines, [
+    { code: '411', debit: 5900, credit: 0 },
+    { code: '443', debit: 0, credit: 900 },
+    { code: '706', debit: 0, credit: 5000 }
+  ]);
+
+  const cancel = async () => request(app)
+    .put('/api/factures/' + invoice.id + '/statut')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ statut: 'annulee' });
+  const reactivate = async () => request(app)
+    .put('/api/factures/' + invoice.id + '/statut')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ statut: 'en_attente' });
+
+  const cancelled = await cancel();
+  assert.equal(cancelled.status, 200, cancelled.text);
+  assert.equal(cancelled.body.facture.statut, 'annulee');
+
+  let [events] = await pool.query(
+    'SELECT id, transition, previous_ecriture_id, ecriture_id FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ? ORDER BY id',
+    [userId, invoice.id]
+  );
+  assert.equal(events.length, 1);
+  assert.equal(events[0].transition, 'annulation');
+  const [reversalRows] = await pool.query(
+    'SELECT id, source_type, source_id, total_debit, total_credit FROM pro_compta_ecritures WHERE id = ? AND user_id = ?',
+    [events[0].ecriture_id, userId]
+  );
+  assert.equal(reversalRows.length, 1);
+  assert.equal(reversalRows[0].source_type, 'facture_annulation');
+  assert.equal(Number(reversalRows[0].source_id), Number(events[0].id));
+  assert.equal(Number(reversalRows[0].total_debit), 5900);
+  assert.equal(Number(reversalRows[0].total_credit), 5900);
+  const reversalLines = await readLines(events[0].ecriture_id);
+  assert.deepEqual(reversalLines, originalLines.map(line => ({
+    code: line.code,
+    debit: line.credit,
+    credit: line.debit
+  })), 'l’annulation doit inverser chaque ligne et chaque compte de l’écriture initiale');
+
+  const duplicateCancel = await cancel();
+  assert.equal(duplicateCancel.status, 200, duplicateCancel.text);
+  [events] = await pool.query(
+    'SELECT id FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ?',
+    [userId, invoice.id]
+  );
+  assert.equal(events.length, 1, 'répéter le statut annulé ne doit pas créer une seconde contrepassation');
+
+  const restored = await reactivate();
+  assert.equal(restored.status, 200, restored.text);
+  assert.equal(restored.body.facture.statut, 'en_attente');
+  [events] = await pool.query(
+    'SELECT id, transition, previous_ecriture_id, ecriture_id FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ? ORDER BY id',
+    [userId, invoice.id]
+  );
+  assert.equal(events.length, 2);
+  assert.equal(events[1].transition, 'reactivation');
+  assert.equal(Number(events[1].previous_ecriture_id), Number(events[0].ecriture_id));
+  assert.deepEqual(await readLines(events[1].ecriture_id), originalLines,
+    'la réactivation doit rétablir exactement les lignes de l’écriture d’origine');
+
+  const cancelledAgain = await cancel();
+  assert.equal(cancelledAgain.status, 200, cancelledAgain.text);
+  [events] = await pool.query(
+    'SELECT id, transition, previous_ecriture_id, ecriture_id FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ? ORDER BY id',
+    [userId, invoice.id]
+  );
+  assert.equal(events.length, 3, 'plusieurs cycles annulation/réactivation doivent être journalisés');
+  assert.equal(events[2].transition, 'annulation');
+  assert.notEqual(Number(events[2].ecriture_id), Number(events[0].ecriture_id));
+  assert.deepEqual(await readLines(events[2].ecriture_id), reversalLines,
+    'la seconde annulation doit de nouveau inverser la dernière écriture active');
+
+  const unpostedInvoice = await creerFacture({ amount: 1200, tax: 0 });
+  const cancelUnposted = await request(app)
+    .put('/api/factures/' + unpostedInvoice.id + '/statut')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ statut: 'annulee' });
+  assert.equal(cancelUnposted.status, 200, cancelUnposted.text);
+  const [unpostedEvents] = await pool.query(
+    'SELECT id FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ?',
+    [userId, unpostedInvoice.id]
+  );
+  assert.deepEqual(unpostedEvents, [],
+    'une facture jamais comptabilisée ne doit pas générer de ligne de contrepassation');
+});
+
 after(async () => {
   try {
     await nettoyerUtilisateur(userId);
