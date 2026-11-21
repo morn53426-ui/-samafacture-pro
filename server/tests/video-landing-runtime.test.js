@@ -67,6 +67,7 @@ function bootPlayer(readyState = 0) {
   root.querySelectorAll = selector => selector === '[data-video-scene]' ? [scene] : [];
   
   const documentListeners = new Map();
+  const intervalCalls = { started: 0, cleared: 0 };
   const document = {
     hidden: false,
     getElementById(id) { return id === 'lp-video-presentation' ? root : null; },
@@ -74,12 +75,12 @@ function bootPlayer(readyState = 0) {
   };
   const window = {
     matchMedia() { return { matches: true }; },
-    clearInterval() {},
-    setInterval() { return 1; }
+    clearInterval() { intervalCalls.cleared += 1; },
+    setInterval() { intervalCalls.started += 1; return 1; }
   };
 
   vm.runInNewContext(playerSource, { document, window, String, Array });
-  return { root, video };
+  return { root, video, intervalCalls };
 }
 
 test('reveals native controls as soon as video metadata is available', () => {
@@ -99,4 +100,15 @@ test('keeps the fallback visible when the video resource fails', () => {
 test('reveals the video immediately when metadata loaded before listener setup', () => {
   const { root } = bootPlayer(1);
   assert.equal(root.classList.contains('is-video-ready'), true);
+});
+
+
+test('pauses fallback rotation while keyboard focus is inside the presentation', () => {
+  const { root, intervalCalls } = bootPlayer(0);
+  const startedBeforeFocus = intervalCalls.started;
+  root.dispatch('focusin');
+  assert.ok(intervalCalls.cleared > 0, 'focus should stop the rotation timer');
+
+  root.dispatch('focusout');
+  assert.ok(intervalCalls.started > startedBeforeFocus, 'leaving focus should resume rotation when motion is allowed');
 });
