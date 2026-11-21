@@ -4120,6 +4120,32 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
               extrasGap: extrasStyle?.rowGap || extrasStyle?.gap || null
             };
           })(),
+          signaturePrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const header = style('.sf-signature-header');
+            const meta = style('.sf-signature-meta');
+            const references = style('.sf-signature-references');
+            const totals = style('.sf-signature-totals');
+            const footer = style('.sf-signature-footer');
+            const docMeta = style('.sf-doc-meta-signature');
+            const extras = style('.sf-doc-extras-signature');
+            const panel = style('.sf-doc-extras-signature .sf-extra-panel');
+            return {
+              headerPaddingTop: header?.paddingTop || null,
+              headerMarginBottom: header?.marginBottom || null,
+              metaGap: meta?.columnGap || meta?.gap || null,
+              metaMarginBottom: meta?.marginBottom || null,
+              referencePaddingTop: references?.paddingTop || null,
+              totalsMarginTop: totals?.marginTop || null,
+              footerMarginTop: footer?.marginTop || null,
+              docMetaPaddingTop: docMeta?.paddingTop || null,
+              extrasMarginTop: extras?.marginTop || null,
+              panelPaddingTop: panel?.paddingTop || null
+            };
+          })(),
           banners
         };
       }, { selector: bannerSelector, expectedTitles: titleLabels });
@@ -4141,6 +4167,20 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.equal(metrics.footerMarginTop, '20px', type + '/consolide : marge du pied de page.');
         assert.equal(metrics.extrasMarginTop, '10px', type + '/consolide : marge des compléments.');
         assert.equal(metrics.extrasGap, '6px', type + '/consolide : espacement des compléments.');
+      }
+      if (template === 'signature') {
+        const metrics = geometry.signaturePrintMetrics;
+        assert.ok(metrics, type + '/signature : les règles A4 ciblées doivent être actives.');
+        assert.equal(metrics.headerPaddingTop, '16px', type + '/signature : padding du bandeau imprimé.');
+        assert.equal(metrics.headerMarginBottom, '14px', type + '/signature : marge après le bandeau.');
+        assert.equal(metrics.metaGap, '12px', type + '/signature : espacement du bloc destinataire/références.');
+        assert.equal(metrics.metaMarginBottom, '12px', type + '/signature : marge du bloc de références.');
+        assert.equal(metrics.referencePaddingTop, '8px', type + '/signature : padding des références.');
+        assert.equal(metrics.totalsMarginTop, '12px', type + '/signature : marge des totaux.');
+        assert.equal(metrics.footerMarginTop, '16px', type + '/signature : marge du pied de document.');
+        assert.equal(metrics.docMetaPaddingTop, '8px', type + '/signature : padding des références communes.');
+        assert.equal(metrics.extrasMarginTop, '10px', type + '/signature : marge des compléments.');
+        assert.equal(metrics.panelPaddingTop, '8px', type + '/signature : padding des panneaux complémentaires.');
       }
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
