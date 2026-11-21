@@ -295,9 +295,17 @@ router.post('/login', loginLimiter, async (req, res, next) => {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
     }
 
-    const token = signToken(user);
+    await pool.query(
+      `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
+       WHERE id = ? AND trial_status = 'trialing'
+         AND (trial_ends_at IS NULL OR trial_ends_at <= UTC_TIMESTAMP())`,
+      [user.id]
+    );
+    const [currentRows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
+    const currentUser = currentRows[0];
+    const token = signToken(currentUser);
     definirCookieSession(res, token);
-    res.json({ token, user: sanitizeUser(user) });
+    res.json({ token, user: sanitizeUser(currentUser) });
   } catch (err) { next(err); }
 });
 
@@ -412,6 +420,15 @@ router.post('/google', async (req, res, next) => {
       [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
       user = rows[0];
     }
+
+    await pool.query(
+      `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
+       WHERE id = ? AND trial_status = 'trialing'
+         AND (trial_ends_at IS NULL OR trial_ends_at <= UTC_TIMESTAMP())`,
+      [user.id]
+    );
+    [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
+    user = rows[0];
 
     const token = signToken(user);
     definirCookieSession(res, token);
