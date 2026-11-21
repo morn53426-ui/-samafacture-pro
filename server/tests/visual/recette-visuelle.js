@@ -4222,6 +4222,27 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
               totalsMarginTop: totals?.marginTop || null
             };
           })(),
+          majestePrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const tableCell = style('.sf-document-table tbody td');
+            const footer = style('.sf-doc-footer');
+            const qr = style('.sf-doc-footer img[alt="QR code de vérification"]');
+            const stamp = style('.sf-doc-footer .stamp');
+            const extras = style('.sf-doc-extras-majeste');
+            return {
+              tableFontSize: tableCell?.fontSize || null,
+              tableLineHeight: tableCell?.lineHeight || null,
+              tablePaddingTop: tableCell?.paddingTop || null,
+              tablePaddingBottom: tableCell?.paddingBottom || null,
+              footerMarginTop: footer?.marginTop || null,
+              qrWidth: qr?.width || null,
+              stampWidth: stamp?.width || null,
+              extrasMarginTop: extras?.marginTop || null
+            };
+          })(),
           banners
         };
       }, { selector: bannerSelector, expectedTitles: titleLabels });
@@ -4292,6 +4313,18 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.equal(metrics.tablePaddingTop, '2px', type + '/tech : padding vertical haut.');
         assert.equal(metrics.tablePaddingBottom, '2px', type + '/tech : padding vertical bas.');
         assert.equal(metrics.totalsMarginTop, '12px', type + '/tech : marge des totaux.');
+      }
+      if (template === 'majeste') {
+        const metrics = geometry.majestePrintMetrics;
+        assert.ok(metrics, type + '/majeste : règles A4 compactes ciblées actives.');
+        assert.equal(metrics.tableFontSize, '12px', type + '/majeste : la police du tableau reste à 9 pt.');
+        assert.equal(metrics.tableLineHeight, '15px', type + '/majeste : interligne de tableau compact mais lisible.');
+        assert.equal(metrics.tablePaddingTop, '2px', type + '/majeste : padding supérieur des lignes.');
+        assert.equal(metrics.tablePaddingBottom, '2px', type + '/majeste : padding inférieur des lignes.');
+        assert.equal(metrics.footerMarginTop, '12px', type + '/majeste : marge compacte du pied de page.');
+        assert.equal(metrics.qrWidth, '52px', type + '/majeste : QR code compact sans perte de lisibilité.');
+        assert.equal(metrics.stampWidth, '64px', type + '/majeste : cachet compact.');
+        assert.equal(metrics.extrasMarginTop, '6px', type + '/majeste : marge des compléments.');
       }
       if (template === 'luxe') {
         const metrics = geometry.luxePrintMetrics;
