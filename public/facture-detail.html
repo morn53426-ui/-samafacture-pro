@@ -46,6 +46,26 @@
       border-radius: 0 !important;
       box-shadow: none !important;
     }
+
+    /*
+     * Les modèles historiques compensent le padding écran de 40px avec des marges
+     * négatives. Le padding du document étant supprimé en impression, conserver
+     * ces marges ferait sortir les bandeaux de la zone A4 imprimable.
+     * Les bandeaux -40px gardent leur alignement avec le corps du document grâce
+     * à la suppression de leur padding horizontal interne.
+     */
+    .invoice-doc [style*="margin:-40px -40px"] {
+      margin-top: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+    .invoice-doc [style*="margin:-8px -8px"] {
+      margin-top: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
   }
 </style>
 </head>
