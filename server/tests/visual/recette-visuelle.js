@@ -3823,15 +3823,15 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       documentFontFamily: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily,
       pageIdentityRuleText: Array.from(
         document.getElementById('sf-print-page-identity')?.sheet?.cssRules || []
-      ).map(rule => rule.cssText).join('\\n')
+      ).map(rule => rule.cssText).join('\n')
     }));
     assert.match(printMetrics.pageIdentityRuleText, /@top-left/,
       type + ' : Chromium doit accepter la zone de marge supérieure gauche.');
     assert.match(printMetrics.pageIdentityRuleText, /@top-right/,
       type + ' : Chromium doit accepter la zone de marge supérieure droite.');
-    assert.match(printMetrics.pageIdentityRuleText, /@page\\s*:first/,
+    assert.match(printMetrics.pageIdentityRuleText, /@page\s*:first/,
       type + ' : la première page doit conserver uniquement le grand bandeau du modèle.');
-    assert.match(printMetrics.pageIdentityRuleText, /content:\\s*none/,
+    assert.match(printMetrics.pageIdentityRuleText, /content:\s*none/,
       type + ' : le rappel compact doit être masqué sur la première page.');
     assert.ok(printMetrics.pageIdentityRuleText.includes('"SamaFacture — Société de test"'),
       type + ' : le nom de l’entreprise doit être présent dans la marge répétée.');
