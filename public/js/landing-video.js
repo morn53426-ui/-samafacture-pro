@@ -81,6 +81,9 @@
   document.addEventListener('visibilitychange', sync);
   root.addEventListener('mouseenter', stop);
   root.addEventListener('mouseleave', sync);
+  // Pause the rotating fallback while keyboard users interact with its controls.
+  root.addEventListener('focusin', stop);
+  root.addEventListener('focusout', sync);
   show(0);
   sync();
 })();
