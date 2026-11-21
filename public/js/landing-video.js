@@ -58,18 +58,24 @@
   if (toggle) toggle.addEventListener('click', function () { playing = !playing; sync(); });
 
   if (video) {
-    video.addEventListener('loadeddata', function () {
+    function revealVideo() {
       root.classList.add('is-video-ready');
       stop();
-    });
+    }
+
+    // loadedmetadata arrive avant la première image : les commandes natives
+    // restent accessibles sur les connexions lentes et les appareils mobiles.
+    video.addEventListener('loadedmetadata', revealVideo);
+    video.addEventListener('loadeddata', revealVideo);
+    video.addEventListener('canplay', revealVideo);
+    video.addEventListener('playing', revealVideo);
     video.addEventListener('error', function () {
       root.classList.remove('is-video-ready');
       sync();
     });
-    video.addEventListener('playing', function () {
-      root.classList.add('is-video-ready');
-      stop();
-    });
+
+    // preload="metadata" peut finir avant l'installation des écouteurs.
+    if (video.readyState >= 1 && !video.error) revealVideo();
   }
 
   document.addEventListener('visibilitychange', sync);
