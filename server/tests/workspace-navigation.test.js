@@ -108,12 +108,21 @@ describe('Navigation et structure des pages métier', () => {
     assert.ok(html.includes('href="comptabilite.html">Comptabilité OHADA</a>'));
   });
 
+  test('le plan de comptes OHADA peut être consulté et complété depuis son écran', () => {
+    const html = readPage('comptabilite.html');
+    assert.match(html, /id="accounting-accounts"/);
+    assert.match(html, /id="accounts-list"/);
+    assert.match(html, /id="account-form"/);
+    assert.match(html, /Api\.post\('\/pro\/accounting\/accounts'/);
+    assert.match(html, /plan préchargé est un socle de démarrage simplifié/i);
+  });
+
   test('Comptabilité OHADA permet de rejoindre chaque zone comptable', () => {
     const html = readPage('comptabilite.html');
     const nav = html.match(/<nav class="workspace-section-nav"[^>]*>([\s\S]*?)<\/nav>/);
     assert.ok(nav, 'La navigation rapide OHADA doit être présente.');
     const links = [...nav[1].matchAll(/href="#([^"]+)"/g)].map(match => match[1]);
-    assert.equal(links.length, 4, 'Les quatre zones comptables doivent être accessibles.');
+    assert.equal(links.length, 5, 'Les cinq zones comptables doivent être accessibles.');
     for (const id of links) {
       assert.match(html, new RegExp('\\bid="' + id + '"'),
         'Le raccourci #' + id + ' doit cibler une section existante.');
