@@ -885,7 +885,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   }
   assert.deepEqual(layoutAudit.unhydratedIcons, [],
     pageDefinition.name + ' contient des icônes statiques non reconnues : ' + JSON.stringify(layoutAudit.unhydratedIcons));
-  if (!pageDefinition.public) {
+  if (workspacePage) {
     assert.ok(layoutAudit.navigationItemCount > 0,
       pageDefinition.name + ' doit présenter des entrées de navigation.');
     assert.equal(layoutAudit.navigationIconCount, layoutAudit.navigationItemCount,
