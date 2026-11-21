@@ -55,3 +55,22 @@ test('les sélecteurs de couleur ont chacun un nom accessible', () => {
       'Le sélecteur de couleur #' + id + ' doit avoir un aria-label non vide.');
   }
 });
+
+test('les paramètres proposent une navigation par domaines sans casser le formulaire unique', () => {
+  const nav = html.match(/<nav class="workspace-section-nav settings-section-nav"[^>]*>([\\s\\S]*?)<\\/nav>/);
+  assert.ok(nav, 'La navigation par domaines doit être présente.');
+  const targets = [...nav[1].matchAll(/href="#([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(targets, [
+    'settings-company',
+    'settings-invoicing',
+    'settings-appearance',
+    'settings-subscription',
+    'settings-reset'
+  ]);
+  for (const id of targets) {
+    assert.match(html, new RegExp('\\\\bid="' + id + '"'), 'La cible #' + id + ' doit exister.');
+  }
+  assert.equal((html.match(/<form\\b/g) || []).length, 1,
+    'Les contrôles restent dans le formulaire d’enregistrement existant.');
+  assert.match(html, /<form id="entreprise-form">/);
+});
