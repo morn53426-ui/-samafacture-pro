@@ -309,7 +309,7 @@ function fixtureFor(pathname, fixtures) {
   };
   if (/^\/api\/factures\/(987|988)$/.test(pathname)) {
     const isQuote = pathname.endsWith('/988');
-    const lineCount = isQuote ? 28 : 8;
+    const lineCount = isQuote || DATASET === 'worst' ? 28 : 8;
     const lignes = Array.from({ length: lineCount }, (_, index) => ({
       designation: makeLong(
         (isQuote ? 'Lot de prestation et fournitures prévu au devis — ' : 'Prestation facturée — ') +
@@ -3787,7 +3787,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       type + ' : la date d’échéance/validité doit utiliser le format du profil récupéré par /auth/me.');
     assert.equal(screenMetrics.title, type === 'devis' ? 'Devis — Sunupilot' : 'Facture — Sunupilot',
       type + ' : le titre du document et les métadonnées PDF doivent identifier le bon type.');
-    assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),
+    assert.ok(screenMetrics.lineCount >= (DATASET === 'worst' || type === 'devis' ? 28 : 8),
       type + ' : toutes les lignes doivent être rendues avant l’impression : ' + JSON.stringify(screenMetrics));
     assert.ok(screenMetrics.documentWidth <= screenMetrics.viewportWidth + 1,
       type + ' : l’aperçu écran ne doit pas élargir la page : ' + JSON.stringify(screenMetrics));
@@ -3869,9 +3869,10 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     const pdfSource = pdfBuffer.toString('latin1');
     const pages = (pdfSource.match(/\/Type\s*\/Page\b/g) || []).length;
     assert.ok(pages >= 1, type + ' : le PDF doit contenir au moins une page.');
-    if (type === 'devis') {
-      assert.ok(pages >= 2, 'Le devis long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
-      assert.ok(pages <= 3, 'Le devis long ne doit pas créer une quatrième page quasi vide. Pages détectées : ' + pages);
+    const documentDoitEtreMultiPage = type === 'devis' || (type === 'facture' && DATASET === 'worst');
+    if (documentDoitEtreMultiPage) {
+      assert.ok(pages >= 2, type + ' long doit continuer proprement sur plusieurs pages A4. Pages détectées : ' + pages);
+      assert.ok(pages <= 3, type + ' long ne doit pas créer une quatrième page quasi vide. Pages détectées : ' + pages);
     }
     fs.writeFileSync(path.join(OUTPUT_DIR, 'document-' + type + '-' + DATASET + '.pdf'), pdfBuffer);
     return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
