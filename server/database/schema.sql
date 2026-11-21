@@ -177,6 +177,7 @@ CREATE TABLE IF NOT EXISTS depenses (
   libelle VARCHAR(190) NOT NULL,
   montant DECIMAL(14,2) NOT NULL DEFAULT 0,
   categorie VARCHAR(100),
+  mode_reglement VARCHAR(10) NOT NULL DEFAULT 'caisse',
   date_depense DATE NOT NULL,
   notes TEXT,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
