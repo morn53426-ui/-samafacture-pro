@@ -3888,7 +3888,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
           // La décoration ne doit pas faire sélectionner un autre mot « DEVIS »
           // présent dans les mentions ou le pied de page du document.
           const text = (element.textContent || '').trim().normalize('NFKD')
-            .replace(/^[^\\p{L}\\p{N}]+/u, '').trim().toUpperCase();
+            .replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ0-9]+/, '').trim().toUpperCase();
           return text.startsWith(expectedTitle);
         });
         titleCandidates.sort((a, b) =>
