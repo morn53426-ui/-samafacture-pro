@@ -99,9 +99,9 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v18 sans perdre les données existantes', async () => {
-  // Simule strictement une base v8 : schéma v8 sans les migrations v9-v18
-  // (échéances récurrentes, multi-sociétés, outbox, preuves email, abonnements, catalogue et entrepôt facture).
+test('une base v8 reçoit les migrations v9 à v19 sans perdre les données existantes', async () => {
+  // Simule strictement une base v8 : schéma v8 sans les migrations v9-v19
+  // (échéances récurrentes, multi-sociétés, outbox, preuves email, abonnements, catalogue, entrepôt et essai).
   await pool.query('DROP TABLE IF EXISTS email_outbox');
   await pool.query('DROP TABLE IF EXISTS pro_team_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitation_verifications');
@@ -147,6 +147,21 @@ test('une base v8 reçoit les migrations v9 à v18 sans perdre les données exis
   );
   if (backfillMarkerBefore.length) await pool.query('ALTER TABLE pro_entrepots DROP COLUMN backfill_stock_termine');
 
+  const [trialIndexBefore] = await pool.query(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+       AND INDEX_NAME = 'idx_users_trial_status_end'`
+  );
+  if (trialIndexBefore.length) await pool.query('ALTER TABLE users DROP INDEX idx_users_trial_status_end');
+  for (const column of ['trial_plan', 'trial_started_at', 'trial_ends_at', 'trial_status']) {
+    const [found] = await pool.query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?`,
+      [column]
+    );
+    if (found.length) await pool.query('ALTER TABLE users DROP COLUMN `' + column + '`');
+  }
+
   const [[beforeUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
     [groupOwnerId]
@@ -156,10 +171,10 @@ test('une base v8 reçoit les migrations v9 à v18 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v18 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v19 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 18, 'la version doit inclure la migration entrepôt v18 après les migrations v8 à v16');
+  assert.equal(Number(meta.version), 19, 'la version doit inclure les migrations v8 à v19 après la migration entrepôt v18');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -215,6 +230,24 @@ test('une base v8 reçoit les migrations v9 à v18 sans perdre les données exis
        AND COLUMN_NAME = 'backfill_stock_termine'`
   );
   assert.equal(backfillMarkerAfter.length, 1, 'la migration v18 doit ajouter le marqueur de reprise des stocks.');
+
+  const [trialColumnsAfter] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+       AND COLUMN_NAME IN ('trial_plan', 'trial_started_at', 'trial_ends_at', 'trial_status')`
+  );
+  assert.deepEqual(
+    trialColumnsAfter.map(row => row.COLUMN_NAME).sort(),
+    ['trial_ends_at', 'trial_plan', 'trial_started_at', 'trial_status'],
+    'la migration v19 doit créer les quatre champs d’essai sur les comptes historiques'
+  );
+  const [[legacyTrial]] = await pool.query(
+    'SELECT trial_status, trial_started_at, trial_ends_at FROM users WHERE id = ?',
+    [groupOwnerId]
+  );
+  assert.equal(legacyTrial.trial_status, 'not_started');
+  assert.equal(legacyTrial.trial_started_at, null);
+  assert.equal(legacyTrial.trial_ends_at, null);
 });
 
 
