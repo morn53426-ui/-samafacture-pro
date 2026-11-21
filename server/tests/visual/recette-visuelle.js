@@ -4167,6 +4167,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
               tableFontSize: tableCell?.fontSize || null,
               tableLineHeight: tableCell?.lineHeight || null,
               tablePaddingTop: tableCell?.paddingTop || null,
+              tablePaddingBottom: tableCell?.paddingBottom || null,
               totalsMarginTop: totals?.marginTop || null,
               footerMarginTop: footer?.marginTop || null,
               extrasMarginTop: extras?.marginTop || null,
@@ -4217,8 +4218,9 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.equal(metrics.metaMarginBottom, '12px', type + '/platine : marge des références client.');
         assert.equal(metrics.docMetaPaddingTop, '7px', type + '/platine : padding des références documentaires.');
         assert.equal(metrics.tableFontSize, '12px', type + '/platine : conserver une typographie de tableau à 9 pt.');
-        assert.equal(metrics.tableLineHeight, '15px', type + '/platine : interligne A4 compact mais lisible.');
-        assert.equal(metrics.tablePaddingTop, '4px', type + '/platine : padding vertical compact des lignes.');
+        assert.equal(metrics.tableLineHeight, '13.8px', type + '/platine : interligne A4 compact mais lisible.');
+        assert.equal(metrics.tablePaddingTop, '2px', type + '/platine : padding supérieur compact des lignes.');
+        assert.equal(metrics.tablePaddingBottom, '2px', type + '/platine : padding inférieur compact des lignes.');
         assert.equal(metrics.totalsMarginTop, '12px', type + '/platine : marge du bloc des totaux.');
         assert.equal(metrics.footerMarginTop, '16px', type + '/platine : marge du bloc QR et signature.');
         assert.equal(metrics.extrasMarginTop, '10px', type + '/platine : marge des compléments.');
