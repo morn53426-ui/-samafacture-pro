@@ -171,6 +171,16 @@
     document.title = `${isDevis ? 'Devis' : 'Facture'} — Sunupilot`;
     const template = user.facture_template || 'classique';
 
+    // Les zones de marge @page sont rendues par Chromium sur chaque feuille imprimée.
+    // Elles sont injectées après le chargement des données, sans modifier l'aperçu écran.
+    let printIdentityStyle = document.getElementById('sf-print-page-identity');
+    if (!printIdentityStyle) {
+      printIdentityStyle = document.createElement('style');
+      printIdentityStyle.id = 'sf-print-page-identity';
+      document.head.appendChild(printIdentityStyle);
+    }
+    printIdentityStyle.textContent = templates.printPageIdentityCss({ user, facture, isDevis });
+
     document.getElementById('doc').innerHTML = templates.renderInvoiceHtml({
       user, facture, lignes, isDevis, qrCode: qr_code, template,
       // Personnalisation (couleurs/logo/police) enregistrée par l'utilisateur — voir
