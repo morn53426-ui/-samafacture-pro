@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const puppeteer = require('puppeteer');
+const QRCode = require('qrcode');
 
 const PUBLIC_DIR = path.resolve(__dirname, '../../../public');
 const OUTPUT_DIR = path.resolve(process.env.VISUAL_ARTIFACTS_DIR || path.join(__dirname, 'artifacts'));
@@ -358,7 +359,7 @@ function fixtureFor(pathname, fixtures) {
         conditions_reglement: isQuote ? 'Offre valable 30 jours. Acompte de 40 % après validation.' : 'Règlement sous 15 jours.'
       },
       lignes,
-      qr_code: null
+      qr_code: fixtures.qrCodes?.[isQuote ? 988 : 987] || null
     };
   }
   if (pathname === '/api/depenses') return { depenses: fixtures.depenses || [] };
@@ -4093,6 +4094,17 @@ async function main() {
   }
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const fixtures = makeFixtures();
+  // Les vues facture/devis doivent disposer d'un vrai QR image pour que la
+  // recette mobile mesure le QR et le cachet. Les URL example.invalid sont
+  // volontairement fictives : aucun document ou endpoint réel n'est sollicité.
+  fixtures.qrCodes = {
+    987: await QRCode.toDataURL('https://example.invalid/verifier.html?id=987&code=VISUAL-FIXTURE-987', {
+      margin: 1, width: 128, color: { dark: '#0F1B33', light: '#FFFFFF' }
+    }),
+    988: await QRCode.toDataURL('https://example.invalid/verifier.html?id=988&code=VISUAL-FIXTURE-988', {
+      margin: 1, width: 128, color: { dark: '#0F1B33', light: '#FFFFFF' }
+    })
+  };
   const server = createStaticServer();
   await new Promise((resolve, reject) => {
     server.once('error', reject);
