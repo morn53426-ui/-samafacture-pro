@@ -99,7 +99,7 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v18 sans perdre les données existantes', async () => {
+test('une base v8 reçoit les migrations v9 à v20 sans perdre les données existantes', async () => {
   // Simule strictement une base v8 : schéma v8 sans les migrations v9-v18
   // (échéances récurrentes, multi-sociétés, outbox, preuves email, abonnements, catalogue et entrepôt facture).
   await pool.query('DROP TABLE IF EXISTS email_outbox');
@@ -159,7 +159,7 @@ test('une base v8 reçoit les migrations v9 à v18 sans perdre les données exis
   assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v18 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 18, 'la version doit inclure la migration entrepôt v18 après les migrations v8 à v16');
+  assert.equal(Number(meta.version), 20, 'la version doit inclure la migration dépenses v20 après les migrations v8 à v19');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',

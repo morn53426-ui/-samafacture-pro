@@ -14,6 +14,7 @@ const { genererPdfFacture } = require('../utils/pdf');
 const { notifierUtilisateur } = require('../realtime');
 const { enqueuePdfJob, getPdfJob, getPdfPath } = require('../pdf-queue');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
+const { recordInvoiceAccountingTransition } = require('../services/accounting-invoice-lifecycle');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -737,10 +738,25 @@ router.put('/:id/statut', async (req, res, next) => {
       [statut, existing.id, req.tenantId]
     );
 
+    let accountingTransition = null;
     if (existing.type === 'facture' && existing.statut !== 'annulee' && statut === 'annulee') {
       await ajusterStockFacture(conn, existing.id, req.tenantId, +1, existing.entrepot_id);
+      accountingTransition = 'annulation';
     } else if (existing.type === 'facture' && existing.statut === 'annulee' && statut !== 'annulee') {
       await ajusterStockFacture(conn, existing.id, req.tenantId, -1, existing.entrepot_id);
+      accountingTransition = 'reactivation';
+    }
+
+    // Une facture déjà comptabilisée est contre-passée dans la même transaction que
+    // son changement de statut et la restitution/redéduction du stock. Les devis et les
+    // factures jamais comptabilisées ne créent aucune écriture comptable automatique.
+    if (accountingTransition) {
+      await recordInvoiceAccountingTransition(conn, {
+        userId: req.tenantId,
+        actorUserId: req.actorId || req.user?.id || req.tenantId,
+        invoice: existing,
+        transition: accountingTransition
+      });
     }
 
     await conn.commit();
@@ -1217,6 +1233,7 @@ router.post('/:id/relancer', async (req, res, next) => {
  *     responses:
  *       200: { description: "Supprimé." }
  *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Suppression refusée car le document possède un historique comptable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.delete('/:id', async (req, res, next) => {
   const conn = await pool.getConnection();
@@ -1231,6 +1248,45 @@ router.delete('/:id', async (req, res, next) => {
     if (!existing) {
       await conn.rollback();
       return res.status(404).json({ error: 'Facture introuvable.' });
+    }
+
+    // Une pièce déjà inscrite au journal ne peut pas être effacée : l'écriture initiale,
+    // ses contrepassations et les règlements doivent rester traçables. Elle doit être
+    // conservée avec son statut annulé plutôt que supprimée définitivement.
+    const [accountingRows] = await conn.query(
+      `SELECT e.id
+       FROM pro_compta_ecritures e
+       WHERE e.user_id = ? AND (
+         (e.source_type = 'facture' AND e.source_id = ?)
+         OR (
+           e.source_type IN ('facture_annulation', 'facture_reactivation')
+           AND EXISTS (
+             SELECT 1 FROM pro_compta_facture_events accounting_event
+             WHERE accounting_event.user_id = e.user_id
+               AND accounting_event.facture_id = ?
+               AND accounting_event.id = e.source_id
+           )
+         )
+         OR (
+           e.source_type = 'paiement'
+           AND EXISTS (
+             SELECT 1 FROM paiements payment
+             WHERE payment.id = e.source_id
+               AND payment.user_id = e.user_id
+               AND payment.facture_id = ?
+           )
+         )
+       )
+       LIMIT 1
+       FOR UPDATE`,
+      [req.tenantId, existing.id, existing.id, existing.id]
+    );
+    if (accountingRows.length) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Cette facture possède un historique comptable. Conservez-la avec le statut Annulée pour préserver la piste d’audit.',
+        code: 'FACTURE_COMPTABILISEE'
+      });
     }
     // Restitue le stock déjà décompté avant de supprimer, sauf si la facture était déjà
     // annulée (son stock avait alors déjà été restitué par PUT /:id/statut — le restituer
