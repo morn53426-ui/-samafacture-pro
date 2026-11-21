@@ -595,6 +595,9 @@ router.put('/refunds/:id/status', async (req, res, next) => {
     res.json({ success: true, statut, solde_facture_ajuste: statut === 'rembourse' });
   } catch (err) {
     if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (err?.status === 409 && err.code) {
+      return res.status(409).json({ error: err.message, code: err.code });
+    }
     next(err);
   } finally {
     if (conn) conn.release();
