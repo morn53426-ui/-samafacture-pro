@@ -1833,3 +1833,18 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout .ico
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization .icon {
   color: #082B50;
 }
+
+/* Espace professionnel : six domaines équilibrés, sans modifier les modules métier. */
+.pro-workspace .pro-workspace-guide-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 1100px) {
+  .pro-workspace .pro-workspace-guide-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .pro-workspace .pro-workspace-guide-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
