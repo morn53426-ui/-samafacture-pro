@@ -7576,3 +7576,11 @@ a.btn .icon {
 :root:not([data-theme="dark"]) .badge-retard { color: #A9413C; }
 :root[data-theme="dark"] .badge-attente { color: #E7BD6D; }
 :root[data-theme="dark"] .badge-retard { color: #F08B81; }
+
+
+/* Contraste WCAG AA du badge Pro dans tous les espaces et les deux thèmes. */
+.plan-badge {
+  background: #F3DDA9 !important;
+  color: #17233B !important;
+  border: 1px solid #B8872E !important;
+}
