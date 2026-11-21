@@ -23,6 +23,8 @@ const PAGES = [
   { name: 'clients', file: 'clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
   { name: 'produits', file: 'produits.html', ready: '#produits-body tr:not(.row-skeleton)' },
   { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
+  { name: 'facture-detail', file: 'facture-detail.html?id=987', ready: '.invoice-doc .sf-document-table tbody tr' },
+  { name: 'devis-detail', file: 'facture-detail.html?id=988', ready: '.invoice-doc .sf-document-table tbody tr' },
   { name: 'factures-recurrentes', file: 'factures-recurrentes.html', ready: '#recurrentes-body tr' },
   { name: 'devis', file: 'devis.html', ready: '#devis-body tr', responsiveTable: '#devis-body' },
   { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
@@ -38,6 +40,14 @@ const PAGES = [
   { name: 'groupe-entreprise', file: 'groupe-entreprise.html', ready: '#invite-company-form', plan: 'entreprise' },
   { name: 'invitation', file: 'invitation.html?type=company-group&token=' + 'a'.repeat(64), ready: '#accept-invite', public: true },
   { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true }
+];
+
+const DOCUMENT_TEMPLATES = [
+  'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
+  'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
+  'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs', 'nova', 'nordique',
+  'luxe', 'tech', 'horizon', 'eclipse', 'saphir', 'conseil', 'imperial',
+  'panorama', 'groupe', 'majeste'
 ];
 
 function makeLong(prefix, length) {
@@ -478,6 +488,22 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion, apiFailures
           response = { facture: { id: 987, numero: 'FAC-VISUAL-0987' } };
         } else {
           response = fixtureFor(requestUrl.pathname, fixtures);
+        }
+        if (requestUrl.pathname === '/api/auth/me' && response.user) {
+          // Permet à la recette d'exercer explicitement chaque modèle sans modifier
+          // les données de production ni ajouter de paramètre à l'API métier.
+          const referer = request.headers().referer || '';
+          try {
+            const refererUrl = new URL(referer);
+            const visualTemplate = refererUrl.pathname.endsWith('/facture-detail.html')
+              ? refererUrl.searchParams.get('visualTemplate')
+              : null;
+            if (DOCUMENT_TEMPLATES.includes(visualTemplate)) {
+              response.user.facture_template = visualTemplate;
+            }
+          } catch (error) {
+            // Un Referer absent ou invalide conserve le modèle de recette par défaut.
+          }
         }
       } catch (error) {
         response = {};
@@ -3789,8 +3815,86 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
   }
 
+  async function verifyAllTemplateBannerGeometry(documentId, type) {
+    const titleText = type === 'devis' ? 'DEVIS' : 'FACTURE';
+    const bannerSelector = '[style*="margin:-40px -40px"], [style*="margin:-8px -8px"]';
+    let bannersChecked = 0;
+    const templatesChecked = [];
+
+    for (const template of DOCUMENT_TEMPLATES) {
+      await page.emulateMediaType(null);
+      await page.goto(baseUrl + '/facture-detail.html?id=' + documentId + '&visualTemplate=' + encodeURIComponent(template), {
+        waitUntil: 'domcontentloaded'
+      });
+      await page.waitForFunction((expectedTemplate) =>
+        window.__docReady === true && document.getElementById('doc')?.classList.contains('tpl-' + expectedTemplate),
+      { timeout: 15000 }, template);
+      await page.emulateMediaType('print');
+
+      const geometry = await page.evaluate(({ selector, expectedTitle }) => {
+        const documentNode = document.querySelector('.invoice-doc');
+        if (!documentNode) return { documentFound: false, banners: [], titlePresent: false, titleBounds: null };
+        const bounds = documentNode.getBoundingClientRect();
+        const banners = Array.from(documentNode.querySelectorAll(selector)).map(element => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            marginTop: Number.parseFloat(style.marginTop) || 0,
+            marginLeft: Number.parseFloat(style.marginLeft) || 0,
+            marginRight: Number.parseFloat(style.marginRight) || 0,
+            leftOverflow: Number((bounds.left - rect.left).toFixed(2)),
+            rightOverflow: Number((rect.right - bounds.right).toFixed(2)),
+            topOverflow: Number((bounds.top - rect.top).toFixed(2)),
+            width: Number(rect.width.toFixed(2))
+          };
+        });
+        const titleCandidates = Array.from(documentNode.querySelectorAll('*')).filter(element =>
+          element.children.length === 0 && (element.textContent || '').trim().toUpperCase().startsWith(expectedTitle)
+        );
+        titleCandidates.sort((a, b) =>
+          Number.parseFloat(getComputedStyle(b).fontSize) - Number.parseFloat(getComputedStyle(a).fontSize)
+        );
+        const titleElement = titleCandidates[0] || null;
+        const titleRect = titleElement?.getBoundingClientRect();
+        return {
+          documentFound: true,
+          documentWidth: Number(bounds.width.toFixed(2)),
+          titlePresent: (documentNode.innerText || '').toUpperCase().includes(expectedTitle),
+          titleBounds: titleRect ? {
+            leftOverflow: Number((bounds.left - titleRect.left).toFixed(2)),
+            rightOverflow: Number((titleRect.right - bounds.right).toFixed(2)),
+            topOverflow: Number((bounds.top - titleRect.top).toFixed(2))
+          } : null,
+          banners
+        };
+      }, { selector: bannerSelector, expectedTitle: titleText });
+
+      assert.equal(geometry.documentFound, true, type + '/' + template + ' : document introuvable.');
+      assert.ok(geometry.documentWidth > 0, type + '/' + template + ' : largeur imprimée nulle.');
+      assert.equal(geometry.titlePresent, true, type + '/' + template + ' : le titre ' + titleText + ' doit rester visible.');
+      if (geometry.titleBounds) {
+        assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
+          type + '/' + template + ' : titre hors de la zone du document : ' + JSON.stringify(geometry.titleBounds));
+      }
+      for (const banner of geometry.banners) {
+        assert.ok(Math.abs(banner.marginTop) <= 0.5 && Math.abs(banner.marginLeft) <= 0.5 && Math.abs(banner.marginRight) <= 0.5,
+          type + '/' + template + ' : les marges négatives du bandeau doivent être neutralisées en print : ' + JSON.stringify(banner));
+        assert.ok(banner.leftOverflow <= 0.5 && banner.rightOverflow <= 0.5 && banner.topOverflow <= 0.5,
+          type + '/' + template + ' : bandeau hors de la zone imprimable : ' + JSON.stringify(banner));
+      }
+      bannersChecked += geometry.banners.length;
+      templatesChecked.push({ template, banners: geometry.banners.length });
+    }
+    assert.ok(bannersChecked > 0, type + ' : la recette doit avoir rencontré et mesuré les bandeaux historiques à marges négatives.');
+    return { templateCount: templatesChecked.length, bannersChecked, templates: templatesChecked };
+  }
+
   const invoicePdf = await verifyDocumentPdf(987, 'facture');
   const quotePdf = await verifyDocumentPdf(988, 'devis');
+  const templateBannerGeometry = DATASET === 'worst' ? {
+    facture: await verifyAllTemplateBannerGeometry(987, 'facture'),
+    devis: await verifyAllTemplateBannerGeometry(988, 'devis')
+  } : { skipped: 'Mesure exhaustive réservée au dataset worst.' };
   await page.close();
   return {
     invoiceCreation: 'ok',
@@ -3798,6 +3902,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     totalWithDiscountVatAndDelivery: 20380,
     invoicePrint: invoicePdf,
     quotePrint: quotePdf,
+    templateBannerGeometry,
     screenshots: 2,
     pdfFiles: 2
   };
