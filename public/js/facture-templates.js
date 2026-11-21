@@ -119,11 +119,11 @@ function createFactureTemplates(helpers) {
   function lignesRowsHtml(lignes) {
     return (Array.isArray(lignes) ? lignes : []).map(l => `
       <tr class="sf-document-line">
-        <td class="sf-doc-description">${escapeHtml(l.designation || '')}</td>
-        <td class="mono sf-doc-qty">${escapeHtml(l.quantite ?? '')}</td>
-        <td class="mono sf-doc-unit-price">${formatMontant(Number(l.prix_unitaire) || 0)}</td>
-        <td class="mono sf-doc-tax-rate">${escapeHtml(l.tva ?? 0)}%</td>
-        <td class="mono sf-doc-line-total">${formatMontant(Number(l.total_ligne) || 0)}</td>
+        <td class="sf-doc-description" data-label="Désignation">${escapeHtml(l.designation || '')}</td>
+        <td class="mono sf-doc-qty" data-label="Quantité">${escapeHtml(l.quantite ?? '')}</td>
+        <td class="mono sf-doc-unit-price" data-label="Prix unitaire HT">${formatMontant(Number(l.prix_unitaire) || 0)}</td>
+        <td class="mono sf-doc-tax-rate" data-label="TVA">${escapeHtml(l.tva ?? 0)}%</td>
+        <td class="mono sf-doc-line-total" data-label="Montant TTC">${formatMontant(Number(l.total_ligne) || 0)}</td>
       </tr>
     `).join('');
   }
