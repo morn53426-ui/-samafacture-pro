@@ -373,9 +373,9 @@ async function runMigrations(conn) {
   const invoiceAccountingEventsPath = path.join(__dirname, '..', 'database', 'migrations', '011_comptabilite_contrepas_factures.sql');
   const invoiceAccountingEventsSql = fs.readFileSync(invoiceAccountingEventsPath, 'utf8');
   const invoiceAccountingEventsStatements = invoiceAccountingEventsSql
-    .split(/\\r?\\n/)
+    .split(/\r?\n/)
     .filter(line => !line.trim().startsWith('--'))
-    .join('\\n')
+    .join('\n')
     .split(';')
     .map(statement => statement.trim())
     .filter(Boolean);
