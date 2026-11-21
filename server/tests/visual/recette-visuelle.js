@@ -3934,6 +3934,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         return {
           documentFound: true,
           documentWidth: Number(bounds.width.toFixed(2)),
+          lineCount: documentNode.querySelectorAll('.sf-document-table tbody tr').length,
           titlePresent: titleCandidates.length > 0,
           titleCandidates: titleCandidates.slice(0, 5).map(element => {
             const rect = element.getBoundingClientRect();
@@ -3956,6 +3957,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
 
       assert.equal(geometry.documentFound, true, type + '/' + template + ' : document introuvable.');
       assert.ok(geometry.documentWidth > 0, type + '/' + template + ' : largeur imprimée nulle.');
+      assert.ok(geometry.lineCount >= 28,
+        type + '/' + template + ' : les 28 lignes longues doivent être rendues avant impression (lignes=' + geometry.lineCount + ').');
       assert.equal(geometry.titlePresent, true, type + '/' + template + ' : titre principal (' + titleLabels.join(' / ') + ') absent du bandeau.');
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
@@ -3967,8 +3970,32 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.ok(banner.leftOverflow <= 0.5 && banner.rightOverflow <= 0.5 && banner.topOverflow <= 0.5,
           type + '/' + template + ' : bandeau hors de la zone imprimable : ' + JSON.stringify(banner));
       }
+      // Générer le PDF réel de chaque modèle (pas seulement mesurer le DOM écran).
+      // La fixture worst contient 28 lignes longues pour les factures et les devis.
+      const pdf = Buffer.from(await page.pdf({
+        format: 'A4',
+        preferCSSPageSize: true,
+        printBackground: true,
+        scale: 1
+      }));
+      assert.equal(pdf.subarray(0, 5).toString('latin1'), '%PDF-',
+        type + '/' + template + ' : la génération PDF doit produire un vrai fichier.');
+      assert.ok(pdf.length > 5000,
+        type + '/' + template + ' : le PDF doit contenir le document complet.');
+      const pdfPages = (pdf.toString('latin1').match(/\\/Type\\s*\\/Page\\b/g) || []).length;
+      assert.ok(pdfPages >= 2,
+        type + '/' + template + ' : 28 lignes doivent occuper plusieurs pages A4 (pages=' + pdfPages + ').');
+      assert.ok(pdfPages <= 4,
+        type + '/' + template + ' : la pagination longue ne doit pas créer plus de quatre pages (pages=' + pdfPages + ').');
+
       bannersChecked += geometry.banners.length;
-      templatesChecked.push({ template, banners: geometry.banners.length });
+      templatesChecked.push({
+        template,
+        banners: geometry.banners.length,
+        lineCount: geometry.lineCount,
+        pdfBytes: pdf.length,
+        pdfPages
+      });
     }
     assert.ok(bannersChecked > 0, type + ' : la recette doit avoir rencontré et mesuré les bandeaux historiques à marges négatives.');
     return { templateCount: templatesChecked.length, bannersChecked, templates: templatesChecked };
