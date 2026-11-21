@@ -84,3 +84,35 @@ body.workspace-modal-open{overflow:hidden}
   font-size:.82rem;
   line-height:1.55
 }
+
+
+/* Paramètres : regroupement visuel, repères directs et formulaires lisibles. */
+.settings-section{min-width:0;margin:0 0 28px;scroll-margin-top:24px}
+.settings-section-heading{margin:0 0 18px;padding:0 0 12px;border-bottom:1px solid var(--line)}
+.settings-section-heading h2{margin:0 0 5px;font-size:1.08rem;line-height:1.35}
+.settings-section-heading p{margin:0;color:var(--ink-soft);font-size:.84rem;line-height:1.55}
+.settings-section-nav{margin:0 0 18px}
+.settings-support-card{scroll-margin-top:24px}
+.page-parametres .settings-main-card{padding:clamp(18px,2.4vw,34px)}
+@media(max-width:560px){.page-parametres .settings-main-card{padding:15px}.settings-section-heading{margin-bottom:14px}}
+
+/* État d'essai : information claire et possibilité de choisir un autre palier sans relancer le délai. */
+.trial-status-banner{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:0 0 22px;padding:20px 22px;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:var(--shadow-xs)}
+.trial-status-banner[hidden]{display:none}
+.trial-status-copy{min-width:0;max-width:70ch}
+.trial-status-copy h2{margin:5px 0 8px;font-size:1.04rem;line-height:1.35}
+.trial-status-copy p{margin:0 0 7px;color:var(--ink);font-size:.86rem}
+.trial-status-copy small{display:block;color:var(--ink-soft);font-size:.78rem;line-height:1.5}
+.trial-plan-switch{display:grid;grid-template-columns:minmax(150px,1fr);gap:8px;min-width:min(250px,100%)}
+.trial-plan-switch label{font-size:.78rem;font-weight:700;color:var(--ink-soft)}
+.trial-plan-switch select{width:100%;min-height:42px}
+.trial-plan-switch .btn{min-height:42px;white-space:normal}
+@media(max-width:760px){.trial-status-banner{align-items:stretch;flex-direction:column;padding:17px}.trial-plan-switch{min-width:0}.trial-plan-switch .btn{width:100%}}
+
+.accounting-accounts-form{align-items:end;margin:0 0 16px}
+.accounting-account-check{display:flex;align-items:center;gap:10px;min-height:42px}
+.accounting-account-check span{font-weight:650}
+.accounting-account-check input{width:18px;height:18px;flex:0 0 auto}
+.accounting-account-submit{display:flex;align-items:end}
+.accounting-account-submit .btn{min-height:42px}
+@media(max-width:760px){.accounting-accounts-form{grid-template-columns:minmax(0,1fr)}.accounting-account-submit .btn{width:100%}}

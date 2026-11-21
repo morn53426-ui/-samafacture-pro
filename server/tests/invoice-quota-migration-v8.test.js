@@ -34,14 +34,28 @@ test('une base en version 7 reçoit la migration du quota sans bloquer les versi
        AND COLUMN_NAME = 'backfill_stock_termine'`
   );
   if (backfillMarkerBefore.length) await pool.query('ALTER TABLE pro_entrepots DROP COLUMN backfill_stock_termine');
+  const [trialIndexBefore] = await pool.query(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+       AND INDEX_NAME = 'idx_users_trial_status_end'`
+  );
+  if (trialIndexBefore.length) await pool.query('ALTER TABLE users DROP INDEX idx_users_trial_status_end');
+  for (const column of ['trial_plan', 'trial_started_at', 'trial_ends_at', 'trial_status']) {
+    const [found] = await pool.query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?`,
+      [column]
+    );
+    if (found.length) await pool.query('ALTER TABLE users DROP COLUMN `' + column + '`');
+  }
   await pool.query('UPDATE _samafacture_schema_meta SET version = 7 WHERE id = 1');
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v18 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v19 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 18, 'une base v7 doit exécuter toute la chaîne de migrations v8 à v18');
+  assert.equal(Number(meta.version), 19, 'une base v7 doit exécuter toute la chaîne de migrations v8 à v19');
 
   const [tables] = await pool.query(
     `SELECT TABLE_NAME FROM information_schema.TABLES
@@ -68,6 +82,25 @@ test('une base en version 7 reçoit la migration du quota sans bloquer les versi
        AND COLUMN_NAME = 'backfill_stock_termine'`
   );
   assert.equal(backfillMarkerAfter.length, 1, 'La migration v18 doit ajouter le marqueur de reprise des stocks.');
+
+  const [trialColumnsAfter] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+       AND COLUMN_NAME IN ('trial_plan', 'trial_started_at', 'trial_ends_at', 'trial_status')`
+  );
+  assert.deepEqual(
+    trialColumnsAfter.map(row => row.COLUMN_NAME).sort(),
+    ['trial_ends_at', 'trial_plan', 'trial_started_at', 'trial_status'],
+    'La migration v19 doit ajouter les colonnes d’essai.'
+  );
+  const [[legacyTrial]] = await pool.query(
+    'SELECT trial_status, trial_started_at, trial_ends_at FROM users LIMIT 1'
+  );
+  if (legacyTrial) {
+    assert.equal(legacyTrial.trial_status, 'not_started');
+    assert.equal(legacyTrial.trial_started_at, null);
+    assert.equal(legacyTrial.trial_ends_at, null);
+  }
 });
 
 after(teardownTestEnvironment);

@@ -35,10 +35,15 @@ CREATE TABLE IF NOT EXISTS users (
   signature_default MEDIUMTEXT,
   devise VARCHAR(10) NOT NULL DEFAULT 'FCFA',
   plan VARCHAR(20) NOT NULL DEFAULT 'gratuit', -- gratuit | starter | pro | entreprise
+  trial_plan VARCHAR(20) NULL, -- starter (libellé Standard), pro | entreprise
+  trial_started_at DATETIME NULL, -- UTC, NULL sur les comptes antérieurs à l'activation de l'essai
+  trial_ends_at DATETIME NULL, -- fin exclusive de la fenêtre de 15 jours, UTC
+  trial_status VARCHAR(20) NOT NULL DEFAULT 'not_started', -- not_started | trialing | expired
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_users_email (email),
   UNIQUE KEY uk_users_google_id (google_id),
-  KEY idx_users_reset_token_hash (reset_token_hash) -- voir AMELIORATIONS_SCALABILITE.md : SELECT ... WHERE reset_token_hash = ? (server/routes/auth.js) tournait sans index
+  KEY idx_users_reset_token_hash (reset_token_hash), -- voir AMELIORATIONS_SCALABILITE.md : SELECT ... WHERE reset_token_hash = ? (server/routes/auth.js) tournait sans index
+  KEY idx_users_trial_status_end (trial_status, trial_ends_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------------

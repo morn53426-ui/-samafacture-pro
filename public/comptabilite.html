@@ -11,6 +11,7 @@
 <a class="workspace-skip-link" href="#main-content">Aller au contenu principal</a><div class="app-shell"><div id="sidebar-root"></div><main class="main-content workspace-page page-comptabilite" id="main-content" tabindex="-1">
   <div class="page-header workspace-page-header"><div><div class="pro-eyebrow">PILOTAGE FINANCIER</div><h1>Comptabilité OHADA</h1><p>Journaux, écritures en partie double, balance générale et grand livre.</p></div></div>
   <nav class="workspace-section-nav" aria-label="Accès rapides à la comptabilité">
+    <a href="#accounting-accounts">Plan de comptes</a>
     <a href="#accounting-entry">Saisir une écriture</a>
     <a href="#accounting-guided">Comptabilisation guidée</a>
     <a href="#accounting-balance">Balance générale</a>
@@ -21,6 +22,20 @@
     <article class="card stat-card"><div class="stat-label">Total crédit</div><div class="stat-value mono" id="kpi-credit">—</div></article>
     <article class="card stat-card"><div class="stat-label">Équilibre de la balance</div><div class="stat-value" id="kpi-balance">—</div></article>
   </div>
+  <section class="card accounting-accounts-card" style="margin-bottom:20px" id="accounting-accounts">
+    <div class="page-header" style="margin-bottom:12px"><div><h2 style="margin:0">Plan de comptes</h2><p class="pro-note">Comptes de démarrage préchargés et comptes personnalisés de votre entreprise.</p></div></div>
+    <form id="account-form" class="grid grid-3 accounting-accounts-form">
+      <div class="field"><label for="account-code">Numéro de compte *</label><input id="account-code" required maxlength="20" pattern="[0-9]{1,8}" placeholder="Ex. 411" /></div>
+      <div class="field"><label for="account-label">Intitulé *</label><input id="account-label" required maxlength="190" placeholder="Ex. Clients" /></div>
+      <div class="field"><label for="account-class">Classe *</label><select id="account-class" required><option value="">Choisir</option><option value="1">Classe 1 — Capitaux</option><option value="2">Classe 2 — Immobilisations</option><option value="3">Classe 3 — Stocks</option><option value="4">Classe 4 — Tiers</option><option value="5">Classe 5 — Trésorerie</option><option value="6">Classe 6 — Charges</option><option value="7">Classe 7 — Produits</option><option value="8">Classe 8 — Autres charges et produits</option></select></div>
+      <div class="field"><label for="account-nature">Nature habituelle *</label><select id="account-nature" required><option value="debit">Débit</option><option value="credit">Crédit</option></select></div>
+      <label class="field accounting-account-check"><span>Lettrable</span><input id="account-reconcile" type="checkbox" /></label>
+      <div class="accounting-account-submit"><button class="btn btn-outline" type="submit">Ajouter au plan de comptes</button></div>
+    </form>
+    <div class="table-scroll" style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:620px"><thead><tr><th>Compte</th><th>Intitulé</th><th>Classe</th><th>Nature</th><th>Lettrable</th><th>État</th></tr></thead><tbody id="accounts-list"><tr><td colspan="6">Chargement…</td></tr></tbody></table></div>
+    <p class="pro-note" style="margin-top:12px">Le plan préchargé est un socle de démarrage simplifié inspiré du SYSCOHADA. Faites valider les comptes et leur paramétrage par votre expert-comptable avant de produire des états réglementaires.</p>
+  </section>
+
   <section class="card" style="margin-bottom:20px" id="accounting-entry">
     <h2 style="margin-top:0">Saisir une écriture</h2>
     <p class="pro-note">Chaque écriture est enregistrée comme validée et devient non modifiable. Vérifiez les montants avant validation. Toute correction doit être passée par une écriture de contrepassation.</p>
@@ -90,6 +105,7 @@ async function loadAccounting(){
     Api.get('/pro/payments'),Api.get('/depenses')
   ]);
   accounts=cfg.comptes||[]; journals=cfg.journaux||[];
+  $('accounts-list').innerHTML=accounts.map(a=>'<tr><td class="mono">'+escapeHtml(a.code)+'</td><td>'+escapeHtml(a.libelle)+'</td><td>Classe '+escapeHtml(String(a.classe))+'</td><td>'+escapeHtml(a.nature==='credit'?'Crédit':'Débit')+'</td><td>'+(a.lettrable?'Oui':'Non')+'</td><td>'+(a.actif?'Actif':'Inactif')+'</td></tr>').join('')||'<tr><td colspan="6">Aucun compte.</td></tr>';
   $('entry-journal').innerHTML=journals.map(j=>'<option value="'+j.id+'">'+escapeHtml(j.code+' · '+j.libelle)+'</option>').join('');
   $('ledger-account').innerHTML=accounts.map(a=>'<option value="'+a.id+'">'+escapeHtml(a.code+' · '+a.libelle)+'</option>').join('');
   if(!$('entry-lines').children.length){addLine();addLine();}
@@ -101,6 +117,22 @@ async function loadAccounting(){
   $('post-payment').innerHTML='<option value="">Sélectionner</option>'+(payments.paiements||[]).map(p=>'<option value="'+p.id+'">'+escapeHtml(p.numero+' · '+p.client_nom+' · '+p.montant)+'</option>').join('');
   $('post-expense').innerHTML='<option value="">Sélectionner</option>'+(expenses.depenses||[]).map(e=>'<option value="'+e.id+'">'+escapeHtml(e.libelle+' · '+e.montant)+'</option>').join('');
 }
+$('account-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const payload={
+    code:$('account-code').value.trim(),
+    libelle:$('account-label').value.trim(),
+    classe:Number($('account-class').value),
+    nature:$('account-nature').value,
+    lettrable:$('account-reconcile').checked
+  };
+  try{
+    await Api.post('/pro/accounting/accounts',payload);
+    e.target.reset();
+    showToast('Compte ajouté au plan de comptes.','success');
+    await loadAccounting();
+  }catch(err){showToast(err.message,'error');}
+});
 $('add-line').addEventListener('click',()=>addLine());
 $('entry-form').addEventListener('submit',async e=>{
   e.preventDefault();

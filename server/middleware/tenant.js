@@ -65,6 +65,8 @@ async function resolveTenant(req, res, next) {
              JOIN pro_company_groups g ON g.id = gc.group_id
              JOIN users group_owner ON group_owner.id = g.owner_user_id
              WHERE g.owner_user_id = ? AND gc.company_owner_id = ?
+               AND (group_owner.trial_status <> 'trialing'
+                    OR (group_owner.trial_ends_at IS NOT NULL AND group_owner.trial_ends_at > UTC_TIMESTAMP()))
              LIMIT 1`,
             [req.actorId, selectedOwner]
           );

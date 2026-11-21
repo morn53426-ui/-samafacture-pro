@@ -40,12 +40,28 @@ test('la migration v15 crée les huit tables du moteur SaaS', async () => {
   assert.deepEqual(actual, [...EXPECTED_TABLES].sort());
 });
 
-test('la base de test annonce la version de schéma 18 après migration', async () => {
+test('la base de test annonce la version de schéma 19 après migration', async () => {
   const [[meta]] = await pool.query(
     'SELECT version FROM _samafacture_schema_meta WHERE id = 1'
   );
   assert.ok(meta);
-  assert.equal(Number(meta.version), 18);
+  assert.equal(Number(meta.version), 19);
+});
+
+test('la migration v19 ajoute les champs d’essai sans attribuer d’essai aux comptes historiques', async () => {
+  const [columns] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+       AND COLUMN_NAME IN ('trial_plan', 'trial_started_at', 'trial_ends_at', 'trial_status')`
+  );
+  assert.deepEqual(columns.map(row => row.COLUMN_NAME).sort(), [
+    'trial_ends_at', 'trial_plan', 'trial_started_at', 'trial_status'
+  ]);
+  const [[statusColumn]] = await pool.query(
+    `SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'trial_status'`
+  );
+  assert.equal(statusColumn.COLUMN_DEFAULT, 'not_started');
 });
 
 test('la fondation du moteur est vide : aucun prix publié, abonnement, mandat ou débit créé', async () => {

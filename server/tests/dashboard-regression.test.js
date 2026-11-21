@@ -98,11 +98,13 @@ describe('Dashboard — régression et scalabilité', () => {
     assert.match(quotePage, /Aucun entrepôt actif/);
   });
 
-  test('les migrations 17 et 18 mémorisent l’entrepôt des factures et rendent le backfill historique idempotent', () => {
+  test('les migrations 17 à 19 conservent les entrepôts et ajoutent les métadonnées d’essai', () => {
     const dbSource = fs.readFileSync(path.join(__dirname, '..', 'config', 'db.js'), 'utf8');
     const professionalSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'professionnel.js'), 'utf8');
     const schemaSource = fs.readFileSync(path.join(__dirname, '..', 'database', 'schema.sql'), 'utf8');
-    assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 18/);
+    assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 19/);
+    assert.match(dbSource, /v19 : dates UTC et état d'essai initial\/actif\/expiré/);
+    assert.match(dbSource, /column: 'trial_ends_at'/);
     assert.match(dbSource, /v17 : entrepôt de sortie mémorisé sur les factures/);
     assert.match(dbSource, /table: 'factures', column: 'entrepot_id', definition: 'INT UNSIGNED NULL AFTER client_id'/);
     assert.match(schemaSource, /entrepot_id INT UNSIGNED NULL/);
