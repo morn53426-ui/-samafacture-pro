@@ -99,6 +99,15 @@ describe('Navigation et structure des pages métier', () => {
     }
   });
 
+  test('l’espace professionnel relie directement ses rubriques et la comptabilité OHADA', () => {
+    const html = readPage('professionnel.html');
+    assert.match(html, /10 accès directs · 4 rubriques/);
+    for (const target of ['#pro-sales', '#pro-clients', '#pro-payments', '#pro-management', '#pro-reports', '#pro-team', '#pro-documents', '#pro-automation', '#pro-integrations']) {
+      assert.ok(html.includes('href="' + target + '"'), 'Raccourci professionnel manquant : ' + target);
+    }
+    assert.ok(html.includes('href="comptabilite.html">Comptabilité OHADA</a>'));
+  });
+
   test('Comptabilité OHADA permet de rejoindre chaque zone comptable', () => {
     const html = readPage('comptabilite.html');
     const nav = html.match(/<nav class="workspace-section-nav"[^>]*>([\s\S]*?)<\/nav>/);
