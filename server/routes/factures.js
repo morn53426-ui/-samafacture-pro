@@ -1261,10 +1261,10 @@ router.delete('/:id', async (req, res, next) => {
          OR (
            e.source_type IN ('facture_annulation', 'facture_reactivation')
            AND EXISTS (
-             SELECT 1 FROM pro_compta_facture_events event
-             WHERE event.user_id = e.user_id
-               AND event.facture_id = ?
-               AND event.id = e.source_id
+             SELECT 1 FROM pro_compta_facture_events accounting_event
+             WHERE accounting_event.user_id = e.user_id
+               AND accounting_event.facture_id = ?
+               AND accounting_event.id = e.source_id
            )
          )
          OR (
