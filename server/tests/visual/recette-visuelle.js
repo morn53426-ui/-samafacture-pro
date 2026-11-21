@@ -3987,9 +3987,9 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
       type + ' : l’en-tête du tableau doit être répété lorsque le document passe sur une nouvelle page.');
     assert.equal(printMetrics.overflowX, 'visible', type + ' : le document ne doit pas être coupé horizontalement à l’impression.');
-    assert.equal(printMetrics.tableCellPaddingTop, '10px',
+    assert.equal(printMetrics.tableCellPaddingTop, '6px',
       type + ' : les lignes doivent garder un espacement vertical régulier à l’impression.');
-    assert.ok(Math.abs(parseFloat(printMetrics.tableCellLineHeight) - 16.8) < 0.2,
+    assert.ok(Math.abs(parseFloat(printMetrics.tableCellLineHeight) - 16.2) < 0.2,
       type + ' : la hauteur de ligne imprimée doit rester confortable sans réduire la police.');
     assert.match(printMetrics.documentFontFamily, /IBM Plex Sans/i,
       type + ' : la pile typographique IBM Plex Sans doit rester prioritaire pour le document imprimé.');

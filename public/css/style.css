@@ -7421,10 +7421,10 @@ a.btn .icon {
 
   .invoice-doc .sf-document-table th,
   .invoice-doc .sf-document-table td {
-    /* Dernière règle d'impression effective : l'espacement est contrôlé ici,
-       après les styles génériques et les ajustements propres aux modèles. */
-    padding: 10px 6px !important;
-    line-height: 1.4 !important;
+    /* Rester cohérent avec l'espacement print défini plus haut : plus lisible
+       que l'ancien 4px sans forcer les factures longues sur une page supplémentaire. */
+    padding: 6px 6px !important;
+    line-height: 1.35 !important;
   }
   .invoice-doc .sf-document-table tbody td {
     font-size: 9pt !important;
