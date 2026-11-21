@@ -1393,6 +1393,59 @@ function createFactureTemplates(helpers) {
     imperial: renderImperial, panorama: renderPanorama, groupe: renderGroupe, majeste: renderMajeste
   };
 
+  // Construit les zones d'en-tête des marges de page CSS (Paged Media).
+  // Chromium les répète sur chaque feuille imprimée, sans ajouter de DOM au document.
+  // Les données dynamiques sont encodées comme chaînes CSS, et non concaténées en HTML.
+  function cssQuotedString(value) {
+    let output = '"';
+    for (const character of String(value ?? '')) {
+      const codePoint = character.codePointAt(0);
+      if (character === '"' || character === '\\') {
+        output += '\\' + character;
+      } else if (codePoint <= 0x1F || codePoint === 0x7F) {
+        output += '\\' + codePoint.toString(16) + ' ';
+      } else {
+        output += character;
+      }
+    }
+    return output + '"';
+  }
+
+  function printPageIdentityCss({ user, facture, isDevis }) {
+    const companyName = user?.entreprise_nom || user?.nom || 'SamaFacture';
+    const documentType = isDevis ? 'DEVIS' : 'FACTURE';
+    const documentNumber = facture?.numero || '';
+    const reference = documentNumber
+      ? documentType + ' · ' + documentNumber
+      : documentType;
+
+    return [
+      '@page {',
+      '  @top-left {',
+      '    content: ' + cssQuotedString(companyName) + ';',
+      '    color: #64748b;',
+      '    font-family: "IBM Plex Sans", Arial, sans-serif;',
+      '    font-size: 7pt;',
+      '    font-weight: 500;',
+      '    vertical-align: bottom;',
+      '    padding-bottom: 1mm;',
+      '    border-bottom: 0.25mm solid #cbd5e1;',
+      '  }',
+      '  @top-right {',
+      '    content: ' + cssQuotedString(reference) + ';',
+      '    color: #334155;',
+      '    font-family: "IBM Plex Sans", Arial, sans-serif;',
+      '    font-size: 7pt;',
+      '    font-weight: 700;',
+      '    text-align: right;',
+      '    vertical-align: bottom;',
+      '    padding-bottom: 1mm;',
+      '    border-bottom: 0.25mm solid #cbd5e1;',
+      '  }',
+      '}'
+    ].join('\\n');
+  }
+
   function renderInvoiceHtml({ user, facture, lignes, isDevis, qrCode, template, personnalisation }) {
     const render = RENDERERS[template] || renderClassique;
     // Un devis porte une date de validité, jamais une échéance de paiement.
@@ -1446,19 +1499,6 @@ function createFactureTemplates(helpers) {
     }
 
     html += documentSupplementHtml(user, facture, isDevis);
-    // En impression, Chromium répète les éléments positionnés en fixed sur chaque page.
-    // Cette ligne d'identité occupe la marge supérieure déjà réservée par @page (12 mm) :
-    // elle rend les feuilles détachées identifiables sans modifier les données métier.
-    const continuationCompany = escapeHtml(user?.entreprise_nom || user?.nom || 'SamaFacture');
-    const continuationKind = isDevis ? 'DEVIS' : 'FACTURE';
-    const continuationNumber = escapeHtml(facture.numero || '');
-    const continuationHeader =
-      '<div class="sf-print-continuation-header" aria-label="Identification du document">' +
-        '<span class="sf-print-continuation-company">' + continuationCompany + '</span>' +
-        '<span class="sf-print-continuation-reference">' + continuationKind + ' · ' + continuationNumber + '</span>' +
-      '</div>';
-    html = continuationHeader + html;
-
     // Le même tableau de lignes reçoit une classe stable pour la mise en page écran et A4.
     html = html.replace(/<table\b([^>]*)>/i, (match, attributes) => {
       const existingClass = attributes.match(/\bclass=["']([^"']*)["']/i);
@@ -1473,7 +1513,7 @@ function createFactureTemplates(helpers) {
     return wrapPersonnalisation(html, personnalisation);
   }
 
-  return { renderInvoiceHtml, RENDERERS };
+  return { renderInvoiceHtml, printPageIdentityCss, RENDERERS };
 }
 
 // Export CommonJS additionnel, utilisé uniquement par les tests Node (server/tests/templates.test.js).
