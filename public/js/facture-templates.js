@@ -907,7 +907,7 @@ function createFactureTemplates(helpers) {
       if (!rendered.includes(email)) fields.push(['Email de l’entreprise', email]);
     }
     if (!fields.length) return '';
-    const variantClass = template === 'consolide' ? ' sf-doc-meta-consolide' : '';
+    const variantClass = template === 'consolide' ? ' sf-doc-meta-consolide' : template === 'signature' ? ' sf-doc-meta-signature' : '';
     return `
       <section class="sf-doc-meta${variantClass}" aria-label="Informations du document">
         ${fields.map(([label, value]) => `
@@ -970,7 +970,7 @@ function createFactureTemplates(helpers) {
       ? escapeHtml(user.entreprise_mentions_legales).replace(/\r?\n/g, '<br/>')
       : '';
 
-    const variantClass = template === 'consolide' ? ' sf-doc-extras-consolide' : '';
+    const variantClass = template === 'consolide' ? ' sf-doc-extras-consolide' : template === 'signature' ? ' sf-doc-extras-signature' : '';
     return `
       <div class="sf-doc-extras${variantClass}">
         ${!isDevis ? `
@@ -1082,7 +1082,7 @@ function createFactureTemplates(helpers) {
 
   function renderSignature(user, facture, lignes, isDevis, qrCode, personnalisation) {
     return `
-      <div style="margin:-40px -40px 28px;padding:27px 40px 24px;border-top:7px solid #174D46;background:#F4F6F1;">
+      <div class="sf-signature-header" style="margin:-40px -40px 28px;padding:27px 40px 24px;border-top:7px solid #174D46;background:#F4F6F1;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;">
           <div style="max-width:65%;"><div style="color:#9A7B4F;font-size:.64rem;font-weight:800;letter-spacing:.2em;">SÉLECTION SIGNATURE</div>
             <div style="margin-top:8px;color:#173D38;font-family:var(--font-display);font-size:1.48rem;font-weight:800;letter-spacing:-.035em;">${escapeHtml(user.entreprise_nom || user.nom)}</div>
@@ -1094,17 +1094,17 @@ function createFactureTemplates(helpers) {
           <div style="color:#9A7B4F;font-size:.75rem;font-weight:800;letter-spacing:.1em;">N° ${escapeHtml(facture.numero)}</div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:25px;">
-        <div><div style="color:#9A7B4F;font-size:.64rem;font-weight:800;letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px;">Destinataire</div>${clientBlockHtml(facture)}</div>
-        <div style="padding:12px 15px;border-left:2px solid #C7B18A;background:#F8F8F5;font-size:.8rem;line-height:1.9;">
+      <div class="sf-signature-meta" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:25px;">
+        <div class="sf-signature-recipient"><div style="color:#9A7B4F;font-size:.64rem;font-weight:800;letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px;">Destinataire</div>${clientBlockHtml(facture)}</div>
+        <div class="sf-signature-references" style="padding:12px 15px;border-left:2px solid #C7B18A;background:#F8F8F5;font-size:.8rem;line-height:1.9;">
           <div><span style="color:#718078;">Date d’émission :</span> ${formatDate(facture.date_emission)}</div>
           <div><span style="color:#718078;">${isDevis ? 'Validité du devis :' : 'Échéance de paiement :'}</span> ${formatDate(isDevis ? facture.date_validite : facture.date_echeance)}</div>
           <div style="margin-top:5px;">${statutBadge(facture.statut)}</div>
         </div>
       </div>
       <table><thead><tr><th style="background:#174D46;color:#fff;">Désignation</th><th style="background:#174D46;color:#fff;">Qté</th><th style="background:#174D46;color:#fff;">Prix U.</th><th style="background:#174D46;color:#fff;">TVA</th><th style="background:#174D46;color:#fff;text-align:right;">Total</th></tr></thead><tbody>${lignesRowsHtml(lignes)}</tbody></table>
-      <div style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:295px;padding:14px 17px;border-top:2px solid #C7B18A;background:#F5F6F1;">${totalsRowsHtml(facture,'#174D46',personnalisation)}</div></div>
-      ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation)}
+      <div class="sf-signature-totals" style="display:flex;justify-content:flex-end;margin-top:20px;"><div style="width:295px;padding:14px 17px;border-top:2px solid #C7B18A;background:#F5F6F1;">${totalsRowsHtml(facture,'#174D46',personnalisation)}</div></div>
+      ${footerHtml(user,facture,isDevis,paymentStampLabel(facture,isDevis)==='Payée'?'':'stamp-clay',qrCode,personnalisation,'sf-signature-footer')}
     `;
   }
 
