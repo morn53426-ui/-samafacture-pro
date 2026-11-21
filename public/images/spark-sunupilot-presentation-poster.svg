@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+<title id="title">Spark Sunupilot — vidéo de présentation</title>
+<desc id="desc">Votre entreprise, mieux pilotée. Facturation, clients, produits et rapports.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#10152f"/><stop offset=".58" stop-color="#202052"/><stop offset="1" stop-color="#0b3028"/></linearGradient>
+  <radialGradient id="glow"><stop stop-color="#0a7a45" stop-opacity=".65"/><stop offset="1" stop-color="#0a7a45" stop-opacity="0"/></radialGradient>
+  <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse"><path d="M42 0H0V42" fill="none" stroke="#fff" stroke-opacity=".07"/></pattern>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<rect width="1280" height="720" fill="url(#bg)"/><rect width="1280" height="720" fill="url(#grid)"/>
+<ellipse cx="1050" cy="280" rx="400" ry="360" fill="url(#glow)"/>
+<g transform="translate(92 74)">
+  <circle cx="24" cy="24" r="22" fill="#0a7a45" stroke="#a4e6bd" stroke-width="2"/>
+  <circle cx="24" cy="24" r="8" fill="#f8fbf9"/>
+  <g stroke="#a4e6bd" stroke-width="4" stroke-linecap="round"><path d="M24 -10V-1M24 49V58M-10 24H-1M49 24H58M0 0L7 7M41 41L48 48M48 0L41 7M7 41L0 48"/></g>
+  <text x="74" y="34" fill="#f8fafc" font-size="30" font-family="Arial,sans-serif" font-weight="700">Spark Sunupilot</text>
+</g>
+<g font-family="Arial,sans-serif">
+  <rect x="94" y="174" width="268" height="42" rx="21" fill="#0a7a45" fill-opacity=".2" stroke="#69ca97" stroke-opacity=".7"/>
+  <text x="116" y="201" fill="#a8e8c1" font-size="17" font-weight="700" letter-spacing="2">UNE GESTION PLUS SIMPLE</text>
+  <text x="94" y="324" fill="#fff" font-size="62" font-weight="700">Votre entreprise,</text>
+  <text x="94" y="397" fill="#fff" font-size="62" font-weight="700">mieux pilotée.</text>
+  <text x="96" y="462" fill="#d9e4e8" font-size="24">Factures, devis, clients et rapports dans un espace</text>
+  <text x="96" y="497" fill="#d9e4e8" font-size="24">clair pour mieux organiser votre activité.</text>
+  <rect x="96" y="558" width="430" height="62" rx="14" fill="#0a7a45"/>
+  <text x="311" y="598" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">Découvrir la présentation</text>
+</g>
+<g transform="translate(785 185)" font-family="Arial,sans-serif">
+  <rect x="12" y="16" width="385" height="390" rx="28" fill="#000" opacity=".25" filter="url(#shadow)"/>
+  <rect width="385" height="390" rx="25" fill="#fff" fill-opacity=".09" stroke="#fff" stroke-opacity=".28" stroke-width="2"/>
+  <circle cx="192" cy="116" r="69" fill="#0a7a45" stroke="#a4e6bd" stroke-width="4"/>
+  <circle cx="192" cy="116" r="26" fill="#f8fbf9"/>
+  <g stroke="#a4e6bd" stroke-width="6" stroke-linecap="round"><path d="M192 26V7M192 225V206M102 116H83M301 116H282M128 52L114 38M270 194L256 180M256 52L270 38M114 194L128 180"/></g>
+  <text x="192" y="256" text-anchor="middle" fill="#d8f5e2" font-size="20" font-weight="700">FACTURATION</text>
+  <text x="192" y="292" text-anchor="middle" fill="#d8f5e2" font-size="18">CLIENTS · PRODUITS</text>
+  <text x="192" y="326" text-anchor="middle" fill="#d8f5e2" font-size="18">DÉPENSES · RAPPORTS</text>
+</g>
+<rect x="94" y="674" width="1092" height="6" rx="3" fill="#fff" fill-opacity=".22"/><rect x="94" y="674" width="182" height="6" rx="3" fill="#35c889"/>
+</svg>
