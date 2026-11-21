@@ -6017,9 +6017,11 @@ a.btn .icon {
   }
   .invoice-doc .sf-document-table th,
   .invoice-doc .sf-document-table td {
-    padding: 6px 6px !important;
+    /* Un peu plus d'air dans les lignes imprimées répartit mieux les dernières
+       lignes du tableau sur la page de synthèse, sans réduire la taille des polices. */
+    padding: 10px 6px !important;
     font-size: 9pt !important;
-    line-height: 1.35 !important;
+    line-height: 1.4 !important;
     overflow-wrap: anywhere !important;
   }
   .invoice-doc .sf-doc-meta,
