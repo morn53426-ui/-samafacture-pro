@@ -92,6 +92,24 @@ Fournis les cinq captures ordinateur (et éventuellement les vues mobiles). Vér
 
 Les captures seront remplacées dans le montage à la place des reconstructions actuelles. La vidéo sera ensuite réexportée et les sous-titres recontrôlés.
 
+## 7. Valider le fichier vidéo final avant intégration
+
+Quand le master final est disponible, copie-le dans le dépôt sous le chemin exact :
+
+`public/videos/sunupilot-presentation.mp4`
+
+Conserve également le fichier de sous-titres `public/videos/sunupilot-presentation-fr.vtt` et l'affiche `public/images/sunupilot-presentation-poster.svg`. Le nom du MP4 est utilisé directement par le lecteur de la page d'accueil.
+
+Depuis le dossier `server`, exécute :
+
+```powershell
+npm run validate:video-asset
+```
+
+Le contrôle vérifie la présence des trois fichiers, la signature du conteneur MP4, les boîtes `moov` et `mdat`, la taille du fichier (100 Ko à 80 Mio) ainsi que l'en-tête et les repères temporels WebVTT. Il s'agit d'un contrôle d'intégrité avant commit ; il ne remplace pas une lecture réelle dans Chrome, Safari et sur téléphone.
+
+Pour l'instant, tant que le MP4 n'est pas ajouté au dépôt, le lecteur utilise volontairement la présentation animée de secours. N'annonce pas la vidéo comme intégrée tant que cette commande ne passe pas et que la lecture locale n'a pas été vérifiée.
+
 ## Données incluses
 
 - 3 clients fictifs ;
