@@ -385,6 +385,74 @@ test('annulation et réactivation contre-passent chaque écriture facture sans d
     'un document sans écriture comptable reste supprimable');
 });
 
+test('les dépenses distinguent caisse et banque et deviennent immuables après comptabilisation', async () => {
+  const createExpense = payload => request(app).post('/api/depenses')
+    .set('Authorization', 'Bearer ' + token).send(payload);
+  const postExpense = id => request(app).post('/api/pro/accounting/post-expense/' + id)
+    .set('Authorization', 'Bearer ' + token);
+
+  const invalidMode = await createExpense({ libelle: 'Mode invalide', montant: 1000, mode_reglement: 'mobile' });
+  assert.equal(invalidMode.status, 400);
+  assert.equal(invalidMode.body.code, 'MODE_REGLEMENT_INVALIDE');
+
+  const bankExpense = await createExpense({
+    libelle: 'Frais bancaires de test', montant: 8500,
+    categorie: 'Frais généraux', mode_reglement: 'banque'
+  });
+  assert.equal(bankExpense.status, 201, bankExpense.text);
+  assert.equal(bankExpense.body.depense.mode_reglement, 'banque');
+  const bankPosted = await postExpense(bankExpense.body.depense.id);
+  assert.equal(bankPosted.status, 201, bankPosted.text);
+  const [[bankEntry]] = await pool.query(
+    'SELECT e.id, e.total_debit, e.total_credit, j.code AS journal_code FROM pro_compta_ecritures e JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id WHERE e.user_id = ? AND e.source_type = ? AND e.source_id = ?',
+    [userId, 'depense', bankExpense.body.depense.id]
+  );
+  assert.equal(bankEntry.journal_code, 'BQ');
+  assert.equal(Number(bankEntry.total_debit), 8500);
+  assert.equal(Number(bankEntry.total_credit), 8500);
+  const [bankLines] = await pool.query(
+    'SELECT c.code, l.debit, l.credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id WHERE l.user_id = ? AND l.ecriture_id = ? ORDER BY c.code',
+    [userId, bankEntry.id]
+  );
+  assert.deepEqual(bankLines.map(line => ({ code: line.code, debit: Number(line.debit), credit: Number(line.credit) })), [
+    { code: '521', debit: 0, credit: 8500 },
+    { code: '622', debit: 8500, credit: 0 }
+  ]);
+
+  const bankReplay = await postExpense(bankExpense.body.depense.id);
+  assert.equal(bankReplay.status, 200, bankReplay.text);
+  assert.equal(bankReplay.body.duplicate, true);
+  const updatePosted = await request(app).put('/api/depenses/' + bankExpense.body.depense.id)
+    .set('Authorization', 'Bearer ' + token).send({ montant: 9999, mode_reglement: 'caisse' });
+  assert.equal(updatePosted.status, 409, updatePosted.text);
+  assert.equal(updatePosted.body.code, 'DEPENSE_COMPTABILISEE');
+  const deletePosted = await request(app).delete('/api/depenses/' + bankExpense.body.depense.id)
+    .set('Authorization', 'Bearer ' + token);
+  assert.equal(deletePosted.status, 409, deletePosted.text);
+  assert.equal(deletePosted.body.code, 'DEPENSE_COMPTABILISEE');
+
+  const listed = await request(app).get('/api/depenses').set('Authorization', 'Bearer ' + token);
+  assert.equal(listed.status, 200, listed.text);
+  const listedExpense = listed.body.depenses.find(row => Number(row.id) === Number(bankExpense.body.depense.id));
+  assert.equal(Number(listedExpense.comptabilisee), 1);
+
+  const cashExpense = await createExpense({ libelle: 'Petite caisse test', montant: 1200 });
+  assert.equal(cashExpense.status, 201, cashExpense.text);
+  assert.equal(cashExpense.body.depense.mode_reglement, 'caisse');
+  const cashPosted = await postExpense(cashExpense.body.depense.id);
+  assert.equal(cashPosted.status, 201, cashPosted.text);
+  const [[cashEntry]] = await pool.query(
+    'SELECT e.id, j.code AS journal_code FROM pro_compta_ecritures e JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id WHERE e.user_id = ? AND e.source_type = ? AND e.source_id = ?',
+    [userId, 'depense', cashExpense.body.depense.id]
+  );
+  assert.equal(cashEntry.journal_code, 'CA');
+  const [cashLines] = await pool.query(
+    'SELECT c.code, l.debit, l.credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id WHERE l.user_id = ? AND l.ecriture_id = ?',
+    [userId, cashEntry.id]
+  );
+  assert.ok(cashLines.some(line => line.code === '571' && Number(line.credit) === 1200));
+});
+
 after(async () => {
   try {
     await nettoyerUtilisateur(userId);
