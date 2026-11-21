@@ -970,7 +970,7 @@ function createFactureTemplates(helpers) {
       ? escapeHtml(user.entreprise_mentions_legales).replace(/\r?\n/g, '<br/>')
       : '';
 
-    const variantClass = template === 'consolide' ? ' sf-doc-extras-consolide' : template === 'signature' ? ' sf-doc-extras-signature' : template === 'platine' ? ' sf-doc-extras-platine' : '';
+    const variantClass = template === 'consolide' ? ' sf-doc-extras-consolide' : template === 'signature' ? ' sf-doc-extras-signature' : template === 'platine' ? ' sf-doc-extras-platine' : template === 'majeste' ? ' sf-doc-extras-majeste' : '';
     return `
       <div class="sf-doc-extras${variantClass}">
         ${!isDevis ? `
