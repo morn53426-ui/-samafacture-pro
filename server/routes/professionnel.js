@@ -3109,18 +3109,35 @@ router.get('/accounting/ledger', async (req, res, next) => {
 });
 
 router.post('/accounting/post-invoice/:id', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req);
-    const [rows] = await pool.query("SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'facture' AND statut <> 'annulee'", [req.params.id, uid]);
+    // Sérialiser l'enregistrement comptable avec une éventuelle annulation/réactivation :
+    // le statut ne peut pas basculer pendant que la première écriture est créée.
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      "SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'facture' AND statut <> 'annulee' FOR UPDATE",
+      [req.params.id, uid]
+    );
     const invoice = rows[0];
-    if (!invoice) return res.status(404).json({ error: 'Facture non trouvée ou annulée.' });
+    if (!invoice) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture non trouvée ou annulée.' });
+    }
     const netSales = Math.round((Number(invoice.total) - Number(invoice.total_tva)) * 100) / 100;
     const lines = [{ code: '411', libelle: 'Client ' + invoice.id, debit: Number(invoice.total), credit: 0, facture_id: invoice.id }];
     if (netSales > 0) lines.push({ code: '706', libelle: 'Vente facture ' + invoice.numero, debit: 0, credit: netSales, facture_id: invoice.id });
     if (Number(invoice.total_tva) > 0) lines.push({ code: '443', libelle: 'TVA facture ' + invoice.numero, debit: 0, credit: Number(invoice.total_tva), facture_id: invoice.id });
     const result = await postSystemEntry(uid, actor(req), 'facture', invoice.id, invoice.date_emission, 'Comptabilisation facture ' + invoice.numero, 'VE', lines);
+    await conn.commit();
     res.status(result.duplicate ? 200 : 201).json(result);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.post('/accounting/post-payment/:id', async (req, res, next) => {
