@@ -7868,3 +7868,49 @@ a.btn .icon {
   }
 }
 
+/* Modèle Luxe — compacter l'impression A4 sans réduire la taille des caractères.
+   Les classes sont propres au modèle pour ne pas modifier les autres factures/devis. */
+@media print {
+  .invoice-doc .sf-luxe-header {
+    margin-bottom: 16px !important;
+    padding-top: 20px !important;
+    padding-bottom: 18px !important;
+  }
+  .invoice-doc .sf-luxe-header > div:first-child > div:first-child > div:nth-child(2) {
+    margin-top: 6px !important;
+  }
+  .invoice-doc .sf-luxe-header > div:first-child > div:first-child > div:nth-child(3) {
+    line-height: 1.4 !important;
+  }
+  .invoice-doc .sf-luxe-header > div:nth-child(2) {
+    margin-top: 16px !important;
+    padding-top: 9px !important;
+  }
+  .invoice-doc .sf-luxe-client-grid {
+    gap: 14px !important;
+    margin-bottom: 14px !important;
+  }
+  .invoice-doc .sf-luxe-client-grid > div:first-child {
+    padding: 10px 12px !important;
+  }
+  .invoice-doc .sf-luxe-client-grid > div:first-child > div:first-child {
+    margin-bottom: 5px !important;
+  }
+  .invoice-doc .sf-luxe-client-grid > div:last-child {
+    padding: 10px 12px !important;
+    line-height: 1.65 !important;
+  }
+  .invoice-doc .sf-luxe-table th,
+  .invoice-doc .sf-luxe-table td {
+    /* Police 9 pt maintenue ; seuls les espacements verticaux diminuent. */
+    padding: 3px 5px !important;
+    font-size: 9pt !important;
+    line-height: 1.25 !important;
+  }
+  .invoice-doc .sf-luxe-totals {
+    margin-top: 14px !important;
+  }
+  .invoice-doc .sf-luxe-totals > div {
+    padding: 12px 14px !important;
+  }
+}
