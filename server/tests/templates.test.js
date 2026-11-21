@@ -273,13 +273,13 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
 
   test('les noms d’entreprise sont échappés comme chaînes CSS et ne peuvent pas injecter une règle @page', () => {
     const css = templates.printPageIdentityCss({
-      user: userDeTest({ entreprise_nom: 'Sama" } @page { size: A0; /*\\nInjected' }),
+      user: userDeTest({ entreprise_nom: 'Sama" } @page { size: A0; /*\nInjected' }),
       facture: factureDeTest(),
       isDevis: false
     });
-    assert.equal((css.match(/@page\\s*\\{/g) || []).length, 1,
+    assert.equal(css.split('@page {').length - 1, 1,
       'Une donnée de société ne doit pas pouvoir créer une seconde règle @page.');
-    assert.ok(css.includes('Sama\\\\" } @page { size: A0; /*\\\\a Injected'),
+    assert.ok(css.includes('Sama\\" } @page { size: A0; /*\\a Injected'),
       'Les guillemets et retours à la ligne doivent rester dans la chaîne CSS.');
   });
 
