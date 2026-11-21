@@ -59,7 +59,34 @@ Ouvre `http://localhost:4000/login.html`, connecte-toi avec les identifiants qui
 
 Pour un rendu propre, utilise un navigateur de bureau en 1920 × 1080, zoom 100 %, largeur de fenêtre constante et barre du navigateur masquée seulement si cela ne rogne pas l'interface. Fais aussi une capture mobile en mode responsive, par exemple 390 × 844.
 
-## 4. Envoyer les captures pour le montage
+
+
+## 5. Lancer la capture automatique (recommandé)
+
+Le dépôt contient un outil Puppeteer local qui ouvre une session vierge, se connecte au compte fictif, attend que les lignes de données chargent et enregistre cinq pages ordinateur et deux vues mobiles. Il refuse les connexions à tout hôte autre que `localhost` / `127.0.0.1` et n'accepte que `demo.video@sunupilot.test`.
+
+Le serveur de démonstration doit rester lancé dans le premier terminal. Dans le second terminal PowerShell, positionné dans le dossier `server` :
+
+```powershell
+$env:SUNUPILOT_DEMO_EMAIL = "demo.video@sunupilot.test"
+$securePassword = Read-Host "Mot de passe du compte de démonstration" -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+$env:SUNUPILOT_DEMO_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+$env:SUNUPILOT_CAPTURE_CONFIRM = "SUNUPILOT_LOCAL_CAPTURE_ONLY"
+npm run capture:video-demo
+Remove-Item Env:SUNUPILOT_DEMO_PASSWORD
+Remove-Item Env:SUNUPILOT_CAPTURE_CONFIRM
+```
+
+Les fichiers sont enregistrés dans le dossier temporaire Windows `%TEMP%\\sunupilot-video-captures` (le chemin exact est affiché à la fin du script) :
+- cinq captures desktop en 1920 × 1080 ;
+- deux captures mobiles en 390 × 844 ;
+- un rapport `capture-report.json` avec les chemins et les erreurs JavaScript éventuelles.
+
+Le script ne téléverse aucun fichier et n'envoie aucune capture hors de la machine. Envoie ensuite les PNG produits dans cette conversation pour le montage. Si Chromium n'est pas encore disponible, laisse Puppeteer installer son navigateur lors de l'installation des dépendances du projet ou exécute `npm install` dans le dossier `server`.
+
+## 6. Envoyer les captures pour le montage
 
 Fournis les cinq captures ordinateur (et éventuellement les vues mobiles). Vérifie qu'elles montrent uniquement les libellés et données fictifs DEMO. Ne photographie ni ne partage de noms, numéros, e-mails, adresses, pièces ou factures de vrais clients.
 
