@@ -79,7 +79,7 @@
         <td data-label="Libellé" class="depense-libelle">${escapeHtml(d.libelle)}</td>
         <td data-label="Catégorie">${escapeHtml(d.categorie) || '—'}</td>
         <td data-label="Date">${formatDate(d.date_depense)}</td>
-        <td data-label="Montant" class="mono" style="color:var(--clay);">${formatMontant(d.montant)}</td>
+        <td data-label="Montant" class="mono" style="color:var(--clay-text);">${formatMontant(d.montant)}</td>
         <td data-label="Actions" class="depense-actions-cell">
           <button class="btn btn-sm btn-outline" onclick='editDepense(${d.id})'>${Icon('edit-3')} Modifier</button>
           <button class="btn btn-sm btn-danger" onclick="deleteDepense(${d.id})">${Icon('trash-2')} Supprimer</button>
