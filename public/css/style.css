@@ -7596,3 +7596,14 @@ a.btn .icon {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --clay-text: #FF9B9B; }
 }
+
+/* Contraste WCAG AA des informations de trésorerie et statuts payés. */
+:root { --emerald-text: #066144; }
+:root[data-theme="dark"] { --emerald-text: #9DE7BC; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --emerald-text: #9DE7BC; }
+}
+.billing-table-topline .billing-table-secure,
+.billing-balance-clear,
+.badge-payee { color: var(--emerald-text); }
+.billing-balance-due { color: var(--clay-text); }
