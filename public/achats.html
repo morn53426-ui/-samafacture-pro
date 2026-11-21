@@ -114,7 +114,7 @@
     <div style="overflow-x:auto"><table class="data-table" style="width:100%;min-width:680px"><thead><tr><th>Date</th><th>Produit</th><th>Entrepôt</th><th>Type</th><th>Variation</th><th>Motif / référence</th></tr></thead><tbody id="movement-list"></tbody></table></div>
     <div id="purchase-orders" class="pro-list" style="margin-top:18px"></div>
   </section>
-  <p class="pro-note" style="margin-top:16px">Les quantités multi-entrepôts deviennent la source du stock total du catalogue après la première initialisation du module. Les ventes issues des factures continuent de mettre à jour le stock global historique ; le routage automatique des sorties de ventes vers un entrepôt spécifique reste une évolution à intégrer.</p>
+  <p class="pro-note" style="margin-top:16px">Le stock total du catalogue correspond à la somme des quantités de tous les entrepôts. Les ventes liées aux factures et leurs annulations sont automatiquement enregistrées dans le Magasin principal (PRINCIPAL) ; les autres entrepôts ne sont pas affectés par ces opérations. Pour vendre depuis un autre dépôt, transférez d’abord le stock vers le Magasin principal.</p>
 </main></div>
 <script src="js/api.js"></script><script src="js/pwa.js"></script><script src="js/sidebar.js"></script>
 <script>
