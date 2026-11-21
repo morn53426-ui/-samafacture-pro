@@ -70,6 +70,38 @@ describe('Génération PDF de facture', () => {
     assert.equal(res.body.slice(0, 5).toString('latin1'), '%PDF-');
   });
 
+  test('une facture courte tient sur une seule page A4', async () => {
+    await pool.query(
+      'UPDATE users SET facture_template = ? WHERE id = ?',
+      ['classique', userIdA]
+    );
+
+    const res = await request(app)
+      .get(`/api/factures/${factureId}/pdf`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks = [];
+        response.on('data', chunk => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      });
+
+    assert.equal(res.status, 200, res.text);
+    assert.match(res.headers['content-type'] || '', /^application\/pdf(?:;|$)/);
+    assert.equal(res.body.subarray(0, 5).toString('latin1'), '%PDF-');
+    assert.ok(res.body.length > 1500,
+      'La facture courte doit produire un PDF non vide et non tronqué (octets=' + res.body.length + ').');
+    const pdfLatin1 = res.body.toString('latin1');
+    const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
+    assert.ok(mediaBox, 'La facture courte doit déclarer une zone de page PDF.');
+    assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
+      Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
+      'La facture courte doit être au format A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
+
+    const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
+    assert.equal(pageCount, 1,
+      'Une facture courte avec une seule ligne doit tenir sur une seule page A4 (pages=' + pageCount + ').');
+  });
   test('les trente et un modèles produisent un vrai PDF A4 avec Puppeteer', async () => {
     for (const modele of TOUS_LES_MODELES_FACTURE) {
       await pool.query(
@@ -104,7 +136,7 @@ describe('Génération PDF de facture', () => {
         modele + ' doit être au vrai format A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
       const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
       assert.ok(pageCount >= 1 && pageCount <= 2,
-        modele + ' ne doit pas créer de pagination excessive pour une facture simple (pages=' + pageCount + ')');
+        modele + ' ne doit pas créer une pagination excessive pour une facture simple (pages=' + pageCount + ')');
       const nomsPolicesPdf = Array.from(
         pdfLatin1.matchAll(/\/(?:BaseFont|FontName)\s*\/([^\s/]+)/g),
         match => match[1]
@@ -359,6 +391,76 @@ describe('Génération PDF de facture', () => {
     assert.ok(pageCount > 0, 'le PDF doit contenir au moins une page');
     assert.ok(pageCount <= 3,
       'les conditions et l’acceptation doivent suivre les totaux sans créer une quatrième page isolée (pages=' + pageCount + ')');
+  });
+
+  test('un devis Executive de 28 lignes reste en trois pages A4 maximum', async () => {
+    const [[templateBefore]] = await pool.query(
+      'SELECT facture_template FROM users WHERE id = ?',
+      [userIdA]
+    );
+    await pool.query(
+      'UPDATE users SET facture_template = ? WHERE id = ?',
+      ['executive', userIdA]
+    );
+
+    try {
+      const client = await request(app)
+        .post('/api/clients')
+        .set('Authorization', 'Bearer ' + tokenA)
+        .send({ nom: 'Client Devis Executive Pagination' });
+      assert.equal(client.status, 201, client.text);
+
+      const lignes = Array.from({ length: 28 }, (_, index) => ({
+        designation: 'Lot de prestation et fournitures prévu au devis — ' +
+          String(index + 1).padStart(2, '0') +
+          ' — Départements et services régionaux de gestion commerciale',
+        quantite: index % 5 === 0 ? 2 : 1,
+        prix_unitaire: 10000 + index * 250,
+        tva: index % 4 === 0 ? 0 : 18
+      }));
+      const devis = await request(app)
+        .post('/api/factures')
+        .set('Authorization', 'Bearer ' + tokenA)
+        .send({
+          client_id: client.body.client.id,
+          type: 'devis',
+          objet: 'Proposition commerciale détaillée et conditions de réalisation',
+          date_validite: '2026-12-17',
+          conditions_reglement: 'Offre valable 30 jours. Exécution après accord du client et validation du calendrier.',
+          lignes
+        });
+      assert.equal(devis.status, 201, devis.text);
+
+      const res = await request(app)
+        .get('/api/factures/' + devis.body.facture.id + '/pdf')
+        .set('Authorization', 'Bearer ' + tokenA)
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks = [];
+          response.on('data', chunk => chunks.push(chunk));
+          response.on('end', () => callback(null, Buffer.concat(chunks)));
+        });
+
+      assert.equal(res.status, 200);
+      assert.ok((res.headers['content-type'] || '').startsWith('application/pdf'));
+      assert.equal(res.body.subarray(0, 5).toString('latin1'), '%PDF-');
+      const pdfLatin1 = res.body.toString('latin1');
+      const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
+      assert.ok(mediaBox, 'Le PDF Executive doit déclarer sa zone A4.');
+      assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
+        Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
+        'Le devis Executive doit être en A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
+      const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
+      assert.ok(pageCount >= 2,
+        'Les 28 lignes du devis Executive doivent produire plusieurs pages (pages=' + pageCount + ').');
+      assert.ok(pageCount <= 3,
+        'Le devis Executive de 28 lignes ne doit pas produire une quatrième page (pages=' + pageCount + ').');
+    } finally {
+      await pool.query(
+        'UPDATE users SET facture_template = ? WHERE id = ?',
+        [templateBefore?.facture_template || 'classique', userIdA]
+      );
+    }
   });
 
   test('une facture volumineuse conserve son suivi de règlement et ses totaux sans page isolée', async () => {
