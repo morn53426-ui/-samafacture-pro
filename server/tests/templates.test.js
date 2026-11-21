@@ -248,29 +248,39 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     }
   });
 
-  test('les trente et un modèles portent l’identité de facture et de devis pour les pages imprimées', () => {
+  test('les trente et un modèles génèrent une identité A4 répétable pour les factures et les devis', () => {
     for (const template of TEMPLATES_ATTENDUS) {
       for (const isDevis of [false, true]) {
         const numero = isDevis ? 'DV-IDENTITE-2026-0988' : 'FAC-IDENTITE-2026-0987';
-        const html = templates.renderInvoiceHtml({
+        const css = templates.printPageIdentityCss({
           user: userDeTest({ entreprise_nom: 'SamaFacture Société & Fils' }),
           facture: factureDeTest({ numero }),
-          lignes: lignesDeTest,
-          isDevis,
-          qrCode: null,
-          template
+          isDevis
         });
-        assert.match(html, /class="sf-print-continuation-header"/,
-          template + ' doit prévoir une ligne d’identification pour les pages imprimées.');
-        assert.ok(html.includes(
-          '<span class="sf-print-continuation-company">SamaFacture Société &amp; Fils</span>'
-        ), template + ' doit afficher le nom de l’entreprise de manière échappée.');
-        assert.ok(html.includes(
-          '<span class="sf-print-continuation-reference">' +
-          (isDevis ? 'DEVIS' : 'FACTURE') + ' · ' + numero + '</span>'
-        ), template + ' doit afficher le type et le numéro exact du document.');
+        assert.match(css, /@top-left/,
+          template + ' doit répéter le nom de l’entreprise dans la marge A4.');
+        assert.match(css, /@top-right/,
+          template + ' doit répéter la référence dans la marge A4.');
+        assert.ok(css.includes('"SamaFacture Société & Fils"'),
+          template + ' doit inclure le nom de l’entreprise.');
+        assert.ok(css.includes(
+          '"' + (isDevis ? 'DEVIS' : 'FACTURE') + ' · ' + numero + '"'
+        ), template + ' doit inclure le type et le numéro du document.');
+        assert.doesNotMatch(css, /undefined|NaN/);
       }
     }
+  });
+
+  test('les noms d’entreprise sont échappés comme chaînes CSS et ne peuvent pas injecter une règle @page', () => {
+    const css = templates.printPageIdentityCss({
+      user: userDeTest({ entreprise_nom: 'Sama" } @page { size: A0; /*\\nInjected' }),
+      facture: factureDeTest(),
+      isDevis: false
+    });
+    assert.equal((css.match(/@page\\s*\\{/g) || []).length, 1,
+      'Une donnée de société ne doit pas pouvoir créer une seconde règle @page.');
+    assert.ok(css.includes('Sama\\\\" } @page { size: A0; /*\\\\a Injected'),
+      'Les guillemets et retours à la ligne doivent rester dans la chaîne CSS.');
   });
 
   test('les trente et un modèles identifient clairement les dates de facture', () => {
