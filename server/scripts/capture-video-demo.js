@@ -112,6 +112,7 @@ async function main() {
       if (!response || !response.ok()) {
         throw new Error('La page mobile ' + item.path + ' a répondu avec une erreur HTTP.');
       }
+      assertLocalPage(page, origin);
       await waitForPage(page, item.ready);
       const destination = path.join(OUTPUT_DIR, item.name + '-390x844.png');
       await page.screenshot({ path: destination, type: 'png', fullPage: true });
