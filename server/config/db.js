@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 18;
+const CURRENT_SCHEMA_VERSION = 19;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -172,6 +172,7 @@ async function runMigrations(conn) {
   // v16 : type structuré des fiches catalogue ; les anciennes fiches restent non classées.
   // v17 : entrepôt de sortie mémorisé sur les factures pour des mouvements multi-entrepôts réversibles.
   // v18 : marqueur transactionnel pour reprendre une seule fois la ventilation des stocks historiques.
+  // v19 : historique des contrepassations et réactivations comptables des factures.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -364,6 +365,21 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of accountingPurchasingStatements) {
+    await conn.query(statement);
+  }
+
+  // Historique des transitions comptables des factures : chaque annulation/réactivation
+  // crée une écriture inverse liée à un événement unique, y compris après plusieurs cycles.
+  const invoiceAccountingEventsPath = path.join(__dirname, '..', 'database', 'migrations', '011_comptabilite_contrepas_factures.sql');
+  const invoiceAccountingEventsSql = fs.readFileSync(invoiceAccountingEventsPath, 'utf8');
+  const invoiceAccountingEventsStatements = invoiceAccountingEventsSql
+    .split(/\\r?\\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of invoiceAccountingEventsStatements) {
     await conn.query(statement);
   }
 
