@@ -23,6 +23,8 @@ const PAGES = [
   { name: 'clients', file: 'clients.html', ready: '#clients-body tr:not(.row-skeleton)' },
   { name: 'produits', file: 'produits.html', ready: '#produits-body tr:not(.row-skeleton)' },
   { name: 'factures', file: 'factures.html', ready: '#factures-body tr:not(.row-skeleton)' },
+  { name: 'facture-detail', file: 'facture-detail.html?id=987', ready: '.invoice-doc .sf-document-table tbody tr', standaloneDocument: true },
+  { name: 'devis-detail', file: 'facture-detail.html?id=988', ready: '.invoice-doc .sf-document-table tbody tr', standaloneDocument: true },
   { name: 'factures-recurrentes', file: 'factures-recurrentes.html', ready: '#recurrentes-body tr' },
   { name: 'devis', file: 'devis.html', ready: '#devis-body tr', responsiveTable: '#devis-body' },
   { name: 'depenses', file: 'depenses.html', ready: '#depenses-body tr', responsiveTable: '#depenses-body' },
@@ -38,6 +40,14 @@ const PAGES = [
   { name: 'groupe-entreprise', file: 'groupe-entreprise.html', ready: '#invite-company-form', plan: 'entreprise' },
   { name: 'invitation', file: 'invitation.html?type=company-group&token=' + 'a'.repeat(64), ready: '#accept-invite', public: true },
   { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true }
+];
+
+const DOCUMENT_TEMPLATES = [
+  'classique', 'moderne', 'minimaliste', 'elegant', 'corporate', 'creatif',
+  'prestige', 'heritage', 'diamant', 'executive', 'institution', 'signature', 'consolide',
+  'epure', 'azur', 'circuit', 'platine', 'atelier', 'saveurs', 'nova', 'nordique',
+  'luxe', 'tech', 'horizon', 'eclipse', 'saphir', 'conseil', 'imperial',
+  'panorama', 'groupe', 'majeste'
 ];
 
 function makeLong(prefix, length) {
@@ -479,6 +489,22 @@ async function preparePage(browser, baseUrl, fixtures, reduceMotion, apiFailures
         } else {
           response = fixtureFor(requestUrl.pathname, fixtures);
         }
+        if (requestUrl.pathname === '/api/auth/me' && response.user) {
+          // Permet à la recette d'exercer explicitement chaque modèle sans modifier
+          // les données de production ni ajouter de paramètre à l'API métier.
+          const referer = request.headers().referer || '';
+          try {
+            const refererUrl = new URL(referer);
+            const visualTemplate = refererUrl.pathname.endsWith('/facture-detail.html')
+              ? refererUrl.searchParams.get('visualTemplate')
+              : null;
+            if (DOCUMENT_TEMPLATES.includes(visualTemplate)) {
+              response.user.facture_template = visualTemplate;
+            }
+          } catch (error) {
+            // Un Referer absent ou invalide conserve le modèle de recette par défaut.
+          }
+        }
       } catch (error) {
         response = {};
       }
@@ -528,6 +554,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   const pageErrors = [];
   const onPageError = (error) => pageErrors.push(error.message);
   page.on('pageerror', onPageError);
+  const workspacePage = !pageDefinition.public && !pageDefinition.standaloneDocument;
 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
   if (pageDefinition.plan) {
@@ -696,6 +723,39 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' contient des tabindex positifs qui perturbent l’ordre de tabulation : ' +
       JSON.stringify(accessibilityBaseline.positiveTabIndex));
   }
+  if (pageDefinition.standaloneDocument) {
+    const documentUi = await page.evaluate(() => {
+      const documentNode = document.querySelector('.invoice-doc');
+      const toolbar = document.querySelector('.toolbar');
+      const buttons = toolbar ? Array.from(toolbar.querySelectorAll('button')) : [];
+      return {
+        documentVisible: Boolean(documentNode && documentNode.getClientRects().length),
+        title: document.title,
+        tableRows: document.querySelectorAll('.invoice-doc .sf-document-table tbody tr').length,
+        toolbarVisible: Boolean(toolbar && getComputedStyle(toolbar).display !== 'none'),
+        visibleActions: buttons.filter(button => button.getClientRects().length && getComputedStyle(button).visibility !== 'hidden').length,
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+        toolbarWidth: toolbar?.scrollWidth || 0,
+        toolbarClientWidth: toolbar?.clientWidth || 0
+      };
+    });
+    assert.equal(documentUi.documentVisible, true,
+      pageDefinition.name + ' doit afficher le document commercial.');
+    assert.ok(documentUi.title.startsWith(pageDefinition.name === 'devis-detail' ? 'Devis' : 'Facture'),
+      pageDefinition.name + ' doit identifier le type du document : ' + JSON.stringify(documentUi));
+    assert.ok(documentUi.tableRows >= (pageDefinition.name === 'devis-detail' ? 28 : 8),
+      pageDefinition.name + ' doit afficher toutes les lignes de la recette : ' + JSON.stringify(documentUi));
+    assert.equal(documentUi.toolbarVisible, true,
+      pageDefinition.name + ' doit conserver sa barre d’actions dédiée.');
+    assert.equal(documentUi.visibleActions, 4,
+      pageDefinition.name + ' doit afficher les quatre actions du document : ' + JSON.stringify(documentUi));
+    assert.ok(documentUi.documentWidth <= documentUi.viewportWidth + 1,
+      pageDefinition.name + ' ne doit pas élargir la page sur petit écran : ' + JSON.stringify(documentUi));
+    assert.ok(documentUi.toolbarWidth <= documentUi.toolbarClientWidth + 1,
+      pageDefinition.name + ' : les actions doivent rester dans la barre dédiée : ' + JSON.stringify(documentUi));
+  }
+
   await page.evaluate(() => document.fonts && document.fonts.ready);
   await new Promise((resolve) => setTimeout(resolve, 120));
 
@@ -737,7 +797,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'Aucun placeholder JavaScript brut ne doit apparaître dans la page.');
   }
 
-  if (!pageDefinition.public && viewport.width >= 901) {
+  if (workspacePage && viewport.width >= 901) {
     const geometry = await page.evaluate(() => ({
       sidebarRight: Math.round(document.getElementById('app-sidebar')?.getBoundingClientRect().right || 0),
       headingLeft: Math.round(document.querySelector('main.workspace-page h1')?.getBoundingClientRect().left || 0)
@@ -746,7 +806,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       pageDefinition.name + ' : le titre ne doit pas passer sous le rail latéral. ' + JSON.stringify(geometry));
   }
 
-  if (!pageDefinition.public) {
+  if (workspacePage) {
     const shell = await page.evaluate(() => ({
       toolbar: Boolean(document.querySelector('.app-topbar')),
       search: Boolean(document.querySelector('.app-topbar-search input#workspace-search')),
@@ -825,7 +885,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   }
   assert.deepEqual(layoutAudit.unhydratedIcons, [],
     pageDefinition.name + ' contient des icônes statiques non reconnues : ' + JSON.stringify(layoutAudit.unhydratedIcons));
-  if (!pageDefinition.public) {
+  if (workspacePage) {
     assert.ok(layoutAudit.navigationItemCount > 0,
       pageDefinition.name + ' doit présenter des entrées de navigation.');
     assert.equal(layoutAudit.navigationIconCount, layoutAudit.navigationItemCount,
@@ -886,7 +946,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       })()
     };
   });
-  if (!pageDefinition.public && viewport.width >= 901) {
+  if (workspacePage && viewport.width >= 901) {
     const expectedCollapsed = pageDefinition.name !== 'dashboard';
     assert.equal(navigationGeometry.sidebarCollapsed, expectedCollapsed,
       pageDefinition.name + ' : l’état initial du menu desktop doit respecter la page de référence.');
@@ -926,7 +986,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     ), 'Les commandes du bandeau doivent rester dans sa rangée visible : ' + JSON.stringify(toolbar));
   }
 
-  if (!pageDefinition.public && viewport.width >= 1900) {
+  if (workspacePage && viewport.width >= 1900) {
     assert.ok(navigationGeometry.firstContentWidth <= 1721,
       pageDefinition.name + ' : le contenu métier doit être borné à 1 720 px sur écran ultra-large : ' +
       JSON.stringify(navigationGeometry));
@@ -2391,7 +2451,7 @@ async function verifyThemeAndZoom(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
 
   for (const pageDefinition of pages) {
     const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -2562,7 +2622,7 @@ async function verifyBusinessPagesDarkTheme(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesLightThemeDesktop(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
 
   for (const pageDefinition of pages) {
     const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -2692,7 +2752,7 @@ async function verifyBusinessPagesLightThemeDesktop(browser, baseUrl, fixtures) 
 
 async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
   const viewports = [
     { name: 'mobile-320', width: 320, height: 812 },
     { name: 'mobile-390', width: 390, height: 844 }
@@ -2826,7 +2886,7 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
   const viewports = [
     { name: 'mobile-320', width: 320, height: 812 },
     { name: 'mobile-390', width: 390, height: 844 }
@@ -2961,7 +3021,7 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
   const viewport = { width: 720, height: 900 };
 
   for (const pageDefinition of pages) {
@@ -3092,7 +3152,7 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
   const viewport = { width: 720, height: 900 };
 
   for (const pageDefinition of pages) {
@@ -3236,7 +3296,7 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
 
 async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
   const results = [];
-  const pages = PAGES.filter(pageDefinition => !pageDefinition.public);
+  const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
 
   for (const pageDefinition of pages) {
     const page = await preparePage(browser, baseUrl, fixtures, false);
@@ -3789,8 +3849,108 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     return { ...screenMetrics, printMetrics, pdfBytes: pdf.length, pdfPages: pages };
   }
 
+  async function verifyAllTemplateBannerGeometry(documentId, type) {
+    const titleLabels = type === 'devis' ? ['DEVIS', 'PROPOSITION'] : ['FACTURE'];
+    const bannerSelector = '[style*="margin:-40px -40px"], [style*="margin:-8px -8px"]';
+    let bannersChecked = 0;
+    const templatesChecked = [];
+
+    for (const template of DOCUMENT_TEMPLATES) {
+      await page.emulateMediaType(null);
+      await page.goto(baseUrl + '/facture-detail.html?id=' + documentId + '&visualTemplate=' + encodeURIComponent(template), {
+        waitUntil: 'domcontentloaded'
+      });
+      await page.waitForFunction((expectedTemplate) =>
+        window.__docReady === true && document.getElementById('doc')?.classList.contains('tpl-' + expectedTemplate),
+      { timeout: 15000 }, template);
+      await page.emulateMediaType('print');
+
+      const geometry = await page.evaluate(({ selector, expectedTitles }) => {
+        const documentNode = document.querySelector('.invoice-doc');
+        if (!documentNode) return { documentFound: false, banners: [], titlePresent: false, titleBounds: null };
+        const bounds = documentNode.getBoundingClientRect();
+        const banners = Array.from(documentNode.querySelectorAll(selector)).map(element => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            marginTop: Number.parseFloat(style.marginTop) || 0,
+            marginLeft: Number.parseFloat(style.marginLeft) || 0,
+            marginRight: Number.parseFloat(style.marginRight) || 0,
+            leftOverflow: Number((bounds.left - rect.left).toFixed(2)),
+            rightOverflow: Number((rect.right - bounds.right).toFixed(2)),
+            topOverflow: Number((bounds.top - rect.top).toFixed(2)),
+            width: Number(rect.width.toFixed(2))
+          };
+        });
+        // Le titre principal doit être mesuré dans le premier bandeau, pas dans
+        // un texte identique des mentions/pieds de page. Deux modèles devis
+        // utilisent intentionnellement « PROPOSITION » au lieu de « DEVIS ».
+        const headerNode = documentNode.firstElementChild || documentNode;
+        const titleCandidates = Array.from(headerNode.querySelectorAll('*')).filter(element => {
+          if (element.children.length !== 0) return false;
+          const text = (element.textContent || '').trim().normalize('NFKD')
+            .replace(/^[^A-Za-zÀ-ÖØ-öø-ÿ0-9]+/, '').trim().toUpperCase();
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return expectedTitles.some(label => text.startsWith(label)) &&
+            style.display !== 'none' && style.visibility !== 'hidden' &&
+            Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+            element.getClientRects().length > 0;
+        });
+        titleCandidates.sort((a, b) =>
+          Number.parseFloat(getComputedStyle(b).fontSize) - Number.parseFloat(getComputedStyle(a).fontSize)
+        );
+        const titleElement = titleCandidates[0] || null;
+        const titleRect = titleElement?.getBoundingClientRect();
+        return {
+          documentFound: true,
+          documentWidth: Number(bounds.width.toFixed(2)),
+          titlePresent: titleCandidates.length > 0,
+          titleCandidates: titleCandidates.slice(0, 5).map(element => {
+            const rect = element.getBoundingClientRect();
+            return {
+              text: (element.textContent || '').trim().slice(0, 80),
+              fontSize: getComputedStyle(element).fontSize,
+              left: Number(rect.left.toFixed(2)),
+              right: Number(rect.right.toFixed(2)),
+              top: Number(rect.top.toFixed(2))
+            };
+          }),
+          titleBounds: titleRect ? {
+            leftOverflow: Number((bounds.left - titleRect.left).toFixed(2)),
+            rightOverflow: Number((titleRect.right - bounds.right).toFixed(2)),
+            topOverflow: Number((bounds.top - titleRect.top).toFixed(2))
+          } : null,
+          banners
+        };
+      }, { selector: bannerSelector, expectedTitles: titleLabels });
+
+      assert.equal(geometry.documentFound, true, type + '/' + template + ' : document introuvable.');
+      assert.ok(geometry.documentWidth > 0, type + '/' + template + ' : largeur imprimée nulle.');
+      assert.equal(geometry.titlePresent, true, type + '/' + template + ' : titre principal (' + titleLabels.join(' / ') + ') absent du bandeau.');
+      if (geometry.titleBounds) {
+        assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
+          type + '/' + template + ' : titre principal hors de la zone du document : ' + JSON.stringify({ bounds: geometry.titleBounds, candidates: geometry.titleCandidates }));
+      }
+      for (const banner of geometry.banners) {
+        assert.ok(Math.abs(banner.marginTop) <= 0.5 && Math.abs(banner.marginLeft) <= 0.5 && Math.abs(banner.marginRight) <= 0.5,
+          type + '/' + template + ' : les marges négatives du bandeau doivent être neutralisées en print : ' + JSON.stringify(banner));
+        assert.ok(banner.leftOverflow <= 0.5 && banner.rightOverflow <= 0.5 && banner.topOverflow <= 0.5,
+          type + '/' + template + ' : bandeau hors de la zone imprimable : ' + JSON.stringify(banner));
+      }
+      bannersChecked += geometry.banners.length;
+      templatesChecked.push({ template, banners: geometry.banners.length });
+    }
+    assert.ok(bannersChecked > 0, type + ' : la recette doit avoir rencontré et mesuré les bandeaux historiques à marges négatives.');
+    return { templateCount: templatesChecked.length, bannersChecked, templates: templatesChecked };
+  }
+
   const invoicePdf = await verifyDocumentPdf(987, 'facture');
   const quotePdf = await verifyDocumentPdf(988, 'devis');
+  const templateBannerGeometry = DATASET === 'worst' ? {
+    facture: await verifyAllTemplateBannerGeometry(987, 'facture'),
+    devis: await verifyAllTemplateBannerGeometry(988, 'devis')
+  } : { skipped: 'Mesure exhaustive réservée au dataset worst.' };
   await page.close();
   return {
     invoiceCreation: 'ok',
@@ -3798,6 +3958,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     totalWithDiscountVatAndDelivery: 20380,
     invoicePrint: invoicePdf,
     quotePrint: quotePdf,
+    templateBannerGeometry,
     screenshots: 2,
     pdfFiles: 2
   };
