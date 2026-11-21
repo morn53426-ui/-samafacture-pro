@@ -7695,7 +7695,7 @@ a.btn .icon {
 }
 
 /* Le focus clavier doit être visible sur le champ et sur les composants composites. */
-.reports-filter-card input[type="date"]:focus-visible {
+.reports-filter-card input[type="date"]:focus {
   outline: 2px solid var(--emerald);
   outline-offset: 2px;
   border-color: var(--emerald);
