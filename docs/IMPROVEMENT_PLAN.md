@@ -2,7 +2,7 @@
 
 **Date de référence :** 21 novembre 2026  
 **Branche de référence :** `main`  
-**Commit de référence :** `f42f69e184f92bec26d76442a1249593b64f795f`  
+**Commit de référence :** `5478809ee73e25f381503a20712893e6cc6c8a2b`  
 **Règle de travail :** toute évolution passe par une branche et une Pull Request. Ne pas modifier directement `main`, ne pas fusionner une PR dont les contrôles requis échouent et ne pas déployer sans validation dédiée.
 
 Ce document est un plan de travail vivant. Les états ci-dessous reflètent les preuves GitHub consultées à la date de référence ; « en cours » ou « à vérifier » ne signifie pas « résolu ».
@@ -11,12 +11,12 @@ Ce document est un plan de travail vivant. Les états ci-dessous reflètent les 
 
 | Nº | Priorité | Chantier | État au 21/11/2026 |
 |---:|---|---|---|
-| 1 | P1 | Identification des factures/devis sur chaque page PDF | PR #112 en cours de validation |
+| 1 | P1 | Identification des factures/devis sur chaque page PDF | PR #112 : CI #1207 réussie ; nouvelle CI après intégration des préférences de profil |
 | 2 | P1 | Recette exhaustive des 31 modèles facture et 31 modèles devis | Géométrie des bandeaux validée sur main ; recette visuelle complète à étendre |
 | 3 | P1 | Invariants financiers, TVA, remises et arrondis | Suite existante verte sur main ; audit transversal à compléter |
-| 4 | P1 | Qualité d'impression et fidélité aperçu/PDF | Correctif de débordement des bandeaux intégré via PR #111 ; recette multipages à terminer |
+| 4 | P1 | Qualité d'impression et fidélité aperçu/PDF | Débordement des bandeaux corrigé via PR #111 ; identité multipages et formatage headless intégrés dans la PR #112, validation combinée en cours |
 | 5 | P2 | Accessibilité clavier, clair/sombre et contrastes | PR #110 en cours de revalidation |
-| 6 | P2 | Routage des stocks et annulations par entrepôt | PR #106 : CI complète réussie, revue fonctionnelle à terminer |
+| 6 | P2 | Routage des stocks et annulations par entrepôt | PR #106 fusionnée dans main ; scénario vente/annulation multi-entrepôts intégré |
 | 7 | P2 | Responsive, zoom et performances | Recette responsive main réussie ; profilage de performance non réalisé |
 | 8 | P2 | Durcissement sécurité, sessions et sauvegardes | CSP et jeton localStorage encore à faire évoluer |
 | 9 | P2 | Identité visuelle et rebranding | PR #99 non fusionnable ; marque encore à valider juridiquement |
@@ -199,9 +199,9 @@ Préserver strictement les montants déjà calculés lors des améliorations vis
 
 - **PR #111 :** fusionnée dans main ; correction des marges négatives des bandeaux et recette géométrique des 31 modèles facture et 31 modèles devis passée.
 - **PR #112 :** ouverte ; identification des pages PDF de continuation en validation.
-- **PR #113 :** ouverte comme évolution dépendante de #112 ; vérification des préférences de date/devise du rendu headless à rebaser et tester.
+- **Ancienne PR #113 :** son correctif de profil headless (date, fuseau et devise) a été réintégré dans la branche de la PR #112 avec des tests dédiés ; la PR séparée est redondante et doit être clôturée comme remplacée après confirmation de la CI combinée.
 - **PR #110 :** ouverte ; recette clavier et clair/sombre en revalidation.
-- **PR #106 :** ouverte ; CI complète réussie, revue fonctionnelle à terminer.
+- **PR #106 :** fusionnée dans main par le commit `5478809e` ; la vente et son annulation sont vérifiées avec un entrepôt secondaire isolé.
 - **PR #99 :** ouverte ; conflits et contraste à corriger, validation juridique requise.
 - **PR #102 :** ancienne campagne d'accessibilité à consolider avec #110.
 
