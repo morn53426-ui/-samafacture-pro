@@ -89,6 +89,8 @@ describe('Génération PDF de facture', () => {
     assert.equal(res.status, 200, res.text);
     assert.match(res.headers['content-type'] || '', /^application\/pdf(?:;|$)/);
     assert.equal(res.body.subarray(0, 5).toString('latin1'), '%PDF-');
+    assert.ok(res.body.length > 1500,
+      'La facture courte doit produire un PDF non vide et non tronqué (octets=' + res.body.length + ').');
     const pdfLatin1 = res.body.toString('latin1');
     const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
     assert.ok(mediaBox, 'La facture courte doit déclarer une zone de page PDF.');
@@ -134,7 +136,7 @@ describe('Génération PDF de facture', () => {
         modele + ' doit être au vrai format A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
       const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
       assert.ok(pageCount >= 1 && pageCount <= 2,
-        modele + ' ne doit pas créer de pagination excessive pour une facture simple (pages=' + pageCount + ')');
+        modele + ' ne doit pas créer une pagination excessive pour une facture simple (pages=' + pageCount + ')');
       const nomsPolicesPdf = Array.from(
         pdfLatin1.matchAll(/\/(?:BaseFont|FontName)\s*\/([^\s/]+)/g),
         match => match[1]
