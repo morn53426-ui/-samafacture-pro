@@ -53,7 +53,10 @@ async function recordInvoiceAccountingTransition(conn, {
     return { recorded: false, duplicate: true, reason: 'FACTURE_NON_CONTREPASSEE' };
   }
 
-  const previousEntryId = latestEvent?.ecriture_id || original.id;
+  if (latestEvent && !latestEvent.ecriture_id) {
+    throw new Error('La dernière transition comptable de cette facture est incomplète ; contrepassation refusée.');
+  }
+  const previousEntryId = latestEvent ? latestEvent.ecriture_id : original.id;
   if (!previousEntryId) {
     throw new Error('Écriture comptable précédente introuvable pour cette facture.');
   }
