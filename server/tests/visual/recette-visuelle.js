@@ -3837,6 +3837,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       tableHeaderDisplay: getComputedStyle(document.querySelector('.sf-document-table thead')).display,
       pageRule: getComputedStyle(document.querySelector('.invoice-doc')).breakInside,
       overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX,
+      tableCellPaddingTop: getComputedStyle(document.querySelector('.sf-document-table tbody td')).paddingTop,
+      tableCellLineHeight: getComputedStyle(document.querySelector('.sf-document-table tbody td')).lineHeight,
       documentFontFamily: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily,
       pageIdentityRuleText: Array.from(
         document.getElementById('sf-print-page-identity')?.sheet?.cssRules || []
@@ -3860,6 +3862,10 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
       type + ' : l’en-tête du tableau doit être répété lorsque le document passe sur une nouvelle page.');
     assert.equal(printMetrics.overflowX, 'visible', type + ' : le document ne doit pas être coupé horizontalement à l’impression.');
+    assert.equal(printMetrics.tableCellPaddingTop, '10px',
+      type + ' : les lignes doivent garder un espacement vertical régulier à l’impression.');
+    assert.ok(Math.abs(parseFloat(printMetrics.tableCellLineHeight) - 16.8) < 0.2,
+      type + ' : la hauteur de ligne imprimée doit rester confortable sans réduire la police.');
     assert.match(printMetrics.documentFontFamily, /IBM Plex Sans/i,
       type + ' : la pile typographique IBM Plex Sans doit rester prioritaire pour le document imprimé.');
 
