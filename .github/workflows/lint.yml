@@ -2,12 +2,14 @@ name: ESLint — JavaScript modifié
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121']
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'
+      - 'public/js/api.js'
       - 'public/js/workspace-modals.js'
       - 'server/tests/visual/recette-visuelle.js'
+      - 'server/tests/local-date-format.test.js'
       - 'server/tests/workspace-navigation.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - 'server/config/db.js'
@@ -25,8 +27,10 @@ on:
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'
+      - 'public/js/api.js'
       - 'public/js/workspace-modals.js'
       - 'server/tests/visual/recette-visuelle.js'
+      - 'server/tests/local-date-format.test.js'
       - 'server/tests/workspace-navigation.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
@@ -55,8 +59,10 @@ jobs:
           npx --yes --package=eslint@10.15.0 eslint
           eslint.config.mjs
           public/js/sidebar.js
+          public/js/api.js
           public/js/workspace-modals.js
           server/tests/visual/recette-visuelle.js
+          server/tests/local-date-format.test.js
           server/tests/workspace-navigation.test.js
           server/tests/workspace-modal-accessibility.test.js
           server/config/db.js

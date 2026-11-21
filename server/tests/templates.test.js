@@ -248,6 +248,45 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     }
   });
 
+  test('les trente et un modèles génèrent une identité A4 répétable pour les factures et les devis', () => {
+    for (const template of TEMPLATES_ATTENDUS) {
+      for (const isDevis of [false, true]) {
+        const numero = isDevis ? 'DV-IDENTITE-2026-0988' : 'FAC-IDENTITE-2026-0987';
+        const css = templates.printPageIdentityCss({
+          user: userDeTest({ entreprise_nom: 'SamaFacture Société & Fils' }),
+          facture: factureDeTest({ numero }),
+          isDevis
+        });
+        assert.match(css, /@top-left/,
+          template + ' doit répéter le nom de l’entreprise dans la marge A4.');
+        assert.match(css, /@top-right/,
+          template + ' doit répéter la référence dans la marge A4.');
+        assert.match(css, /@page:first/,
+          template + ' doit préserver le grand bandeau principal sur la première page.');
+        assert.ok(css.includes('@top-left { content: none; border: 0; }'),
+          template + ' doit masquer le rappel compact sur la première page.');
+        assert.ok(css.includes('@top-right { content: none; border: 0; }'),
+          template + ' doit masquer la référence compacte sur la première page.');
+        assert.ok(css.includes('"SamaFacture Société & Fils"'),
+          template + ' doit inclure le nom de l’entreprise.');
+        assert.ok(css.includes(
+          '"' + (isDevis ? 'DEVIS' : 'FACTURE') + ' · ' + numero + '"'
+        ), template + ' doit inclure le type et le numéro du document.');
+        assert.doesNotMatch(css, /undefined|NaN/);
+      }
+    }
+  });
+
+  test('les noms d’entreprise sont échappés comme chaînes CSS et ne peuvent pas injecter une règle @page', () => {
+    const css = templates.printPageIdentityCss({
+      user: userDeTest({ entreprise_nom: 'Sama" } @page { size: A0; /*\nInjected' }),
+      facture: factureDeTest(),
+      isDevis: false
+    });
+    assert.ok(css.includes('"Sama\\" } @page { size: A0; /*\\a Injected"'),
+      'Les guillemets et retours à la ligne doivent rester dans une seule chaîne CSS.');
+  });
+
   test('les trente et un modèles identifient clairement les dates de facture', () => {
     for (const template of TEMPLATES_ATTENDUS) {
       const html = templates.renderInvoiceHtml({

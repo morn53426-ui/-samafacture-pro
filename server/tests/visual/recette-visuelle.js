@@ -404,7 +404,8 @@ function fixtureFor(pathname, fixtures) {
   if (pathname === '/api/auth/me') return {
     user: {
       id: 1, nom: 'Compte de recette SamaFacture', entreprise_nom: 'SamaFacture — Société de test',
-      entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro'
+      entreprise_conditions_reglement: 'Paiement sous 30 jours', devise: 'FCFA', plan: 'pro',
+      locale: 'fr-FR', format_date: 'yyyy-MM-dd', fuseau_horaire: 'Africa/Dakar'
     }
   };
   if (pathname === '/api/pro/crm/overview') return {
@@ -3747,6 +3748,9 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     'Échap doit fermer le dialogue et libérer le verrou de focus.');
 
   async function verifyDocumentPdf(documentId, type) {
+    // Reproduire le contexte du worker PDF : sf_token est présent, mais pas sf_user.
+    // Le profil et ses préférences doivent venir de GET /auth/me.
+    await page.evaluate(() => localStorage.removeItem('sf_user'));
     // Revenir au média écran avant de capturer l’aperçu de chaque document.
     await page.emulateMediaType(null);
     await page.goto(baseUrl + '/facture-detail.html?id=' + documentId, { waitUntil: 'domcontentloaded' });
@@ -3771,8 +3775,16 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       taxRowAmounts: Array.from(document.querySelectorAll('.invoice-doc .sf-doc-tax-row strong')).map(element => element.textContent),
       taxTotalAmount: document.querySelector('.invoice-doc .sf-doc-tax-total strong')?.textContent || '',
       validityLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Validité du devis'),
-      dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance')
+      dueLabel: (document.querySelector('.invoice-doc')?.innerText || '').includes('Échéance'),
+      renderedDocumentText: document.querySelector('.invoice-doc')?.innerText || '',
+      pageIdentityRulePresent: Boolean(document.getElementById('sf-print-page-identity')?.sheet)
     }));
+    assert.equal(screenMetrics.pageIdentityRulePresent, true,
+      type + ' : les règles d’identification des marges A4 doivent être préparées.');
+    assert.ok(screenMetrics.renderedDocumentText.includes('2026-11-15'),
+      type + ' : la date d’émission doit utiliser le format du profil récupéré par /auth/me.');
+    assert.ok(screenMetrics.renderedDocumentText.includes('2026-12-15'),
+      type + ' : la date d’échéance/validité doit utiliser le format du profil récupéré par /auth/me.');
     assert.equal(screenMetrics.title, type === 'devis' ? 'Devis — Sunupilot' : 'Facture — Sunupilot',
       type + ' : le titre du document et les métadonnées PDF doivent identifier le bon type.');
     assert.ok(screenMetrics.lineCount >= (type === 'devis' ? 28 : 8),
@@ -3817,8 +3829,24 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       tableHeaderDisplay: getComputedStyle(document.querySelector('.sf-document-table thead')).display,
       pageRule: getComputedStyle(document.querySelector('.invoice-doc')).breakInside,
       overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX,
-      documentFontFamily: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily
+      documentFontFamily: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily,
+      pageIdentityRuleText: Array.from(
+        document.getElementById('sf-print-page-identity')?.sheet?.cssRules || []
+      ).map(rule => rule.cssText).join('\n')
     }));
+    assert.match(printMetrics.pageIdentityRuleText, /@top-left/,
+      type + ' : Chromium doit accepter la zone de marge supérieure gauche.');
+    assert.match(printMetrics.pageIdentityRuleText, /@top-right/,
+      type + ' : Chromium doit accepter la zone de marge supérieure droite.');
+    assert.match(printMetrics.pageIdentityRuleText, /@page\s*:first/,
+      type + ' : la première page doit conserver uniquement le grand bandeau du modèle.');
+    assert.match(printMetrics.pageIdentityRuleText, /content:\s*none/,
+      type + ' : le rappel compact doit être masqué sur la première page.');
+    assert.ok(printMetrics.pageIdentityRuleText.includes('"SamaFacture — Société de test"'),
+      type + ' : le nom de l’entreprise doit être présent dans la marge répétée.');
+    assert.ok(printMetrics.pageIdentityRuleText.includes(
+      type === 'devis' ? '"DEVIS · DV-2026-0988"' : '"FACTURE · FAC-2026-0987"'
+    ), type + ' : le type et le numéro doivent être présents dans la marge répétée.');
     assert.equal(printMetrics.toolbarDisplay, 'none', type + ' : la barre d’outils ne doit jamais être imprimée.');
     assert.equal(printMetrics.themeToggleDisplay, 'none', type + ' : le sélecteur de thème ne doit jamais recouvrir le document imprimé.');
     assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
