@@ -12,8 +12,9 @@ CREATE TABLE IF NOT EXISTS pro_compta_facture_events (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_pro_compta_facture_events (user_id, facture_id, id),
   KEY idx_pro_compta_facture_events_entry (user_id, ecriture_id),
+  -- L'identifiant facture est conservé comme référence historique sans FK :
+  -- supprimer une facture ne doit pas effacer ses événements comptables.
+  -- La FK user_id conserve l'effacement complet du tenant.
   CONSTRAINT fk_pro_compta_facture_events_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_pro_compta_facture_events_invoice
-    FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE RESTRICT
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
