@@ -317,10 +317,17 @@ router.delete('/:id', async (req, res, next) => {
       'SELECT id FROM pro_mouvements_stock WHERE user_id = ? AND produit_id = ? LIMIT 1 FOR UPDATE',
       [req.tenantId, existing.id]
     );
-    if (Number(existing.stock) !== 0 || Number(warehouseStock.total) !== 0 || invoiceLines.length || movements.length) {
+    // Les lignes d'achats et de réception gardent leur document mais la FK produit
+    // est ON DELETE SET NULL : bloquer pour conserver la traçabilité du catalogue.
+    const [purchaseLines] = await conn.query(
+      'SELECT id FROM pro_commandes_fournisseurs_lignes WHERE produit_id = ? LIMIT 1 FOR UPDATE',
+      [existing.id]
+    );
+    if (Number(existing.stock) !== 0 || Number(warehouseStock.total) !== 0 ||
+        invoiceLines.length || movements.length || purchaseLines.length) {
       await conn.rollback();
       return res.status(409).json({
-        error: 'Ce produit possède du stock, des mouvements ou des lignes de documents liés. Ajustez le stock et archivez le produit plutôt que de le supprimer.',
+        error: 'Ce produit possède du stock, des mouvements ou des lignes de vente/achat liées. Ajustez le stock et archivez le produit plutôt que de le supprimer.',
         code: 'PRODUIT_HISTORIQUE_PROTEGE'
       });
     }
