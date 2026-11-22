@@ -172,10 +172,10 @@ test('une base v8 reçoit les migrations v9 à v22 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v22 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v23 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 22, 'la version doit inclure les migrations v19 à v22 après le socle v18.');
+  assert.equal(Number(meta.version), 23, 'la version doit inclure les migrations v19 à v23 après le socle v18.');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',

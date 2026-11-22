@@ -133,7 +133,8 @@ describe('Navigation et structure des pages métier', () => {
     const nav = html.match(/<nav class="workspace-section-nav"[^>]*>([\s\S]*?)<\/nav>/);
     assert.ok(nav, 'La navigation rapide OHADA doit être présente.');
     const links = [...nav[1].matchAll(/href="#([^"]+)"/g)].map(match => match[1]);
-    assert.equal(links.length, 5, 'Les cinq zones comptables doivent être accessibles.');
+    assert.equal(links.length, 6, 'Les six zones comptables doivent être accessibles.');
+    assert.ok(links.includes('accounting-expense-mappings'), 'La zone des affectations de dépenses doit être accessible.');
     for (const id of links) {
       assert.match(html, new RegExp('\\bid="' + id + '"'),
         'Le raccourci #' + id + ' doit cibler une section existante.');
