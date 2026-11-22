@@ -978,6 +978,6 @@ Aucun changement direct main, merge/close PR, suppression de branche, volume, do
 - Status/workflow-runs sur head #141 f16f127b: aucune entrée retournée au contrôle; **tests non exécutés/validation CI non confirmée**. Le PR est Draft, sans merge.
 - PR #129 head 868027e1, 9 commits/6 fichiers, Draft, mergeable; status/runs non retournés. La branche #141 fournit une CI structurelle dédiée, mais ne remplace pas la recette visuelle responsive complète.
 - Après création #141, branche count actualisé à **147** (100+47, page terminale vide) et PR ouvertes à **24**. L'inventaire run 8 précédent est complété par cette branche.
-- #132 docs head c77da4b8: Tests automatisés run 45012834066 encore in_progress; ZIP run 45012833989 success. Compare main: 69 ahead/0 behind, deux fichiers docs. Ne pas déclarer la CI complète verte tant que le job test ne termine pas.
+- #132: Tests automatisés run 45012834066 (in_progress) et ZIP run 45012833989 (success) sur le head c77da4b8, avant les commits documentaires follow-up. Les commits de rapport/inventaire avancent le head auto-référentiel; statut CI du head live à revérifier. Aucune CI complète verte revendiquée sur les commits finaux.
 
 Aucun code produit modifié. Aucun merge, close, delete de branche, donnée, volume ou sauvegarde; main inchangée; paiement réel désactivé.
