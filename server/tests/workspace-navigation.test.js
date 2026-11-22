@@ -119,7 +119,6 @@ describe('Navigation et structure des pages métier', () => {
     }
   });
 
-
   test('la navigation des domaines professionnels est défilable au clavier sur mobile', () => {
     const html = readPage('professionnel.html');
     const grid = html.match(/<div class="pro-workspace-guide-grid"([^>]*)>/);
