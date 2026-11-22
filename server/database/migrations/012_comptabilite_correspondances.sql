@@ -14,5 +14,5 @@ CREATE TABLE IF NOT EXISTS pro_compta_correspondances (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_pro_compta_correspondance_account
     FOREIGN KEY (compte_id, user_id)
-    REFERENCES pro_compta_comptes(id, user_id) ON DELETE RESTRICT
+    REFERENCES pro_compta_comptes(id, user_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -278,6 +278,10 @@ test('une base v21 protège les événements comptables contre la suppression en
       "SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_comptes' AND INDEX_NAME = 'uk_pro_compta_compte_id_user'"
     );
     assert.equal(Number(mappingAccountIndex.n), 1, 'la clé composée compte + entreprise doit exister');
+    const [[mappingForeignKey]] = await pool.query(
+      "SELECT COUNT(*) AS n FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_pro_compta_correspondance_account'"
+    );
+    assert.equal(Number(mappingForeignKey.n), 1, 'chaque correspondance doit référencer un compte du même tenant');
     const [[fkAfter]] = await pool.query(
       `SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
        WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
