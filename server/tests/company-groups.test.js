@@ -72,6 +72,8 @@ function runMigrationInNewProcess() {
 
 before(async () => {
   await setupTestDatabase();
+  assert.match(String(process.env.DB_NAME || ''), /test/i,
+    'La simulation d’upgrade destructif doit rester sur une base dédiée de test.');
 
   const groupOwner = await register('group-owner', 'Groupe Sénégal');
   groupOwnerId = groupOwner.user.id;
@@ -99,9 +101,23 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v18 sans perdre les données existantes', async () => {
-  // Simule strictement une base v8 : schéma v8 sans les migrations v9-v18
-  // (échéances récurrentes, multi-sociétés, outbox, preuves email, abonnements, catalogue et entrepôt facture).
+test('une base v8 reçoit les migrations v9 à v23 sans perdre les données existantes', async () => {
+  // Simule strictement une base v8 : schéma v8 sans les migrations v9-v22
+  // (échéances récurrentes, multi-sociétés, outbox, preuves email, abonnements, catalogue, entrepôts, comptabilité et essai).
+  const [[trialRows]] = await pool.query("SELECT COUNT(*) AS total FROM users WHERE trial_status = 'trialing' OR trial_started_at IS NOT NULL OR trial_ends_at IS NOT NULL");
+  assert.equal(Number(trialRows.total), 0, 'Ne pas supprimer d’essais existants pendant la simulation v8.');
+  const [[nonDefaultModes]] = await pool.query("SELECT COUNT(*) AS total FROM depenses WHERE mode_reglement <> 'caisse'");
+  assert.equal(Number(nonDefaultModes.total), 0, 'Ne pas supprimer de mode de règlement non standard.');
+  const [[accountingEvents]] = await pool.query('SELECT COUNT(*) AS total FROM pro_compta_facture_events');
+  assert.equal(Number(accountingEvents.total), 0, 'Ne pas supprimer d’événements comptables existants.');
+  await pool.query('DROP TABLE pro_compta_facture_events');
+  await pool.query('ALTER TABLE depenses DROP COLUMN mode_reglement');
+  const [trialIndex] = await pool.query(`SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND INDEX_NAME = 'idx_users_trial_status_end'`);
+  if (trialIndex.length) await pool.query('ALTER TABLE users DROP INDEX idx_users_trial_status_end');
+  for (const column of ['trial_plan', 'trial_started_at', 'trial_ends_at', 'trial_status']) {
+    const [found] = await pool.query(`SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = ?`, [column]);
+    if (found.length) await pool.query('ALTER TABLE users DROP COLUMN `' + column + '`');
+  }
   await pool.query('DROP TABLE IF EXISTS email_outbox');
   await pool.query('DROP TABLE IF EXISTS pro_team_invitation_verifications');
   await pool.query('DROP TABLE IF EXISTS pro_company_group_invitation_verifications');
@@ -156,10 +172,10 @@ test('une base v8 reçoit les migrations v9 à v18 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v18 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v23 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 18, 'la version doit inclure la migration entrepôt v18 après les migrations v8 à v16');
+  assert.equal(Number(meta.version), 23, 'la version doit inclure les migrations v19 à v22 après le socle v18.');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -215,6 +231,12 @@ test('une base v8 reçoit les migrations v9 à v18 sans perdre les données exis
        AND COLUMN_NAME = 'backfill_stock_termine'`
   );
   assert.equal(backfillMarkerAfter.length, 1, 'la migration v18 doit ajouter le marqueur de reprise des stocks.');
+  const [trialColumnsAfter] = await pool.query(`SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME IN ('trial_plan', 'trial_started_at', 'trial_ends_at', 'trial_status')`);
+  assert.deepEqual(trialColumnsAfter.map(row => row.COLUMN_NAME).sort(), ['trial_ends_at', 'trial_plan', 'trial_started_at', 'trial_status']);
+  const [accountingEventsAfter] = await pool.query(`SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'`);
+  assert.equal(accountingEventsAfter.length, 1, 'la migration v19 doit créer la table des événements comptables.');
+  const [expenseModeAfter] = await pool.query(`SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'depenses' AND COLUMN_NAME = 'mode_reglement'`);
+  assert.equal(expenseModeAfter[0]?.COLUMN_DEFAULT, 'caisse', 'la migration v20 doit restaurer le mode par défaut caisse.');
 });
 
 

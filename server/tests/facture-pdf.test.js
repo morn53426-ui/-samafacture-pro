@@ -220,6 +220,14 @@ describe('Génération PDF de facture', () => {
     const baseUrl = process.env.PDF_BASE_URL;
     assert.ok(baseUrl, 'le serveur HTTP de test doit être démarré');
 
+    // Le modèle moderne possède un bandeau -40px avec 40px de padding horizontal.
+    // En impression, son fond doit atteindre exactement les bords utiles sans coller
+    // le titre FACTURE/DEVIS au bord du papier.
+    await pool.query(
+      'UPDATE users SET facture_template = ? WHERE id = ?',
+      ['moderne', userIdA]
+    );
+
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -300,15 +308,42 @@ describe('Génération PDF de facture', () => {
       assert.equal(etat.couleurFondApp, couleurPaletteClaire);
       assert.equal(etat.toolbar, 'none');
       assert.equal(etat.fondDocument, 'rgb(255, 254, 252)', 'le fond papier doit rester blanc cassé en impression');
-      const printMetrics = await page.evaluate(() => ({
-        paddingLeft: getComputedStyle(document.querySelector('.invoice-doc')).paddingLeft,
-        paddingRight: getComputedStyle(document.querySelector('.invoice-doc')).paddingRight,
-        fontSize: getComputedStyle(document.querySelector('.invoice-doc')).fontSize,
-        tableFontSize: getComputedStyle(document.querySelector('.sf-document-table td')).fontSize
-      }));
+      const printMetrics = await page.evaluate(() => {
+        const documentNode = document.querySelector('.invoice-doc');
+        const bannerNode = document.querySelector('.invoice-doc [style*="margin:-40px -40px"]');
+        const documentRect = documentNode.getBoundingClientRect();
+        const bannerRect = bannerNode ? bannerNode.getBoundingClientRect() : null;
+        const bannerTitle = bannerNode && bannerNode.querySelector('[style*="text-align:right"]');
+        const bannerTitleRect = bannerTitle ? bannerTitle.getBoundingClientRect() : null;
+        const bannerStyle = bannerNode ? getComputedStyle(bannerNode) : null;
+        return {
+          paddingLeft: getComputedStyle(documentNode).paddingLeft,
+          paddingRight: getComputedStyle(documentNode).paddingRight,
+          fontSize: getComputedStyle(documentNode).fontSize,
+          tableFontSize: getComputedStyle(document.querySelector('.sf-document-table td')).fontSize,
+          bannerExists: Boolean(bannerNode),
+          bannerLeftOffset: bannerRect ? bannerRect.left - documentRect.left : null,
+          bannerRightOffset: bannerRect ? documentRect.right - bannerRect.right : null,
+          bannerPaddingLeft: bannerStyle ? bannerStyle.paddingLeft : null,
+          bannerPaddingRight: bannerStyle ? bannerStyle.paddingRight : null,
+          bannerTitleRightInset: bannerRect && bannerTitleRect ? bannerRect.right - bannerTitleRect.right : null
+        };
+      });
       assert.equal(printMetrics.paddingLeft, '0px',
         'Les marges A4 de @page ne doivent pas être doublées par un padding de 40 px.');
       assert.equal(printMetrics.paddingRight, '0px');
+      assert.equal(printMetrics.bannerExists, true,
+        'Le modèle moderne doit exposer son bandeau principal au rendu imprimé.');
+      assert.ok(Math.abs(printMetrics.bannerLeftOffset) < 1.5,
+        'Le bandeau doit commencer au bord gauche de la zone imprimable : ' + printMetrics.bannerLeftOffset + 'px.');
+      assert.ok(Math.abs(printMetrics.bannerRightOffset) < 1.5,
+        'Le bandeau doit finir au bord droit de la zone imprimable : ' + printMetrics.bannerRightOffset + 'px.');
+      assert.equal(printMetrics.bannerPaddingLeft, '40px',
+        'Le padding gauche du modèle doit être conservé pour protéger le texte.');
+      assert.equal(printMetrics.bannerPaddingRight, '40px',
+        'Le padding droit du modèle doit être conservé pour protéger le titre FACTURE/DEVIS.');
+      assert.ok(printMetrics.bannerTitleRightInset >= 30,
+        'Le titre FACTURE/DEVIS doit garder une marge intérieure visible : ' + printMetrics.bannerTitleRightInset + 'px.');
       assert.ok(Math.abs(parseFloat(printMetrics.fontSize) - 13.3333) < 0.2,
         'Le texte courant doit être imprimé à 10 pt minimum : ' + printMetrics.fontSize);
       assert.ok(Math.abs(parseFloat(printMetrics.tableFontSize) - 12) < 0.2,
