@@ -939,9 +939,18 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
     { code: '6181', debit: 500, credit: 0 }
   ]);
 
+  await pool.query("UPDATE pro_compta_comptes SET actif = 0 WHERE user_id = ? AND code = '6181'", [userId]);
+  const replayExpenseAfterAccountDeactivation = await request(app)
+    .post('/api/pro/accounting/post-expense/' + categoryExpense.body.depense.id)
+    .set('Authorization', 'Bearer ' + token).send({});
+  assert.equal(replayExpenseAfterAccountDeactivation.status, 200, replayExpenseAfterAccountDeactivation.text);
+  assert.equal(replayExpenseAfterAccountDeactivation.body.duplicate, true,
+    'une dépense déjà validée doit rester rejouable même si son compte de correspondance est désactivé');
+  await pool.query("UPDATE pro_compta_comptes SET actif = 1 WHERE user_id = ? AND code = '6181'", [userId]);
+
   const readBack = await getMappings();
   assert.equal(readBack.status, 200, readBack.text);
-  assert.ok(readBack.body.categories_depenses.some(row => row.categorie === 'Déplacements' && row.personnalisee && row.code === '625'));
+  assert.ok(readBack.body.categories_depenses.some(row => row.categorie === 'Déplacements' && row.personnalisee && row.code === '6181'));
 });
 
 after(async () => {

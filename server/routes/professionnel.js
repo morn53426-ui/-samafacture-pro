@@ -3758,6 +3758,22 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Dépense introuvable.' });
     }
+
+    // Une écriture déjà validée n'est jamais recalculée selon une correspondance
+    // modifiée ou un compte devenu inactif : le rejeu renvoie l'écriture d'origine.
+    const [existingEntries] = await conn.query(
+      "SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE",
+      [uid, expense.id]
+    );
+    if (existingEntries.length) {
+      await conn.commit();
+      return res.status(200).json({
+        id: existingEntries[0].id,
+        numero: existingEntries[0].numero,
+        duplicate: true
+      });
+    }
+
     const amount = Number(expense.montant);
     if (!Number.isFinite(amount) || amount <= 0) {
       await conn.rollback();
