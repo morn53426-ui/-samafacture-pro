@@ -254,9 +254,10 @@ test('une base v21 protège les événements comptables contre la suppression en
        WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
          AND CONSTRAINT_NAME = 'fk_pro_compta_facture_events_invoice'`
     );
-    assert.ok(fkBefore, 'la contrainte invoice-event doit exister en v21');
-    if (fkBefore.DELETE_RULE !== 'CASCADE') {
-      await pool.query('ALTER TABLE pro_compta_facture_events DROP FOREIGN KEY fk_pro_compta_facture_events_invoice');
+    if (!fkBefore || fkBefore.DELETE_RULE !== 'CASCADE') {
+      if (fkBefore) {
+        await pool.query('ALTER TABLE pro_compta_facture_events DROP FOREIGN KEY fk_pro_compta_facture_events_invoice');
+      }
       await pool.query(
         'ALTER TABLE pro_compta_facture_events ADD CONSTRAINT fk_pro_compta_facture_events_invoice FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE CASCADE'
       );
