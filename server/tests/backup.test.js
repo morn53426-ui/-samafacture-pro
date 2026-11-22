@@ -42,6 +42,7 @@ describe('Sauvegardes automatiques', () => {
     const savedMode = process.env.NODE_ENV;
     const savedKey = process.env.BACKUP_ENCRYPTION_KEY;
     const savedDump = process.env.MYSQLDUMP_PATH;
+    let generatedPath = null;
     try {
       process.env.NODE_ENV = 'test';
       delete process.env.BACKUP_ENCRYPTION_KEY;
@@ -50,6 +51,7 @@ describe('Sauvegardes automatiques', () => {
       await fs.promises.chmod(BACKUP_DIR, 0o755);
 
       const result = await effectuerSauvegarde();
+      generatedPath = result.path;
       const dirStat = await fs.promises.stat(BACKUP_DIR);
       const fileStat = await fs.promises.stat(result.path);
       assert.equal(dirStat.mode & 0o777, 0o700,
@@ -57,6 +59,7 @@ describe('Sauvegardes automatiques', () => {
       assert.equal(fileStat.mode & 0o777, 0o600,
         'l’archive doit rester lisible uniquement par le compte applicatif');
     } finally {
+      if (generatedPath) await fs.promises.unlink(generatedPath).catch(() => {});
       if (savedMode === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = savedMode;
       if (savedKey === undefined) delete process.env.BACKUP_ENCRYPTION_KEY;
