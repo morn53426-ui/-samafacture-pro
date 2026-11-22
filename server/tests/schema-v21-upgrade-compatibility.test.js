@@ -138,7 +138,7 @@ test('une base v19 conservant un essai actif migre vers v22 sans perdre ses date
   await removeTestUser(userId);
 });
 
-test('une base v20 conserve les règlements bancaires et reçoit un essai neutre en v21', async () => {
+test('une base v20 conserve les règlements bancaires et reçoit un essai neutre en v22', async () => {
   const userId = await addUser('from-v20', false);
   const date = new Date().toISOString().slice(0, 10);
   await pool.query(
@@ -300,6 +300,24 @@ test('une base v21 protège les événements comptables contre la suppression en
       [userId, invoiceId]
     );
     assert.deepEqual(repeatEvent, eventAfterDeleteAttempt);
+
+    // La suppression du compte doit pouvoir effacer les données de test via les FK
+    // user→invoice et user→event, sans que la FK invoice→event ne la bloque.
+    await pool.query('DELETE FROM users WHERE id = ?', [userId]);
+    const createdIndex = createdUserIds.indexOf(userId);
+    if (createdIndex !== -1) createdUserIds.splice(createdIndex, 1);
+    const [[remainingEvents]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM pro_compta_facture_events WHERE user_id = ?',
+      [userId]
+    );
+    const [[remainingInvoices]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM factures WHERE user_id = ?',
+      [userId]
+    );
+    assert.equal(Number(remainingEvents.total), 0);
+    assert.equal(Number(remainingInvoices.total), 0);
+    invoiceId = null;
+    clientId = null;
   } finally {
     if (invoiceId) {
       await pool.query('DELETE FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ?', [userId, invoiceId]);
