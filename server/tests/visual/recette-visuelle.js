@@ -3977,6 +3977,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       tableHeaderDisplay: getComputedStyle(document.querySelector('.sf-document-table thead')).display,
       pageRule: getComputedStyle(document.querySelector('.invoice-doc')).breakInside,
       overflowX: getComputedStyle(document.querySelector('.invoice-doc')).overflowX,
+      tableCellPaddingTop: getComputedStyle(document.querySelector('.sf-document-table tbody td')).paddingTop,
+      tableCellLineHeight: getComputedStyle(document.querySelector('.sf-document-table tbody td')).lineHeight,
       documentFontFamily: getComputedStyle(document.querySelector('.invoice-doc')).fontFamily,
       pageIdentityRuleText: Array.from(
         document.getElementById('sf-print-page-identity')?.sheet?.cssRules || []
@@ -4000,6 +4002,10 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
     assert.equal(printMetrics.tableHeaderDisplay, 'table-header-group',
       type + ' : l’en-tête du tableau doit être répété lorsque le document passe sur une nouvelle page.');
     assert.equal(printMetrics.overflowX, 'visible', type + ' : le document ne doit pas être coupé horizontalement à l’impression.');
+    assert.equal(printMetrics.tableCellPaddingTop, '6px',
+      type + ' : les lignes doivent garder un espacement vertical régulier à l’impression.');
+    assert.ok(Math.abs(parseFloat(printMetrics.tableCellLineHeight) - 16.2) < 0.2,
+      type + ' : la hauteur de ligne imprimée doit rester confortable sans réduire la police.');
     assert.match(printMetrics.documentFontFamily, /IBM Plex Sans/i,
       type + ' : la pile typographique IBM Plex Sans doit rester prioritaire pour le document imprimé.');
 
@@ -4169,6 +4175,181 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
             clippingOverflow,
             titleElementOutsideBanner
           } : null,
+          consolidePrintMetrics: (() => {
+            const header = documentNode.querySelector('.sf-consolide-header');
+            if (!header) return null;
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const headerStyle = getComputedStyle(header);
+            const metaStyle = style('.sf-consolide-meta');
+            const clientStyle = style('.sf-consolide-client');
+            const docMetaStyle = style('.sf-doc-meta-consolide');
+            const totalsStyle = style('.sf-consolide-totals');
+            const footerStyle = style('.sf-consolide-footer');
+            const extrasStyle = style('.sf-doc-extras-consolide');
+            return {
+              headerPaddingTop: headerStyle.paddingTop,
+              headerMarginBottom: headerStyle.marginBottom,
+              metaMarginBottom: metaStyle?.marginBottom || null,
+              clientMarginBottom: clientStyle?.marginBottom || null,
+              docMetaPaddingTop: docMetaStyle?.paddingTop || null,
+              totalsMarginTop: totalsStyle?.marginTop || null,
+              footerMarginTop: footerStyle?.marginTop || null,
+              extrasMarginTop: extrasStyle?.marginTop || null,
+              extrasGap: extrasStyle?.rowGap || extrasStyle?.gap || null
+            };
+          })(),
+          signaturePrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const header = style('.sf-signature-header');
+            const meta = style('.sf-signature-meta');
+            const references = style('.sf-signature-references');
+            const totals = style('.sf-signature-totals');
+            const footer = style('.sf-signature-footer');
+            const docMeta = style('.sf-doc-meta-signature');
+            const extras = style('.sf-doc-extras-signature');
+            const panel = style('.sf-doc-extras-signature .sf-extra-panel');
+            return {
+              headerPaddingTop: header?.paddingTop || null,
+              headerMarginBottom: header?.marginBottom || null,
+              metaGap: meta?.columnGap || meta?.gap || null,
+              metaMarginBottom: meta?.marginBottom || null,
+              referencePaddingTop: references?.paddingTop || null,
+              totalsMarginTop: totals?.marginTop || null,
+              footerMarginTop: footer?.marginTop || null,
+              docMetaPaddingTop: docMeta?.paddingTop || null,
+              extrasMarginTop: extras?.marginTop || null,
+              panelPaddingTop: panel?.paddingTop || null
+            };
+          })(),
+          platinePrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const header = style('.sf-platine-header');
+            const meta = style('.sf-platine-meta');
+            const docMeta = style('.sf-doc-meta-platine');
+            const tableCell = style('.sf-platine-table tbody td');
+            const totals = style('.sf-platine-totals');
+            const footer = style('.sf-platine-footer');
+            const extras = style('.sf-doc-extras-platine');
+            const acceptance = style('.sf-doc-extras-platine .sf-acceptance-panel');
+            const acceptanceCopy = style('.sf-doc-extras-platine .sf-acceptance-copy');
+            const acceptanceGrid = style('.sf-doc-extras-platine .sf-acceptance-grid');
+            const signField = style('.sf-doc-extras-platine .sf-sign-field');
+            const signLine = style('.sf-doc-extras-platine .sf-sign-line');
+            const tax = style('.sf-doc-tax-platine');
+            const taxRow = style('.sf-doc-tax-row');
+            const taxTotal = style('.sf-doc-tax-total');
+            const totalRow = style('.sf-platine-totals .sf-total-row');
+            const grandTotal = style('.sf-platine-totals .sf-total-row.sf-total-grand');
+            const qr = style('.sf-platine-verification img[alt="QR code de vérification"]');
+            const stamp = style('.sf-platine-verification .stamp');
+            const extraPanel = style('.sf-doc-extras-platine .sf-extra-panel:not(.sf-acceptance-panel)');
+            return {
+              headerPaddingBottom: header?.paddingBottom || null,
+              headerMarginBottom: header?.marginBottom || null,
+              metaMarginBottom: meta?.marginBottom || null,
+              docMetaPaddingTop: docMeta?.paddingTop || null,
+              tableFontSize: tableCell?.fontSize || null,
+              tableLineHeight: tableCell?.lineHeight || null,
+              tablePaddingTop: tableCell?.paddingTop || null,
+              tablePaddingBottom: tableCell?.paddingBottom || null,
+              totalsMarginTop: totals?.marginTop || null,
+              footerMarginTop: footer?.marginTop || null,
+              qrWidth: qr?.width || null,
+              stampWidth: stamp?.width || null,
+              taxMarginTop: tax?.marginTop || null,
+              taxPaddingTop: tax?.paddingTop || null,
+              taxRowPaddingTop: taxRow?.paddingTop || null,
+              taxTotalPaddingTop: taxTotal?.paddingTop || null,
+              totalRowPaddingTop: totalRow?.paddingTop || null,
+              grandTotalPaddingTop: grandTotal?.paddingTop || null,
+              extrasMarginTop: extras?.marginTop || null,
+              extraPanelPaddingTop: extraPanel?.paddingTop || null,
+              acceptancePaddingTop: acceptance?.paddingTop || null,
+              acceptanceCopyMarginBottom: acceptanceCopy?.marginBottom || null,
+              acceptanceGridGap: acceptanceGrid?.rowGap || acceptanceGrid?.gap || null,
+              signFieldGap: signField?.rowGap || signField?.gap || null,
+              signLineHeight: signLine?.height || null
+            };
+          })(),
+          techPrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const header = style('.sf-tech-header');
+            const meta = style('.sf-tech-meta');
+            const client = style('.sf-tech-client');
+            const tableCell = style('.sf-tech-table tbody td');
+            const totals = style('.sf-tech-totals');
+            return {
+              headerPaddingTop: header?.paddingTop || null,
+              headerPaddingBottom: header?.paddingBottom || null,
+              headerMarginBottom: header?.marginBottom || null,
+              metaMarginBottom: meta?.marginBottom || null,
+              clientPaddingTop: client?.paddingTop || null,
+              clientMarginBottom: client?.marginBottom || null,
+              tableFontSize: tableCell?.fontSize || null,
+              tableLineHeight: tableCell?.lineHeight || null,
+              tablePaddingTop: tableCell?.paddingTop || null,
+              tablePaddingBottom: tableCell?.paddingBottom || null,
+              totalsMarginTop: totals?.marginTop || null
+            };
+          })(),
+          luxePrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const header = style('.sf-luxe-header');
+            const client = style('.sf-luxe-client-grid');
+            const clientPanel = style('.sf-luxe-client-grid > div:first-child');
+            const tableCell = style('.sf-luxe-table tbody td');
+            const totals = style('.sf-luxe-totals');
+            return {
+              headerPaddingTop: header?.paddingTop || null,
+              headerPaddingBottom: header?.paddingBottom || null,
+              headerMarginBottom: header?.marginBottom || null,
+              clientGap: client?.columnGap || client?.gap || null,
+              clientMarginBottom: client?.marginBottom || null,
+              clientPanelPaddingTop: clientPanel?.paddingTop || null,
+              tableFontSize: tableCell?.fontSize || null,
+              tableLineHeight: tableCell?.lineHeight || null,
+              tablePaddingTop: tableCell?.paddingTop || null,
+              tablePaddingBottom: tableCell?.paddingBottom || null,
+              totalsMarginTop: totals?.marginTop || null
+            };
+          })(),
+          majestePrintMetrics: (() => {
+            const style = selector => {
+              const node = documentNode.querySelector(selector);
+              return node ? getComputedStyle(node) : null;
+            };
+            const tableCell = style('.sf-document-table tbody td');
+            const footer = style('.sf-doc-footer');
+            const qr = style('.sf-doc-footer img[alt="QR code de vérification"]');
+            const stamp = style('.sf-doc-footer .stamp');
+            const extras = style('.sf-doc-extras-majeste');
+            return {
+              tableFontSize: tableCell?.fontSize || null,
+              tableLineHeight: tableCell?.lineHeight || null,
+              tablePaddingTop: tableCell?.paddingTop || null,
+              tablePaddingBottom: tableCell?.paddingBottom || null,
+              footerMarginTop: footer?.marginTop || null,
+              qrWidth: qr?.width || null,
+              stampWidth: stamp?.width || null,
+              extrasMarginTop: extras?.marginTop || null
+            };
+          })(),
+          platineTaxModifierPresent: Boolean(documentNode.querySelector('.sf-doc-tax-platine')),
           banners
         };
       }, { selector: bannerSelector, expectedTitles: titleLabels });
@@ -4178,6 +4359,110 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       assert.ok(geometry.lineCount >= 28,
         type + '/' + template + ' : les 28 lignes longues doivent être rendues avant impression (lignes=' + geometry.lineCount + ').');
       assert.equal(geometry.titlePresent, true, type + '/' + template + ' : titre principal (' + titleLabels.join(' / ') + ') absent du bandeau.');
+      assert.equal(geometry.platineTaxModifierPresent, template === 'platine',
+        type + '/' + template + ' : le compactage TVA doit être réservé au seul modèle Platine.');
+      if (template === 'consolide') {
+        const metrics = geometry.consolidePrintMetrics;
+        assert.ok(metrics, type + '/consolide : les règles d’impression compactes doivent être actives.');
+        assert.equal(metrics.headerPaddingTop, '17px', type + '/consolide : padding du bandeau imprimé.');
+        assert.equal(metrics.headerMarginBottom, '15px', type + '/consolide : marge après le bandeau imprimé.');
+        assert.equal(metrics.metaMarginBottom, '12px', type + '/consolide : marge des cartes de métadonnées.');
+        assert.equal(metrics.clientMarginBottom, '12px', type + '/consolide : marge du bloc client.');
+        assert.equal(metrics.docMetaPaddingTop, '8px', type + '/consolide : padding des références du document.');
+        assert.equal(metrics.totalsMarginTop, '12px', type + '/consolide : marge du bloc des totaux.');
+        assert.equal(metrics.footerMarginTop, '20px', type + '/consolide : marge du pied de page.');
+        assert.equal(metrics.extrasMarginTop, '10px', type + '/consolide : marge des compléments.');
+        assert.equal(metrics.extrasGap, '6px', type + '/consolide : espacement des compléments.');
+      }
+      if (template === 'signature') {
+        const metrics = geometry.signaturePrintMetrics;
+        assert.ok(metrics, type + '/signature : les règles A4 ciblées doivent être actives.');
+        assert.equal(metrics.headerPaddingTop, '16px', type + '/signature : padding du bandeau imprimé.');
+        assert.equal(metrics.headerMarginBottom, '14px', type + '/signature : marge après le bandeau.');
+        assert.equal(metrics.metaGap, '12px', type + '/signature : espacement du bloc destinataire/références.');
+        assert.equal(metrics.metaMarginBottom, '12px', type + '/signature : marge du bloc de références.');
+        assert.equal(metrics.referencePaddingTop, '8px', type + '/signature : padding des références.');
+        assert.equal(metrics.totalsMarginTop, '12px', type + '/signature : marge des totaux.');
+        assert.equal(metrics.footerMarginTop, '16px', type + '/signature : marge du pied de document.');
+        assert.equal(metrics.docMetaPaddingTop, '8px', type + '/signature : padding des références communes.');
+        assert.equal(metrics.extrasMarginTop, '10px', type + '/signature : marge des compléments.');
+        assert.equal(metrics.panelPaddingTop, '8px', type + '/signature : padding des panneaux complémentaires.');
+      }
+      if (template === 'platine') {
+        const metrics = geometry.platinePrintMetrics;
+        assert.ok(metrics, type + '/platine : les règles A4 ciblées doivent être actives.');
+        assert.equal(metrics.headerPaddingBottom, '12px', type + '/platine : padding inférieur du bandeau.');
+        assert.equal(metrics.headerMarginBottom, '14px', type + '/platine : marge après le bandeau.');
+        assert.equal(metrics.metaMarginBottom, '12px', type + '/platine : marge des références client.');
+        assert.equal(metrics.docMetaPaddingTop, '7px', type + '/platine : padding des références documentaires.');
+        assert.equal(metrics.tableFontSize, '12px', type + '/platine : conserver une typographie de tableau à 9 pt.');
+        assert.equal(metrics.tableLineHeight, '13.8px', type + '/platine : interligne A4 compact mais lisible.');
+        assert.equal(metrics.tablePaddingTop, '1px', type + '/platine : padding supérieur compact des lignes.');
+        assert.equal(metrics.tablePaddingBottom, '1px', type + '/platine : padding inférieur compact des lignes.');
+        assert.equal(metrics.totalsMarginTop, '8px', type + '/platine : marge du bloc des totaux.');
+        assert.equal(metrics.footerMarginTop, '8px', type + '/platine : marge du bloc QR et signature.');
+        assert.equal(metrics.extrasMarginTop, '6px', type + '/platine : marge des compléments.');
+        assert.equal(metrics.qrWidth, '52px', type + '/platine : QR réduit sans retirer le code.');
+        assert.equal(metrics.stampWidth, '56px', type + '/platine : cachet conservé et compact.');
+        assert.equal(metrics.taxMarginTop, '8px', type + '/platine : marge du bloc TVA.');
+        assert.equal(metrics.taxPaddingTop, '8px', type + '/platine : padding du bloc TVA.');
+        assert.equal(metrics.taxRowPaddingTop, '2px', type + '/platine : espacement des lignes de TVA.');
+        assert.equal(metrics.taxTotalPaddingTop, '5px', type + '/platine : séparation du total TVA.');
+        assert.equal(metrics.totalRowPaddingTop, '4px', type + '/platine : espacement des lignes de totaux.');
+        assert.equal(metrics.grandTotalPaddingTop, '7px', type + '/platine : hiérarchie du total TTC conservée.');
+        assert.equal(metrics.extraPanelPaddingTop, '8px', type + '/platine : panneau de conditions compact.');
+        if (type === 'devis') {
+          assert.equal(metrics.acceptanceCopyMarginBottom, '6px', type + '/platine : respiration du texte d’acceptation.');
+          assert.equal(metrics.acceptanceGridGap, '10px', type + '/platine : champs d’acceptation alignés.');
+          assert.equal(metrics.signFieldGap, '10px', type + '/platine : espace des libellés de signature.');
+          assert.equal(metrics.signLineHeight, '18px', type + '/platine : lignes de signature conservées.');
+        }
+        if (type !== 'devis') {
+          assert.equal(metrics.acceptancePaddingTop, null, 'facture/platine : aucun panneau d’acceptation de devis ne doit être rendu.');
+        }
+      }
+      if (template === 'tech') {
+        const metrics = geometry.techPrintMetrics;
+        assert.ok(metrics, type + '/tech : règles de compactage A4 ciblées présentes.');
+        assert.equal(metrics.headerPaddingTop, '17px', type + '/tech : padding haut du bandeau.');
+        assert.equal(metrics.headerPaddingBottom, '16px', type + '/tech : padding bas du bandeau.');
+        assert.equal(metrics.headerMarginBottom, '14px', type + '/tech : marge après bandeau.');
+        assert.equal(metrics.metaMarginBottom, '12px', type + '/tech : marge des métadonnées.');
+        assert.equal(metrics.clientPaddingTop, '9px', type + '/tech : padding client.');
+        assert.equal(metrics.clientMarginBottom, '12px', type + '/tech : marge après client.');
+        assert.equal(metrics.tableFontSize, '12.6667px', type + '/tech : taille lisible de tableau 9.5 pt.');
+        assert.equal(metrics.tableLineHeight, '15px', type + '/tech : interligne compact.');
+        assert.equal(metrics.tablePaddingTop, '2px', type + '/tech : padding vertical haut.');
+        assert.equal(metrics.tablePaddingBottom, '2px', type + '/tech : padding vertical bas.');
+        assert.equal(metrics.totalsMarginTop, '12px', type + '/tech : marge des totaux.');
+      }
+      if (template === 'majeste') {
+        const metrics = geometry.majestePrintMetrics;
+        assert.ok(metrics, type + '/majeste : règles A4 compactes ciblées actives.');
+        assert.equal(metrics.tableFontSize, '12px', type + '/majeste : la police du tableau reste à 9 pt.');
+        assert.equal(metrics.tableLineHeight, '13.8px', type + '/majeste : interligne A4 resserré, police de 9 pt conservée.');
+        assert.equal(metrics.tablePaddingTop, '1px', type + '/majeste : padding supérieur compact des lignes.');
+        assert.equal(metrics.tablePaddingBottom, '1px', type + '/majeste : padding inférieur compact des lignes.');
+        assert.equal(metrics.footerMarginTop, '12px', type + '/majeste : marge compacte du pied de page.');
+        assert.equal(metrics.qrWidth, '52px', type + '/majeste : QR code compact sans perte de lisibilité.');
+        assert.equal(metrics.stampWidth, '64px', type + '/majeste : cachet compact.');
+        assert.equal(metrics.extrasMarginTop, '6px', type + '/majeste : marge des compléments.');
+      }
+      if (template === 'luxe') {
+        const metrics = geometry.luxePrintMetrics;
+        assert.ok(metrics, type + '/luxe : les règles A4 ciblées doivent être actives.');
+        assert.equal(metrics.headerPaddingTop, '20px', type + '/luxe : padding supérieur du bandeau.');
+        assert.equal(metrics.headerPaddingBottom, '18px', type + '/luxe : padding inférieur du bandeau.');
+        assert.equal(metrics.headerMarginBottom, '16px', type + '/luxe : marge après le bandeau.');
+        assert.equal(metrics.clientGap, '14px', type + '/luxe : espacement du bloc client.');
+        assert.equal(metrics.clientMarginBottom, '14px', type + '/luxe : marge après le bloc client.');
+        assert.equal(metrics.clientPanelPaddingTop, '10px', type + '/luxe : padding de la carte client.');
+        assert.equal(metrics.tableFontSize, '12px', type + '/luxe : conserver une typographie à 9 pt.');
+        assert.equal(metrics.tableLineHeight, '15px', type + '/luxe : interligne A4 compact et lisible.');
+        assert.equal(metrics.tablePaddingTop, '3px', type + '/luxe : padding supérieur compact des lignes.');
+        assert.equal(metrics.tablePaddingBottom, '3px', type + '/luxe : padding inférieur compact des lignes.');
+        assert.equal(metrics.totalsMarginTop, '14px', type + '/luxe : marge du bloc des totaux.');
+      }
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
           type + '/' + template + ' : titre principal hors de la zone du document : ' + JSON.stringify({ bounds: geometry.titleBounds, candidates: geometry.titleCandidates }));
@@ -4241,6 +4526,11 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       assert.ok(pdf.length > 5000,
         type + '/' + template + ' : le PDF doit contenir le document complet.');
       const pdfPages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
+      if (pdfPages > 3) {
+        const diagnosticName = 'diagnostic-template-' + type + '-' + template + '-pages-' + pdfPages + '.pdf';
+        fs.writeFileSync(path.join(OUTPUT_DIR, diagnosticName), pdf);
+        console.error('PDF de diagnostic enregistré : ' + diagnosticName);
+      }
       assert.ok(pdfPages >= 2,
         type + '/' + template + ' : 28 lignes doivent occuper plusieurs pages A4 (pages=' + pdfPages + ').');
       assert.ok(pdfPages <= 3,
