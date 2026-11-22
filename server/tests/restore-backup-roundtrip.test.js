@@ -41,9 +41,13 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
       `GRANT SELECT, SHOW VIEW, TRIGGER, EVENT ON ${sourceDb}.* TO '${backupUser}'@'%'`
     );
     const [backupGrants] = await connection.query(`SHOW GRANTS FOR '${backupUser}'@'%'`);
-    const grantsText = backupGrants.map(row => Object.values(row).join(' ')).join('\n');
-    assert.doesNotMatch(grantsText, /ON \*\.\*/i,
-      'le compte de sauvegarde ne doit recevoir aucun privilège global');
+    const globalGrants = backupGrants
+      .map(row => Object.values(row).join(' '))
+      .filter(grant => /ON \*\.\*/i.test(grant));
+    assert.equal(globalGrants.length, 1,
+      'le compte de sauvegarde ne doit avoir qu’une seule entrée globale USAGE');
+    assert.match(globalGrants[0], /^GRANT USAGE ON \*\.\*/i,
+      'aucun privilège global ne doit être accordé au compte de sauvegarde');
     await connection.query(
       'CREATE TABLE ?? (id INT PRIMARY KEY, label VARCHAR(120) NOT NULL, amount DECIMAL(14,2) NOT NULL)',
       [sourceDb + '.restore_roundtrip_fixture']
