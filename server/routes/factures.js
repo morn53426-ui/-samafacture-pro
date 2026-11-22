@@ -9,6 +9,7 @@ const { localDateString } = require('../utils/local-date');
 const { SUPPORTED_CURRENCIES } = require('../config/localization');
 const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { escapeHtmlEmail, sanitizeEmailHeader } = require('../utils/email-escape');
+const { formatAmountWithCurrency } = require('../utils/money-format');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 const { genererPdfFacture } = require('../utils/pdf');
 const { notifierUtilisateur } = require('../realtime');
@@ -1096,6 +1097,8 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
   const safeEmetteur = escapeHtmlEmail(emetteur);
   const safeNumero = escapeHtmlEmail(facture.numero);
   const safeConsultUrl = escapeHtmlEmail(consultUrl);
+  const montantFormate = formatAmountWithCurrency(facture.total, facture.devise);
+  const safeMontantFormate = escapeHtmlEmail(montantFormate);
 
   let attachments;
   try {
@@ -1113,8 +1116,8 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
   const mailResult = await sendMail({
     to: destinataire,
     subject: sanitizeEmailHeader(`${emetteur} vous a envoyé un ${label} — ${facture.numero}`),
-    text: `Bonjour ${facture.client_nom},\n\n${emetteur} vous a envoyé un ${label} d'un montant de ${facture.total} FCFA.\n\nConsultez-le en ligne : ${consultUrl}\n\nMerci de votre confiance.`,
-    html: `<p>Bonjour ${safeClientNom},</p><p><strong>${safeEmetteur}</strong> vous a envoyé un ${label} (${safeNumero}) d'un montant de <strong>${facture.total} FCFA</strong>.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#0FA980;color:#fff;border-radius:8px;text-decoration:none;">Consulter le ${label}</a></p><p>Ou copiez ce lien : ${safeConsultUrl}</p>`,
+    text: `Bonjour ${facture.client_nom},\n\n${emetteur} vous a envoyé un ${label} d'un montant de ${montantFormate}.\n\nConsultez-le en ligne : ${consultUrl}\n\nMerci de votre confiance.`,
+    html: `<p>Bonjour ${safeClientNom},</p><p><strong>${safeEmetteur}</strong> vous a envoyé un ${label} (${safeNumero}) d'un montant de <strong>${safeMontantFormate}</strong>.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#0FA980;color:#fff;border-radius:8px;text-decoration:none;">Consulter le ${label}</a></p><p>Ou copiez ce lien : ${safeConsultUrl}</p>`,
     attachments
   });
   if (!mailResult?.sent) {
@@ -1190,6 +1193,8 @@ router.post('/:id/relancer', async (req, res, next) => {
     const consultUrl = `${baseUrl}/consulter.html?id=${facture.id}&code=${facture.verification_code}`;
     const emetteur = facture.entreprise_nom || facture.user_nom;
     const resteAPayer = Number(facture.total) - Number(facture.montant_paye);
+    const resteAPayerFormate = formatAmountWithCurrency(resteAPayer, facture.devise);
+    const safeResteAPayer = escapeHtmlEmail(resteAPayerFormate);
 
     const safeClientNom = escapeHtmlEmail(facture.client_nom);
     const safeEmetteur = escapeHtmlEmail(emetteur);
@@ -1206,8 +1211,8 @@ router.post('/:id/relancer', async (req, res, next) => {
     const mailResult = await sendMail({
       to: destinataire,
       subject: sanitizeEmailHeader(`Rappel : facture ${facture.numero} en attente de paiement`),
-      text: `Bonjour ${facture.client_nom},\n\nNous vous rappelons que la facture ${facture.numero} d'un montant de ${resteAPayer} FCFA est toujours en attente de règlement.\n\nConsultez-la ici : ${consultUrl}\n\nMerci de régulariser dans les meilleurs délais.`,
-      html: `<p>Bonjour ${safeClientNom},</p><p>Nous vous rappelons que la facture <strong>${safeNumero}</strong> d'un montant restant dû de <strong>${resteAPayer} FCFA</strong> est toujours en attente de règlement par ${safeEmetteur}.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#E8A33D;color:#0F1B33;border-radius:8px;text-decoration:none;font-weight:600;">Consulter la facture</a></p><p>Merci de régulariser dans les meilleurs délais.</p>`,
+      text: `Bonjour ${facture.client_nom},\n\nNous vous rappelons que la facture ${facture.numero} d'un montant de ${resteAPayerFormate} est toujours en attente de règlement.\n\nConsultez-la ici : ${consultUrl}\n\nMerci de régulariser dans les meilleurs délais.`,
+      html: `<p>Bonjour ${safeClientNom},</p><p>Nous vous rappelons que la facture <strong>${safeNumero}</strong> d'un montant restant dû de <strong>${safeResteAPayer}</strong> est toujours en attente de règlement par ${safeEmetteur}.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#E8A33D;color:#0F1B33;border-radius:8px;text-decoration:none;font-weight:600;">Consulter la facture</a></p><p>Merci de régulariser dans les meilleurs délais.</p>`,
       attachments
     });
     if (!mailResult?.sent) return res.status(503).json({ error: 'SMTP non configuré : email non envoyé.' });
@@ -1423,7 +1428,7 @@ router.post('/:id/paiements', async (req, res, next) => {
     if (montantNum > resteAPayerAvant) {
       await conn.rollback();
       return res.status(400).json({
-        error: `Le montant dépasse le solde restant dû (${resteAPayerAvant} FCFA).`
+        error: `Le montant dépasse le solde restant dû (${formatAmountWithCurrency(resteAPayerAvant, facture.devise)}).`
       });
     }
 
