@@ -278,7 +278,7 @@ router.put('/:id', async (req, res, next) => {
  * @openapi
  * /produits/{id}:
  *   delete:
- *     summary: Supprime un produit du catalogue (les lignes de facture existantes le référençant sont conservées, mais détachées)
+ *     summary: Supprime un produit sans stock ni historique lié
  *     tags: [Produits]
  *     parameters:
  *       - in: path
@@ -291,28 +291,51 @@ router.put('/:id', async (req, res, next) => {
  *       409: { description: Suppression bloquée par une contrainte de la base., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.delete('/:id', async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
-    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
-    if (!existingRows.length) return res.status(404).json({ error: 'Produit introuvable.' });
-
+    conn = await pool.getConnection();
     await conn.beginTransaction();
-    // Détache d'abord le produit des lignes de facture existantes (au lieu de compter uniquement
-    // sur la contrainte ON DELETE SET NULL de la base, qui peut différer si les tables ont été
-    // créées avec une ancienne version du schéma).
-    await conn.query('UPDATE facture_lignes fl JOIN factures f ON f.id = fl.facture_id SET fl.produit_id = NULL WHERE fl.produit_id = ? AND f.user_id = ?', [existingRows[0].id, req.tenantId]);
-    await conn.query('DELETE FROM produits WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
-    await conn.commit();
+    const [existingRows] = await conn.query(
+      'SELECT * FROM produits WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
+    const existing = existingRows[0];
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Produit introuvable.' });
+    }
 
+    const [[warehouseStock]] = await conn.query(
+      'SELECT COALESCE(SUM(quantite), 0) AS total FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?',
+      [req.tenantId, existing.id]
+    );
+    const [invoiceLines] = await conn.query(
+      'SELECT id FROM facture_lignes WHERE produit_id = ? LIMIT 1 FOR UPDATE',
+      [existing.id]
+    );
+    const [movements] = await conn.query(
+      'SELECT id FROM pro_mouvements_stock WHERE user_id = ? AND produit_id = ? LIMIT 1 FOR UPDATE',
+      [req.tenantId, existing.id]
+    );
+    if (Number(existing.stock) !== 0 || Number(warehouseStock.total) !== 0 || invoiceLines.length || movements.length) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Ce produit possède du stock, des mouvements ou des lignes de documents liés. Ajustez le stock et archivez le produit plutôt que de le supprimer.',
+        code: 'PRODUIT_HISTORIQUE_PROTEGE'
+      });
+    }
+
+    await conn.query('DELETE FROM produits WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
     if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED') {
       return res.status(409).json({ error: 'Impossible de supprimer ce produit : il est encore lié à des données existantes.' });
     }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
