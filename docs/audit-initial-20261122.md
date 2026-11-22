@@ -781,4 +781,4 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - Aucun paiement réel activé.
 
 ### Sécurité / préservation
-Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 116 branches restantes (diff, dates, CI) est encore incomplet.
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 91 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
