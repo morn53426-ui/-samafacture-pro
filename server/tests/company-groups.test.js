@@ -26,6 +26,8 @@ let starterToken;
 let subsidiaryClientId;
 let teamRecipientId;
 let teamConcurrentRecipientId;
+let teamExpiryRecipientId;
+let teamChangedRecipientId;
 
 function getVerificationTokens(verificationUrl) {
   const url = new URL(verificationUrl);
@@ -409,6 +411,95 @@ test('les invitations classiques exigent une preuve email, un envoi outbox et un
     [groupOwnerId, teamConcurrentRecipientId]
   );
   assert.equal(Number(secondMembership.total), 1);
+
+  // Une preuve expirée ne doit jamais rattacher un membre d'équipe.
+  const expiryRecipient = await register('team-expiry', 'Compte preuve expirée');
+  teamExpiryRecipientId = expiryRecipient.user.id;
+  const expiryInvitation = await request(app)
+    .post('/api/pro/team/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: expiryRecipient.user.email, role: 'employe' });
+  assert.equal(expiryInvitation.status, 201, expiryInvitation.text);
+  const [[expiryInviteOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation' AND entity_id = ?",
+    [expiryInvitation.body.id]
+  );
+  const expiryToken = getVerificationTokens(decryptEmailPayload(expiryInviteOutbox.payload_enc).invitation_url).token;
+  const expiryChallenge = await request(app)
+    .post('/api/pro/team/invitations/accept')
+    .set('Authorization', 'Bearer ' + expiryRecipient.token)
+    .send({ token: expiryToken });
+  assert.equal(expiryChallenge.status, 202, expiryChallenge.text);
+  const [[expiryProof]] = await pool.query(
+    'SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ?',
+    [expiryInvitation.body.id]
+  );
+  const [[expiryProofOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = ?",
+    [expiryProof.id]
+  );
+  const expiryVerificationToken = getVerificationTokens(
+    decryptEmailPayload(expiryProofOutbox.payload_enc).verification_url
+  ).verificationToken;
+  await pool.query(
+    'UPDATE pro_team_invitation_verifications SET expires_at = DATE_SUB(NOW(), INTERVAL 1 SECOND) WHERE id = ?',
+    [expiryProof.id]
+  );
+  const expiredProof = await request(app)
+    .post('/api/pro/team/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + expiryRecipient.token)
+    .send({ token: expiryToken, verification_token: expiryVerificationToken });
+  assert.equal(expiredProof.status, 404, 'une preuve email expirée ne doit pas créer le membre');
+  const [[expiredMembership]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_team_members WHERE owner_user_id = ? AND member_user_id = ? AND active = 1',
+    [groupOwnerId, teamExpiryRecipientId]
+  );
+  assert.equal(Number(expiredMembership.total), 0);
+
+  // Un changement d'adresse après émission de la preuve doit invalider le lien reçu auparavant.
+  const changedRecipient = await register('team-email-changed', 'Compte adresse modifiée');
+  teamChangedRecipientId = changedRecipient.user.id;
+  const changedInvitation = await request(app)
+    .post('/api/pro/team/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: changedRecipient.user.email, role: 'employe' });
+  assert.equal(changedInvitation.status, 201, changedInvitation.text);
+  const [[changedInviteOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation' AND entity_id = ?",
+    [changedInvitation.body.id]
+  );
+  const changedToken = getVerificationTokens(decryptEmailPayload(changedInviteOutbox.payload_enc).invitation_url).token;
+  const changedChallenge = await request(app)
+    .post('/api/pro/team/invitations/accept')
+    .set('Authorization', 'Bearer ' + changedRecipient.token)
+    .send({ token: changedToken });
+  assert.equal(changedChallenge.status, 202, changedChallenge.text);
+  const [[changedProof]] = await pool.query(
+    'SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ?',
+    [changedInvitation.body.id]
+  );
+  const [[changedProofOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = ?",
+    [changedProof.id]
+  );
+  const changedVerificationToken = getVerificationTokens(
+    decryptEmailPayload(changedProofOutbox.payload_enc).verification_url
+  ).verificationToken;
+  const replacementEmail = emailDeTest('team-email-replacement');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [replacementEmail, teamChangedRecipientId]);
+  const staleAddressProof = await request(app)
+    .post('/api/pro/team/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + changedRecipient.token)
+    .send({ token: changedToken, verification_token: changedVerificationToken });
+  assert.equal(staleAddressProof.status, 403,
+    'une preuve envoyée à l’ancienne adresse ne doit plus être valable après changement du compte');
+  const [[changedMembership]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_team_members WHERE owner_user_id = ? AND member_user_id = ? AND active = 1',
+    [groupOwnerId, teamChangedRecipientId]
+  );
+  assert.equal(Number(changedMembership.total), 0);
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [changedRecipient.user.email, teamChangedRecipientId]);
+
   const [cancelledEmails] = await pool.query(
     "SELECT entity_type, statut FROM email_outbox WHERE (entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)",
     [secondInvitation.body.id, secondProof.id]
@@ -1264,6 +1355,8 @@ after(async () => {
     await nettoyerUtilisateur(starterId);
     await nettoyerUtilisateur(teamRecipientId);
     await nettoyerUtilisateur(teamConcurrentRecipientId);
+    await nettoyerUtilisateur(teamExpiryRecipientId);
+    await nettoyerUtilisateur(teamChangedRecipientId);
   } finally {
     await teardownTestEnvironment();
   }
