@@ -264,3 +264,27 @@ La PR #135 a été renforcée: **toutes les factures émises ne peuvent plus êt
 - #138: CI déclenchée; head aa954; mergeable true.
 - #132: CI en cours après actualisation du rapport.
 - main demeure 8453ee6d, inchangé.
+
+
+## 14. Actualisation — migration ordering and PR117 review (03:42 UTC)
+
+### Collision de migrations : impact concret
+Le code `server/config/db.js` vérifié dans les deux branches n'exécute `runMigrations(conn)` que si le marqueur absent ou `meta.version < CURRENT_SCHEMA_VERSION`.
+- PR #128 est version 19 et ses quatre champs d'essai sont ajoutés dans `columnsToEnsure` (dans `runMigrations`).
+- PR #117 est version 20 et ajoute l'historique comptable facture + mode de règlement dépense, sans les quatre colonnes d'essai dans sa liste.
+- Si #117 est intégré en premier (version20), #128 version19 ne lance pas `runMigrations` sur une base v20: les colonnes trial peuvent manquer.
+- Si #128 est intégré en premier (version19), #117 version20 lance `runMigrations`, mais sa liste n'assure pas les colonnes trial; elles peuvent manquer aussi.
+**Solution impérative d'intégration:** branch combinée avec version21, les colonnes trial et migration comptable incluses dans le même `runMigrations`, schema.sql combiné, commentaires et tests de migration/metadata mis à jour vers v21; tester les bases v18, v19 et v20 sur copie dédiée non destructive. Ne merge pas #117 et #128 telles quelles.
+
+### Revue ciblée de PR #117
+- Service `accounting-invoice-lifecycle.js`: verrou facture attendu par l'appelant, vérifie l'écriture précédente validée et équilibrée, inverse débit/crédit, journalise un événement, utilise des transitions annulation/réactivation idempotentes; tests de cycles multiples.
+- Remboursements: demande cumulative vérifie `a_traiter/approuve/rembourse` sous verrou paiement; passage à `rembourse` exige référence prestataire, crée l'encaissement d'origine si absent, vérifie deux lignes trésorerie/client, et crée la contrepassation dans même transaction; met à jour `montant_paye` et statut facture. La revue de ce périmètre est positive mais CI de PR #117 ne remplace pas l'analyse de l'intégration.
+- PR #117 est large: 70 commits dans PR metadata, 22 fichiers, incluant migration comptable, mode règlement dépense, remboursement, tests, workflows et responsive/PDF. Recommander de scinder les lots ou faire une revue diff complète avant intégration, car plusieurs changements indépendants et les workflows de CI se chevauchent avec #128.
+- PR #128 est aussi large (39 commits, 26 fichiers): essai 15 jours, auth/expiration, navigation professionnelle, paramètres, comptes OHADA, tests et CSS. CI réussie sur le SHA contrôlé, mais collision version à résoudre.
+
+### Statut actuel
+- Branches: **144**, heads uniques estimés **142**.
+- PR ouvertes: **21**.
+- #134 CI entièrement verte.
+- #135, #136, #137, #138 et #132 tests automatisés en cours; aucun résultat final n'est déclaré.
+- #117 et #128 CI réussies sur leurs heads; ne pas fusionner avant version21 et rebase/intégration contrôlée.
