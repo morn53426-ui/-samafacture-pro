@@ -7738,3 +7738,10 @@ a.btn .icon {
     color: #9DE7BC !important;
   }
 }
+
+
+/* Contraste WCAG AA pour les badges et l'état de formule sur la page Abonnement. */
+.subscription-status,
+.plan-current-badge {
+  color: var(--emerald-text);
+}
