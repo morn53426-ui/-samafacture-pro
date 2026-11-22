@@ -186,5 +186,27 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   );
   assert.equal(indexes.length, 1);
 
+  // Rejouer le chemin de migration depuis la version précédente doit rester idempotent
+  // et ne modifier ni l'essai neutre ni le règlement bancaire déjà enregistré.
+  await pool.query('UPDATE _samafacture_schema_meta SET version = 20 WHERE id = 1');
+  const repeatedMigration = runMigrationInNewProcess();
+  assert.equal(repeatedMigration.error, undefined, repeatedMigration.error?.message);
+  assert.equal(repeatedMigration.status, 0,
+    repeatedMigration.stderr || repeatedMigration.stdout || 'La migration répétée v20 → v21 a échoué.');
+  const [[repeatedMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
+  assert.equal(Number(repeatedMeta.version), 21);
+  const [[repeatedExpense]] = await pool.query(
+    'SELECT mode_reglement FROM depenses WHERE user_id = ? AND libelle = ?',
+    [userId, 'Dépense banque conservée pendant upgrade v20']
+  );
+  assert.equal(repeatedExpense.mode_reglement, 'banque');
+  const [[repeatedAccount]] = await pool.query(
+    'SELECT trial_status, trial_started_at, trial_ends_at FROM users WHERE id = ?',
+    [userId]
+  );
+  assert.equal(repeatedAccount.trial_status, 'not_started');
+  assert.equal(repeatedAccount.trial_started_at, null);
+  assert.equal(repeatedAccount.trial_ends_at, null);
+
   await removeTestUser(userId);
 });
