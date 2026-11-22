@@ -683,7 +683,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 
 ### État actuel et limites de vérification
 - Main confirmé au SHA `8453ee6d8e633f151523236eecff1bc0e0cf877b`; le commit récent est le merge PR #123. Les endpoints status et workflow-runs accessibles ont renvoyé zéro status et zéro run pour main; le run main #1296 mentionné dans l'addendum précédent n'est donc **pas revalidé sur ce run**.
-- Branch names: 146; deux pages 100 + 46; noms identiques à l'inventaire précédent. Les 144 SHA uniques et les dates de dernier commit n'ont pas été recalculés pour toutes les branches. HEADs actualisés ci-dessous pour 23 PR et 30 branches sélectionnées.
+- Branch names: 146; deux pages 100 + 46; noms identiques à l'inventaire précédent. L'inventaire mixte contient 145 SHA enregistrés et 143 valeurs uniques (self branch sans SHA); ce n'est pas un refresh global des refs. Dates de dernier commit non disponibles. HEADs actualisés pour 22 branches de PR et 32 branches sélectionnées sans PR ouverte.
 - 23 PR ouvertes confirmées. Comparaisons fraîches main...head pour les 23; CI consultée pour les 23.
 
 ### PR ahead/behind (recalcul par SHA actuel; main = 8453ee6d)
