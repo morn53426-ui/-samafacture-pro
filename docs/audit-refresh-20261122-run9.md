@@ -398,3 +398,10 @@ Sur main, le check-run Tests Node.js et MySQL associé à HEAD a conclu success.
 - #142 head `decb8da` : ZIP/ESLint verts, tests #45027909669 en cours (step test).
 - #145 head `35adb125` après correction d'assertion : ZIP, ESLint, tests tous relancés; tests #45028257640 en cours, étape Docker build/secret sentinel.
 - #132 report head `4c5fe5fd` : ZIP #45028296928 vert, tests #45028297015 en cours.
+
+## Run 7 — tests phase progressing (22 novembre 2026)
+
+- #142 run `45027909669` on head `decb8da`: test suite step completed success, encrypted backup restore completed success; cluster MySQL/Redis smoke active, visual sweep not yet started.
+- #145 run `45028257640` on head `35adb125`: Docker build/secret sentinel step active; previous head `c59e3f0` test suite still running at last check.
+- #132 latest head `cdd380e1`: ZIP and tests runs initiated; tests currently in progress.
+- Logs for the completed #142 test step are not yet downloadable while the job remains active (GitHub log endpoint returned BlobNotFound); test counts are not claimed until the job finishes and logs are readable.
