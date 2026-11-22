@@ -800,7 +800,7 @@ function createFactureTemplates(helpers) {
           ${facture.mode_paiement ? `<div style="margin-top:6px;">Mode de paiement : ${escapeHtml(facture.mode_paiement)}</div>` : ''}
           ${user.signature_default ? `<div style="margin-top:10px;"><div style="font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-soft);">Signature numérique</div>${signatureHtml(user, 180)}</div>` : ''}
         </div>
-        <div style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+        <div class="sf-platine-verification" style="display:flex; flex-direction:column; align-items:center; gap:6px;">
           ${qrCodeHtml(qrCode, 78)}
           <div class="stamp ${paymentStampLabel(facture, isDevis) === 'Payée' ? '' : 'stamp-clay'}">
             ${paymentStampLabel(facture, isDevis)}
