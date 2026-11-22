@@ -82,3 +82,4 @@ jobs:
           server/routes/produits.js
           server/tests/stock.test.js
           server/tests/produits-delete.test.js
+          $(test -f server/tests/client-history-protection.test.js && echo server/tests/client-history-protection.test.js)
