@@ -308,8 +308,8 @@ router.delete('/:id', async (req, res, next) => {
     // Ne pas agréger : des soldes entrepôts opposés (données historiques/anormales)
     // pourraient s'annuler et masquer un stock non nul. Verrouiller la ligne détectée.
     const [warehouseStockRows] = await conn.query(
-      'SELECT id FROM pro_stocks_entrepots WHERE produit_id = ? AND quantite <> 0 LIMIT 1 FOR UPDATE',
-      [existing.id]
+      'SELECT id FROM pro_stocks_entrepots WHERE produit_id = ? AND (quantite <> 0 OR user_id <> ?) LIMIT 1 FOR UPDATE',
+      [existing.id, req.tenantId]
     );
     const [invoiceLines] = await conn.query(
       'SELECT id FROM facture_lignes WHERE produit_id = ? LIMIT 1 FOR UPDATE',
