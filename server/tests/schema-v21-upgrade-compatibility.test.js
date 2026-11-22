@@ -144,7 +144,7 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
     'Ne pas supprimer des événements comptables existants.');
 
   const [trialIndex] = await pool.query(
-    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+    `SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
        AND INDEX_NAME = 'idx_users_trial_status_end'`
   );
@@ -180,7 +180,7 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   assert.equal(expense.mode_reglement, 'banque');
 
   const [indexes] = await pool.query(
-    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+    `SELECT DISTINCT INDEX_NAME FROM information_schema.STATISTICS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
        AND INDEX_NAME = 'idx_users_trial_status_end'`
   );
