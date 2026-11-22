@@ -380,3 +380,12 @@ Sur main, le check-run Tests Node.js et MySQL associé à HEAD a conclu success.
 - #142 : head `decb8da`, ZIP #45027909640 et ESLint #45027909637 verts; Tests #45027909669 en cours.
 - #132 : head report précédent `57e9743`, ZIP #45027535450 vert, Tests #45027535457 en cours. Le rapport sera relancé après cette mise à jour.
 - #144 demeure ouverte Draft sans checks et est superseded par #145; aucune PR fermée.
+
+## Run 5 — test review correction on v22 branch (22 novembre 2026)
+
+- Independent diff review of #145 found a stale expected schema version in the repeated v20 migration assertion: it still expected 21 while the migration now sets 22.
+- Corrected in commit `35adb125` before accepting CI. Latest #145 head is `35adb125f44a825e2c21e8cc5da23967caa932f3`; all three workflows were restarted, currently in progress (tests job initialized; earlier head had progressed to the test step).
+- #142 current head `decb8da`: ZIP/ESLint success; tests #45027909669 in progress at test suite.
+- #145 previous head `c59e3f0`: ZIP/ESLint success; tests #45027993526 in progress at test suite. New head tests #45028257640 initializing.
+- #132 latest report head `1d837da`: ZIP success, tests in progress. Previous report head `13d6bce` completed success.
+- No local test execution. No merge, close, deletion, or main modification.
