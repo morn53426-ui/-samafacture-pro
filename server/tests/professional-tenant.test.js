@@ -50,6 +50,8 @@ before(async () => {
   assert.equal(clientResponse.status, 201, clientResponse.text);
   clientId = clientResponse.body.client.id;
 
+  await pool.query("UPDATE users SET devise = 'EUR' WHERE id = ?", [ownerId]);
+
   // Simule une invitation acceptée avec un rôle strictement en lecture seule.
   await pool.query(
     'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json, active) VALUES (?, ?, ?, ?, 1)',
@@ -88,6 +90,15 @@ test('les espaces entreprise isolent les clients, les factures et les permission
   assert.equal(companyList.status, 200);
   const sharedClient = companyList.body.clients.find(client => Number(client.id) === Number(clientId));
   assert.ok(sharedClient, 'le client de l’entreprise doit être visible par le membre autorisé');
+
+  // Un membre lecture seule peut lire le seul code devise de l’espace sélectionné,
+  // sans recevoir le droit de consulter ou modifier tous les paramètres internationaux.
+  const companyContext = await request(app)
+    .get('/api/pro/company-context')
+    .set('Authorization', 'Bearer ' + memberToken)
+    .set('X-SF-Company-Owner', String(ownerId));
+  assert.equal(companyContext.status, 200, companyContext.text);
+  assert.equal(companyContext.body.devise, 'EUR');
 
   // Une facture rattachée anormalement au client mais appartenant au membre ne doit pas
   // polluer les totaux affichés dans l’espace de l’entreprise propriétaire.
