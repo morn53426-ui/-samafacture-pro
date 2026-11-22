@@ -306,16 +306,16 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     const [[warehouseStock]] = await conn.query(
-      'SELECT COALESCE(SUM(quantite), 0) AS total FROM pro_stocks_entrepots WHERE user_id = ? AND produit_id = ?',
-      [req.tenantId, existing.id]
+      'SELECT COALESCE(SUM(quantite), 0) AS total FROM pro_stocks_entrepots WHERE produit_id = ?',
+      [existing.id]
     );
     const [invoiceLines] = await conn.query(
       'SELECT id FROM facture_lignes WHERE produit_id = ? LIMIT 1 FOR UPDATE',
       [existing.id]
     );
     const [movements] = await conn.query(
-      'SELECT id FROM pro_mouvements_stock WHERE user_id = ? AND produit_id = ? LIMIT 1 FOR UPDATE',
-      [req.tenantId, existing.id]
+      'SELECT id FROM pro_mouvements_stock WHERE produit_id = ? LIMIT 1 FOR UPDATE',
+      [existing.id]
     );
     // Les lignes d'achats et de réception gardent leur document mais la FK produit
     // est ON DELETE SET NULL : bloquer pour conserver la traçabilité du catalogue.
