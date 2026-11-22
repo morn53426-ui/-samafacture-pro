@@ -26,6 +26,14 @@ docker volume ls
 
 Identifiez le volume Docker monté sur `/app/server/backups` pour le service `app`. Le nom est généralement préfixé par le nom du projet Compose ; vérifiez-le avec `docker volume inspect` et ne choisissez pas un volume uniquement par ressemblance.
 
+Avant la première sauvegarde après déploiement, vérifiez les droits du point de montage depuis le conteneur applicatif :
+
+```bash
+docker compose exec app sh -lc 'id; stat -c "%u:%g %a %n" /app/server/backups'
+```
+
+Le processus Node s'exécute sous l'utilisateur non-root `samafacture`. Le répertoire doit lui appartenir pour que le durcissement `chmod 0700` puisse réussir. Un nouveau volume nommé hérite normalement du propriétaire préparé dans l'image ; un ancien volume peut conserver un propriétaire historique différent. Dans ce cas, ne lancez pas `chmod 777` et ne changez pas récursivement le propriétaire à l'aveugle : planifiez une correction de propriété contrôlée, après vérification de l'UID/GID et de l'existence d'une sauvegarde récupérable. L'application ne tente volontairement pas de s'approprier le volume automatiquement.
+
 ## 3. Configurer la destination S3-compatible
 
 Installez rclone sur l'hôte et configurez une destination distante avec `rclone config`. Les identifiants ne doivent pas être enregistrés dans le dépôt. Le fichier de configuration doit être lisible uniquement par l'administrateur (`chmod 600`).
