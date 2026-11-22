@@ -632,7 +632,7 @@ test('un remboursement réellement exécuté contre-passe le journal du paiement
   assert.equal(unknownRefundCompleted.status, 409, unknownRefundCompleted.text);
   assert.equal(unknownRefundCompleted.body.code, 'METHODE_PAIEMENT_NON_RECONNUE');
   const [[unknownEntries]] = await pool.query(
-    "SELECT COUNT(*) AS total FROM pro_compta_ecritures WHERE user_id = ? AND source_type IN ('paiement', 'remboursement') AND source_id IN (?, ?)",
+    "SELECT COUNT(*) AS total FROM pro_compta_ecritures WHERE user_id = ? AND ((source_type = 'paiement' AND source_id = ?) OR (source_type = 'remboursement' AND source_id = ?))",
     [userId, unknownPayment.id, unknownRefundRequest.body.id]
   );
   assert.equal(Number(unknownEntries.total), 0, 'aucune écriture ne doit être créée pour une méthode non reconnue');
