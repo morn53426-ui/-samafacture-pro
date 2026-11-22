@@ -18,9 +18,20 @@ async function authenticateApiKey(req, res, next) {
       [hash]
     );
     if (!rows.length) return res.status(401).json({ error: 'Clé API inconnue, expirée ou révoquée.' });
+    let scopes;
+    try {
+      scopes = Array.isArray(rows[0].scopes_json)
+        ? rows[0].scopes_json
+        : JSON.parse(rows[0].scopes_json || '[]');
+    } catch (_) {
+      return res.status(401).json({ error: 'Clé API invalide : permissions illisibles.' });
+    }
+    if (!Array.isArray(scopes) || !scopes.every(scope => typeof scope === 'string')) {
+      return res.status(401).json({ error: 'Clé API invalide : permissions mal formées.' });
+    }
     req.apiKeyId = Number(rows[0].id);
     req.apiUserId = Number(rows[0].user_id);
-    req.apiScopes = Array.isArray(rows[0].scopes_json) ? rows[0].scopes_json : JSON.parse(rows[0].scopes_json || '[]');
+    req.apiScopes = scopes;
     await pool.query('UPDATE pro_api_keys SET derniere_utilisation = NOW() WHERE id = ?', [req.apiKeyId]);
     next();
   } catch (err) { next(err); }
@@ -96,6 +107,9 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
     }
     const inputLines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
     if (!inputLines.length || inputLines.length > 100) return res.status(400).json({ error: 'Une facture doit contenir entre 1 et 100 lignes.' });
+    if (inputLines.some(line => !line || typeof line !== 'object' || Array.isArray(line))) {
+      return res.status(400).json({ error: 'Chaque ligne de facture doit être un objet valide.' });
+    }
     const productIds = [...new Set(inputLines.map(l => Number(l.produit_id)).filter(n => Number.isInteger(n) && n > 0))];
     let validProducts = new Set();
     if (productIds.length) {
