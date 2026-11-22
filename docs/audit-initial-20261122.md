@@ -894,3 +894,77 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 
 ### État PR #132 après la couverture ahead/behind complète
 - Avant ce dernier commit documentaire, HEAD `8331513e` était 66 ahead/0 behind, Draft, sans workflow-run visible. Ce commit final ajoute un commit (ahead attendu 67); aucune CI locale ou produit n'est validée, et le workflow du HEAD après commit doit être vérifié.
+
+
+## Run 8 — actualisation GitHub et revue ciblée (22 novembre 2026, 10:26 UTC)
+
+### État vérifié
+- Repo public, permission actuelle du connecteur: admin/maintain/push.
+- main demeure 8453ee6d8e633f151523236eecff1bc0e0cf877b. Compare main...main = identical (0 ahead/behind).
+- Status checks legacy sur main: liste vide. Workflow-runs PR associés au SHA main: aucun retourné. **CI main n'est donc pas revalidée dans ce run**; l'absence de résultats n'est ni un succès ni un échec.
+- Noms des branches: 146, pagination 100 + 46 + page terminale vide; aucune différence de noms avec l'inventaire run 7. 145 noms/SHA lignes sont consignés dans le fichier inventaire (la branche audit #132 est auto-référente et omise de sa propre ligne).
+- Head SHA des 23 PR ouvertes récupérés. Les 122 heads sans PR n'ont pas été rafraîchis ce run; leurs SHA dans le tableau d'inventaire restent ceux de run 7. Aucun commit-date n'a été collecté.
+
+### Comparaison fraîche des PR avec main
+| PR | Head SHA | Ahead/behind | Base effective | CI HEAD |
+|---|---|---:|---|---|
+| #140 | d16c4c54 | 4/0 | main | tests, lint, ZIP OK |
+| #139 | baa9ea6a | 1/0 | main | tests + ZIP OK; lint absent |
+| #138 | 27d5a6c2 | 15/0 | main | tests, lint, ZIP OK |
+| #137 | f2aada8d | 10/0 | main | tests, lint, ZIP OK |
+| #136 | 4e0f2a89 | 5/0 | main | tests, lint, ZIP OK |
+| #135 | 2c7f3cbd | 11/0 | main | tests, lint, ZIP OK |
+| #134 | 52021018 | 3/0 | main | tests, lint, ZIP OK |
+| #133 | 6b3cd9ff | 13/0 vs main; 1/8 vs current #130 | #130 (stacked) | aucun run |
+| #132 | 97fc9486* | 67/0 | main | tests + ZIP OK |
+| #131 | 3d51f0af | 4/0 | main | tests + ZIP OK |
+| #130 | 9722ca99 | 20/0 | main | tests, lint, ZIP OK |
+| #129 | 868027e1 | 9/0 | main | aucun run retourné |
+| #128 | e3b91dc4 | 39/0 | main | tests, lint, ZIP OK |
+| #127 | 9bfc8aea | 5/0 | main | tests, lint, ZIP OK |
+| #126 | 817b10da | 30/0 | main | tests + ZIP OK; lint absent |
+| #125 | 7d9617d0 | 43/0 | main | tests, lint, ZIP OK |
+| #118 | 29dd7ccc | 42/23 | main | tests + ZIP OK; divergence |
+| #117 | ba756d09 | 47/0 | main | tests, lint, ZIP OK |
+| #115 | 3873c1d1 | 1/23 | main | tests + ZIP OK; divergence |
+| #114 | ff2cae7b | 4/50 | main | tests + ZIP OK; divergence |
+| #110 | 722b5bfc | 15/53 | main | tests/visuel échoués; lint + ZIP OK |
+| #102 | 86aeeb6f | 13/228 | main | tests/visuel échoués; lint + ZIP OK |
+| #99 | 3f70466d | 21/228 | main | tests/visuel échoués; lint + ZIP OK |
+
+* #132 head SHA est celui avant les deux mises à jour documentaires de ce run; son head évolue avec ces commits.
+
+### CI — preuve et anomalies
+- #130 head 9722ca99: Tests automatisés run 45007493879, ESLint 45007493874, ZIP 45007493877: tous success. La correction contraste/focus de run 7 reste validée.
+- #132 head précédent 97fc9486: Tests 45008646664 et ZIP 45008646742: success. Les commits documentaires ajoutés après ce head doivent encore recevoir leurs propres runs.
+- #134–#140: tests/lint/package tous success pour #134, #135, #136, #137, #138 et #140; #139 tests + package success, aucun workflow lint retourné.
+- #117/#128/#125/#127: tests, ESLint et ZIP success. #126/#131/#115/#114/#118: tests + ZIP success, lint absent dans les runs consultés.
+- #129 et #133: aucun workflow-run retourné sur leurs HEAD.
+- Échec #99 (run 44383668275): recette visuelle, badge sombre, ratio 3,97:1 sous AA.
+- Échec #102 (run 44552969767): recette keyboard/focus; les contrôles date from/to de Rapports ne montrent pas de focus visible au parcours Maj+Tab.
+- Échec #110 (run 44929935396): recette visuelle Dépenses; montants rouges rgb(225,72,79) sur fond transparent, ratio 4,23:1 au lieu de 4,5:1.
+Ces trois PR anciennes/divergentes ne sont pas mergeables sans rebase et correction/portage.
+
+### Revue ciblée read-only des protections P1
+- #135 factures: revue de server/routes/factures.js. Toutes les factures émises sont refusées en suppression (409); les devis sont supprimables seulement sans références financières/comptables/commerciales/documentaires/portail. Transaction + verrou parent; rollback protégé si connexion indisponible. CI complète verte. Aucun défaut confirmé dans l'extrait revu; la revue de toutes les références et cas tenant adversariaux reste nécessaire.
+- #136 dépenses: PUT/DELETE transactionnels, verrou dépense, refuse une source déjà comptabilisée. postSystemEntry relit la source sous FOR UPDATE et vérifie montant, date, libellé et catégorie avant de créer l'écriture; la suite concurrente autorise les deux ordres mais vérifie l'équilibre source/écriture. CI verte.
+- #137 clients: verrou client, refuse références facture inter-tenant et protège factures, récurrences, commandes, documents, accès/décisions portail et activités CRM. CI verte.
+- #138 produits: refuse stock catalogue non nul, lignes entrepôt non nulles ou cross-tenant, lignes facture, mouvements et lignes achats; test +3/-3 empêche l'annulation de soldes par SUM. CI verte.
+- #140: lint backend/tests élargi aux routes et tests clients/produits; CI verte.
+Cette revue ciblée n'est pas une revue exhaustive de tout le dépôt et aucun correctif produit supplémentaire n'a été appliqué dans ce run.
+
+### Migration combinée #117 + #128 — plan confirmé par le code
+- #117 db.js: CURRENT_SCHEMA_VERSION=20; v19 contrepassations facture, v20 mode_reglement dépense (caisse/banque).
+- #128 db.js: CURRENT_SCHEMA_VERSION=19; v19 trial_plan, trial_started_at, trial_ends_at, trial_status et index trial_status/trial_ends_at.
+- Les colonnes/indexes sont ajoutés via les mécanismes idempotents ensure-columns/ensure-indexes. Une branche combinée basée sur main doit conserver les changements #117 et ajouter les champs/index trial au v21, mettre CURRENT_SCHEMA_VERSION=21, harmoniser schema.sql et les tests de version, puis valider upgrades depuis les versions existantes et exécution répétée. Ne pas fusionner #117/#128 séparément.
+- #128 décrit essais de 15 jours Standard (alias starter), Pro et Entreprise, UTC, expiration vers Gratuit et conservation des données. Les CI sont vertes; revue indépendante et migration combinée non exécutées.
+
+### Prochaines priorités
+1. Revue humaine des PR #134–#140; toutes les CI sont vertes, mais elles restent Draft.
+2. Préparer une branche migration v21 combinée #117/#128 et tests upgrade/downgrade non destructifs.
+3. Recette PDF #125/#127, #129 sans CI, et vidéo #126 (master vidéo absent indiqué dans la description).
+4. Rebase/portage #115/#114/#110/#102/#99; comparer #118/#126 et #114/#131; ne pas intégrer les PR divergentes telles quelles.
+5. Revue diff détaillée et dates/CI pour les 122 branches sans PR, non terminées.
+
+### Protections et limites
+Aucun changement direct main, merge/close PR, suppression de branche, volume, donnée ou sauvegarde; aucun paiement réel. Tests locaux et Docker local non exécutés. CI GitHub des PR citées uniquement. Certification SYSCOHADA et validations manuelles clavier/lecteurs d'écran restent requises.
