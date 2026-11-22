@@ -134,34 +134,42 @@ describe('Décompte et restitution automatique du stock', () => {
     assert.equal(await stockActuel(), avant, 'réactiver doit redécompter les 2 unités');
   });
 
-  test('supprimer une facture active restitue le stock ; supprimer une facture déjà annulée ne le restitue pas deux fois', async () => {
+  test('une facture active ou annulée ne peut être supprimée; l’annulation restitue le stock', async () => {
     const facture = await request(app)
       .post('/api/factures')
       .set('Authorization', `Bearer ${token}`)
       .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Chaise', quantite: 4, prix_unitaire: 5000, tva: 18, produit_id: produitId }] });
     const avant = await stockActuel();
 
-    await request(app)
+    const rejectedDelete = await request(app)
       .delete(`/api/factures/${facture.body.facture.id}`)
       .set('Authorization', `Bearer ${token}`);
-    assert.equal(await stockActuel(), avant + 4);
+    assert.equal(rejectedDelete.status, 409, rejectedDelete.text);
+    assert.equal(await stockActuel(), avant, 'une suppression refusée ne doit pas modifier le stock');
 
-    // Facture annulée puis supprimée : le stock avait déjà été restitué à l'annulation,
-    // la suppression ne doit pas le restituer une seconde fois.
+    const cancellation = await request(app)
+      .put(`/api/factures/${facture.body.facture.id}/statut`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ statut: 'annulee' });
+    assert.equal(cancellation.status, 200, cancellation.text);
+    assert.equal(await stockActuel(), avant + 4, 'annuler doit restituer le stock');
+
     const facture2 = await request(app)
       .post('/api/factures')
       .set('Authorization', `Bearer ${token}`)
       .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Chaise', quantite: 1, prix_unitaire: 5000, tva: 18, produit_id: produitId }] });
-    await request(app)
+    const cancellation2 = await request(app)
       .put(`/api/factures/${facture2.body.facture.id}/statut`)
       .set('Authorization', `Bearer ${token}`)
       .send({ statut: 'annulee' });
-    const apresAnnulation = await stockActuel();
+    assert.equal(cancellation2.status, 200, cancellation2.text);
+    const afterCancellation = await stockActuel();
 
-    await request(app)
+    const rejectedDelete2 = await request(app)
       .delete(`/api/factures/${facture2.body.facture.id}`)
       .set('Authorization', `Bearer ${token}`);
-    assert.equal(await stockActuel(), apresAnnulation, 'pas de restitution en double');
+    assert.equal(rejectedDelete2.status, 409, rejectedDelete2.text);
+    assert.equal(await stockActuel(), afterCancellation, 'le stock ne doit pas être restitué une seconde fois');
   });
 
   test('supprimer le client restitue aussi le stock de ses factures actives', async () => {
@@ -273,12 +281,19 @@ describe('Décompte et restitution automatique du stock', () => {
       assert.equal(currentBalances[secondaryWarehouseId], -3, 'la réactivation redébite le même dépôt');
       assert.equal(await storedTotal(), 7);
 
-      const deleted = await request(app).delete(`/api/factures/${invoiceId}`)
+      const rejectedDelete = await request(app).delete(`/api/factures/${invoiceId}`)
         .set('Authorization', `Bearer ${token}`);
-      assert.equal(deleted.status, 200, deleted.text);
+      assert.equal(rejectedDelete.status, 409, rejectedDelete.text);
       currentBalances = await balances();
       assert.equal(currentBalances[Number(mainWarehouse.id)], 10);
-      assert.equal(currentBalances[secondaryWarehouseId], 0, 'la suppression restitue dans le dépôt mémorisé');
+      assert.equal(currentBalances[secondaryWarehouseId], -3, 'la suppression refusée ne doit pas modifier le dépôt');
+      assert.equal(await storedTotal(), 7);
+
+      const cancellationAfterRejectedDelete = await request(app).put(`/api/factures/${invoiceId}/statut`)
+        .set('Authorization', `Bearer ${token}`).send({ statut: 'annulee' });
+      assert.equal(cancellationAfterRejectedDelete.status, 200, cancellationAfterRejectedDelete.text);
+      currentBalances = await balances();
+      assert.equal(currentBalances[secondaryWarehouseId], 0, 'l’annulation restitue dans le dépôt mémorisé');
       assert.equal(await storedTotal(), 10);
 
       const concurrentInvoice = await request(app).post('/api/factures')
@@ -293,13 +308,12 @@ describe('Décompte et restitution automatique du stock', () => {
         request(app).delete(`/api/factures/${concurrentId}`).set('Authorization', `Bearer ${token}`),
         request(app).put(`/api/factures/${concurrentId}/statut`).set('Authorization', `Bearer ${token}`).send({ statut: 'annulee' })
       ]);
-      assert.equal(deleteResponse.status, 200, deleteResponse.text);
-      assert.ok([200, 404].includes(cancelResponse.status),
-        'annulation concurrente : elle réussit avant la suppression ou trouve la facture déjà supprimée');
+      assert.equal(deleteResponse.status, 409, deleteResponse.text);
+      assert.equal(cancelResponse.status, 200, cancelResponse.text);
       currentBalances = await balances();
       assert.equal(currentBalances[Number(mainWarehouse.id)], 10);
       assert.equal(currentBalances[secondaryWarehouseId], 0,
-        'une suppression et une annulation concurrentes ne doivent restituer le stock qu’une fois');
+        'annulation concurrente et suppression refusée ne doivent pas restituer deux fois');
       assert.equal(await storedTotal(), 10);
 
       const quoteResponse = await request(app).post('/api/factures')
@@ -335,14 +349,14 @@ describe('Décompte et restitution automatique du stock', () => {
       assert.equal(Number(duplicate.body.facture.entrepot_id), secondaryWarehouseId);
       currentBalances = await balances();
       assert.equal(currentBalances[secondaryWarehouseId], -2, 'la duplication d’une facture débite le même dépôt');
-      const deleteDuplicate = await request(app).delete(`/api/factures/${duplicate.body.facture.id}`)
-        .set('Authorization', `Bearer ${token}`);
-      const deleteOriginal = await request(app).delete(`/api/factures/${original.body.facture.id}`)
-        .set('Authorization', `Bearer ${token}`);
-      assert.equal(deleteDuplicate.status, 200);
-      assert.equal(deleteOriginal.status, 200);
+      const cancelDuplicate = await request(app).put(`/api/factures/${duplicate.body.facture.id}/statut`)
+        .set('Authorization', `Bearer ${token}`).send({ statut: 'annulee' });
+      const cancelOriginal = await request(app).put(`/api/factures/${original.body.facture.id}/statut`)
+        .set('Authorization', `Bearer ${token}`).send({ statut: 'annulee' });
+      assert.equal(cancelDuplicate.status, 200, cancelDuplicate.text);
+      assert.equal(cancelOriginal.status, 200, cancelOriginal.text);
       currentBalances = await balances();
-      assert.equal(currentBalances[secondaryWarehouseId], 0);
+      assert.equal(currentBalances[secondaryWarehouseId], 0, 'les annulations restituent les deux sorties');
       assert.equal(await storedTotal(), 10);
     } finally {
       await nettoyerUtilisateur(foreignUserId);
