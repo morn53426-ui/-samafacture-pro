@@ -48,23 +48,26 @@
     }
 
     /*
-     * Les modèles historiques compensent le padding écran de 40px avec des marges
-     * négatives. Le padding du document étant supprimé en impression, conserver
-     * ces marges ferait sortir les bandeaux de la zone A4 imprimable.
-     * Les bandeaux -40px gardent leur alignement avec le corps du document grâce
-     * à la suppression de leur padding horizontal interne.
+     * Les modèles historiques utilisent des marges négatives pour faire courir
+     * leur bandeau jusqu'aux bords du document malgré le padding écran.
+     * En impression, le padding du document est supprimé et les marges négatives
+     * sont neutralisées. Le bandeau reprend explicitement toute la largeur utile,
+     * en conservant son padding interne (notamment les 40px qui protègent le titre
+     * FACTURE/DEVIS du bord papier).
      */
     .invoice-doc [style*="margin:-40px -40px"] {
       margin-top: 0 !important;
       margin-left: 0 !important;
       margin-right: 0 !important;
-      padding-left: 0 !important;
-      padding-right: 0 !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
     }
     .invoice-doc [style*="margin:-8px -8px"] {
       margin-top: 0 !important;
       margin-left: 0 !important;
       margin-right: 0 !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
     }
   }
 </style>
