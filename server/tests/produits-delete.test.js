@@ -1,7 +1,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 // DELETE /api/produits/:id — non couvert jusqu'ici (création et modification l'étaient déjà
 // dans validation-update.test.js / stock.test.js, jamais la suppression elle-même).
