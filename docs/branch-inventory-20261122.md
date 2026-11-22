@@ -7,7 +7,7 @@ PR ouvertes : **23** (têtes et comparaisons rafraîchies run 7). Main : `8453ee
 CI main : aucune status/run fraîche retournée run 7; le run 6 rapportait #1296 réussi (non revalidé). Ruleset `protect main` actif selon run 6 (non revalidé run 7).
 
 
-> Run 7 (09:23 UTC): noms de branches vérifiés (100+46, aucun changement). HEADs mis à jour pour les 22 branches des PR ouvertes et 87 branches non-PR sélectionnées. Les 36 branches restantes sans PR ouverte n'ont pas reçu de comparaison SHA/CI exhaustive run 7. Les dates de dernier commit ne sont pas disponibles via la collecte. PR comparisons fresh: 23.
+> Run 7 (09:23 UTC): noms de branches vérifiés (100+46, aucun changement). HEADs mis à jour pour les 22 branches des PR ouvertes et 94 branches non-PR sélectionnées. Les 28 branches restantes sans PR ouverte n'ont pas reçu de comparaison SHA/CI exhaustive run 7. Les dates de dernier commit ne sont pas disponibles via la collecte. PR comparisons fresh: 23.
 
 > Branches API paginées 100+46. La ligne de cette branche d’audit est auto-référente : son HEAD est le commit de mise à jour du présent inventaire, consultable dans PR #132. Les dates de dernier commit ne sont pas retournées par cette collecte. Ahead/behind a été recalculé pour les 23 PR ouvertes; les branches sans PR n'ont pas toutes été comparées à main. Aucune branche supprimée.
 
