@@ -7845,18 +7845,18 @@ a.btn .icon {
     font-size: 9pt !important;
     line-height: 1.15 !important;
   }
-  .invoice-doc .sf-doc-tax {
+  .invoice-doc .sf-doc-tax-platine {
     margin-top: 8px !important;
     padding: 8px 10px !important;
   }
-  .invoice-doc .sf-doc-tax-title {
+  .invoice-doc .sf-doc-tax-platine .sf-doc-tax-title {
     margin-bottom: 4px !important;
   }
-  .invoice-doc .sf-doc-tax-row,
-  .invoice-doc .sf-doc-tax-total {
+  .invoice-doc .sf-doc-tax-platine .sf-doc-tax-row,
+  .invoice-doc .sf-doc-tax-platine .sf-doc-tax-total {
     padding: 2px 0 !important;
   }
-  .invoice-doc .sf-doc-tax-total {
+  .invoice-doc .sf-doc-tax-platine .sf-doc-tax-total {
     margin-top: 3px !important;
     padding-top: 5px !important;
   }
