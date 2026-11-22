@@ -424,8 +424,8 @@ describe('Impression et génération PDF', () => {
       'La recette PDF visuelle ne doit pas redéfinir les marges déjà fixées par @page.');
     assert.match(pdfSource, /preferCSSPageSize:\s*true/);
     assert.match(visualSource, /preferCSSPageSize:\s*true/);
-    assert.match(rendererSource, /class="sf-doc-footer"/,
-      'Le pied de facture doit rester groupé lors des sauts de page.');
+    assert.match(rendererSource, /class="sf-doc-footer(?:\$\{extraClass \? ' ' \+ extraClass : ''\})?"/,
+      'Le pied de facture doit conserver sa classe de base et rester groupé lors des sauts de page.');
   });
 
   test('le téléchargement laisse au navigateur le temps de lire le fichier PDF', () => {

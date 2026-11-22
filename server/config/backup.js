@@ -41,7 +41,11 @@ async function runMysqldump(outputPath, encryptionKey = null) {
     `--port=${process.env.DB_PORT || 3306}`,
     `--user=${process.env.DB_USER || 'root'}`,
     '--single-transaction',
-    '--routines',
+    // MySQL 8.0.21+ otherwise requires the global PROCESS privilege.
+    // The application DB account is deliberately scoped to this schema only.
+    '--no-tablespaces',
+    // The current application schema has no stored procedures/functions.
+    // Avoid --routines, which requires global SELECT on MySQL 8.
     '--events',
     process.env.DB_NAME || 'samafacture'
   ];
