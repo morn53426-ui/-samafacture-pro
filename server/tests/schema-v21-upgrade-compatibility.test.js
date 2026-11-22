@@ -75,6 +75,10 @@ after(async () => {
 
 test('une base v19 conservant un essai actif migre vers v21 sans perdre ses dates', async () => {
   const userId = await addUser('from-v19', true);
+  const [[trialBefore]] = await pool.query(
+    'SELECT trial_plan, trial_started_at, trial_ends_at, trial_status FROM users WHERE id = ?',
+    [userId]
+  );
   const date = new Date().toISOString().slice(0, 10);
   await pool.query(
     'INSERT INTO depenses (user_id, libelle, montant, date_depense) VALUES (?, ?, ?, ?)',
@@ -113,6 +117,16 @@ test('une base v19 conservant un essai actif migre vers v21 sans perdre ses date
   assert.equal(account.trial_status, 'trialing');
   assert.ok(account.trial_started_at);
   assert.ok(account.trial_ends_at);
+  assert.deepEqual(
+    {
+      trial_plan: account.trial_plan,
+      trial_started_at: account.trial_started_at,
+      trial_ends_at: account.trial_ends_at,
+      trial_status: account.trial_status
+    },
+    trialBefore,
+    'La migration v19 → v21 ne doit ni redémarrer ni raccourcir l’essai actif.'
+  );
 
   const [[expense]] = await pool.query(
     'SELECT mode_reglement FROM depenses WHERE user_id = ? AND libelle = ?',
