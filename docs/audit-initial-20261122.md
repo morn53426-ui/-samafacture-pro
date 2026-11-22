@@ -165,3 +165,29 @@ Les comparaisons effectuées sur un échantillon de 15 refs révèlent plusieurs
 - Revue code approfondie de toutes les 140 branches, tous les commits, diffs, dates et CI n'est pas achevée; cette actualisation couvre branches (noms et SHA), PR ouvertes et comparaisons ciblées.
 - Le statut de protection main n'a pas pu être lu via endpoint de protection (403 de l'intégration); la protection reste attestée par la metadata branch `protected=true`.
 - Priorité prochaine: attendre CI #134, corriger/revalider #130, préparer la migration combinée #117/#128, rebaser #115 et comparer les PR doublons #118/#126, #114/#131, #102/#110.
+
+
+## 10. Actualisation — anomalie suppression facture et correction PR #135 (03:34 UTC)
+
+### P1 confirmé — suppression d'une facture avec historique
+Revue read-only de `server/routes/factures.js` et migrations 003/004/005 : `DELETE /factures/:id` verrouillait le document puis le supprimait sans vérifier paiements, remboursements, écritures comptables, lignes comptables, avoirs, acomptes, liens/checkouts, bons de livraison, documents ou décisions portail. Les FK `ON DELETE CASCADE` supprimeraient certains liens (notamment paiements) ; les lignes comptables peuvent perdre le lien à la facture (`ON DELETE SET NULL`). Les mouvements de stock ne possèdent pas de facture_id, donc les factures avec produits ne sont pas supprimables de façon traçable.
+
+### Correction préparée — PR #135
+- Branche `fix/invoice-delete-history-guard-20261122`, basée sur main SHA `8453ee6d8e633f151523236eecff1bc0e0cf877b`.
+- PR draft: https://github.com/morn53426-ui/-samafacture-pro/pull/135
+- Refus 409 `DOCUMENT_HISTORIQUE_PROTEGE` si historique financier/comptable/commercial/documentaire lié ou ligne stock.
+- Comptabilisation invoice verrouille la facture dans la même transaction que l'écriture, pour sérialiser avec la suppression; retour 409 si supprimée/annulée avant posting.
+- 5 tests ajoutés: paiement, ledger, stock, concurrence delete/post, service-only delete conservé.
+- ZIP réussi; tests automatisés et ESLint en cours après mise à jour du head (dernier SHA `03777247701a50d0562f01f5be16986da51b9930`). Tests locaux non exécutés. **Ne pas merge avant CI.**
+
+### Actualisation PR #134
+- Test Puppeteer étendu pour badge Entreprise en thème clair, sombre et système-sombre.
+- Head actuel `52021018d7894b637d311af7d036cea220248195`; ESLint/ZIP réussis, Tests automatisés en cours.
+
+### Revue multi-sociétés (échantillon de code main)
+- Migration 006: table `pro_company_group_companies` ne crée le rattachement que dans la route de vérification email `company-group/invitations/accept/verify`, après token 20 minutes et confirmation email; les invitations non acceptées n'ont pas de ligne de membership.
+- `resolveTenant` se base sur ce membership et vérifie le plan Enterprise du propriétaire; l'accès groupe observé ne paraît pas bypasser l'acceptation. Aucun correctif de sécurité multi-tenant effectué sur ce point.
+- Reste à tester de façon adversariale toutes les routes/API, rôles, membres, groupe et changement de tenant; ce contrôle partiel ne vaut pas certification d'isolation.
+
+### Statut
+La branche audit PR #132 a été actualisée et CI est relancée. Les tests locaux, Docker, MySQL, Redis, PDF et recette complète restent non exécutés dans ce runtime.
