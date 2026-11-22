@@ -85,6 +85,42 @@ describe('Protection de l’historique client', () => {
     assert.equal(Number(activities.n), 1, 'l’activité CRM doit rester présente');
   });
 
+  test('un client avec modèle de facture récurrente ne peut être supprimé', async () => {
+    const client = await createClient('Client facture récurrente');
+    const [created] = await pool.query(
+      `INSERT INTO factures_recurrentes (user_id, client_id, libelle, frequence, prochaine_date, lignes_json)
+       VALUES (?, ?, 'Modèle récurrent de test', 'mensuelle', '2026-11-30', '[]')`,
+      [userId, client.id]
+    );
+    const deletion = await request(app)
+      .delete(`/api/clients/${client.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(deletion.status, 409, deletion.text);
+    assert.equal(deletion.body.code, 'CLIENT_HISTORIQUE_PROTEGE');
+    const [[storedClient]] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client.id, userId]);
+    const [[template]] = await pool.query('SELECT id FROM factures_recurrentes WHERE id = ? AND client_id = ?', [created.insertId, client.id]);
+    assert.ok(storedClient, 'client conservé');
+    assert.ok(template, 'modèle récurrent conservé');
+  });
+
+  test('un client avec commande professionnelle ne peut être supprimé', async () => {
+    const client = await createClient('Client commande');
+    const [created] = await pool.query(
+      `INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, lignes_json)
+       VALUES (?, ?, 'TEST-CLIENT-HISTORY-001', 'brouillon', '2026-11-22', '[]')`,
+      [userId, client.id]
+    );
+    const deletion = await request(app)
+      .delete(`/api/clients/${client.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(deletion.status, 409, deletion.text);
+    assert.equal(deletion.body.code, 'CLIENT_HISTORIQUE_PROTEGE');
+    const [[storedClient]] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client.id, userId]);
+    const [[order]] = await pool.query('SELECT id FROM pro_commandes WHERE id = ? AND client_id = ?', [created.insertId, client.id]);
+    assert.ok(storedClient, 'client conservé');
+    assert.ok(order, 'commande conservée');
+  });
+
   test('un client sans historique reste supprimable', async () => {
     const client = await createClient('Client sans historique');
     const deletion = await request(app)
