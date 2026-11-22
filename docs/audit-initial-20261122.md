@@ -893,5 +893,4 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 
 
 ### État PR #132 après la couverture ahead/behind complète
-- Avant le dernier refresh d'inventaire: HEAD `b7109a14`, 63 ahead/0 behind, Draft. Status/workflow-run query vide.
-- Ce refresh d'inventaire ajoute un commit supplémentaire (ahead 64); il ne constitue pas une validation produit. CI du HEAD après commit à vérifier, tests locaux toujours non exécutés.
+- Avant le refresh d'inventaire et cette correction documentaire, HEAD `b7109a14` était 63 ahead/0 behind. Le commit inventaire et les mises à jour de rapport ajoutent trois commits; le HEAD attendu après cette correction est 66 ahead/0 behind, Draft. Status/workflow-run queries précédentes étaient vides; CI du HEAD après commit à vérifier, tests locaux toujours non exécutés.
