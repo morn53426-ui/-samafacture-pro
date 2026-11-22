@@ -3828,10 +3828,10 @@ thead th { background: #F2F6FD; color: #52627D; }
 }
 
 /* Résumé de rapports : quatre accents colorés cohérents avec le tableau de bord. */
-.reports-kpi-blue { background:linear-gradient(125deg,#1769F5,#287CF7); border:0; color:#fff; }
-.reports-kpi-green { background:linear-gradient(125deg,#0BAA7D,#10BF90); border:0; color:#fff; }
+.reports-kpi-blue { background:linear-gradient(125deg,#155BC4,#2367C8); border:0; color:#fff; }
+.reports-kpi-green { background:linear-gradient(125deg,#0B765C,#087A61); border:0; color:#fff; }
 .reports-kpi-purple { background:linear-gradient(125deg,#7138E8,#8B38F1); border:0; color:#fff; }
-.reports-kpi-amber { background:linear-gradient(125deg,#ED9508,#FFB322); border:0; color:#fff; }
+.reports-kpi-amber { background:linear-gradient(125deg,#9C5A00,#A45F00); border:0; color:#fff; }
 .reports-kpi-blue .stat-label,
 .reports-kpi-green .stat-label,
 .reports-kpi-purple .stat-label,
