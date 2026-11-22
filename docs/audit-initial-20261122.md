@@ -781,7 +781,7 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - Aucun paiement réel activé.
 
 ### Sécurité / préservation
-Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Les ahead/behind sont désormais comparés pour les 122 branches sans PR ouverte; revue détaillée diff/date/CI et tests de chaque branche restent à compléter.
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Ahead/behind est désormais comparé pour les 122 branches sans PR ouverte (aucune restante non comparée). Les 146 HEADs sont rafraîchis, sauf branche d'audit auto-référente #132. Revue détaillée diff/date/CI et tests de chaque branche restent à compléter.
 
 
 ### Documentation branch follow-up
@@ -893,5 +893,5 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 
 
 ### État PR #132 après la couverture ahead/behind complète
-- Avant le dernier commit documentaire: HEAD `974ebe24`, 62 ahead/0 behind, Draft. Status/workflow-run query vide.
-- Ce commit documentaire ajoutera un commit supplémentaire (ahead 63); il ne constitue pas une validation produit. CI du HEAD après commit à vérifier, tests locaux toujours non exécutés.
+- Avant le dernier refresh d'inventaire: HEAD `b7109a14`, 63 ahead/0 behind, Draft. Status/workflow-run query vide.
+- Ce refresh d'inventaire ajoute un commit supplémentaire (ahead 64); il ne constitue pas une validation produit. CI du HEAD après commit à vérifier, tests locaux toujours non exécutés.
