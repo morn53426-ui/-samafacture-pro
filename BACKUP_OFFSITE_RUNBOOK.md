@@ -11,6 +11,7 @@
 - [ ] Versioning / protection contre suppression et politique de rétention du fournisseur configurés côté stockage.
 - [ ] Un compte ou une clé d'accès limitée à l'envoi des sauvegardes dans le préfixe dédié, sans droit de supprimer les versions précédentes.
 - [ ] Un chemin de configuration rclone protégé sur le serveur, hors du dépôt Git.
+- [ ] Une image rclone avec une version explicite validée, puis son digest OCI immuable résolu localement. L'étiquette `latest` est interdite pour les transferts planifiés.
 
 Les archives de production doivent porter l'extension `.sql.gz.enc`. Ne téléversez pas de dump non chiffré.
 
@@ -35,6 +36,11 @@ Exemple de variables à adapter dans un shell protégé :
 export BACKUP_VOLUME='nom_exact_du_volume_app_backups'
 export RCLONE_CONFIG='/etc/samafacture/rclone.conf'
 export BACKUP_REMOTE='sama-backups:nom-du-bucket/samafacture/production'
+# Remplacer par une version précise validée après vérification de la publication officielle.
+export RCLONE_IMAGE='rclone/rclone:VERSION_APPROUVEE'
+docker pull "$RCLONE_IMAGE"
+export RCLONE_IMAGE_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$RCLONE_IMAGE")"
+test -n "$RCLONE_IMAGE_DIGEST" || { echo "Impossible de résoudre le digest de l'image rclone." >&2; exit 1; }
 ```
 
 ## 4. Copier sans effacer les archives distantes
@@ -42,21 +48,23 @@ export BACKUP_REMOTE='sama-backups:nom-du-bucket/samafacture/production'
 Exécutez une copie depuis le volume en lecture seule. Remplacez le nom de l'image rclone par une version fixe, validée et approuvée par l'administrateur, plutôt que de garder `latest` dans une automatisation permanente.
 
 ```bash
-docker run --rm \
+docker run --rm --read-only --cap-drop=ALL --security-opt=no-new-privileges \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --mount type=volume,src="$BACKUP_VOLUME",dst=/source,readonly \
   --mount type=bind,src="$RCLONE_CONFIG",dst=/config/rclone/rclone.conf,readonly \
-  rclone/rclone:latest copy /source "$BACKUP_REMOTE" \
+  "$RCLONE_IMAGE_DIGEST" copy /source "$BACKUP_REMOTE" \
   --include 'samafacture-*.sql.gz.enc' \
   --immutable --checkers 4 --transfers 2
 ```
 
-Après la copie, vérifiez le contenu du bucket et comparez les archives :
+Après la copie, vérifiez le contenu du bucket et comparez les archives avec exactement le même digest rclone :
 
 ```bash
-docker run --rm \
+docker run --rm --read-only --cap-drop=ALL --security-opt=no-new-privileges \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --mount type=volume,src="$BACKUP_VOLUME",dst=/source,readonly \
   --mount type=bind,src="$RCLONE_CONFIG",dst=/config/rclone/rclone.conf,readonly \
-  rclone/rclone:latest check /source "$BACKUP_REMOTE" \
+  "$RCLONE_IMAGE_DIGEST" check /source "$BACKUP_REMOTE" \
   --include 'samafacture-*.sql.gz.enc'
 ```
 
