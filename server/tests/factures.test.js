@@ -26,6 +26,23 @@ describe('Factures : calcul et numérotation', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ nom: 'Client de Test' });
     clientId = client.body.client.id;
+
+    // Les tests de protection comptable utilisent des lignes de facture libres.
+    // Cette fixture attribue explicitement le compte de services ; aucune valeur
+    // par défaut n'est devinée par l'API de production.
+    const accounting = await request(app)
+      .get('/api/pro/accounting/config')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(accounting.status, 200, accounting.text);
+    const freeTextMapping = await request(app)
+      .put('/api/pro/accounting/mappings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        type_source: 'vente',
+        cle_source: 'saisie_libre',
+        compte_id: accounting.body.comptes.find(account => account.code === '706').id
+      });
+    assert.equal(freeTextMapping.status, 200, freeTextMapping.text);
   });
 
   after(async () => {

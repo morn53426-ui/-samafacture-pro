@@ -36,6 +36,42 @@
     <p class="pro-note" style="margin-top:12px">Le plan préchargé est un socle de démarrage simplifié inspiré du SYSCOHADA. Faites valider les comptes et leur paramétrage par votre expert-comptable avant de produire des états réglementaires.</p>
   </section>
 
+  <section class="card" style="margin-bottom:20px" id="accounting-mappings">
+    <h2 style="margin-top:0">Correspondances comptables automatiques</h2>
+    <p class="pro-note">Affectez les ventes et les dépenses à des comptes de votre entreprise. Les changements ne modifient jamais les écritures déjà validées. Les fiches non classées et les lignes libres n'ont aucun compte automatique : choisissez explicitement leur compte avant de les comptabiliser. Attention : le réglage « produit catalogue » s’applique à tous les produits de ce type. En SYSCOHADA, 701 concerne les marchandises revendues sans transformation, 702 les produits finis fabriqués, 703 les produits intermédiaires, 704 les produits résiduels, 705 les travaux et 706 les services. Choisissez le compte selon la nature réelle de votre activité. Pour les dépenses, 638 est le compte de repli « autres charges externes » ; configurez un compte précis pour les catégories connues (loyer 622, déplacements 6181, assurance 625, etc.). Les comptes existants des entreprises ne sont pas renommés automatiquement.</p>
+    <form id="mapping-form" class="grid grid-3">
+      <div class="field">
+        <label for="mapping-key">Opération à paramétrer</label>
+        <select id="mapping-key" required>
+          <option value="vente:produit">Vente — produit catalogue (701 à 704 selon sa nature)</option>
+          <option value="vente:service">Vente — service du catalogue</option>
+          <option value="vente:non_classe">Vente — fiche non classée (historique)</option>
+          <option value="vente:saisie_libre">Vente — ligne saisie libre</option>
+          <option value="vente:frais_livraison">Vente — frais de livraison</option>
+          <option value="depense:__default__">Dépense — autres charges externes par défaut (638)</option>
+          <option value="depense:custom">Dépense — catégorie précise</option>
+        </select>
+      </div>
+      <div class="field" id="mapping-category-field" hidden>
+        <label for="mapping-category">Catégorie de dépense</label>
+        <input id="mapping-category" maxlength="100" placeholder="Ex. Déplacements" />
+      </div>
+      <div class="field">
+        <label for="mapping-account">Compte cible</label>
+        <select id="mapping-account" required></select>
+      </div>
+      <div class="field" style="align-self:end">
+        <button class="btn btn-outline" type="submit">Enregistrer la correspondance</button>
+      </div>
+    </form>
+    <div style="overflow-x:auto">
+      <table class="data-table" style="width:100%;min-width:650px">
+        <thead><tr><th>Opération</th><th>Clé</th><th>Compte</th><th>État</th></tr></thead>
+        <tbody id="mappings-list"><tr><td colspan="4">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
   <section class="card" style="margin-bottom:20px" id="accounting-entry">
     <h2 style="margin-top:0">Saisir une écriture</h2>
     <p class="pro-note">Chaque écriture est enregistrée comme validée et devient non modifiable. Vérifiez les montants avant validation. Toute correction doit être passée par une écriture de contrepassation.</p>
@@ -82,6 +118,33 @@ requireAuthPage(); renderSidebar('comptabilite');
 const $ = id => document.getElementById(id);
 let accounts=[], journals=[];
 function fmt(v){return formatMontant(Number(v)||0);}
+
+function refreshMappingAccountOptions(){
+  const [sourceType]= $('mapping-key').value.split(':');
+  const expectedClass=sourceType==='vente'?7:6;
+  const current=String($('mapping-account').value||'');
+  const eligible=accounts.filter(account=>Number(account.classe)===expectedClass && Number(account.actif)===1);
+  $('mapping-account').innerHTML=eligible.map(account=>'<option value="'+account.id+'">'+escapeHtml(account.code+' · '+account.libelle)+'</option>').join('');
+  if(eligible.some(account=>String(account.id)===current)) $('mapping-account').value=current;
+}
+function renderAccountingMappings(data){
+  const labels={
+    produit:'Vente — produit catalogue',
+    service:'Vente — service catalogue',
+    non_classe:'Vente — fiche non classée',
+    saisie_libre:'Vente — saisie libre',
+    frais_livraison:'Vente — livraison',
+    __default__:'Dépense — repli autres charges externes (638)'
+  };
+  const rows=(data.correspondances||[]).map(mapping=>{
+    const label=mapping.type_source==='vente'?(labels[mapping.cle_source]||mapping.cle_source):'Dépense';
+    return '<tr><td>'+escapeHtml(label)+'</td><td>'+escapeHtml(mapping.cle_source)+'</td><td>'+escapeHtml(mapping.code+' · '+mapping.libelle)+'</td><td>'+(mapping.actif?'Actif':'Inactif')+'</td></tr>';
+  });
+  (data.categories_depenses||[]).forEach(category=>{
+    rows.push('<tr><td>Dépense — catégorie</td><td>'+escapeHtml(category.categorie)+'</td><td>'+escapeHtml(category.code?category.code+' · '+category.libelle:'Non configuré')+'</td><td>'+(category.personnalisee?'Personnalisé':'Compte par défaut')+'</td></tr>');
+  });
+  $('mappings-list').innerHTML=rows.join('')||'<tr><td colspan="4">Aucune correspondance.</td></tr>';
+}
 function addLine(line={}) {
   const row=document.createElement('tr');
   row.innerHTML='<td><select class="line-account" required></select></td><td><input class="line-label" maxlength="255" placeholder="Libellé" value="'+escapeHtml(line.libelle||'')+'"></td><td><input class="line-debit" type="number" min="0" step="0.01" value="'+(line.debit||'')+'"></td><td><input class="line-credit" type="number" min="0" step="0.01" value="'+(line.credit||'')+'"></td><td><button class="btn btn-sm btn-outline line-remove" type="button" aria-label="Supprimer la ligne">×</button></td>';
@@ -99,12 +162,14 @@ function updateTotals(){
   $('entry-total').textContent='Débit '+fmt(debit)+' · Crédit '+fmt(credit)+' · Écart '+fmt(Math.abs(debit-credit));
 }
 async function loadAccounting(){
-  const [cfg,balance,entries,invoices,payments,expenses]=await Promise.all([
+  const [cfg,balance,entries,invoices,payments,expenses,mappingData]=await Promise.all([
     Api.get('/pro/accounting/config'),Api.get('/pro/accounting/trial-balance'),
     Api.get('/pro/accounting/entries'),Api.get('/factures?type=facture'),
-    Api.get('/pro/payments'),Api.get('/depenses')
+    Api.get('/pro/payments'),Api.get('/depenses'),Api.get('/pro/accounting/mappings')
   ]);
   accounts=cfg.comptes||[]; journals=cfg.journaux||[];
+  refreshMappingAccountOptions();
+  renderAccountingMappings(mappingData);
   $('accounts-list').innerHTML=accounts.map(a=>'<tr><td class="mono">'+escapeHtml(a.code)+'</td><td>'+escapeHtml(a.libelle)+'</td><td>Classe '+escapeHtml(String(a.classe))+'</td><td>'+escapeHtml(a.nature==='credit'?'Crédit':'Débit')+'</td><td>'+(a.lettrable?'Oui':'Non')+'</td><td>'+(a.actif?'Actif':'Inactif')+'</td></tr>').join('')||'<tr><td colspan="6">Aucun compte.</td></tr>';
   $('entry-journal').innerHTML=journals.map(j=>'<option value="'+j.id+'">'+escapeHtml(j.code+' · '+j.libelle)+'</option>').join('');
   $('ledger-account').innerHTML=accounts.map(a=>'<option value="'+a.id+'">'+escapeHtml(a.code+' · '+a.libelle)+'</option>').join('');
@@ -130,6 +195,27 @@ $('account-form').addEventListener('submit',async e=>{
     await Api.post('/pro/accounting/accounts',payload);
     e.target.reset();
     showToast('Compte ajouté au plan de comptes.','success');
+    await loadAccounting();
+  }catch(err){showToast(err.message,'error');}
+});
+$('mapping-key').addEventListener('change',()=>{
+  const custom=$('mapping-key').value==='depense:custom';
+  $('mapping-category-field').hidden=!custom;
+  $('mapping-category').required=custom;
+  refreshMappingAccountOptions();
+});
+$('mapping-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const [type_source,selectedKey]=$('mapping-key').value.split(':');
+  const cle_source=selectedKey==='custom'
+    ? $('mapping-category').value.trim().normalize('NFKC').toLowerCase().replace(/\s+/g,' ').slice(0,100)
+    : selectedKey;
+  const compte_id=Number($('mapping-account').value);
+  if(!cle_source||!compte_id){showToast('Indiquez une catégorie et un compte valides.','error');return;}
+  try{
+    await Api.put('/pro/accounting/mappings',{type_source,cle_source,compte_id});
+    $('mapping-category').value='';
+    showToast('Correspondance comptable enregistrée. Les écritures existantes sont inchangées.','success');
     await loadAccounting();
   }catch(err){showToast(err.message,'error');}
 });
