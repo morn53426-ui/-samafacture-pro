@@ -2422,13 +2422,21 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   const soonBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.soonText, goldBadgeColorsDark.soonBackground);
   const proBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.proText, goldBadgeColorsDark.proBackground);
   const enterpriseBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.enterpriseText, goldBadgeColorsDark.enterpriseBackground);
+  await settingsPage.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+  await settingsPage.evaluate(() => window.SamaTheme.definir('auto'));
+  const goldBadgeColorsSystemDark = await readGoldBadgeColors();
+  const enterpriseBadgeSystemDarkContrast = contrastRatio(
+    goldBadgeColorsSystemDark.enterpriseText,
+    goldBadgeColorsSystemDark.enterpriseBackground
+  );
   for (const [label, contrast] of [
     ['Disponibilité clair', soonBadgeLightContrast],
     ['Modèle Pro clair', proBadgeLightContrast],
     ['Modèle Entreprise clair', enterpriseBadgeLightContrast],
     ['Disponibilité sombre', soonBadgeDarkContrast],
     ['Modèle Pro sombre', proBadgeDarkContrast],
-    ['Modèle Entreprise sombre', enterpriseBadgeDarkContrast]
+    ['Modèle Entreprise sombre', enterpriseBadgeDarkContrast],
+    ['Modèle Entreprise système sombre', enterpriseBadgeSystemDarkContrast]
   ]) {
     assert.ok(contrast >= 4.5,
       label + ' doit conserver un contraste de 4,5:1. Valeur : ' + contrast.toFixed(2));
