@@ -49,10 +49,10 @@ Exécutez une copie depuis le volume en lecture seule. Remplacez le nom de l'ima
 
 ```bash
 docker run --rm --read-only --cap-drop=ALL --security-opt=no-new-privileges \
-  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --env HOME=/tmp --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --mount type=volume,src="$BACKUP_VOLUME",dst=/source,readonly \
   --mount type=bind,src="$RCLONE_CONFIG",dst=/config/rclone/rclone.conf,readonly \
-  "$RCLONE_IMAGE_DIGEST" copy /source "$BACKUP_REMOTE" \
+  "$RCLONE_IMAGE_DIGEST" --config /config/rclone/rclone.conf copy /source "$BACKUP_REMOTE" \
   --include 'samafacture-*.sql.gz.enc' \
   --immutable --checkers 4 --transfers 2
 ```
@@ -61,10 +61,10 @@ Après la copie, vérifiez le contenu du bucket et comparez les archives avec ex
 
 ```bash
 docker run --rm --read-only --cap-drop=ALL --security-opt=no-new-privileges \
-  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --env HOME=/tmp --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   --mount type=volume,src="$BACKUP_VOLUME",dst=/source,readonly \
   --mount type=bind,src="$RCLONE_CONFIG",dst=/config/rclone/rclone.conf,readonly \
-  "$RCLONE_IMAGE_DIGEST" check /source "$BACKUP_REMOTE" \
+  "$RCLONE_IMAGE_DIGEST" --config /config/rclone/rclone.conf check /source "$BACKUP_REMOTE" \
   --include 'samafacture-*.sql.gz.enc'
 ```
 
