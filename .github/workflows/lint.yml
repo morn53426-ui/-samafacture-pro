@@ -21,7 +21,10 @@ on:
       - 'server/tests/phases-2-4.test.js'
       - 'server/tests/setup.js'
       - 'server/routes/clients.js'
+      - 'server/routes/produits.js'
       - 'server/tests/client-history-protection.test.js'
+      - 'server/tests/produits-delete.test.js'
+      - 'server/tests/expense-accounting-protection.test.js'
       - 'server/tests/stock.test.js'
       - 'server/tests/company-group-ui.test.js'
       - 'server/tests/company-groups.test.js'
@@ -84,7 +87,10 @@ jobs:
           server/tests/phases-2-4.test.js
           server/tests/setup.js
           server/routes/clients.js
+          server/routes/produits.js
           server/tests/client-history-protection.test.js
+          server/tests/produits-delete.test.js
+          server/tests/expense-accounting-protection.test.js
           server/tests/stock.test.js
           server/tests/company-group-ui.test.js
           server/tests/company-groups.test.js
