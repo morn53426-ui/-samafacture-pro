@@ -320,3 +320,6 @@
 - #142 current head `b4e23b2a` (test query assertion scoped by source_type+source_id); run #1518 Tests automated **in progress**, container initialization. ESLint #525 and ZIP #1220 **success**.
 - The previous run #1516 on head `d2a687ab` was superseded by the test assertion refinement. Do not treat it as final.
 - #143 remains Draft, head `17d25a5e`, no CI returned and mergeability false against its stale base; same correction is included on #142 for CI.
+
+### CI step progress — 12:44 UTC
+- #142 run #1518 : Docker build + secrets check success; npm install en cours; audit dépendances/tests/restore/cluster/visual non encore démarrés. ESLint #525 et ZIP #1220 restent success.
