@@ -1833,19 +1833,50 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
   }
 }
 
-/* Accessibilité : les commandes du bandeau Entreprise ont une surface claire.
-   Utiliser un texte et des icônes navy sur ces boutons, pas le bleu pâle réservé
-   au texte placé directement sur le fond navy du bandeau. */
+/* Accessibilité WCAG : commandes sur surfaces claires en thème light,
+   surfaces sombres en thème dark. Le texte suit la surface du bouton,
+   pas la couleur du bandeau qui se trouve derrière. */
+body.enterprise-console-shell {
+  --enterprise-topbar-control-text: #082B50;
+  --enterprise-topbar-control-hover-text: #066144;
+  --enterprise-topbar-control-hover-bg: var(--emerald-light);
+}
+:root[data-theme="dark"] body.enterprise-console-shell {
+  --enterprise-topbar-control-text: #E8F1FB;
+  --enterprise-topbar-control-hover-text: #91CDB0;
+  --enterprise-topbar-control-hover-bg: rgba(8,122,87,.2);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell {
+    --enterprise-topbar-control-text: #E8F1FB;
+    --enterprise-topbar-control-hover-text: #91CDB0;
+    --enterprise-topbar-control-hover-bg: rgba(8,122,87,.2);
+  }
+}
 body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle,
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout,
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization {
-  color: #E8F1FB;
+  color: var(--enterprise-topbar-control-text);
 }
 body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle .icon,
 body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle svg,
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout .icon,
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization .icon {
-  color: #E8F1FB;
+  color: var(--enterprise-topbar-control-text);
+}
+@media (hover: hover) and (pointer: fine) {
+  body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle:hover,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout:hover,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization:hover {
+    background: var(--enterprise-topbar-control-hover-bg);
+    color: var(--enterprise-topbar-control-hover-text);
+  }
+  body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle:hover .icon,
+  body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle:hover svg,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout:hover .icon,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization:hover .icon {
+    color: var(--enterprise-topbar-control-hover-text);
+  }
 }
 
 
