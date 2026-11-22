@@ -683,13 +683,13 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 
 ### État actuel et limites de vérification
 - Main confirmé au SHA `8453ee6d8e633f151523236eecff1bc0e0cf877b`; le commit récent est le merge PR #123. Les endpoints status et workflow-runs accessibles ont renvoyé zéro status et zéro run pour main; le run main #1296 mentionné dans l'addendum précédent n'est donc **pas revalidé sur ce run**.
-- Branch names: 146; deux pages 100 + 46; noms identiques à l'inventaire précédent. L'inventaire mixte contient 145 SHA enregistrés et 143 valeurs uniques (self branch sans SHA); ce n'est pas un refresh global des refs. Dates de dernier commit non disponibles. HEADs actualisés pour 22 branches de PR et 32 branches sélectionnées sans PR ouverte.
+- Branch names: 146; deux pages 100 + 46; noms identiques à l'inventaire précédent. L'inventaire mixte contient 145 SHA enregistrés et 143 valeurs uniques (self branch sans SHA); ce n'est pas un refresh global des refs. Dates de dernier commit non disponibles. HEADs actualisés pour 22 branches de PR et 52 branches sélectionnées sans PR ouverte.
 - 23 PR ouvertes confirmées. Comparaisons fraîches main...head pour les 23; CI consultée pour les 23.
 
 ### PR ahead/behind (recalcul par SHA actuel; main = 8453ee6d)
 | PR | Ahead | Behind | Remarque |
 |---|---:|---:|---|
-| #132 | 29 | 0 | rapport documentaire |
+| #132 | 43 | 0 | rapport documentaire, CI docs en cours |
 | #130 | 20 | 0 | HEAD corrigé 9722ca99, CI relancée |
 | #138 | 15 | 0 | stock/protection |
 | #140 | 4 | 0 | lint backend |
@@ -716,7 +716,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 ### CI fresh sur HEAD
 | PR | Tests Node/MySQL | ESLint | ZIP |
 |---|---|---|---|
-| #132 | #1433 success | — | #1135 success |
+| #132 | #1446 in_progress (nouveau HEAD; #1433 success ancien) | — | #1148 in_progress (nouveau HEAD; #1135 success ancien) |
 | #130 | #1430 failure sur ancien HEAD; nouveau #1434 in_progress | #484 success ancien; #485 in_progress nouveau | #1132 success ancien; #1136 success nouveau |
 | #138 | #1429 success | #483 success | #1131 success |
 | #140 | #1420 success | #476 success | #1122 success |
@@ -748,7 +748,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 - Nouveau HEAD PR #130 `9722ca99`, mergeable=true, draft=true. Run #1434 Tests in_progress, #485 ESLint in_progress, #1136 ZIP success. Validation visuelle encore attendue.
 - Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
 
-### Branches sans PR — comparaison ciblée 32 (dates/CI non exhaustives)
+### Branches sans PR — comparaison ciblée 52 (dates/CI non exhaustives)
 Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble. Deux comparaisons complémentaires: `feat/enterprise-command-center-20261117` 8/400 (4 fichiers), `feat/enterprise-company-pagination-20261117` 0/359 (behind only).
 
 **Audit/sécurité:**
@@ -781,8 +781,20 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - Aucun paiement réel activé.
 
 ### Sécurité / préservation
-Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 91 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 71 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
 
 
 ### Documentation branch follow-up
-- Les commits documentaires ajoutés après #1433/#1135 ne disposent pas de run CI visible sur le HEAD interrogé (status et workflow-run queries vides). Les tests #1433 et ZIP #1135 étaient green sur un HEAD antérieur; ils ne valident pas les derniers commits documentaires.
+- PR #132 latest head `9f6e89ff` is 43 ahead/0 behind; current CI Tests #1446 and ZIP #1148 are in_progress. Previous #1433/#1135 were green on an earlier HEAD; they do not validate the latest inventory updates.
+
+
+### Run 7 — vingt comparaisons supplémentaires PDF / responsive (branches sans PR ouverte)
+- `fix/invoice-print-and-payment-stamp-2026-11-15`: 8/653 (4 files).
+- `fix/invoice-print-banner-geometry-20261121`: 0/54; `fix/invoice-print-typography-20261118`: 0/240; `fix/invoice-pdf-continuation-identity-20261121`: 0/24 (behind only).
+- `fix/pdf-headless-user-formatting-20261121`: 2/39 (4 files); `fix/pdf-pagination-extras-flow-20261117`: 7/396 (4 files).
+- `fix/pdf-print-pagination-20261117`: 0/394; `fix/pdf-stream-ack-payment-disclosures-20261116`: 0/423 (behind only).
+- `test/invoice-long-pdf-pagination-20261121`: 0/16; `test/invoice-short-pdf-one-page-20261121`: 0/1 (behind only).
+- `fix/mobile-invoice-line-columns`: 35/597 (7 files); `fix/invoice-mobile-table-cards-20261121`: 0/17; `fix/invoice-footer-stamp-mobile-20261121`: 0/7.
+- `fix/visual-qr-fixture-20261121`: 1/21; `fix/ui-responsive-polish-20261117`: 0/301; `feat/responsive-scaling-2026-11-15`: 0/655; `ui/modern-responsive-polish`: 0/803 (behind only).
+- `test/workspace-zoom-200-sweep-20261118`: 4/231; `test/dark-theme-zoom-200-sweep-20261118`: 2/230; `test/theme-dark-mobile-sweep-20261118`: 3/235.
+- Les commits de tête de ces 20 branches sont rafraîchis dans l'inventaire. Les statuts CI de ces branches non-PR ne sont pas vérifiés (le connecteur workflow-runs ne retourne que les runs PR). Les branches behind-only semblent déjà intégrées/obsolètes au regard de main; celles qui sont diverged sont à porter sélectivement, jamais merge direct.
