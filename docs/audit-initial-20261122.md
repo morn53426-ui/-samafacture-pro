@@ -748,7 +748,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 - Nouveau HEAD PR #130 `9722ca99`, draft=true. Tests Node/MySQL #1434, ESLint #485 et ZIP #1136 sont tous success; la recette visuelle responsive a réussi. PR non fusionnée, revue humaine requise.
 - Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
 
-### Branches sans PR — comparaison ciblée 82 (dates/CI non exhaustives)
+### Branches sans PR — comparaison ciblée 87 (dates/CI non exhaustives)
 Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble. Deux comparaisons complémentaires: `feat/enterprise-command-center-20261117` 8/400 (4 fichiers), `feat/enterprise-company-pagination-20261117` 0/359 (behind only).
 
 **Audit/sécurité:**
@@ -781,7 +781,7 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - Aucun paiement réel activé.
 
 ### Sécurité / préservation
-Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 41 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 36 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
 
 
 ### Documentation branch follow-up
@@ -834,3 +834,12 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 - `fix/subscription-icons-main-2026-11-15`: 1/621, 3 fichiers.
 - `fix/sunupilot-pwa-lifecycle`: 0/200 (behind only).
 - HEADs rafraîchis pour ces 10 branches; CI non-PR non vérifiée. Les branches diverged doivent être portées/retestées sélectivement; les behind-only sont candidates obsolètes, pas à supprimer.
+
+
+### Run 7 — cinq comparaisons supplémentaires Docker / entrepôt / backups
+- `docs/local-docker-bootstrap-20261117`: 0/289 (behind only).
+- `fix/quote-warehouse-resilience-20261120`: 0/63 (behind only).
+- `integration/main-company-invitation-email-proof-20261117`: 0/584 (behind only).
+- `test/backup-atomic-visibility-2026-11-15`: 1/615, 1 fichier.
+- `tooling/local-docker-test-bundle-20261112`: 1/715, 1 fichier.
+- HEADs rafraîchis pour ces cinq branches. Les trois behind-only sont candidates obsolètes; les deux diverged ont très peu d'avance et doivent être portées/retestées. CI non-PR non vérifiée.
