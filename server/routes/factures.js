@@ -1232,6 +1232,53 @@ router.delete('/:id', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Facture introuvable.' });
     }
+
+    // Avant toute suppression, protéger l'historique financier, comptable, commercial,
+    // documentaire et les mouvements de stock. Les cascades FK peuvent supprimer paiements,
+    // liens/checkouts ou décisions portail; les lignes comptables peuvent perdre leur facture.
+    // Un mouvement de stock n'ayant pas de facture_id, les factures avec produits sont
+    // conservées et doivent être annulées plutôt que supprimées.
+    const [historyRows] = await conn.query(
+      `SELECT
+         (SELECT COUNT(*) FROM paiements WHERE user_id = ? AND facture_id = ?) AS paiements,
+         (SELECT COUNT(*) FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id WHERE r.user_id = ? AND p.facture_id = ?) AS remboursements,
+         (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?) AS ecritures_facture,
+         (SELECT COUNT(*) FROM pro_compta_lignes WHERE user_id = ? AND facture_id = ?) AS lignes_comptables,
+         (SELECT COUNT(*) FROM pro_avoirs WHERE user_id = ? AND facture_id = ?) AS avoirs,
+         (SELECT COUNT(*) FROM pro_acomptes WHERE user_id = ? AND facture_id = ?) AS acomptes,
+         (SELECT COUNT(*) FROM pro_payment_links WHERE user_id = ? AND facture_id = ?) AS liens_paiement,
+         (SELECT COUNT(*) FROM pro_invoice_checkouts WHERE user_id = ? AND facture_id = ?) AS checkouts,
+         (SELECT COUNT(*) FROM pro_bons_livraison WHERE user_id = ? AND facture_id = ?) AS bons_livraison,
+         (SELECT COUNT(*) FROM pro_documents WHERE user_id = ? AND facture_id = ?) AS documents,
+         (SELECT COUNT(*) FROM pro_portal_quote_decisions WHERE user_id = ? AND facture_id = ?) AS decisions_portail,
+         (SELECT COUNT(*) FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL) AS lignes_stock`,
+      [
+        req.tenantId, existing.id,
+        req.tenantId, existing.id,
+        req.tenantId, existing.id,
+        req.tenantId, existing.id,
+        req.tenantId, existing.id,
+        req.tenantId, existing.id,
+        req.tenantId, existing.id,
+        req.tenantId, existing.id,
+        req.tenantId, existing.id,
+        req.tenantId, existing.id,
+        existing.id
+      ]
+    );
+    const history = historyRows[0];
+    const linkedHistory = Object.entries(history)
+      .filter(([key]) => key !== 'lignes_stock')
+      .some(([, count]) => Number(count) > 0);
+    const stockHistory = existing.type === 'facture' && Number(history.lignes_stock) > 0;
+    if (linkedHistory || stockHistory) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Ce document possède un historique financier, comptable, commercial, documentaire ou de stock et ne peut pas être supprimé. Utilisez l’annulation ou une contrepassation pour préserver la traçabilité.',
+        code: 'DOCUMENT_HISTORIQUE_PROTEGE'
+      });
+    }
+
     // Restitue le stock déjà décompté avant de supprimer, sauf si la facture était déjà
     // annulée (son stock avait alors déjà été restitué par PUT /:id/statut — le restituer
     // une seconde fois créerait un stock fantôme supérieur à la réalité).
