@@ -20,6 +20,7 @@ on:
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
       - 'server/tests/facture-pdf.test.js'
+      - 'server/tests/parametres-accessibility.test.js'
       - 'server/config/backup.js'
       - 'server/tests/restore-backup-roundtrip.test.js'
       - 'server/tests/paiements.test.js'
@@ -77,6 +78,7 @@ jobs:
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
           server/tests/facture-pdf.test.js
+          server/tests/parametres-accessibility.test.js
           server/config/backup.js
           server/tests/restore-backup-roundtrip.test.js
           server/tests/paiements.test.js
