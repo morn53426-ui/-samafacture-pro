@@ -1,10 +1,13 @@
-# Inventaire des branches distantes — 22 novembre 2026, run 6
+# Inventaire des branches distantes — 22 novembre 2026, run 7
 
 Dépôt : `morn53426-ui/-samafacture-pro`  
 Référence : `main`  
-Branches : **146** ; SHA de tête uniques : **144**.  
-PR ouvertes : **23**. Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
+Branches : **146** (noms confirmés run 7) ; **144 SHA uniques** (statistique run 6, non recalculée globalement run 7).  
+PR ouvertes : **23** (têtes et comparaisons rafraîchies run 7). Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
 CI main : workflow Tests automatisés #1296 réussi. Ruleset `protect main` actif.
+
+
+> Run 7 (09:23 UTC): noms de branches vérifiés (100+46, aucun changement). HEADs mis à jour pour les 22 branches des PR ouvertes et 32 branches non-PR sélectionnées. Les 116 branches restantes n'ont pas reçu de comparaison SHA/CI exhaustive run 7. Les dates de dernier commit ne sont pas disponibles via la collecte. PR comparisons fresh: 23.
 
 > Branches API paginées 100+46. La ligne de cette branche d’audit est auto-référente : son HEAD est le commit de mise à jour du présent inventaire, consultable dans PR #132. Les dates de dernier commit ne sont pas retournées par cette collecte. Ahead/behind a été recalculé pour les 23 PR ouvertes; les branches sans PR n'ont pas toutes été comparées à main. Aucune branche supprimée.
 
@@ -128,7 +131,7 @@ CI main : workflow Tests automatisés #1296 réussi. Ruleset `protect main` acti
 | Branche | HEAD |
 |---|---|
 | `fix/a11y-settings-labels-20261116` | `4b275916` |
-| `fix/accessibility-contrast-focus-main-20261121` | `780b357a` |
+| `fix/accessibility-contrast-focus-main-20261121` | `9722ca99` |
 | `fix/accessibility-template-preview-contrast-20261122` | `6b3cd9ff` |
 | `fix/accounting-invoice-cancellation-reversal-20261121` | `ba756d09` |
 | `fix/accounting-refund-journal-reversal-20261121` | `b45f4797` |
