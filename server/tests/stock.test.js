@@ -164,23 +164,34 @@ describe('Décompte et restitution automatique du stock', () => {
     assert.equal(await stockActuel(), apresAnnulation, 'pas de restitution en double');
   });
 
-  test('supprimer le client restitue aussi le stock de ses factures actives', async () => {
+  test('client avec facture protégé; l’annulation de facture restitue le stock', async () => {
     const client2 = await request(app)
       .post('/api/clients')
       .set('Authorization', `Bearer ${token}`)
       .send({ nom: 'Client à supprimer' });
 
-    await request(app)
+    const facture = await request(app)
       .post('/api/factures')
       .set('Authorization', `Bearer ${token}`)
       .send({ client_id: client2.body.client.id, type: 'facture', lignes: [{ designation: 'Chaise', quantite: 6, prix_unitaire: 5000, tva: 18, produit_id: produitId }] });
+    assert.equal(facture.status, 201, facture.text);
     const avant = await stockActuel();
 
-    await request(app)
+    const suppression = await request(app)
       .delete(`/api/clients/${client2.body.client.id}`)
       .set('Authorization', `Bearer ${token}`);
+    assert.equal(suppression.status, 409, suppression.text);
+    assert.equal(suppression.body.code, 'CLIENT_HISTORIQUE_PROTEGE');
+    assert.equal(await stockActuel(), avant, 'la suppression refusée ne doit pas modifier le stock');
 
-    assert.equal(await stockActuel(), avant + 6);
+    const annulation = await request(app)
+      .put(`/api/factures/${facture.body.facture.id}/statut`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ statut: 'annulee' });
+    assert.equal(annulation.status, 200, annulation.text);
+    assert.equal(await stockActuel(), avant + 6, 'l’annulation restitue le stock');
+    const [[storedClient]] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client2.body.client.id, userId]);
+    assert.ok(storedClient, 'le client doit rester présent');
   });
   test('une facture débite l’entrepôt choisi et restitue au même endroit à chaque transition', async () => {
     const product = await request(app).post('/api/produits')
