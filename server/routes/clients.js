@@ -230,23 +230,19 @@ router.delete('/:id', async (req, res, next) => {
       });
     }
 
-    // Protéger l'historique : la FK client -> facture ON DELETE CASCADE peut supprimer
-    // factures, lignes et paiements; d'autres tables cascade les accès portail/CRM.
-    // Un client ayant un historique doit être archivé (fonction à ajouter) plutôt que supprimé.
+    // Protéger tous les enfants référencés par client_id, même si un user_id anomal
+    // est présent : les FK peuvent cascade (factures, récurrence, portail, CRM),
+    // RESTRICT (commandes) ou détacher les documents. L'archivage remplacera la suppression.
     const [historyRows] = await conn.query(
       `SELECT
-         (SELECT COUNT(*) FROM factures WHERE user_id = ? AND client_id = ?) AS factures,
-         (SELECT COUNT(*) FROM pro_documents WHERE user_id = ? AND client_id = ?) AS documents,
-         (SELECT COUNT(*) FROM pro_customer_portal_access WHERE user_id = ? AND client_id = ?) AS acces_portail,
-         (SELECT COUNT(*) FROM pro_portal_quote_decisions WHERE user_id = ? AND client_id = ?) AS decisions_portail,
-         (SELECT COUNT(*) FROM pro_crm_activities WHERE user_id = ? AND client_id = ?) AS activites_crm`,
-      [
-        req.tenantId, clientId,
-        req.tenantId, clientId,
-        req.tenantId, clientId,
-        req.tenantId, clientId,
-        req.tenantId, clientId
-      ]
+         (SELECT COUNT(*) FROM factures WHERE client_id = ?) AS factures,
+         (SELECT COUNT(*) FROM factures_recurrentes WHERE client_id = ?) AS factures_recurrentes,
+         (SELECT COUNT(*) FROM pro_commandes WHERE client_id = ?) AS commandes,
+         (SELECT COUNT(*) FROM pro_documents WHERE client_id = ?) AS documents,
+         (SELECT COUNT(*) FROM pro_customer_portal_access WHERE client_id = ?) AS acces_portail,
+         (SELECT COUNT(*) FROM pro_portal_quote_decisions WHERE client_id = ?) AS decisions_portail,
+         (SELECT COUNT(*) FROM pro_crm_activities WHERE client_id = ?) AS activites_crm`,
+      [clientId, clientId, clientId, clientId, clientId, clientId, clientId]
     );
     const history = historyRows[0];
     if (Object.values(history).some(count => Number(count) > 0)) {
