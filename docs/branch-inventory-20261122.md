@@ -2,7 +2,7 @@
 
 Dépôt : `morn53426-ui/-samafacture-pro`  
 Référence : `main`  
-Branches : **146** (noms confirmés run 7) ; **144 SHA uniques** (statistique run 6, non recalculée globalement run 7).  
+Branches : **146** (noms confirmés run 7) ; **145 SHA enregistrés / 143 uniques** dans l’inventaire (snapshot mixte run 6/run 7, pas un refresh global).  
 PR ouvertes : **23** (têtes et comparaisons rafraîchies run 7). Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
 CI main : workflow Tests automatisés #1296 réussi. Ruleset `protect main` actif.
 
