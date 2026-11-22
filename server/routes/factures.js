@@ -1207,7 +1207,7 @@ router.post('/:id/relancer', async (req, res, next) => {
  * @openapi
  * /factures/{id}:
  *   delete:
- *     summary: Supprime une facture/devis (et ses lignes/paiements associés)
+ *     summary: Supprime un devis sans historique (les factures émises sont non supprimables)
  *     tags: [Factures]
  *     parameters:
  *       - in: path
@@ -1215,12 +1215,14 @@ router.post('/:id/relancer', async (req, res, next) => {
  *         required: true
  *         schema: { type: integer }
  *     responses:
- *       200: { description: "Supprimé." }
+ *       200: { description: "Devis supprimé." }
  *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Document avec historique ou facture émise protégée.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.delete('/:id', async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
+    conn = await pool.getConnection();
     await conn.beginTransaction();
     // Sérialiser suppression, annulation et réactivation sur la facture elle-même.
     const [existingRows] = await conn.query(
@@ -1261,8 +1263,7 @@ router.delete('/:id', async (req, res, next) => {
          (SELECT COUNT(*) FROM pro_invoice_checkouts WHERE user_id = ? AND facture_id = ?) AS checkouts,
          (SELECT COUNT(*) FROM pro_bons_livraison WHERE user_id = ? AND facture_id = ?) AS bons_livraison,
          (SELECT COUNT(*) FROM pro_documents WHERE user_id = ? AND facture_id = ?) AS documents,
-         (SELECT COUNT(*) FROM pro_portal_quote_decisions WHERE user_id = ? AND facture_id = ?) AS decisions_portail,
-         (SELECT COUNT(*) FROM facture_lignes WHERE facture_id = ? AND produit_id IS NOT NULL) AS lignes_stock`,
+         (SELECT COUNT(*) FROM pro_portal_quote_decisions WHERE user_id = ? AND facture_id = ?) AS decisions_portail`,
       [
         req.tenantId, existing.id,
         req.tenantId, existing.id,
@@ -1274,16 +1275,12 @@ router.delete('/:id', async (req, res, next) => {
         req.tenantId, existing.id,
         req.tenantId, existing.id,
         req.tenantId, existing.id,
-        req.tenantId, existing.id,
-        existing.id
+        req.tenantId, existing.id
       ]
     );
     const history = historyRows[0];
-    const linkedHistory = Object.entries(history)
-      .filter(([key]) => key !== 'lignes_stock')
-      .some(([, count]) => Number(count) > 0);
-    const stockHistory = existing.type === 'facture' && Number(history.lignes_stock) > 0;
-    if (linkedHistory || stockHistory) {
+    const linkedHistory = Object.values(history).some(count => Number(count) > 0);
+    if (linkedHistory) {
       await conn.rollback();
       return res.status(409).json({
         error: 'Ce document possède un historique financier, comptable, commercial, documentaire ou de stock et ne peut pas être supprimé. Utilisez l’annulation ou une contrepassation pour préserver la traçabilité.',
@@ -1291,20 +1288,14 @@ router.delete('/:id', async (req, res, next) => {
       });
     }
 
-    // Restitue le stock déjà décompté avant de supprimer, sauf si la facture était déjà
-    // annulée (son stock avait alors déjà été restitué par PUT /:id/statut — le restituer
-    // une seconde fois créerait un stock fantôme supérieur à la réalité).
-    if (existing.type === 'facture' && existing.statut !== 'annulee') {
-      await ajusterStockFacture(conn, existing.id, req.tenantId, +1, existing.entrepot_id);
-    }
     await conn.query('DELETE FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
