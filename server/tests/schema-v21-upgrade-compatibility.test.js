@@ -208,7 +208,7 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   assert.equal(repeatedMigration.status, 0,
     repeatedMigration.stderr || repeatedMigration.stdout || 'La migration répétée v20 → v22 a échoué.');
   const [[repeatedMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(repeatedMeta.version), 21);
+  assert.equal(Number(repeatedMeta.version), 22);
   const [[repeatedExpense]] = await pool.query(
     'SELECT mode_reglement FROM depenses WHERE user_id = ? AND libelle = ?',
     [userId, 'Dépense banque conservée pendant upgrade v20']
