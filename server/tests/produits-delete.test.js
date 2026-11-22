@@ -154,7 +154,9 @@ describe('Suppression de produit', () => {
       [produit.body.produit.id, userIdA]
     );
     assert.ok(storedProduct, 'produit conservé');
-    assert.deepEqual(storedStocks.map(row => Number(row.quantite)).sort((a, b) => a - b), [-3, 3]);
+    // La création du produit initialise aussi un stock principal à zéro; le guard doit
+    // conserver cette ligne et les deux soldes opposés non nuls.
+    assert.deepEqual(storedStocks.map(row => Number(row.quantite)).sort((a, b) => a - b), [-3, 0, 3]);
   });
 
   test('un stock d’entrepôt référencé depuis une autre entreprise bloque la suppression', async () => {
