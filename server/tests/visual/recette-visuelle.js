@@ -1636,6 +1636,34 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'Les montants TTC doivent tenir sur leur ligne en vue mobile : ' + JSON.stringify(legendMetrics));
   }
 
+
+  if (pageDefinition.name === 'dashboard' && viewport.name === 'mobile-320') {
+    await page.$eval('.workspace-skip-link', element => element.focus());
+    await page.waitForFunction(() => {
+      const element = document.querySelector('.workspace-skip-link');
+      if (!element) return false;
+      const rect = element.getBoundingClientRect();
+      return rect.top >= 0 && rect.bottom <= Math.min(70, window.innerHeight);
+    }, { timeout: 3000 });
+    const skipLink = await page.$eval('.workspace-skip-link', element => {
+      const rect = element.getBoundingClientRect();
+      const main = document.getElementById(element.getAttribute('href').slice(1));
+      return {
+        target: element.getAttribute('href'),
+        mainExists: Boolean(main && main.tagName === 'MAIN' && main.tabIndex === -1),
+        top: rect.top,
+        bottom: rect.bottom,
+        viewportHeight: window.innerHeight
+      };
+    });
+    assert.equal(skipLink.target, '#main-content');
+    assert.equal(skipLink.mainExists, true,
+      'Le lien clavier doit viser le main focusable du tableau de bord.');
+    assert.ok(skipLink.top >= 0 && skipLink.bottom <= Math.min(70, skipLink.viewportHeight),
+      'Le raccourci doit apparaître après focus et transition CSS : ' + JSON.stringify(skipLink));
+    await page.evaluate(() => document.activeElement?.blur());
+  }
+
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
   await page.screenshot({
     path: path.join(screenshots, filename),

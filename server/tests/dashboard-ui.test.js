@@ -15,6 +15,16 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     assert.match(dashboard, /Bienvenue sur Sunupilot/);
   });
 
+  test('le tableau de bord propose un lien clavier vers un contenu principal focusable', () => {
+    const skipLink = dashboard.match(/<a class="workspace-skip-link" href="#main-content">([^<]+)<\/a>/);
+    assert.ok(skipLink, 'Un raccourci d’évitement doit être présent dès le chargement.');
+    assert.equal(skipLink[1].trim(), 'Aller au contenu principal');
+    assert.ok(dashboard.includes('<main class="main-content workspace-page page-dashboard" id="main-content" tabindex="-1">'));
+    assert.ok(styles.includes('.workspace-skip-link {'));
+    assert.ok(styles.includes('.workspace-skip-link:focus {'));
+    assert.ok(styles.includes('transform: translateY(0);'));
+  });
+
   test('le graphique des ventes facturées couvre six ou douze mois et conserve les mois sans vente', () => {
     assert.match(dashboard, /<h2>Évolution des ventes facturées<\/h2>/);
     assert.match(dashboard, /id="dashboard-period-select"/);
