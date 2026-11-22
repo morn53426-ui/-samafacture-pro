@@ -38,12 +38,12 @@
 
   <section class="card" style="margin-bottom:20px" id="accounting-mappings">
     <h2 style="margin-top:0">Correspondances comptables automatiques</h2>
-    <p class="pro-note">Affectez les ventes et les dépenses à des comptes de votre entreprise. Les changements ne modifient jamais les écritures déjà validées. Les anciennes fiches non classées restent non classées ; leur compte de repli peut être ajusté ici.</p>
+    <p class="pro-note">Affectez les ventes et les dépenses à des comptes de votre entreprise. Les changements ne modifient jamais les écritures déjà validées. Les anciennes fiches non classées restent non classées ; leur compte de repli peut être ajusté ici. Attention : le réglage « produit catalogue » s’applique à tous les produits de ce type. En SYSCOHADA, 701 concerne les marchandises revendues sans transformation, 702 les produits finis fabriqués, 703 les produits intermédiaires, 704 les produits résiduels, 705 les travaux et 706 les services. Choisissez le compte selon la nature réelle de votre activité ; les entreprises ayant plusieurs natures de produits doivent les distinguer avant la comptabilisation automatique.</p>
     <form id="mapping-form" class="grid grid-3">
       <div class="field">
         <label for="mapping-key">Opération à paramétrer</label>
         <select id="mapping-key" required>
-          <option value="vente:produit">Vente — produit du catalogue</option>
+          <option value="vente:produit">Vente — produit catalogue (701 à 704 selon sa nature)</option>
           <option value="vente:service">Vente — service du catalogue</option>
           <option value="vente:non_classe">Vente — fiche non classée (historique)</option>
           <option value="vente:saisie_libre">Vente — ligne saisie libre</option>

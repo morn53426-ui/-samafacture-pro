@@ -760,7 +760,12 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
   assert.ok(account('701'));
   assert.ok(account('706'));
   assert.ok(account('707'));
+  assert.ok(account('6181'));
   assert.ok(account('625'));
+  assert.ok(account('702'));
+  assert.ok(account('703'));
+  assert.ok(account('704'));
+  assert.ok(account('705'));
 
   const defaults = await getMappings();
   assert.equal(defaults.status, 200, defaults.text);
@@ -780,7 +785,7 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
   assert.equal(serviceResponse.status, 201, serviceResponse.text);
   const serviceId = serviceResponse.body.produit.id;
 
-  const productMapping = await setMapping('vente', 'produit', account('707'));
+  const productMapping = await setMapping('vente', 'produit', account('702'));
   assert.equal(productMapping.status, 200, productMapping.text);
   const serviceMapping = await setMapping('vente', 'service', account('706'));
   assert.equal(serviceMapping.status, 200, serviceMapping.text);
@@ -812,8 +817,9 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
     [userId, entry.id]
   );
   assert.deepEqual(revenueLines.map(row => ({ code: row.code, credit: Number(row.credit) })), [
+    { code: '702', credit: 750 },
     { code: '706', credit: 750 },
-    { code: '707', credit: 850 }
+    { code: '707', credit: 100 }
   ]);
 
   const shippingOnlyInvoice = await request(app).post('/api/factures').set('Authorization', 'Bearer ' + token).send({
@@ -863,7 +869,7 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
   const categoryExpense = await request(app).post('/api/depenses').set('Authorization', 'Bearer ' + token)
     .send({ libelle: 'Déplacement client', montant: 500, categorie: 'Déplacements', mode_reglement: 'banque', date_depense: '2026-11-22' });
   assert.equal(categoryExpense.status, 201, categoryExpense.text);
-  const categoryMapping = await setMapping('depense', 'déplacements', account('625'));
+  const categoryMapping = await setMapping('depense', 'déplacements', account('6181'));
   assert.equal(categoryMapping.status, 200, categoryMapping.text);
   const expensePosted = await request(app).post('/api/pro/accounting/post-expense/' + categoryExpense.body.depense.id)
     .set('Authorization', 'Bearer ' + token).send({});
@@ -878,7 +884,7 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
   );
   assert.deepEqual(expenseLines.map(row => ({ code: row.code, debit: Number(row.debit), credit: Number(row.credit) })), [
     { code: '521', debit: 0, credit: 500 },
-    { code: '625', debit: 500, credit: 0 }
+    { code: '6181', debit: 500, credit: 0 }
   ]);
 
   const readBack = await getMappings();
