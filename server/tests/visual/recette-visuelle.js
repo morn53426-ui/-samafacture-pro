@@ -1183,6 +1183,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
               right: rect ? rect.right : window.innerWidth + 1,
               width: rect ? rect.width : 0,
               linkCount: links.length,
+              totalLinkCount: document.querySelectorAll('.pro-workspace-guide a').length,
+              directPageLinkCount: Array.from(document.querySelectorAll('.pro-workspace-guide a'))
+                .filter(link => !link.getAttribute('href').startsWith('#')).length,
               missingTargets: links.filter(link => !document.getElementById(link.getAttribute('href').slice(1)))
                 .map(link => link.getAttribute('href')),
               groupCount: document.querySelectorAll('.pro-workspace-guide-group').length
@@ -1262,8 +1265,10 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   if (pageDefinition.name === 'professionnel') {
     const nav = metrics.proWorkspaceNavigation;
     assert.equal(nav?.found, true, 'L’espace professionnel doit présenter une navigation par activité.');
-    assert.equal(nav.groupCount, 4, 'Les outils professionnels doivent être rangés en quatre rubriques.');
-    assert.equal(nav.linkCount, 9, 'Les neuf modules professionnels doivent être accessibles depuis la navigation.');
+    assert.equal(nav.groupCount, 6, 'Les outils professionnels doivent être rangés en six domaines.');
+    assert.equal(nav.linkCount, 9, 'Les neuf raccourcis internes doivent rester accessibles depuis la navigation.');
+    assert.equal(nav.totalLinkCount, 11, 'Les onze accès directs, dont OHADA et Achats, doivent être présents.');
+    assert.equal(nav.directPageLinkCount, 2, 'Les liens vers les pages OHADA et Achats doivent être conservés.');
     assert.deepEqual(nav.missingTargets, [], 'Chaque accès rapide doit pointer vers un module existant.');
     assert.ok(nav.left >= -1 && nav.right <= metrics.viewport + 1,
       'La navigation professionnelle ne doit pas sortir de l’écran : ' + JSON.stringify(nav));
@@ -1271,6 +1276,16 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
       assert.equal(gridColumns.split(' ').length, 1,
         'Les rubriques professionnelles doivent s’empiler sur téléphone : ' + gridColumns);
+    }
+    if (viewport.width > 1100) {
+      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
+      assert.equal(gridColumns.split(' ').length, 3,
+        'Les six domaines doivent rester organisés en trois colonnes sur grand écran : ' + gridColumns);
+    }
+    if (viewport.width > 560 && viewport.width <= 1100) {
+      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
+      assert.equal(gridColumns.split(' ').length, 2,
+        'Les domaines doivent passer sur deux colonnes sur tablette : ' + gridColumns);
     }
     if (viewport.width === 1440) {
       await page.click('.pro-workspace-guide a[href="#pro-integrations"]');
@@ -4068,6 +4083,70 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         );
         const titleElement = titleCandidates[0] || null;
         const titleRect = titleElement?.getBoundingClientRect();
+        // Contrôler le texte via ses véritables ancêtres qui coupent le contenu.
+        // Range.getClientRects() renvoie ici des fragments incohérents sur certains
+        // moteurs/templates (notamment Épuré), alors que la boîte CSS et le rendu
+        // restent dans la page. scrollWidth/scrollHeight ne déclenchent l'alerte que
+        // lorsqu'un ancêtre applique réellement un overflow qui peut masquer le texte.
+        const clippingOverflow = [];
+        let ancestor = titleElement;
+        while (ancestor && titleRect) {
+          const style = getComputedStyle(ancestor);
+          const clipsX = ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowX);
+          const clipsY = ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowY);
+          const ancestorRect = ancestor.getBoundingClientRect();
+          // clientLeft/clientTop et clientWidth/clientHeight expriment la boîte
+          // réellement visible (hors bordures et barres de défilement). Recaler
+          // ces mesures sur getBoundingClientRect pour tenir compte des transforms.
+          const scaleX = ancestor.offsetWidth > 0 ? ancestorRect.width / ancestor.offsetWidth : 1;
+          const scaleY = ancestor.offsetHeight > 0 ? ancestorRect.height / ancestor.offsetHeight : 1;
+          const clipLeft = ancestorRect.left + ancestor.clientLeft * scaleX;
+          const clipRight = clipLeft + ancestor.clientWidth * scaleX;
+          const clipTop = ancestorRect.top + ancestor.clientTop * scaleY;
+          const clipBottom = clipTop + ancestor.clientHeight * scaleY;
+          const titleOutsideX = titleRect.left < clipLeft - 0.5 || titleRect.right > clipRight + 0.5;
+          const titleOutsideY = titleRect.top < clipTop - 0.5 || titleRect.bottom > clipBottom + 0.5;
+          // Pour le titre lui-même, scrollWidth/Height détecte un texte coupé
+          // à l'intérieur de sa propre boîte. Pour les parents, on ne signale un
+          // overflow que si la boîte du titre franchit vraiment leur zone visible.
+          const ownTextOverflowX = ancestor === titleElement &&
+            ancestor.scrollWidth > ancestor.clientWidth + 1;
+          const ownTextOverflowY = ancestor === titleElement &&
+            ancestor.scrollHeight > ancestor.clientHeight + 1;
+          if (clipsX && (titleOutsideX || ownTextOverflowX)) {
+            clippingOverflow.push({
+              axis: 'x',
+              element: ancestor.tagName.toLowerCase(),
+              className: String(ancestor.className || '').slice(0, 100),
+              overflow: style.overflowX,
+              scrollSize: ancestor.scrollWidth,
+              clientSize: ancestor.clientWidth,
+              titleOutsideClip: titleOutsideX
+            });
+          }
+          if (clipsY && (titleOutsideY || ownTextOverflowY)) {
+            clippingOverflow.push({
+              axis: 'y',
+              element: ancestor.tagName.toLowerCase(),
+              className: String(ancestor.className || '').slice(0, 100),
+              overflow: style.overflowY,
+              scrollSize: ancestor.scrollHeight,
+              clientSize: ancestor.clientHeight,
+              titleOutsideClip: titleOutsideY
+            });
+          }
+          if (ancestor === documentNode) break;
+          ancestor = ancestor.parentElement;
+        }
+        const firstBannerRect = banners.length
+          ? documentNode.querySelector(selector)?.getBoundingClientRect()
+          : null;
+        const titleElementOutsideBanner = Boolean(firstBannerRect && titleRect && (
+          titleRect.left < firstBannerRect.left - 0.5 ||
+          titleRect.right > firstBannerRect.right + 0.5 ||
+          titleRect.top < firstBannerRect.top - 0.5 ||
+          titleRect.bottom > firstBannerRect.bottom + 0.5
+        ));
         return {
           documentFound: true,
           documentWidth: Number(bounds.width.toFixed(2)),
@@ -4086,7 +4165,9 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
           titleBounds: titleRect ? {
             leftOverflow: Number((bounds.left - titleRect.left).toFixed(2)),
             rightOverflow: Number((titleRect.right - bounds.right).toFixed(2)),
-            topOverflow: Number((bounds.top - titleRect.top).toFixed(2))
+            topOverflow: Number((bounds.top - titleRect.top).toFixed(2)),
+            clippingOverflow,
+            titleElementOutsideBanner
           } : null,
           banners
         };
@@ -4100,6 +4181,12 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
           type + '/' + template + ' : titre principal hors de la zone du document : ' + JSON.stringify({ bounds: geometry.titleBounds, candidates: geometry.titleCandidates }));
+        assert.deepEqual(geometry.titleBounds.clippingOverflow, [],
+          type + '/' + template + ' : aucun ancêtre du titre ne doit couper son texte par overflow : ' + JSON.stringify(geometry.titleBounds));
+        if (geometry.banners.length) {
+          assert.equal(geometry.titleBounds.titleElementOutsideBanner, false,
+            type + '/' + template + ' : la boîte du titre doit rester dans le bandeau : ' + JSON.stringify(geometry.titleBounds));
+        }
       }
       for (const banner of geometry.banners) {
         assert.ok(Math.abs(banner.marginTop) <= 0.5 && Math.abs(banner.marginLeft) <= 0.5 && Math.abs(banner.marginRight) <= 0.5,

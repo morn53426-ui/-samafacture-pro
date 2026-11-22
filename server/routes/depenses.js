@@ -45,14 +45,19 @@ router.get('/', async (req, res, next) => {
     // modifier le comportement de l'écran sans le prévenir.
     const { page, limite, offset } = getPagination(req.query, { defaultLimite: 200, maxLimite: 500 });
 
-    let whereSql = ' WHERE user_id = ?';
+    let whereSql = ' WHERE d.user_id = ?';
     const params = [req.tenantId];
-    if (from) { whereSql += ' AND date_depense >= ?'; params.push(from); }
-    if (to) { whereSql += ' AND date_depense <= ?'; params.push(to); }
+    if (from) { whereSql += ' AND d.date_depense >= ?'; params.push(from); }
+    if (to) { whereSql += ' AND d.date_depense <= ?'; params.push(to); }
 
-    const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM depenses${whereSql}`, params);
+    const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM depenses d${whereSql}`, params);
     const [rows] = await pool.query(
-      `SELECT * FROM depenses${whereSql} ORDER BY date_depense DESC, id DESC LIMIT ? OFFSET ?`,
+      `SELECT d.*,
+        EXISTS (
+          SELECT 1 FROM pro_compta_ecritures e
+          WHERE e.user_id = d.user_id AND e.source_type = 'depense' AND e.source_id = d.id
+        ) AS comptabilisee
+       FROM depenses d${whereSql} ORDER BY d.date_depense DESC, d.id DESC LIMIT ? OFFSET ?`,
       [...params, limite, offset]
     );
     res.json({ depenses: rows, pagination: buildPaginationMeta(page, limite, total) });
@@ -76,6 +81,7 @@ router.get('/', async (req, res, next) => {
  *               libelle: { type: string, example: 'Achat de fournitures' }
  *               montant: { type: number, example: 8500 }
  *               categorie: { type: string }
+ *               mode_reglement: { type: string, enum: [caisse, banque], default: caisse }
  *               date_depense: { type: string, format: date, description: "Défaut : aujourd’hui." }
  *               notes: { type: string }
  *     responses:
@@ -85,11 +91,14 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { libelle, montant, categorie, date_depense, notes } = req.body;
+    const modeReglement = req.body.mode_reglement === undefined ? 'caisse' : req.body.mode_reglement;
     if (!libelle || !montant) return res.status(400).json({ error: 'Le libellé et le montant sont obligatoires.' });
-
+    if (!['caisse', 'banque'].includes(modeReglement)) {
+      return res.status(400).json({ error: 'Le mode de règlement doit être caisse ou banque.', code: 'MODE_REGLEMENT_INVALIDE' });
+    }
     const [result] = await pool.query(
-      `INSERT INTO depenses (user_id, libelle, montant, categorie, date_depense, notes) VALUES (?, ?, ?, ?, ?, ?)`,
-      [req.tenantId, libelle, positiveNumber(montant, 0), categorie || null, date_depense || new Date().toISOString().slice(0, 10), notes || null]
+      `INSERT INTO depenses (user_id, libelle, montant, categorie, mode_reglement, date_depense, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.tenantId, libelle, positiveNumber(montant, 0), categorie || null, modeReglement, date_depense || new Date().toISOString().slice(0, 10), notes || null]
     );
 
     const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
@@ -113,32 +122,67 @@ router.post('/', async (req, res, next) => {
  *     responses:
  *       200: { description: Dépense mise à jour. }
  *       404: { description: Dépense introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Dépense déjà comptabilisée : modification refusée." }
  */
 router.put('/:id', async (req, res, next) => {
+  let conn;
   try {
-    const [existingRows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [existingRows] = await conn.query(
+      'SELECT * FROM depenses WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
     const existing = existingRows[0];
-    if (!existing) return res.status(404).json({ error: 'Dépense introuvable.' });
-
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Dépense introuvable.' });
+    }
+    const [postedRows] = await conn.query(
+      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE",
+      [req.tenantId, existing.id]
+    );
+    if (postedRows.length) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Cette dépense est déjà comptabilisée. Conservez-la et passez une écriture corrective pour toute modification.',
+        code: 'DEPENSE_COMPTABILISEE_PROTEGEE'
+      });
+    }
     const { libelle, montant, categorie, date_depense, notes } = req.body;
-    // Même règle qu'à la création (POST /depenses) : le libellé est obligatoire. Sans ce
-    // contrôle, `{ libelle: "" }` effaçait silencieusement le libellé d'une dépense existante.
-    if (libelle !== undefined && !libelle) {
+    if (libelle !== undefined && !String(libelle).trim()) {
+      await conn.rollback();
       return res.status(400).json({ error: 'Le libellé est obligatoire.' });
     }
-    await pool.query(
-      `UPDATE depenses SET libelle=?, montant=?, categorie=?, date_depense=?, notes=? WHERE id = ? AND user_id = ?`,
+    const modeReglement = req.body.mode_reglement === undefined
+      ? (existing.mode_reglement || 'caisse')
+      : req.body.mode_reglement;
+    if (!['caisse', 'banque'].includes(modeReglement)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le mode de règlement doit être caisse ou banque.', code: 'MODE_REGLEMENT_INVALIDE' });
+    }
+    await conn.query(
+      'UPDATE depenses SET libelle=?, montant=?, categorie=?, mode_reglement=?, date_depense=?, notes=? WHERE id = ? AND user_id = ?',
       [
-        libelle ?? existing.libelle,
+        libelle !== undefined ? String(libelle).trim() : existing.libelle,
         montant !== undefined ? positiveNumber(montant, existing.montant) : existing.montant,
         categorie ?? existing.categorie,
-        date_depense ?? existing.date_depense, notes ?? existing.notes, existing.id, req.tenantId
+        modeReglement,
+        date_depense ?? existing.date_depense,
+        notes ?? existing.notes,
+        existing.id,
+        req.tenantId
       ]
     );
-
-    const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    const [rows] = await conn.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    await conn.commit();
     res.json({ depense: rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 /**
@@ -155,14 +199,41 @@ router.put('/:id', async (req, res, next) => {
  *     responses:
  *       200: { description: Dépense supprimée. }
  *       404: { description: Dépense introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Dépense déjà comptabilisée : suppression refusée." }
  */
 router.delete('/:id', async (req, res, next) => {
+  let conn;
   try {
-    const [existingRows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
-    if (!existingRows.length) return res.status(404).json({ error: 'Dépense introuvable.' });
-    await pool.query('DELETE FROM depenses WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [existingRows] = await conn.query(
+      'SELECT id FROM depenses WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
+    if (!existingRows.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Dépense introuvable.' });
+    }
+    const [postedRows] = await conn.query(
+      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE",
+      [req.tenantId, existingRows[0].id]
+    );
+    if (postedRows.length) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Cette dépense est déjà comptabilisée. Elle doit être conservée dans la piste d’audit.',
+        code: 'DEPENSE_COMPTABILISEE_PROTEGEE'
+      });
+    }
+    await conn.query('DELETE FROM depenses WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
+    await conn.commit();
     res.json({ success: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 module.exports = router;

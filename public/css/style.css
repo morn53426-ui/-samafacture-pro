@@ -1100,7 +1100,6 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
   .invoice-doc .head { page-break-after: avoid; }
   .invoice-doc table thead { display: table-header-group; }
 }
-
 /* Modèle Executive : réduire les espacements périphériques en A4 sans toucher
    aux colonnes, aux lignes, aux montants ni à la typographie du tableau. */
 @media print {

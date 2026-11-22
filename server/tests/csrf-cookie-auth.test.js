@@ -13,7 +13,17 @@ const sessionPath = require.resolve('../utils/session');
 const etatSession = { valide: true };
 require.cache[sessionPath] = {
   id: sessionPath, filename: sessionPath, loaded: true,
-  exports: { jetonEstValide: async () => etatSession.valide }
+  exports: {
+    getSessionContext: async (payload) => etatSession.valide ? ({
+      token_version: Number(payload.tv || 0),
+      plan: 'gratuit',
+      trial_plan: null,
+      trial_status: 'not_started',
+      trial_started_at: null,
+      trial_ends_at: null,
+      trial_expired: 0
+    }) : null
+  }
 };
 const { requireAuth } = require('../middleware/auth');
 
