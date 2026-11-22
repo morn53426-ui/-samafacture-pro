@@ -21,7 +21,7 @@ Ce document distingue les changements présents sur une branche, les contrôles 
 |---|---|---|---|
 | P1 | PDF A4 multipages, factures et devis | PR #125 | CI complète verte sur HEAD `8eebb236` ; 31 modèles facture et 31 modèles devis vérifiés avec 28 lignes longues ; maximum constaté et exigé : 3 pages A4 |
 | P1 | Essai gratuit et espace professionnel | PR #128 | CI verte sur HEAD `e3b91dc4` ; essai de 15 jours sur Standard, Pro et Entreprise, avec règles de non-réinitialisation et d'expiration testées |
-| P1 | Cycle de vie comptable des factures et dépenses | PR #117 | Branche synchronisée avec le `main` actuel ; tests Node/MySQL et recette visuelle en cours sur le nouveau HEAD `ba756d09` |
+| P1 | Cycle de vie comptable des factures et dépenses | PR #117 | CI complète verte sur le HEAD synchronisé `ba756d09` ; tests dépense/isolation de #115 inclus |
 | P1 | Contraste et navigation clavier clair/sombre | PR #130 | Correctifs sur une branche neuve ; ESLint et ZIP verts sur un commit précédent ; suite Chromium/MySQL en cours sur le dernier HEAD |
 | P1 | Vidéo de présentation Sunupilot | PR #126 | Code du lecteur, capture locale et tests présents ; master MP4 final absent du dépôt, donc le lecteur reste sur l'animation de secours |
 | P2 | Gouvernance et feuille de route | PR #131 (ce document) | Mise à jour proposée sur la base du `main` actuel |
@@ -70,7 +70,7 @@ La branche #117 a été synchronisée sur le `main` de référence via un commit
 - rejeu idempotent ;
 - isolation entre entreprises.
 
-La suite CI sur le HEAD actualisé est encore en cours au moment de ce point de situation. Les anciennes validations exécutées sur une base précédente ne suffisent pas à déclarer la branche validée.
+La CI complète sur le HEAD actualisé est verte : tests Node/MySQL, restauration réelle d'une sauvegarde chiffrée, smoke test MySQL/Redis, recette visuelle responsive et publication des captures. La branche est à jour avec le `main` de référence (0 commit en retard).
 
 **À faire :** attendre le résultat de la CI complète sur `ba756d09`, corriger toute régression détectée et inspecter les écritures générées. Ne pas fusionner #115 séparément : son test de dépense a été porté dans #117.
 
@@ -130,7 +130,7 @@ Une PR remplacée peut rester ouverte le temps de vérifier son historique ; sa 
 | 21/11/2026 — main `8453ee6` | Référence de départ de ce plan |
 | 21/11/2026 — PR #125 / run `44963765145` | CI complète verte ; 31 modèles facture et 31 modèles devis ; 28 lignes longues ; plafond de trois pages ; 324 captures |
 | 21/11/2026 — PR #128 / HEAD `e3b91dc4` | Tests d'essai 15 jours, changement de formule et expiration validés ; CI verte |
-| 21–22/11/2026 — PR #117 / HEAD `ba756d09` | Branche synchronisée avec main ; test dépense/isolation ajouté ; CI actuelle en cours |
+| 22/11/2026 — PR #117 / HEAD `ba756d09` / run `44964496620` | CI complète verte ; tests de dépense/idempotence/isolation intégrés ; branche à jour avec main |
 | 21–22/11/2026 — PR #130 / HEAD `1075c737` | Contraste montants, badges, dégradés et focus corrigés ; CI actuelle en cours |
 | 21/11/2026 — PR #126 | Tests du lecteur et capture locale verts ; MP4 final absent du dépôt |
 
