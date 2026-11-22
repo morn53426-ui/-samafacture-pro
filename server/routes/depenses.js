@@ -115,8 +115,9 @@ router.post('/', async (req, res, next) => {
  *       404: { description: Dépense introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.put('/:id', async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
+    conn = await pool.getConnection();
     await conn.beginTransaction();
     const [existingRows] = await conn.query(
       'SELECT * FROM depenses WHERE id = ? AND user_id = ? FOR UPDATE',
@@ -158,10 +159,10 @@ router.put('/:id', async (req, res, next) => {
     await conn.commit();
     res.json({ depense: rows[0] });
   } catch (err) {
-    await conn.rollback();
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
@@ -181,8 +182,9 @@ router.put('/:id', async (req, res, next) => {
  *       404: { description: Dépense introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.delete('/:id', async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
+    conn = await pool.getConnection();
     await conn.beginTransaction();
     const [existingRows] = await conn.query(
       'SELECT id FROM depenses WHERE id = ? AND user_id = ? FOR UPDATE',
@@ -207,10 +209,10 @@ router.delete('/:id', async (req, res, next) => {
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
