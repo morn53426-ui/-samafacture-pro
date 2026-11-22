@@ -6,7 +6,7 @@ Branches : **146** ; SHA uniques : **144**.
 PR ouvertes : **23**. Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
 Ruleset `protect main` actif : suppression/non-fast-forward interdits, PR obligatoire, résolution des threads, checks `Tests Node.js et MySQL` et `Build complete source archive`, 0 approbation requise, bypass none. API classic `protected=true` mais `protection.enabled=false`; ruleset actif confirmé.
 
-> Branches API paginées 100+46. L’endpoint ne fournit pas la date des commits; dates non inventées. Comparaisons ahead/behind ciblées (21 PR) uniquement; aucune branche supprimée.
+> Branches API paginées 100+46. L’endpoint ne fournit pas les dates de commit. Ahead/behind exhaustif non calculé; comparaisons ciblées dans le rapport. Aucune branche supprimée.
 
 ## Têtes partagées
 - `11d55850`: `feat/dashboard-reference-layout`, `feat/sunupilot-dashboard-reference`
@@ -29,7 +29,7 @@ Ruleset `protect main` actif : suppression/non-fast-forward interdits, PR obliga
 | `audit/fix-nginx-upstream-order-20261116` | `5e93abdc` |
 | `audit/fix-realtime-company-groups-20261116-run1` | `e5c3d802` |
 | `audit/fix-reset-email-docs-and-redaction-test-20261116` | `a53c96da` |
-| `audit/initial-review-20261122` | `1a5be8b0` |
+| `audit/initial-review-20261122` | `904fcf79` |
 | `audit/invoice-pdf-typography-print-20261118` | `7cb2d43c` |
 | `audit/npm-audit-gate-2026-11-16` | `63a344d9` |
 | `audit/rapport-approfondi-2026-11-16-run2` | `1aee9331` |
@@ -128,7 +128,7 @@ Ruleset `protect main` actif : suppression/non-fast-forward interdits, PR obliga
 | Branche | HEAD |
 |---|---|
 | `fix/a11y-settings-labels-20261116` | `4b275916` |
-| `fix/accessibility-contrast-focus-main-20261121` | `378ff2a2` |
+| `fix/accessibility-contrast-focus-main-20261121` | `c420c63a` |
 | `fix/accessibility-template-preview-contrast-20261122` | `6b3cd9ff` |
 | `fix/accounting-invoice-cancellation-reversal-20261121` | `ba756d09` |
 | `fix/accounting-refund-journal-reversal-20261121` | `b45f4797` |
@@ -164,7 +164,7 @@ Ruleset `protect main` actif : suppression/non-fast-forward interdits, PR obliga
 | `fix/pdf-worker-health-and-sidebar-icons-2026-11-15` | `04304461` |
 | `fix/pdf-worker-wait-for-api-health-2026-11-15` | `941f235f` |
 | `fix/pro-workspace-status-contrast-20261122` | `baa9ea6a` |
-| `fix/product-delete-stock-history-protection-20261122` | `44d02021` |
+| `fix/product-delete-stock-history-protection-20261122` | `c4340b88` |
 | `fix/purchase-receipt-warehouse-deadlock-20261119` | `f0f43c3d` |
 | `fix/quota-registry-initialization-robustness-2026-11-15` | `c8ea3204` |
 | `fix/quote-executive-a4-pagination-20261121` | `9bfc8aea` |
