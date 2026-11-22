@@ -3052,7 +3052,7 @@ const OHADA_STARTER_ACCOUNTS = [
   ['521','Banques',5,'debit',0],['571','Caisse',5,'debit',0],
   ['601','Achats de marchandises',6,'debit',0],['604','Achats de matières et fournitures',6,'debit',0],
   ['6181','Voyages et déplacements',6,'debit',0],['622','Locations et charges locatives',6,'debit',0],['625','Primes d’assurance',6,'debit',0],['641','Rémunérations du personnel',6,'debit',0],
-  ['661','Charges d’intérêts',6,'debit',0],['701','Ventes de marchandises',7,'credit',0],
+  ['638','Autres charges externes',6,'debit',0],['661','Charges d’intérêts',6,'debit',0],['701','Ventes de marchandises',7,'credit',0],
   ['702','Ventes de produits finis',7,'credit',0],['703','Ventes de produits intermédiaires',7,'credit',0],
   ['704','Ventes de produits résiduels',7,'credit',0],['705','Travaux facturés',7,'credit',0],
   ['706','Services vendus',7,'credit',0],['707','Produits accessoires',7,'credit',0],['758','Produits divers',7,'credit',0]
@@ -3291,7 +3291,7 @@ async function ensureAccountingDefaults(uid, conn = pool) {
     ['vente', 'non_classe', '706'],
     ['vente', 'saisie_libre', '706'],
     ['vente', 'frais_livraison', '707'],
-    ['depense', '__default__', '622']
+    ['depense', '__default__', '638']
   ];
   for (const [sourceType, sourceKey, accountCode] of defaultMappings) {
     const account = await accountId(uid, accountCode, conn);

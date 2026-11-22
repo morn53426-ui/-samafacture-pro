@@ -73,7 +73,7 @@ after(async () => {
   await teardownTestEnvironment();
 });
 
-test('une base v19 conservant un essai actif migre vers v22 sans perdre ses dates', async () => {
+test('une base v19 conservant un essai actif migre vers v23 sans perdre ses dates', async () => {
   const userId = await addUser('from-v19', true);
   const [[trialBefore]] = await pool.query(
     'SELECT trial_plan, trial_started_at, trial_ends_at, trial_status FROM users WHERE id = ?',
@@ -102,7 +102,7 @@ test('une base v19 conservant un essai actif migre vers v22 sans perdre ses date
 
   const migration = runMigrationInNewProcess();
   assert.equal(migration.error, undefined, migration.error?.message);
-  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v19 → v22 a échoué.');
+  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v19 → v23 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
   assert.equal(Number(meta.version), 23);
@@ -125,7 +125,7 @@ test('une base v19 conservant un essai actif migre vers v22 sans perdre ses date
       trial_status: account.trial_status
     },
     trialBefore,
-    'La migration v19 → v22 ne doit ni redémarrer ni raccourcir l’essai actif.'
+    'La migration v19 → v23 ne doit ni redémarrer ni raccourcir l’essai actif.'
   );
 
   const [[expense]] = await pool.query(
@@ -138,7 +138,7 @@ test('une base v19 conservant un essai actif migre vers v22 sans perdre ses date
   await removeTestUser(userId);
 });
 
-test('une base v20 conserve les règlements bancaires et reçoit un essai neutre en v22', async () => {
+test('une base v20 conserve les règlements bancaires et reçoit un essai neutre en v23', async () => {
   const userId = await addUser('from-v20', false);
   const date = new Date().toISOString().slice(0, 10);
   await pool.query(
@@ -172,7 +172,7 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
 
   const migration = runMigrationInNewProcess();
   assert.equal(migration.error, undefined, migration.error?.message);
-  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v20 → v22 a échoué.');
+  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v20 → v23 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
   assert.equal(Number(meta.version), 23);
@@ -206,7 +206,7 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   const repeatedMigration = runMigrationInNewProcess();
   assert.equal(repeatedMigration.error, undefined, repeatedMigration.error?.message);
   assert.equal(repeatedMigration.status, 0,
-    repeatedMigration.stderr || repeatedMigration.stdout || 'La migration répétée v20 → v22 a échoué.');
+    repeatedMigration.stderr || repeatedMigration.stdout || 'La migration répétée v20 → v23 a échoué.');
   const [[repeatedMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
   assert.equal(Number(repeatedMeta.version), 23);
   const [[repeatedExpense]] = await pool.query(
@@ -225,14 +225,14 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   await removeTestUser(userId);
 });
 
-test('une base v21 protège les événements comptables contre la suppression en cascade et rejoue la migration v22', async () => {
+test('une base v21 protège les événements comptables contre la suppression en cascade et rejoue la migration v23', async () => {
   const userId = await addUser('from-v21', false);
   let clientId = null;
   let invoiceId = null;
   try {
     const [client] = await pool.query(
       'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
-      [userId, 'Client audit migration v22']
+      [userId, 'Client audit migration v23']
     );
     clientId = client.insertId;
     const numero = 'AUDIT-EVENT-' + crypto.randomUUID().slice(0, 8);
@@ -266,7 +266,7 @@ test('une base v21 protège les événements comptables contre la suppression en
 
     const migration = runMigrationInNewProcess();
     assert.equal(migration.error, undefined, migration.error?.message);
-    assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v21 → v22 a échoué.');
+    assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v21 → v23 a échoué.');
 
     const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
     assert.equal(Number(meta.version), 23);
@@ -301,11 +301,11 @@ test('une base v21 protège les événements comptables contre la suppression en
     assert.equal(Number(eventAfterInvoiceDelete.facture_id), Number(invoiceId));
     assert.equal(eventAfterInvoiceDelete.transition, 'annulation');
 
-    // Le chemin v21→v22 doit être rejouable sans remplacer ni perdre l'événement.
+    // Le chemin v21→v23 doit être rejouable sans remplacer ni perdre l'événement.
     await pool.query('UPDATE _samafacture_schema_meta SET version = 21 WHERE id = 1');
     const repeated = runMigrationInNewProcess();
     assert.equal(repeated.error, undefined, repeated.error?.message);
-    assert.equal(repeated.status, 0, repeated.stderr || repeated.stdout || 'La migration v21 → v22 rejouée a échoué.');
+    assert.equal(repeated.status, 0, repeated.stderr || repeated.stdout || 'La migration v21 → v23 rejouée a échoué.');
     const [[repeatMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
     assert.equal(Number(repeatMeta.version), 23);
     const [[repeatEvent]] = await pool.query(
