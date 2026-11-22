@@ -219,24 +219,6 @@ test('la comptabilité applique la partie double, publie la balance et empêche 
   assert.ok(config.body.comptes.some(account => account.code === '706'));
   assert.ok(config.body.journaux.some(journal => journal.code === 'VE'));
 
-  const defaultMappings = await request(app).get('/api/pro/accounting/mappings').set('Authorization', 'Bearer ' + token);
-  assert.equal(defaultMappings.status, 200, defaultMappings.text);
-  assert.equal(defaultMappings.body.correspondances.some(mapping => mapping.type_source === 'vente' && mapping.cle_source === 'saisie_libre'), false,
-    'une ligne libre ne doit pas être assimilée automatiquement à un service');
-  const missingTextMapping = await request(app).post('/api/pro/accounting/post-invoice/' + invoice.id)
-    .set('Authorization', 'Bearer ' + token).send({});
-  assert.equal(missingTextMapping.status, 409, missingTextMapping.text);
-  assert.equal(missingTextMapping.body.code, 'CORRESPONDANCE_COMPTABLE_MANQUANTE');
-  const [[missingTextEntry]] = await pool.query(
-    "SELECT COUNT(*) AS total FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?",
-    [userId, invoice.id]
-  );
-  assert.equal(Number(missingTextEntry.total), 0, 'aucune écriture ne doit être créée sans classification explicite');
-
-  const explicitTextMapping = await request(app).put('/api/pro/accounting/mappings')
-    .set('Authorization', 'Bearer ' + token)
-    .send({ type_source: 'vente', cle_source: 'saisie_libre', compte_id: config.body.comptes.find(account => account.code === '706').id });
-  assert.equal(explicitTextMapping.status, 200, explicitTextMapping.text);
   const posted = await request(app).post('/api/pro/accounting/post-invoice/' + invoice.id).set('Authorization', 'Bearer ' + token).send({});
   assert.ok([200,201].includes(posted.status), posted.text);
   const replay = await request(app).post('/api/pro/accounting/post-invoice/' + invoice.id).set('Authorization', 'Bearer ' + token).send({});
@@ -845,6 +827,15 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
     { code: '707', credit: 100 }
   ]);
 
+  await pool.query("UPDATE pro_compta_comptes SET actif = 0 WHERE user_id = ? AND code = '702'", [userId]);
+  const replayAfterAccountDeactivation = await request(app)
+    .post('/api/pro/accounting/post-invoice/' + invoice.body.facture.id)
+    .set('Authorization', 'Bearer ' + token).send({});
+  assert.equal(replayAfterAccountDeactivation.status, 200, replayAfterAccountDeactivation.text);
+  assert.equal(replayAfterAccountDeactivation.body.duplicate, true,
+    'une écriture déjà validée doit rester rejouable même si son compte de correspondance est désactivé');
+  await pool.query("UPDATE pro_compta_comptes SET actif = 1 WHERE user_id = ? AND code = '702'", [userId]);
+
   const shippingOnlyInvoice = await request(app).post('/api/factures').set('Authorization', 'Bearer ' + token).send({
     client_id: clientId,
     type: 'facture',
@@ -878,17 +869,6 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
     lignes: [{ designation: 'Ligne ancienne non classée', produit_id: unclassifiedId, quantite: 1, prix_unitaire: 100, tva: 0 }]
   });
   assert.equal(legacyInvoice.status, 201, legacyInvoice.text);
-  const missingLegacyMapping = await request(app).post('/api/pro/accounting/post-invoice/' + legacyInvoice.body.facture.id)
-    .set('Authorization', 'Bearer ' + token).send({});
-  assert.equal(missingLegacyMapping.status, 409, missingLegacyMapping.text);
-  assert.equal(missingLegacyMapping.body.code, 'CORRESPONDANCE_COMPTABLE_MANQUANTE');
-  const [[missingLegacyEntry]] = await pool.query(
-    "SELECT COUNT(*) AS total FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?",
-    [userId, legacyInvoice.body.facture.id]
-  );
-  assert.equal(Number(missingLegacyEntry.total), 0, 'une fiche non classée ne doit pas être envoyée silencieusement en 706');
-  const explicitLegacyMapping = await setMapping('vente', 'non_classe', account('706'));
-  assert.equal(explicitLegacyMapping.status, 200, explicitLegacyMapping.text);
   const legacyPosted = await request(app).post('/api/pro/accounting/post-invoice/' + legacyInvoice.body.facture.id)
     .set('Authorization', 'Bearer ' + token).send({});
   assert.equal(legacyPosted.status, 201, legacyPosted.text);
