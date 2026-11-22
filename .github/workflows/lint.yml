@@ -12,6 +12,7 @@ on:
       - 'server/tests/local-date-format.test.js'
       - 'server/tests/workspace-navigation.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
+      - 'server/tests/sidebar-mobile-keyboard.test.js'
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
@@ -65,6 +66,7 @@ jobs:
           server/tests/local-date-format.test.js
           server/tests/workspace-navigation.test.js
           server/tests/workspace-modal-accessibility.test.js
+          server/tests/sidebar-mobile-keyboard.test.js
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
