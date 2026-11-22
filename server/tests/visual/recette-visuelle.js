@@ -4318,9 +4318,9 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         const metrics = geometry.majestePrintMetrics;
         assert.ok(metrics, type + '/majeste : règles A4 compactes ciblées actives.');
         assert.equal(metrics.tableFontSize, '12px', type + '/majeste : la police du tableau reste à 9 pt.');
-        assert.equal(metrics.tableLineHeight, '15px', type + '/majeste : interligne de tableau compact mais lisible.');
-        assert.equal(metrics.tablePaddingTop, '2px', type + '/majeste : padding supérieur des lignes.');
-        assert.equal(metrics.tablePaddingBottom, '2px', type + '/majeste : padding inférieur des lignes.');
+        assert.equal(metrics.tableLineHeight, '13.8px', type + '/majeste : interligne A4 resserré, police de 9 pt conservée.');
+        assert.equal(metrics.tablePaddingTop, '1px', type + '/majeste : padding supérieur compact des lignes.');
+        assert.equal(metrics.tablePaddingBottom, '1px', type + '/majeste : padding inférieur compact des lignes.');
         assert.equal(metrics.footerMarginTop, '12px', type + '/majeste : marge compacte du pied de page.');
         assert.equal(metrics.qrWidth, '52px', type + '/majeste : QR code compact sans perte de lisibilité.');
         assert.equal(metrics.stampWidth, '64px', type + '/majeste : cachet compact.');
