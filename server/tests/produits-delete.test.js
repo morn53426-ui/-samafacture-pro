@@ -24,8 +24,8 @@ describe('Suppression de produit', () => {
   });
 
   after(async () => {
-    await nettoyerUtilisateur(userIdA);
     await nettoyerUtilisateur(userIdB);
+    await nettoyerUtilisateur(userIdA);
   });
 
   test('supprimer son propre produit réussit et le retire de la liste', async () => {
@@ -122,6 +122,31 @@ describe('Suppression de produit', () => {
     const [[storedLine]] = await pool.query('SELECT id, produit_id FROM pro_commandes_fournisseurs_lignes WHERE id = ?', [line.insertId]);
     assert.ok(stored, 'produit conservé');
     assert.equal(Number(storedLine.produit_id), Number(produit.body.produit.id), 'lien au produit conservé');
+  });
+
+  test('un stock d’entrepôt référencé depuis une autre entreprise bloque la suppression', async () => {
+    const produit = await request(app)
+      .post('/api/produits')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ nom: 'Produit stock inter-entreprise', type_catalogue: 'produit', prix_ht: 1000, tva: 0, stock: 0 });
+    assert.equal(produit.status, 201, produit.text);
+    const [warehouse] = await pool.query(
+      'INSERT INTO pro_entrepots (user_id, code, nom) VALUES (?, ?, ?)',
+      [userIdB, `TEST-CROSS-${Date.now()}`, 'Entrepôt inter-entreprise']
+    );
+    const [stock] = await pool.query(
+      'INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, ?)',
+      [userIdB, warehouse.insertId, produit.body.produit.id, 3]
+    );
+    const deletion = await request(app)
+      .delete(`/api/produits/${produit.body.produit.id}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    assert.equal(deletion.status, 409, deletion.text);
+    assert.equal(deletion.body.code, 'PRODUIT_HISTORIQUE_PROTEGE');
+    const [[storedProduct]] = await pool.query('SELECT id FROM produits WHERE id = ? AND user_id = ?', [produit.body.produit.id, userIdA]);
+    const [[storedStock]] = await pool.query('SELECT id, quantite FROM pro_stocks_entrepots WHERE id = ?', [stock.insertId]);
+    assert.ok(storedProduct, 'produit conservé');
+    assert.equal(Number(storedStock.quantite), 3, 'stock de l’autre entreprise conservé');
   });
 
   test('supprimer un produit déjà supprimé renvoie 404 (pas de double suppression silencieuse)', async () => {
