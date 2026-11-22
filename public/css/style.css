@@ -7709,3 +7709,24 @@ a.btn .icon {
 
 /* Le badge PILOT est posé sur un dégradé or : utiliser un texte bleu nuit contrasté. */
 .sidebar-brand .brand-pro { color: #17233B !important; }
+
+
+/* Contraste WCAG AA dans la liste de factures et ses soldes. */
+.billing-table-topline .billing-table-secure,
+.billing-balance-clear {
+  color: var(--emerald-text) !important;
+}
+.billing-balance-due {
+  color: var(--clay-text) !important;
+}
+:root:not([data-theme="dark"]) .badge-payee {
+  color: #066144 !important;
+}
+:root[data-theme="dark"] .badge-payee {
+  color: #9DE7BC !important;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .badge-payee {
+    color: #9DE7BC !important;
+  }
+}
