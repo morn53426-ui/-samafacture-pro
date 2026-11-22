@@ -1,8 +1,7 @@
 'use strict';
-// Révocation des sessions : chaque JWT embarque la version de jeton (`tv`) de l'utilisateur
-// au moment de sa signature. La base reste la source de vérité afin qu'une déconnexion,
-// une réinitialisation du mot de passe ou une révocation soit effective immédiatement
-// sur tous les workers du cluster, et non après expiration d'un cache mémoire local.
+// Révocation des sessions et contexte d'accès : la base reste la source de vérité
+// sur tous les workers. Le contexte inclut les dates d'essai pour faire appliquer
+// l'expiration côté serveur avant qu'une route ne lise les droits du compte.
 const { pool } = require('../config/db');
 
 async function getTokenVersion(userId) {
@@ -13,21 +12,35 @@ async function getTokenVersion(userId) {
     'SELECT token_version FROM users WHERE id = ? LIMIT 1',
     [id]
   );
-  if (!rows.length) return null; // compte supprimé
+  if (!rows.length) return null;
   return Number(rows[0].token_version || 0);
 }
 
-// true si le jeton correspond encore à la version courante du compte.
-// Chaque vérification relit la base : aucune copie locale ne peut survivre à une révocation
-// effectuée par un autre worker ou une autre instance.
+async function getSessionContext(payload) {
+  const id = Number(payload && payload.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+
+  const [rows] = await pool.query(
+    `SELECT token_version, plan, trial_plan, trial_status, trial_started_at, trial_ends_at,
+            CASE
+              WHEN trial_status = 'trialing'
+               AND (trial_ends_at IS NULL OR trial_ends_at <= UTC_TIMESTAMP())
+              THEN 1 ELSE 0
+            END AS trial_expired
+     FROM users WHERE id = ? LIMIT 1`,
+    [id]
+  );
+  if (!rows.length) return null;
+  if (Number(payload.tv || 0) !== Number(rows[0].token_version || 0)) return null;
+  return rows[0];
+}
+
+// Conservée pour les appelants historiques : la réponse reste strictement booléenne.
 async function jetonEstValide(payload) {
-  const courante = await getTokenVersion(payload && payload.id);
-  if (courante === null) return false;
-  return Number(payload.tv || 0) === courante;
+  return Boolean(await getSessionContext(payload));
 }
 
 // Conservée pour compatibilité avec les appels existants après les UPDATE atomiques.
-// Il n'existe plus de cache local à invalider.
 function invaliderCacheVersion() {}
 
 async function incrementerTokenVersion(conn, userId) {
@@ -38,4 +51,4 @@ async function incrementerTokenVersion(conn, userId) {
   invaliderCacheVersion(userId);
 }
 
-module.exports = { getTokenVersion, jetonEstValide, invaliderCacheVersion, incrementerTokenVersion };
+module.exports = { getTokenVersion, getSessionContext, jetonEstValide, invaliderCacheVersion, incrementerTokenVersion };

@@ -120,7 +120,8 @@ describe('Quota mensuel : tous les parcours de création de facture', () => {
     const deleted = await request(app)
       .delete(`/api/factures/${invoices[0].id}`)
       .set('Authorization', `Bearer ${token}`);
-    assert.equal(deleted.status, 200, deleted.text);
+    assert.equal(deleted.status, 409, deleted.text);
+    assert.equal(deleted.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
 
     const afterDelete = await createDocument('facture');
     assert.equal(afterDelete.status, 403, afterDelete.text);
