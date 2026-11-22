@@ -4083,36 +4083,48 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         );
         const titleElement = titleCandidates[0] || null;
         const titleRect = titleElement?.getBoundingClientRect();
-        const titleTextRects = titleElement
-          ? (() => {
-            const range = document.createRange();
-            range.selectNodeContents(titleElement);
-            return Array.from(range.getClientRects()).map(rect => ({
-              left: rect.left,
-              right: rect.right,
-              top: rect.top,
-              bottom: rect.bottom
-            }));
-          })()
-          : [];
-        // Un Range mesure les fragments de glyphe, qui peuvent dépasser légèrement
-        // la boîte CSS de leur élément (line-height/font metrics) sans être rognés.
-        // Le critère visuel fiable est la zone imprimable du document, puis le bandeau
-        // lorsqu'il existe ; ne pas confondre boîte de ligne et zone de clipping.
-        const titleTextOverflowsDocument = titleTextRects.some(rect =>
-          rect.left < bounds.left - 0.5 ||
-          rect.right > bounds.right + 0.5 ||
-          rect.top < bounds.top - 0.5 ||
-          rect.bottom > bounds.bottom + 0.5
-        );
+        // Contrôler le texte via ses véritables ancêtres qui coupent le contenu.
+        // Range.getClientRects() renvoie ici des fragments incohérents sur certains
+        // moteurs/templates (notamment Épuré), alors que la boîte CSS et le rendu
+        // restent dans la page. scrollWidth/scrollHeight ne déclenchent l'alerte que
+        // lorsqu'un ancêtre applique réellement un overflow qui peut masquer le texte.
+        const clippingOverflow = [];
+        let ancestor = titleElement;
+        while (ancestor) {
+          const style = getComputedStyle(ancestor);
+          const clipsX = ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowX);
+          const clipsY = ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowY);
+          if (clipsX && ancestor.scrollWidth > ancestor.clientWidth + 1) {
+            clippingOverflow.push({
+              axis: 'x',
+              element: ancestor.tagName.toLowerCase(),
+              className: String(ancestor.className || '').slice(0, 100),
+              overflow: style.overflowX,
+              scrollSize: ancestor.scrollWidth,
+              clientSize: ancestor.clientWidth
+            });
+          }
+          if (clipsY && ancestor.scrollHeight > ancestor.clientHeight + 1) {
+            clippingOverflow.push({
+              axis: 'y',
+              element: ancestor.tagName.toLowerCase(),
+              className: String(ancestor.className || '').slice(0, 100),
+              overflow: style.overflowY,
+              scrollSize: ancestor.scrollHeight,
+              clientSize: ancestor.clientHeight
+            });
+          }
+          if (ancestor === documentNode) break;
+          ancestor = ancestor.parentElement;
+        }
         const firstBannerRect = banners.length
           ? documentNode.querySelector(selector)?.getBoundingClientRect()
           : null;
-        const titleTextOverflowsBanner = Boolean(firstBannerRect && titleTextRects.some(rect =>
-          rect.left < firstBannerRect.left - 0.5 ||
-          rect.right > firstBannerRect.right + 0.5 ||
-          rect.top < firstBannerRect.top - 0.5 ||
-          rect.bottom > firstBannerRect.bottom + 0.5
+        const titleElementOutsideBanner = Boolean(firstBannerRect && titleRect && (
+          titleRect.left < firstBannerRect.left - 0.5 ||
+          titleRect.right > firstBannerRect.right + 0.5 ||
+          titleRect.top < firstBannerRect.top - 0.5 ||
+          titleRect.bottom > firstBannerRect.bottom + 0.5
         ));
         return {
           documentFound: true,
@@ -4133,8 +4145,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
             leftOverflow: Number((bounds.left - titleRect.left).toFixed(2)),
             rightOverflow: Number((titleRect.right - bounds.right).toFixed(2)),
             topOverflow: Number((bounds.top - titleRect.top).toFixed(2)),
-            textOverflowDocument: titleTextOverflowsDocument,
-            textOverflowBanner: titleTextOverflowsBanner
+            clippingOverflow,
+            titleElementOutsideBanner
           } : null,
           banners
         };
@@ -4148,11 +4160,11 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
           type + '/' + template + ' : titre principal hors de la zone du document : ' + JSON.stringify({ bounds: geometry.titleBounds, candidates: geometry.titleCandidates }));
-        assert.equal(geometry.titleBounds.textOverflowDocument, false,
-          type + '/' + template + ' : le texte réel du titre doit rester dans la zone imprimable du document : ' + JSON.stringify(geometry.titleBounds));
+        assert.deepEqual(geometry.titleBounds.clippingOverflow, [],
+          type + '/' + template + ' : aucun ancêtre du titre ne doit couper son texte par overflow : ' + JSON.stringify(geometry.titleBounds));
         if (geometry.banners.length) {
-          assert.equal(geometry.titleBounds.textOverflowBanner, false,
-            type + '/' + template + ' : le texte du titre doit rester dans le bandeau : ' + JSON.stringify(geometry.titleBounds));
+          assert.equal(geometry.titleBounds.titleElementOutsideBanner, false,
+            type + '/' + template + ' : la boîte du titre doit rester dans le bandeau : ' + JSON.stringify(geometry.titleBounds));
         }
       }
       for (const banner of geometry.banners) {
