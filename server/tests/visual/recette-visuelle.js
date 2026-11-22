@@ -4268,6 +4268,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
               extrasMarginTop: extras?.marginTop || null
             };
           })(),
+          platineTaxModifierPresent: Boolean(documentNode.querySelector('.sf-doc-tax-platine')),
           banners
         };
       }, { selector: bannerSelector, expectedTitles: titleLabels });
@@ -4277,6 +4278,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       assert.ok(geometry.lineCount >= 28,
         type + '/' + template + ' : les 28 lignes longues doivent être rendues avant impression (lignes=' + geometry.lineCount + ').');
       assert.equal(geometry.titlePresent, true, type + '/' + template + ' : titre principal (' + titleLabels.join(' / ') + ') absent du bandeau.');
+      assert.equal(geometry.platineTaxModifierPresent, template === 'platine',
+        type + '/' + template + ' : le compactage TVA doit être réservé au seul modèle Platine.');
       if (template === 'consolide') {
         const metrics = geometry.consolidePrintMetrics;
         assert.ok(metrics, type + '/consolide : les règles d’impression compactes doivent être actives.');
