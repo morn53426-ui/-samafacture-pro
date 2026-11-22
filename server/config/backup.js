@@ -113,7 +113,6 @@ async function nettoyerAnciennesSauvegardes() {
 /** Effectue une sauvegarde. En cas d'échec, l'appelant reçoit une erreur explicite. */
 async function effectuerSauvegarde() {
   const encryptionKey = getBackupEncryptionKey();
-  await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
   // Le volume peut avoir été créé avec le mode Docker 0755. Les noms et archives
   // de sauvegarde ne doivent être accessibles qu'au compte applicatif.
   await fs.promises.mkdir(BACKUP_DIR, { recursive: true, mode: 0o700 });
