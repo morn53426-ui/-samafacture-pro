@@ -50,6 +50,26 @@ test('les paramètres proposent cinq accès rapides sans casser le formulaire un
   assert.ok(html.includes('<form id="entreprise-form">'));
 });
 
+
+test('les coordonnées de l’entreprise sont groupées en grille responsive sans déplacer les champs légaux', () => {
+  const start = html.indexOf('<div class="settings-company-fields-grid">');
+  const end = html.indexOf('<div class="field"><label for="entreprise_conditions_reglement">', start);
+  assert.ok(start >= 0 && end > start, 'La grille de coordonnées doit être présente et se fermer avant les conditions de règlement.');
+  const fields = html.slice(start, end);
+  for (const id of [
+    'entreprise_nom', 'entreprise_adresse', 'entreprise_telephone',
+    'entreprise_email', 'entreprise_ninea', 'entreprise_rccm',
+    'entreprise_site_web', 'entreprise_banque', 'entreprise_rib'
+  ]) {
+    assert.ok(fields.includes('id="' + id + '"'), 'Le champ #' + id + ' doit rester dans la grille.');
+  }
+  assert.match(fields, /class="field settings-field-wide"><label for="entreprise_rib"/);
+  assert.match(html, /\.settings-company-fields-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(html, /@media\s*\(max-width:\s*700px\)[\s\S]*?\.settings-company-fields-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.match(html, /id="entreprise_conditions_reglement"/);
+  assert.match(html, /id="entreprise_mentions_legales"/);
+});
+
 test('les champs de paramètres ont un label HTML explicitement associé', () => {
   for (const id of labelledControlIds) {
     const labelStart = html.indexOf('<label for="' + id + '">');
