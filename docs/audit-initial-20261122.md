@@ -748,7 +748,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 - Nouveau HEAD PR #130 `9722ca99`, draft=true. Tests Node/MySQL #1434, ESLint #485 et ZIP #1136 sont tous success; la recette visuelle responsive a réussi. PR non fusionnée, revue humaine requise.
 - Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
 
-### Branches sans PR — comparaison ciblée 72 (dates/CI non exhaustives)
+### Branches sans PR — comparaison ciblée 82 (dates/CI non exhaustives)
 Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble. Deux comparaisons complémentaires: `feat/enterprise-command-center-20261117` 8/400 (4 fichiers), `feat/enterprise-company-pagination-20261117` 0/359 (behind only).
 
 **Audit/sécurité:**
@@ -781,7 +781,7 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - Aucun paiement réel activé.
 
 ### Sécurité / préservation
-Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 51 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 41 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
 
 
 ### Documentation branch follow-up
@@ -822,3 +822,15 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 - `fix/dashboard-donut-count-20261118`: 3/232, 2 fichiers.
 - `feat/dashboard-reference-layout` et `feat/sunupilot-dashboard-reference`: HEAD partagé `11d55850`, 0/201 behind only.
 - HEADs rafraîchis pour ces 11 noms; aucun run CI non-PR n'est validé sur cette collecte.
+
+
+### Run 7 — dix comparaisons supplémentaires facturation / stock / abonnement / PWA
+- `feat/invoice-stock-warehouse-20261119`: 3/69, 15 fichiers.
+- `feat/invoice-template-gallery-2026-11-15`: 10/653, 3 fichiers; `feat/invoice-template-gallery-2026-11-15-v2`: 0/623 (behind only).
+- `feat/invoice-warehouse-stock-20261119`: 8/73, 6 fichiers; `feat/invoice-warehouse-stock-main-20261119`: 8/69, 6 fichiers.
+- `feat/5-nouveaux-modeles-facture`: 9/610, 6 fichiers.
+- `fix/invoice-settlement-integrity-2026-11-15`: 4/614, 3 fichiers.
+- `fix/subscription-disabled-state-tests-docs-20261117`: 0/336 (behind only).
+- `fix/subscription-icons-main-2026-11-15`: 1/621, 3 fichiers.
+- `fix/sunupilot-pwa-lifecycle`: 0/200 (behind only).
+- HEADs rafraîchis pour ces 10 branches; CI non-PR non vérifiée. Les branches diverged doivent être portées/retestées sélectivement; les behind-only sont candidates obsolètes, pas à supprimer.
