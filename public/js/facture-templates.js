@@ -920,7 +920,7 @@ function createFactureTemplates(helpers) {
     `;
   }
 
-  function taxBreakdownHtml(facture, lignes) {
+  function taxBreakdownHtml(facture, lignes, template = '') {
     if (!Array.isArray(lignes) || lignes.length < 2) return '';
     const subtotal = Math.max(0, Number(facture.sous_total) || 0);
     const discount = Math.min(Math.max(0, Number(facture.remise) || 0), subtotal);
@@ -941,8 +941,9 @@ function createFactureTemplates(helpers) {
         <strong class="mono">${formatMontant(Math.round(values.tax * 100) / 100)}</strong>
       </div>
     `).join('');
+    const variantClass = template === 'platine' ? ' sf-doc-tax-platine' : '';
     return `
-      <section class="sf-doc-tax" aria-label="Détail de la TVA par taux">
+      <section class="sf-doc-tax${variantClass}" aria-label="Détail de la TVA par taux">
         <div class="sf-doc-tax-title">Détail de la TVA par taux</div>
         ${rows}
         <div class="sf-doc-tax-total"><span>Total TVA</span><strong class="mono">${formatMontant(facture.total_tva)}</strong></div>
@@ -1500,7 +1501,7 @@ function createFactureTemplates(helpers) {
       .replace(/<th([^>]*)>Total<\/th>/g, '<th$1>Montant TTC</th>');
 
     const tableEnd = html.indexOf('</table>');
-    const taxBreakdown = taxBreakdownHtml(facture, lignes);
+    const taxBreakdown = taxBreakdownHtml(facture, lignes, template);
     if (taxBreakdown && tableEnd >= 0) {
       const insertAt = tableEnd + '</table>'.length;
       html = html.slice(0, insertAt) + taxBreakdown + html.slice(insertAt);
