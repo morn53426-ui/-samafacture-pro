@@ -65,13 +65,16 @@ describe('Suppression de produit', () => {
     const produit = await request(app)
       .post('/api/produits')
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ nom: 'Produit mouvements historiques', type_catalogue: 'produit', prix_ht: 1000, tva: 0, stock: 5 });
+      .send({ nom: 'Produit mouvements historiques', type_catalogue: 'produit', prix_ht: 1000, tva: 0, stock: 0 });
     assert.equal(produit.status, 201, produit.text);
-    const update = await request(app)
-      .put(`/api/produits/${produit.body.produit.id}`)
-      .set('Authorization', `Bearer ${tokenA}`)
-      .send({ stock: 0 });
-    assert.equal(update.status, 200, update.text);
+
+    for (const variation of [5, -5]) {
+      const movement = await request(app)
+        .post('/api/pro/inventory/adjustments')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ produit_id: produit.body.produit.id, quantite: variation, motif: 'Test historique stock' });
+      assert.equal(movement.status, 200, movement.text);
+    }
 
     const deletion = await request(app)
       .delete(`/api/produits/${produit.body.produit.id}`)
@@ -82,7 +85,11 @@ describe('Suppression de produit', () => {
       'SELECT COUNT(*) AS n FROM pro_mouvements_stock WHERE user_id = ? AND produit_id = ?',
       [userIdA, produit.body.produit.id]
     );
+    const list = await request(app).get('/api/produits').set('Authorization', `Bearer ${tokenA}`);
+    const stored = list.body.produits.find(p => p.id === produit.body.produit.id);
     assert.ok(Number(movement.n) > 0);
+    assert.ok(stored);
+    assert.equal(Number(stored.stock), 0);
   });
 
   test('supprimer un produit déjà supprimé renvoie 404 (pas de double suppression silencieuse)', async () => {
