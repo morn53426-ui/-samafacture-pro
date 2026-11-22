@@ -785,4 +785,4 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 
 
 ### Documentation branch follow-up
-- PR #132 latest head at this update: `ec5fc22ae39efb77f377db787888fdbd1a220d2a` (inventory header updated to mark main CI/ruleset as not freshly reverified; count correction included). The workflow query for this head returned no runs. Previous tests #1433 and ZIP #1135 were green on an earlier audit head; they do not validate the latest documentation commits.
+- PR #132 branch head before this addendum was `ec5fc22ae39efb77f377db787888fdbd1a220d2a`; this addendum is the new head `a3c848d7d826abdcbcb194913415786b9035dd50`. Status and workflow-run queries for `a3c848d7` returned no items. Previous tests #1433 and ZIP #1135 were green on an earlier audit head; they do not validate the latest documentation commits.
