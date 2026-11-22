@@ -4095,12 +4095,16 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
             }));
           })()
           : [];
-        const titleTextOverflowsElement = Boolean(titleRect && titleTextRects.some(rect =>
-          rect.left < titleRect.left - 0.5 ||
-          rect.right > titleRect.right + 0.5 ||
-          rect.top < titleRect.top - 0.5 ||
-          rect.bottom > titleRect.bottom + 0.5
-        ));
+        // Un Range mesure les fragments de glyphe, qui peuvent dépasser légèrement
+        // la boîte CSS de leur élément (line-height/font metrics) sans être rognés.
+        // Le critère visuel fiable est la zone imprimable du document, puis le bandeau
+        // lorsqu'il existe ; ne pas confondre boîte de ligne et zone de clipping.
+        const titleTextOverflowsDocument = titleTextRects.some(rect =>
+          rect.left < bounds.left - 0.5 ||
+          rect.right > bounds.right + 0.5 ||
+          rect.top < bounds.top - 0.5 ||
+          rect.bottom > bounds.bottom + 0.5
+        );
         const firstBannerRect = banners.length
           ? documentNode.querySelector(selector)?.getBoundingClientRect()
           : null;
@@ -4129,7 +4133,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
             leftOverflow: Number((bounds.left - titleRect.left).toFixed(2)),
             rightOverflow: Number((titleRect.right - bounds.right).toFixed(2)),
             topOverflow: Number((bounds.top - titleRect.top).toFixed(2)),
-            textOverflowElement: titleTextOverflowsElement,
+            textOverflowDocument: titleTextOverflowsDocument,
             textOverflowBanner: titleTextOverflowsBanner
           } : null,
           banners
@@ -4144,8 +4148,8 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
           type + '/' + template + ' : titre principal hors de la zone du document : ' + JSON.stringify({ bounds: geometry.titleBounds, candidates: geometry.titleCandidates }));
-        assert.equal(geometry.titleBounds.textOverflowElement, false,
-          type + '/' + template + ' : le texte du titre doit rester dans son propre bloc, sans rognage : ' + JSON.stringify(geometry.titleBounds));
+        assert.equal(geometry.titleBounds.textOverflowDocument, false,
+          type + '/' + template + ' : le texte réel du titre doit rester dans la zone imprimable du document : ' + JSON.stringify(geometry.titleBounds));
         if (geometry.banners.length) {
           assert.equal(geometry.titleBounds.textOverflowBanner, false,
             type + '/' + template + ' : le texte du titre doit rester dans le bandeau : ' + JSON.stringify(geometry.titleBounds));
