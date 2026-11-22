@@ -748,8 +748,8 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 - Nouveau HEAD PR #130 `9722ca99`, mergeable=true, draft=true. Run #1434 Tests in_progress, #485 ESLint in_progress, #1136 ZIP success. Validation visuelle encore attendue.
 - Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
 
-### Branches sans PR — comparaison ciblée 30 (dates/CI non exhaustives)
-Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble.
+### Branches sans PR — comparaison ciblée 32 (dates/CI non exhaustives)
+Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble. Deux comparaisons complémentaires: `feat/enterprise-command-center-20261117` 8/400 (4 fichiers), `feat/enterprise-company-pagination-20261117` 0/359 (behind only).
 
 **Audit/sécurité:**
 - `audit/fix-backup-and-runtime-20261110`: 126/774, 41 fichiers; `audit/fix-enterprise-migration-invitation-20261116`: 14/585, 12 fichiers; `audit/fix-nginx-upstream-order-20261116`: 2/587, 2 fichiers; `audit/fix-realtime-company-groups-20261116-run1`: 3/585, 2 fichiers.
