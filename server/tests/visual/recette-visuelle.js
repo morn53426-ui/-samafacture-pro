@@ -4159,6 +4159,18 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
             const footer = style('.sf-platine-footer');
             const extras = style('.sf-doc-extras-platine');
             const acceptance = style('.sf-doc-extras-platine .sf-acceptance-panel');
+            const acceptanceCopy = style('.sf-doc-extras-platine .sf-acceptance-copy');
+            const acceptanceGrid = style('.sf-doc-extras-platine .sf-acceptance-grid');
+            const signField = style('.sf-doc-extras-platine .sf-sign-field');
+            const signLine = style('.sf-doc-extras-platine .sf-sign-line');
+            const tax = style('.sf-doc-tax');
+            const taxRow = style('.sf-doc-tax-row');
+            const taxTotal = style('.sf-doc-tax-total');
+            const totalRow = style('.sf-platine-totals .sf-total-row');
+            const grandTotal = style('.sf-platine-totals .sf-total-row.sf-total-grand');
+            const qr = style('.sf-platine-verification img[alt="QR code de vérification"]');
+            const stamp = style('.sf-platine-verification .stamp');
+            const extraPanel = style('.sf-doc-extras-platine .sf-extra-panel:not(.sf-acceptance-panel)');
             return {
               headerPaddingBottom: header?.paddingBottom || null,
               headerMarginBottom: header?.marginBottom || null,
@@ -4170,8 +4182,21 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
               tablePaddingBottom: tableCell?.paddingBottom || null,
               totalsMarginTop: totals?.marginTop || null,
               footerMarginTop: footer?.marginTop || null,
+              qrWidth: qr?.width || null,
+              stampWidth: stamp?.width || null,
+              taxMarginTop: tax?.marginTop || null,
+              taxPaddingTop: tax?.paddingTop || null,
+              taxRowPaddingTop: taxRow?.paddingTop || null,
+              taxTotalPaddingTop: taxTotal?.paddingTop || null,
+              totalRowPaddingTop: totalRow?.paddingTop || null,
+              grandTotalPaddingTop: grandTotal?.paddingTop || null,
               extrasMarginTop: extras?.marginTop || null,
-              acceptancePaddingTop: acceptance?.paddingTop || null
+              extraPanelPaddingTop: extraPanel?.paddingTop || null,
+              acceptancePaddingTop: acceptance?.paddingTop || null,
+              acceptanceCopyMarginBottom: acceptanceCopy?.marginBottom || null,
+              acceptanceGridGap: acceptanceGrid?.rowGap || acceptanceGrid?.gap || null,
+              signFieldGap: signField?.rowGap || signField?.gap || null,
+              signLineHeight: signLine?.height || null
             };
           })(),
           techPrintMetrics: (() => {
@@ -4288,14 +4313,27 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         assert.equal(metrics.docMetaPaddingTop, '7px', type + '/platine : padding des références documentaires.');
         assert.equal(metrics.tableFontSize, '12px', type + '/platine : conserver une typographie de tableau à 9 pt.');
         assert.equal(metrics.tableLineHeight, '13.8px', type + '/platine : interligne A4 compact mais lisible.');
-        assert.equal(metrics.tablePaddingTop, '2px', type + '/platine : padding supérieur compact des lignes.');
-        assert.equal(metrics.tablePaddingBottom, '2px', type + '/platine : padding inférieur compact des lignes.');
-        assert.equal(metrics.totalsMarginTop, '12px', type + '/platine : marge du bloc des totaux.');
-        assert.equal(metrics.footerMarginTop, '16px', type + '/platine : marge du bloc QR et signature.');
-        assert.equal(metrics.extrasMarginTop, '10px', type + '/platine : marge des compléments.');
+        assert.equal(metrics.tablePaddingTop, '1px', type + '/platine : padding supérieur compact des lignes.');
+        assert.equal(metrics.tablePaddingBottom, '1px', type + '/platine : padding inférieur compact des lignes.');
+        assert.equal(metrics.totalsMarginTop, '8px', type + '/platine : marge du bloc des totaux.');
+        assert.equal(metrics.footerMarginTop, '8px', type + '/platine : marge du bloc QR et signature.');
+        assert.equal(metrics.extrasMarginTop, '6px', type + '/platine : marge des compléments.');
+        assert.equal(metrics.qrWidth, '52px', type + '/platine : QR réduit sans retirer le code.');
+        assert.equal(metrics.stampWidth, '56px', type + '/platine : cachet conservé et compact.');
+        assert.equal(metrics.taxMarginTop, '8px', type + '/platine : marge du bloc TVA.');
+        assert.equal(metrics.taxPaddingTop, '8px', type + '/platine : padding du bloc TVA.');
+        assert.equal(metrics.taxRowPaddingTop, '2px', type + '/platine : espacement des lignes de TVA.');
+        assert.equal(metrics.taxTotalPaddingTop, '5px', type + '/platine : séparation du total TVA.');
+        assert.equal(metrics.totalRowPaddingTop, '4px', type + '/platine : espacement des lignes de totaux.');
+        assert.equal(metrics.grandTotalPaddingTop, '7px', type + '/platine : hiérarchie du total TTC conservée.');
+        assert.equal(metrics.extraPanelPaddingTop, '8px', type + '/platine : panneau de conditions compact.');
         if (type === 'devis') {
-          assert.equal(metrics.acceptancePaddingTop, '8px', type + '/platine : panneau d’acceptation compact.');
-        } else {
+          assert.equal(metrics.acceptanceCopyMarginBottom, '6px', type + '/platine : respiration du texte d’acceptation.');
+          assert.equal(metrics.acceptanceGridGap, '10px', type + '/platine : champs d’acceptation alignés.');
+          assert.equal(metrics.signFieldGap, '10px', type + '/platine : espace des libellés de signature.');
+          assert.equal(metrics.signLineHeight, '18px', type + '/platine : lignes de signature conservées.');
+        }
+        if (type !== 'devis') {
           assert.equal(metrics.acceptancePaddingTop, null, 'facture/platine : aucun panneau d’acceptation de devis ne doit être rendu.');
         }
       }
