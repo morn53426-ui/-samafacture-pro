@@ -22,6 +22,7 @@ on:
       - 'server/tests/facture-pdf.test.js'
       - 'server/config/backup.js'
       - 'server/tests/restore-backup-roundtrip.test.js'
+      - 'server/tests/auth.test.js'
       - 'server/tests/paiements.test.js'
       - '.github/workflows/lint.yml'
   push:
@@ -79,4 +80,5 @@ jobs:
           server/tests/facture-pdf.test.js
           server/config/backup.js
           server/tests/restore-backup-roundtrip.test.js
+          server/tests/auth.test.js
           server/tests/paiements.test.js
