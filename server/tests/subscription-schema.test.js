@@ -40,16 +40,16 @@ test('la migration v15 crée les huit tables du moteur SaaS', async () => {
   assert.deepEqual(actual, [...EXPECTED_TABLES].sort());
 });
 
-test('la base de test annonce la version de schéma 22 après migration', async () => {
+test('la base de test annonce la version de schéma 23 après migration', async () => {
   const [[meta]] = await pool.query(
     'SELECT version FROM _samafacture_schema_meta WHERE id = 1'
   );
   assert.ok(meta);
-  assert.equal(Number(meta.version), 22);
+  assert.equal(Number(meta.version), 23);
 });
 
 
-test('la version 22 expose comptabilité et essai sans activer de paiement ni créer d’essai rétroactif', async () => {
+test('la version 23 expose comptabilité et essai avec les affectations de dépenses sans activer de paiement ni créer d’essai rétroactif', async () => {
   const [trialColumns] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
@@ -73,6 +73,11 @@ test('la version 22 expose comptabilité et essai sans activer de paiement ni cr
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'`
   );
   assert.equal(eventTable.length, 1, 'la table des événements comptables doit exister');
+  const [expenseMappingsTable] = await pool.query(
+    `SELECT TABLE_NAME FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_affectations_depenses'`
+  );
+  assert.equal(expenseMappingsTable.length, 1, 'la table des affectations de charges doit exister');
 });
 
 test('la fondation du moteur est vide : aucun prix publié, abonnement, mandat ou débit créé', async () => {

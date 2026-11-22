@@ -50,6 +50,14 @@ async function safeDateForUser(value, userId) {
   );
   return localDateString(accounts?.[0]?.fuseau_horaire || 'Africa/Dakar');
 }
+function normalizeExpenseCategoryMapping(value) {
+  const raw = String(value == null ? '' : value).trim();
+  if (raw === '__sans_categorie__') return { key: raw, label: 'Sans catégorie' };
+  const label = raw.normalize('NFKC').replace(/\s+/g, ' ');
+  if (!label || label.length > 100) return null;
+  return { key: label.toLocaleLowerCase('fr'), label };
+}
+
 function optionalText(value, maxLength) {
   if (value === undefined || value === null) return null;
   return String(value).trim().slice(0, maxLength) || null;
@@ -3191,6 +3199,79 @@ router.get('/accounting/config', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/accounting/expense-mappings', async (req, res, next) => {
+  try {
+    await ensureAccountingDefaults(owner(req));
+    const [rows] = await pool.query(
+      `SELECT m.id, m.categorie_key, m.categorie_label, m.compte_id,
+              c.code AS compte_code, c.libelle AS compte_libelle,
+              c.classe AS compte_classe, c.actif AS compte_actif
+       FROM pro_compta_affectations_depenses m
+       JOIN pro_compta_comptes c ON c.id = m.compte_id
+       WHERE m.user_id = ? ORDER BY m.categorie_label`,
+      [owner(req)]
+    );
+    res.json({ affectations: rows });
+  } catch (err) { next(err); }
+});
+
+router.put('/accounting/expense-mappings', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const mapping = normalizeExpenseCategoryMapping(req.body.categorie);
+    const accountCode = String(req.body.compte_code || '').trim();
+    if (!mapping || !/^\d{1,20}$/.test(accountCode)) {
+      return res.status(400).json({ error: 'Indiquez une catégorie valide et un compte de charges.' });
+    }
+
+    await ensureAccountingDefaults(uid);
+    const [accounts] = await pool.query(
+      'SELECT id, code, libelle FROM pro_compta_comptes WHERE user_id = ? AND code = ? AND classe = 6 AND actif = 1 LIMIT 1',
+      [uid, accountCode]
+    );
+    if (!accounts.length) {
+      return res.status(400).json({
+        error: 'Le compte sélectionné doit être actif, appartenir à cette entreprise et relever de la classe 6.',
+        code: 'COMPTE_CHARGES_INVALIDE'
+      });
+    }
+
+    await pool.query(
+      `INSERT INTO pro_compta_affectations_depenses (user_id, categorie_key, categorie_label, compte_id)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE categorie_label = VALUES(categorie_label),
+                               compte_id = VALUES(compte_id)`,
+      [uid, mapping.key, mapping.label, accounts[0].id]
+    );
+    const [[saved]] = await pool.query(
+      `SELECT m.id, m.categorie_key, m.categorie_label, m.compte_id,
+              c.code AS compte_code, c.libelle AS compte_libelle,
+              c.classe AS compte_classe, c.actif AS compte_actif
+       FROM pro_compta_affectations_depenses m
+       JOIN pro_compta_comptes c ON c.id = m.compte_id
+       WHERE m.user_id = ? AND m.categorie_key = ? LIMIT 1`,
+      [uid, mapping.key]
+    );
+    await audit(req, 'comptabilite.affectation_depense_modifiee', 'affectation_depense', saved.id, {
+      categorie: mapping.label, compte_code: saved.compte_code
+    });
+    res.json({ affectation: saved });
+  } catch (err) { next(err); }
+});
+
+router.delete('/accounting/expense-mappings/:id', async (req, res, next) => {
+  try {
+    if (!idOk(req.params.id)) return res.status(400).json({ error: 'Identifiant d’affectation invalide.' });
+    const [result] = await pool.query(
+      'DELETE FROM pro_compta_affectations_depenses WHERE id = ? AND user_id = ?',
+      [req.params.id, owner(req)]
+    );
+    if (!result.affectedRows) return res.status(404).json({ error: 'Affectation introuvable.' });
+    await audit(req, 'comptabilite.affectation_depense_supprimee', 'affectation_depense', req.params.id);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 router.post('/accounting/accounts', async (req, res, next) => {
   try {
     const code = String(req.body.code || '').trim().slice(0,20), libelle = String(req.body.libelle || '').trim().slice(0,190);
@@ -3419,6 +3500,40 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
       await conn.rollback();
       return res.status(409).json({ error: 'Le montant de la dépense doit être positif avant comptabilisation.' });
     }
+
+    // Un rejeu doit rester idempotent même si l'affectation a été retirée depuis le premier posting.
+    const [existingEntries] = await conn.query(
+      "SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE",
+      [uid, expense.id]
+    );
+    if (existingEntries.length) {
+      await conn.commit();
+      return res.status(200).json({
+        id: existingEntries[0].id,
+        numero: existingEntries[0].numero,
+        duplicate: true
+      });
+    }
+
+    const categoryMapping = normalizeExpenseCategoryMapping(expense.categorie);
+    const [mappingRows] = await conn.query(
+      `SELECT c.code AS compte_code
+       FROM pro_compta_affectations_depenses m
+       JOIN pro_compta_comptes c ON c.id = m.compte_id AND c.user_id = m.user_id
+       WHERE m.user_id = ? AND m.categorie_key = ?
+         AND c.classe = 6 AND c.actif = 1
+       LIMIT 1 FOR UPDATE`,
+      [uid, categoryMapping ? categoryMapping.key : '__sans_categorie__']
+    );
+    if (!mappingRows.length) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Aucun compte de charges actif n’est associé à cette catégorie. Configurez son affectation dans Comptabilité OHADA avant de comptabiliser la dépense.',
+        code: 'AFFECTATION_COMPTABLE_DEPENSE_MANQUANTE',
+        categorie: categoryMapping ? categoryMapping.label : 'Sans catégorie'
+      });
+    }
+
     const bank = expense.mode_reglement === 'banque';
     const result = await postSystemEntry(
       uid,
@@ -3429,7 +3544,7 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
       'Dépense ' + expense.libelle,
       bank ? 'BQ' : 'CA',
       [
-        { code: '622', libelle: expense.categorie || expense.libelle, debit: amount, credit: 0 },
+        { code: mappingRows[0].compte_code, libelle: expense.categorie || expense.libelle, debit: amount, credit: 0 },
         { code: bank ? '521' : '571', libelle: bank ? 'Règlement bancaire dépense' : 'Règlement caisse dépense', debit: 0, credit: amount }
       ],
       conn

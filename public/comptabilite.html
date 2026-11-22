@@ -12,6 +12,7 @@
   <div class="page-header workspace-page-header"><div><div class="pro-eyebrow">PILOTAGE FINANCIER</div><h1>Comptabilité OHADA</h1><p>Journaux, écritures en partie double, balance générale et grand livre.</p></div></div>
   <nav class="workspace-section-nav" aria-label="Accès rapides à la comptabilité">
     <a href="#accounting-accounts">Plan de comptes</a>
+    <a href="#accounting-expense-mappings">Affectations des dépenses</a>
     <a href="#accounting-entry">Saisir une écriture</a>
     <a href="#accounting-guided">Comptabilisation guidée</a>
     <a href="#accounting-balance">Balance générale</a>
@@ -36,6 +37,19 @@
     <p class="pro-note" style="margin-top:12px">Le plan préchargé est un socle de démarrage simplifié inspiré du SYSCOHADA. Faites valider les comptes et leur paramétrage par votre expert-comptable avant de produire des états réglementaires.</p>
   </section>
 
+  <section class="card" style="margin-bottom:20px" id="accounting-expense-mappings">
+    <div class="page-header" style="margin-bottom:12px"><div><h2 style="margin:0">Affectation des dépenses</h2><p class="pro-note">Associez chaque catégorie de dépense à un compte actif de classe 6. Les dépenses sans catégorie disposent d’une affectation dédiée.</p></div></div>
+    <form id="expense-mapping-form" class="grid grid-3">
+      <div class="field"><label for="expense-mapping-category">Catégorie de dépense *</label><input id="expense-mapping-category" maxlength="100" placeholder="Ex. Loyer, Transport, Fournitures" /></div>
+      <div class="field"><label for="expense-mapping-account">Compte de charges (classe 6) *</label><select id="expense-mapping-account" required><option value="">Choisir un compte…</option></select></div>
+      <div class="field accounting-account-submit"><button class="btn btn-outline" type="submit">Enregistrer l’affectation</button></div>
+      <label class="field accounting-account-check"><span>Affectation pour les dépenses sans catégorie</span><input id="expense-mapping-uncategorized" type="checkbox" /></label>
+    </form>
+    <p class="pro-note">Une dépense non associée à un compte n’est pas comptabilisée automatiquement. Les écritures déjà validées ne sont jamais modifiées par ce paramétrage.</p>
+    <div id="expense-mappings-list" aria-live="polite" style="overflow-x:auto">
+      <table class="data-table" style="width:100%;min-width:560px"><thead><tr><th>Catégorie</th><th>Compte</th><th>État</th><th></th></tr></thead><tbody id="expense-mappings-body"><tr><td colspan="4">Chargement…</td></tr></tbody></table>
+    </div>
+  </section>
   <section class="card" style="margin-bottom:20px" id="accounting-entry">
     <h2 style="margin-top:0">Saisir une écriture</h2>
     <p class="pro-note">Chaque écriture est enregistrée comme validée et devient non modifiable. Vérifiez les montants avant validation. Toute correction doit être passée par une écriture de contrepassation.</p>
@@ -80,7 +94,7 @@
 <script>
 requireAuthPage(); renderSidebar('comptabilite');
 const $ = id => document.getElementById(id);
-let accounts=[], journals=[];
+let accounts=[], journals=[], expenseMappings=[];
 function fmt(v){return formatMontant(Number(v)||0);}
 function addLine(line={}) {
   const row=document.createElement('tr');
@@ -99,12 +113,19 @@ function updateTotals(){
   $('entry-total').textContent='Débit '+fmt(debit)+' · Crédit '+fmt(credit)+' · Écart '+fmt(Math.abs(debit-credit));
 }
 async function loadAccounting(){
-  const [cfg,balance,entries,invoices,payments,expenses]=await Promise.all([
+  const [cfg,balance,entries,invoices,payments,expenses,mappings]=await Promise.all([
     Api.get('/pro/accounting/config'),Api.get('/pro/accounting/trial-balance'),
     Api.get('/pro/accounting/entries'),Api.get('/factures?type=facture'),
-    Api.get('/pro/payments'),Api.get('/depenses')
+    Api.get('/pro/payments'),Api.get('/depenses'),Api.get('/pro/accounting/expense-mappings')
   ]);
-  accounts=cfg.comptes||[]; journals=cfg.journaux||[];
+  accounts=cfg.comptes||[]; journals=cfg.journaux||[]; expenseMappings=mappings.affectations||[];
+  const chargeAccounts=accounts.filter(a=>Number(a.classe)===6 && Number(a.actif)===1);
+  $('expense-mapping-account').innerHTML='<option value="">Choisir un compte…</option>'+chargeAccounts.map(a=>'<option value="'+escapeHtml(a.code)+'">'+escapeHtml(a.code+' · '+a.libelle)+'</option>').join('');
+  $('expense-mappings-body').innerHTML=expenseMappings.map(m=>'<tr><td>'+escapeHtml(m.categorie_label)+'</td><td>'+escapeHtml(m.compte_code+' · '+m.compte_libelle)+'</td><td>'+(Number(m.compte_actif)===1?'Actif':'Compte inactif')+'</td><td><button class="btn btn-sm btn-outline" type="button" data-delete-expense-mapping="'+m.id+'">Retirer</button></td></tr>').join('')||'<tr><td colspan="4">Aucune affectation configurée.</td></tr>';
+  $('expense-mappings-body').querySelectorAll('[data-delete-expense-mapping]').forEach(button=>button.addEventListener('click',async()=>{
+    try{await Api.del('/pro/accounting/expense-mappings/'+button.dataset.deleteExpenseMapping);showToast('Affectation retirée.','success');await loadAccounting();}
+    catch(err){showToast(err.message,'error');}
+  }));
   $('accounts-list').innerHTML=accounts.map(a=>'<tr><td class="mono">'+escapeHtml(a.code)+'</td><td>'+escapeHtml(a.libelle)+'</td><td>Classe '+escapeHtml(String(a.classe))+'</td><td>'+escapeHtml(a.nature==='credit'?'Crédit':'Débit')+'</td><td>'+(a.lettrable?'Oui':'Non')+'</td><td>'+(a.actif?'Actif':'Inactif')+'</td></tr>').join('')||'<tr><td colspan="6">Aucun compte.</td></tr>';
   $('entry-journal').innerHTML=journals.map(j=>'<option value="'+j.id+'">'+escapeHtml(j.code+' · '+j.libelle)+'</option>').join('');
   $('ledger-account').innerHTML=accounts.map(a=>'<option value="'+a.id+'">'+escapeHtml(a.code+' · '+a.libelle)+'</option>').join('');
@@ -117,6 +138,28 @@ async function loadAccounting(){
   $('post-payment').innerHTML='<option value="">Sélectionner</option>'+(payments.paiements||[]).map(p=>'<option value="'+p.id+'">'+escapeHtml(p.numero+' · '+p.client_nom+' · '+p.montant)+'</option>').join('');
   $('post-expense').innerHTML='<option value="">Sélectionner</option>'+(expenses.depenses||[]).map(e=>'<option value="'+e.id+'">'+escapeHtml(e.libelle+' · '+e.montant)+'</option>').join('');
 }
+$('expense-mapping-uncategorized').addEventListener('change',e=>{
+  $('expense-mapping-category').disabled=e.target.checked;
+  if(e.target.checked)$('expense-mapping-category').value='';
+});
+$('expense-mapping-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const uncategorized=$('expense-mapping-uncategorized').checked;
+  const categorie=uncategorized?'__sans_categorie__':$('expense-mapping-category').value.trim();
+  if(!categorie){showToast('Indiquez la catégorie à associer.','error');return;}
+  try{
+    await Api.put('/pro/accounting/expense-mappings',{
+      categorie,
+      compte_code:$('expense-mapping-account').value
+    });
+    $('expense-mapping-category').value='';
+    $('expense-mapping-account').value='';
+    $('expense-mapping-uncategorized').checked=false;
+    $('expense-mapping-category').disabled=false;
+    showToast('Affectation comptable enregistrée.','success');
+    await loadAccounting();
+  }catch(err){showToast(err.message,'error');}
+});
 $('account-form').addEventListener('submit',async e=>{
   e.preventDefault();
   const payload={

@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 22;
+const CURRENT_SCHEMA_VERSION = 23;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -176,6 +176,7 @@ async function runMigrations(conn) {
   // v20 : mode de règlement des dépenses (caisse 571 / banque 521).
   // v21 : état et dates UTC de l'essai gratuit de 15 jours, sans attribution rétroactive.
   // v22 : les événements comptables de facture ne doivent pas être supprimés en cascade par une suppression de facture.
+  // v23 : affectation explicite des catégories de dépenses aux comptes de charges de classe 6.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -499,6 +500,20 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of saasSubscriptionsStatements) {
+    await conn.query(statement);
+  }
+
+  // Affectations de dépenses : migration additive, sans classement rétroactif des dépenses existantes.
+  const expenseMappingsPath = path.join(__dirname, '..', 'database', 'migrations', '012_comptabilite_affectations_depenses.sql');
+  const expenseMappingsSql = fs.readFileSync(expenseMappingsPath, 'utf8');
+  const expenseMappingsStatements = expenseMappingsSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of expenseMappingsStatements) {
     await conn.query(statement);
   }
 

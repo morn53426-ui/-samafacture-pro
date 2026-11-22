@@ -29,6 +29,7 @@ test('une base en version 7 reçoit la migration du quota sans bloquer les versi
   assert.equal(Number(nonDefaultExpenseModes.total), 0, 'Ne pas supprimer des modes de règlement de test non standards.');
   const [[accountingEventsBefore]] = await pool.query('SELECT COUNT(*) AS total FROM pro_compta_facture_events');
   assert.equal(Number(accountingEventsBefore.total), 0, 'Ne pas supprimer des événements comptables de test existants.');
+  await pool.query('DROP TABLE IF EXISTS pro_compta_affectations_depenses');
   await pool.query('DROP TABLE pro_compta_facture_events');
   await pool.query('ALTER TABLE depenses DROP COLUMN mode_reglement');
   await pool.query('DROP TABLE IF EXISTS facture_usage_mensuelle');
@@ -61,10 +62,10 @@ test('une base en version 7 reçoit la migration du quota sans bloquer les versi
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v22 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v23 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 22, 'une base v7 doit exécuter toute la chaîne de migrations v8 à v22');
+  assert.equal(Number(meta.version), 23, 'une base v7 doit exécuter toute la chaîne de migrations v8 à v23');
 
   const [tables] = await pool.query(
     `SELECT TABLE_NAME FROM information_schema.TABLES
@@ -91,6 +92,11 @@ test('une base en version 7 reçoit la migration du quota sans bloquer les versi
        AND COLUMN_NAME = 'backfill_stock_termine'`
   );
   assert.equal(backfillMarkerAfter.length, 1, 'La migration v18 doit ajouter le marqueur de reprise des stocks.');
+  const [expenseMappingsAfter] = await pool.query(
+    `SELECT TABLE_NAME FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_affectations_depenses'`
+  );
+  assert.equal(expenseMappingsAfter.length, 1, 'La migration v23 doit créer la table des affectations comptables de dépenses.');
 
   const [trialColumnsAfter] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS

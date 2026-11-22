@@ -22,6 +22,15 @@ async function creerFacture({ amount = 1000, tax = 0, quantity = 1, product = fa
   return response.body.facture;
 }
 
+async function configurerAffectationDepense(categorie, compte_code = '622') {
+  const response = await request(app)
+    .put('/api/pro/accounting/expense-mappings')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ categorie, compte_code });
+  assert.equal(response.status, 200, response.text);
+  return response.body.affectation;
+}
+
 before(async () => {
   process.env.DATA_ENCRYPTION_KEY = 'test-encryption-key-phases-2-4-ne-pas-utiliser';
   process.env.APP_URL = 'https://staging.samafacture.invalid';
@@ -398,6 +407,9 @@ test('les dépenses distinguent caisse et banque et deviennent immuables après 
   const postExpense = id => request(app).post('/api/pro/accounting/post-expense/' + id)
     .set('Authorization', 'Bearer ' + token);
 
+  await configurerAffectationDepense('Frais généraux', '622');
+  await configurerAffectationDepense('__sans_categorie__', '622');
+
   const invalidMode = await createExpense({ libelle: 'Mode invalide', montant: 1000, mode_reglement: 'mobile' });
   assert.equal(invalidMode.status, 400);
   assert.equal(invalidMode.body.code, 'MODE_REGLEMENT_INVALIDE');
@@ -673,6 +685,7 @@ test('la comptabilisation des dépenses est équilibrée, idempotente et isolée
   const cashAccount = config.body.comptes.find(account => account.code === '571');
   assert.ok(expenseAccount, 'le compte de charges 622 doit être disponible');
   assert.ok(cashAccount, 'le compte de caisse 571 doit être disponible');
+  await configurerAffectationDepense('Loyer', '622');
 
   const posted = await request(app)
     .post('/api/pro/accounting/post-expense/' + expenseId)

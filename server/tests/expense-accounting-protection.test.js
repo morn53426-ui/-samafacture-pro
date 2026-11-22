@@ -23,6 +23,11 @@ describe('Protection des dépenses comptabilisées', () => {
     userId = registration.body.user.id;
     token = registration.body.token;
     await pool.query("UPDATE users SET plan = 'pro' WHERE id = ?", [userId]);
+    const mapping = await request(app)
+      .put('/api/pro/accounting/expense-mappings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ categorie: 'Bureau', compte_code: '622' });
+    assert.equal(mapping.status, 200, mapping.text);
   });
 
   after(async () => {
