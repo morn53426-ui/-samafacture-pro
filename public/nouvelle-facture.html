@@ -89,8 +89,8 @@
         <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addLigne()">+ Ajouter une ligne</button>
 
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:20px;">
-          <div class="field"><label for="remise">Remise (montant)</label><input type="number" id="remise" value="0" /></div>
-          <div class="field"><label for="frais_livraison">Frais de livraison</label><input type="number" id="frais_livraison" value="0" /></div>
+          <div class="field"><label for="remise">Remise (montant)</label><input type="number" id="remise" value="0" step="0.01" /></div>
+          <div class="field"><label for="frais_livraison">Frais de livraison</label><input type="number" id="frais_livraison" value="0" step="0.01" /></div>
         </div>
         <div class="field"><label for="commentaires">Commentaires</label><textarea id="commentaires" placeholder="Merci pour votre confiance."></textarea></div>
       </div>
@@ -128,6 +128,7 @@
   let clients = [];
   let produits = [];
   let ligneCount = 0;
+  let companyCurrency = (Api.currentUser() || {}).devise || 'FCFA';
 
   document.getElementById('date_emission').value = dateCivileAujourdhui();
 
@@ -169,6 +170,13 @@
     document.querySelectorAll('input[name=doc_type]').forEach(r => r.addEventListener('change', syncDocumentType));
     syncDocumentType();
     const { user } = await Api.get('/auth/me');
+    try {
+      const { parametres } = await Api.get('/pro/localization');
+      companyCurrency = parametres?.devise || user?.devise || companyCurrency;
+    } catch (_) {
+      companyCurrency = user?.devise || companyCurrency;
+    }
+    recalc();
     if (user?.entreprise_conditions_reglement) {
       document.getElementById('conditions_reglement').value = user.entreprise_conditions_reglement;
     }
@@ -205,8 +213,8 @@
       </td>
       <td data-label="Prix unitaire">
         <div class="ligne-mobile-field">
-          <label class="ligne-mobile-label" for="${id}-prix">Prix unitaire en FCFA</label>
-          <input id="${id}-prix" type="number" class="ligne-pu ligne-input-sm" value="0" min="0" step="1" inputmode="decimal" oninput="recalc()" />
+          <label class="ligne-mobile-label" for="${id}-prix">Prix unitaire en ${companyCurrency}</label>
+          <input id="${id}-prix" type="number" class="ligne-pu ligne-input-sm" value="0" min="0" step="0.01" inputmode="decimal" oninput="recalc()" />
         </div>
       </td>
       <td data-label="TVA (%)">
@@ -249,7 +257,7 @@
       const designation = row.querySelector('.ligne-designation').value;
       const produitId = row.querySelector('.ligne-produit').value;
       const total = round2(qte * pu * (1 + tva / 100));
-      row.querySelector('.ligne-total').textContent = formatMontant(total);
+      row.querySelector('.ligne-total').textContent = formatMontant(total, companyCurrency);
       return { produit_id: produitId ? Number(produitId) : null, designation, quantite: qte, prix_unitaire: pu, tva, total_ligne: total };
     });
   }
@@ -271,11 +279,11 @@
 
     const total = round2(sousTotal - remise + totalTva + livraison);
 
-    document.getElementById('rec-sous-total').textContent = formatMontant(sousTotal);
-    document.getElementById('rec-tva').textContent = formatMontant(totalTva);
-    document.getElementById('rec-remise').textContent = '- ' + formatMontant(remise);
-    document.getElementById('rec-livraison').textContent = formatMontant(livraison);
-    document.getElementById('rec-total').textContent = formatMontant(total);
+    document.getElementById('rec-sous-total').textContent = formatMontant(sousTotal, companyCurrency);
+    document.getElementById('rec-tva').textContent = formatMontant(totalTva, companyCurrency);
+    document.getElementById('rec-remise').textContent = '- ' + formatMontant(remise, companyCurrency);
+    document.getElementById('rec-livraison').textContent = formatMontant(livraison, companyCurrency);
+    document.getElementById('rec-total').textContent = formatMontant(total, companyCurrency);
   }
 
   document.getElementById('remise').addEventListener('input', recalc);
