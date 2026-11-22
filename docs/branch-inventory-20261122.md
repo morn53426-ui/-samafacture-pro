@@ -257,3 +257,43 @@ CI main : aucune status/run fraîche retournée run 7; le run 6 rapportait #1296
 |---|---|
 | `ui/augmenter-logo-icones-sidebar` | `63af3d94` |
 | `ui/modern-responsive-polish` | `a2faa30e` |
+
+
+## Run 8 — PR heads et comparaisons fraîches (22 novembre 2026, 10:26 UTC)
+
+Les 146 noms sont identiques au run 7 (pagination 100 + 46 + page terminale vide). Les têtes des PR ouvertes ont été rafraîchies; les SHA des 122 branches sans PR ne sont pas rafraîchis dans ce run et restent ceux du run 7. Les comparaisons ahead/behind ci-dessous sont recalculées contre main actuel, sauf #133 qui est empilée sur #130.
+
+| PR | Head SHA | Ahead/behind | CI observée |
+|---|---|---:|---|
+| #140 | d16c4c54 | 4/0 | tests, lint, ZIP success |
+| #139 | baa9ea6a | 1/0 | tests + ZIP success, lint absent |
+| #138 | 27d5a6c2 | 15/0 | tests, lint, ZIP success |
+| #137 | f2aada8d | 10/0 | tests, lint, ZIP success |
+| #136 | 4e0f2a89 | 5/0 | tests, lint, ZIP success |
+| #135 | 2c7f3cbd | 11/0 | tests, lint, ZIP success |
+| #134 | 52021018 | 3/0 | tests, lint, ZIP success |
+| #133 | 6b3cd9ff | 13/0 vs main; 1/8 vs #130 | aucun run; base #130 |
+| #132 | 97fc9486* | 67/0 | tests + ZIP success sur ce head précédent |
+| #131 | 3d51f0af | 4/0 | tests + ZIP success |
+| #130 | 9722ca99 | 20/0 | tests, lint, ZIP success |
+| #129 | 868027e1 | 9/0 | aucun run retourné |
+| #128 | e3b91dc4 | 39/0 | tests, lint, ZIP success |
+| #127 | 9bfc8aea | 5/0 | tests, lint, ZIP success |
+| #126 | 817b10da | 30/0 | tests + ZIP success, lint absent |
+| #125 | 7d9617d0 | 43/0 | tests, lint, ZIP success |
+| #118 | 29dd7ccc | 42/23 | tests + ZIP success, diverged |
+| #117 | ba756d09 | 47/0 | tests, lint, ZIP success |
+| #115 | 3873c1d1 | 1/23 | tests + ZIP success, diverged |
+| #114 | ff2cae7b | 4/50 | tests + ZIP success, diverged |
+| #110 | 722b5bfc | 15/53 | visual tests failure; lint + ZIP success |
+| #102 | 86aeeb6f | 13/228 | visual tests failure; lint + ZIP success |
+| #99 | 3f70466d | 21/228 | visual tests failure; lint + ZIP success |
+
+* #132 auto-reference: the head changes after these audit documents are committed; use the PR's live head SHA.
+
+### Failures confirmed from current workflow logs
+- #99: dark status badge contrast 3.97:1 (below WCAG AA 4.5:1).
+- #102: native date inputs from/to on Rapports had no visible focus during reverse keyboard traversal.
+- #110: expense red amounts contrast 4.23:1, below 4.5:1.
+### Main CI
+Current main SHA remains 8453ee6d8e633f151523236eecff1bc0e0cf877b. Combined statuses and PR-triggered workflow-run query returned no entries this run; no main CI result is claimed.
