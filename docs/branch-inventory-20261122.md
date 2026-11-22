@@ -2,12 +2,12 @@
 
 Dépôt : `morn53426-ui/-samafacture-pro`  
 Référence : `main`  
-Branches : **146** (noms confirmés run 7) ; **145 SHA enregistrés / 143 uniques** dans l’inventaire (snapshot mixte run 6/run 7, pas un refresh global).  
+Branches : **146** (noms confirmés run 7) ; **145 SHA enregistrés / 143 uniques**, HEADs actualisés pour toutes les refs (la branche d’audit est auto-référente et n’a pas de SHA dans le tableau).  
 PR ouvertes : **23** (têtes et comparaisons rafraîchies run 7). Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
 CI main : aucune status/run fraîche retournée run 7; le run 6 rapportait #1296 réussi (non revalidé). Ruleset `protect main` actif selon run 6 (non revalidé run 7).
 
 
-> Run 7 (09:23 UTC): noms de branches vérifiés (100+46, aucun changement). HEADs mis à jour pour les 22 branches des PR ouvertes et 122 branches non-PR sélectionnées. Les 0 branches restantes sans PR ouverte n'ont pas reçu de comparaison SHA/CI exhaustive run 7. Les dates de dernier commit ne sont pas disponibles via la collecte. PR comparisons fresh: 23.
+> Run 7 (09:23 UTC): noms de branches vérifiés (100+46, aucun changement). HEADs mis à jour pour les 22 branches des PR ouvertes (hors branche auto-référente #132) et les 122 branches sans PR ouverte. Ahead/behind frais pour les 23 PR et les 122 branches non-PR. Les dates de dernier commit ne sont pas disponibles via la collecte; CI non-PR non vérifiée. Couverture des noms et SHA: 146 branches, aucun nom manquant.
 
 > Branches API paginées 100+46. La ligne de cette branche d’audit est auto-référente : son HEAD est le commit de mise à jour du présent inventaire, consultable dans PR #132. Les dates de dernier commit ne sont pas retournées par cette collecte. Ahead/behind a été recalculé pour les 23 PR ouvertes; les branches sans PR n'ont pas toutes été comparées à main. Aucune branche supprimée.
 
