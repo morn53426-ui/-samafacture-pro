@@ -417,6 +417,111 @@ router.post('/payments/:id/refunds', async (req, res, next) => {
   }
 });
 
+async function postRefundAccountingEntry(conn, uid, actorId, payment, invoice, refund, entryDate) {
+  // Garantir qu'un remboursement déclaré réellement effectué possède toujours
+  // l'encaissement d'origine au journal. Les deux mouvements sont dans la même
+  // transaction : impossible de laisser le grand livre dans un état intermédiaire.
+  let [paymentEntries] = await conn.query(
+    `SELECT e.id, e.journal_id, j.code AS journal_code
+     FROM pro_compta_ecritures e
+     JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id
+     WHERE e.user_id = ? AND e.source_type = 'paiement' AND e.source_id = ?
+     LIMIT 1 FOR UPDATE`,
+    [uid, payment.id]
+  );
+  if (!paymentEntries.length) {
+    const bank = /wave|paydunya|orange|carte|virement/i.test(payment.methode || '');
+    await postSystemEntry(
+      uid,
+      actorId,
+      'paiement',
+      payment.id,
+      String(payment.date_paiement || entryDate).slice(0, 10),
+      'Encaissement facture ' + invoice.numero,
+      bank ? 'BQ' : 'CA',
+      [
+        { code: bank ? '521' : '571', libelle: 'Règlement ' + invoice.numero, debit: Number(payment.montant), credit: 0, paiement_id: payment.id, facture_id: invoice.id },
+        { code: '411', libelle: 'Lettrage client ' + invoice.numero, debit: 0, credit: Number(payment.montant), paiement_id: payment.id, facture_id: invoice.id }
+      ],
+      conn
+    );
+    [paymentEntries] = await conn.query(
+      `SELECT e.id, e.journal_id, j.code AS journal_code
+       FROM pro_compta_ecritures e
+       JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id
+       WHERE e.user_id = ? AND e.source_type = 'paiement' AND e.source_id = ?
+       LIMIT 1 FOR UPDATE`,
+      [uid, payment.id]
+    );
+  }
+  const paymentEntry = paymentEntries[0];
+  if (!paymentEntry) throw new Error('Impossible de retrouver l’écriture comptable du paiement d’origine.');
+
+  const [originalLines] = await conn.query(
+    `SELECT c.code, l.debit, l.credit
+     FROM pro_compta_lignes l
+     JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id
+     WHERE l.user_id = ? AND l.ecriture_id = ?
+     ORDER BY l.id`,
+    [uid, paymentEntry.id]
+  );
+  const expectedAmount = Math.round(Number(payment.montant) * 100) / 100;
+  const treasuryLine = originalLines.find(line =>
+    ['521', '571'].includes(String(line.code)) &&
+    Number(line.debit) > 0 && Number(line.credit) === 0
+  );
+  const customerLine = originalLines.find(line =>
+    String(line.code) === '411' &&
+    Number(line.credit) > 0 && Number(line.debit) === 0
+  );
+  if (originalLines.length !== 2 || !treasuryLine || !customerLine ||
+      Math.abs(Number(treasuryLine.debit) - expectedAmount) > 0.01 ||
+      Math.abs(Number(customerLine.credit) - expectedAmount) > 0.01 ||
+      !['BQ', 'CA'].includes(paymentEntry.journal_code)) {
+    const error = new Error('L’écriture d’origine ne présente pas les deux lignes attendues (trésorerie et client). Le remboursement est bloqué pour éviter une contrepassation incorrecte.');
+    error.status = 409;
+    error.code = 'ECRITURE_PAIEMENT_NON_REVERSIBLE';
+    throw error;
+  }
+
+  const refundAmount = Math.round(Number(refund.montant) * 100) / 100;
+  if (!Number.isFinite(refundAmount) || refundAmount <= 0 || refundAmount > expectedAmount + 0.001) {
+    const error = new Error('Le montant du remboursement ne correspond pas à un montant valide du paiement d’origine.');
+    error.status = 409;
+    error.code = 'MONTANT_REMBOURSEMENT_INVALIDE';
+    throw error;
+  }
+
+  return postSystemEntry(
+    uid,
+    actorId,
+    'remboursement',
+    refund.id,
+    entryDate,
+    'Remboursement facture ' + invoice.numero,
+    paymentEntry.journal_code,
+    [
+      {
+        code: customerLine.code,
+        libelle: 'Annulation du lettrage client ' + invoice.numero,
+        debit: refundAmount,
+        credit: 0,
+        paiement_id: payment.id,
+        facture_id: invoice.id
+      },
+      {
+        code: treasuryLine.code,
+        libelle: 'Sortie de trésorerie — remboursement ' + (refund.reference_prestataire || refund.id),
+        debit: 0,
+        credit: refundAmount,
+        paiement_id: payment.id,
+        facture_id: invoice.id
+      }
+    ],
+    conn
+  );
+}
+
 router.put('/refunds/:id/status', async (req, res, next) => {
   let conn;
   try {
@@ -467,6 +572,9 @@ router.put('/refunds/:id/status', async (req, res, next) => {
         [owner(req)]
       );
       const today = localDateString(accountRows?.[0]?.fuseau_horaire || 'Africa/Dakar');
+      // Enregistrer la sortie de trésorerie dans le même journal et le même compte
+      // que l'encaissement initial, avant d'affirmer que le remboursement est effectué.
+      await postRefundAccountingEntry(conn, owner(req), actor(req), payment, invoice, refund, today);
       const newInvoiceStatus = invoice.statut === 'annulee'
         ? 'annulee'
         : (remainingPaid + 0.001 >= Number(invoice.total)
@@ -487,6 +595,9 @@ router.put('/refunds/:id/status', async (req, res, next) => {
     res.json({ success: true, statut, solde_facture_ajuste: statut === 'rembourse' });
   } catch (err) {
     if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (err?.status === 409 && err.code) {
+      return res.status(409).json({ error: err.message, code: err.code });
+    }
     next(err);
   } finally {
     if (conn) conn.release();
@@ -2921,16 +3032,16 @@ const OHADA_STARTER_ACCOUNTS = [
   ['706','Services vendus',7,'credit',0],['707','Produits accessoires',7,'credit',0],['758','Produits divers',7,'credit',0]
 ];
 
-async function ensureAccountingDefaults(uid) {
+async function ensureAccountingDefaults(uid, conn = pool) {
   for (const [code, label, classe, nature, lettrable] of OHADA_STARTER_ACCOUNTS) {
-    await pool.query(
+    await conn.query(
       'INSERT IGNORE INTO pro_compta_comptes (user_id, code, libelle, classe, nature, lettrable) VALUES (?, ?, ?, ?, ?, ?)',
       [uid, code, label, classe, nature, lettrable]
     );
   }
   const journals = [['VE','Ventes','vente'],['AC','Achats','achat'],['BQ','Banque','banque'],['CA','Caisse','caisse'],['OD','Opérations diverses','od']];
   for (const [code, label, type] of journals) {
-    await pool.query('INSERT IGNORE INTO pro_compta_journaux (user_id, code, libelle, type) VALUES (?, ?, ?, ?)', [uid, code, label, type]);
+    await conn.query('INSERT IGNORE INTO pro_compta_journaux (user_id, code, libelle, type) VALUES (?, ?, ?, ?)', [uid, code, label, type]);
   }
 }
 
@@ -2946,21 +3057,35 @@ async function journalId(uid, code, conn = pool) {
   return Number(rows[0].id);
 }
 
-async function postSystemEntry(uid, actorId, sourceType, sourceId, date, label, journalCode, lines) {
-  await ensureAccountingDefaults(uid);
-  const conn = await pool.getConnection();
+async function postSystemEntry(uid, actorId, sourceType, sourceId, date, label, journalCode, lines, existingConnection = null) {
+  const ownsConnection = !existingConnection;
+  const conn = existingConnection || await pool.getConnection();
   try {
-    await conn.beginTransaction();
-    const [existing] = await conn.query('SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = ? AND source_id = ? LIMIT 1 FOR UPDATE', [uid, sourceType, sourceId]);
-    if (existing.length) { await conn.commit(); return { id: existing[0].id, numero: existing[0].numero, duplicate: true }; }
+    await ensureAccountingDefaults(uid, conn);
+    if (ownsConnection) await conn.beginTransaction();
+
+    const [existing] = await conn.query(
+      'SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = ? AND source_id = ? LIMIT 1 FOR UPDATE',
+      [uid, sourceType, sourceId]
+    );
+    if (existing.length) {
+      if (ownsConnection) await conn.commit();
+      return { id: existing[0].id, numero: existing[0].numero, duplicate: true };
+    }
+
     const journal = await journalId(uid, journalCode, conn);
     let debit = 0, credit = 0;
     for (const line of lines) {
-      if (line.debit < 0 || line.credit < 0 || (line.debit > 0 && line.credit > 0) || (!line.debit && !line.credit)) throw new Error('Ligne comptable invalide.');
-      debit += line.debit; credit += line.credit;
+      if (line.debit < 0 || line.credit < 0 || (line.debit > 0 && line.credit > 0) || (!line.debit && !line.credit)) {
+        throw new Error('Ligne comptable invalide.');
+      }
+      debit += line.debit;
+      credit += line.credit;
     }
-    debit = Math.round(debit * 100) / 100; credit = Math.round(credit * 100) / 100;
+    debit = Math.round(debit * 100) / 100;
+    credit = Math.round(credit * 100) / 100;
     if (Math.abs(debit - credit) > 0.01) throw new Error('Écriture déséquilibrée.');
+
     const numero = randomRef('ECR');
     const [entry] = await conn.query(
       "INSERT INTO pro_compta_ecritures (user_id, journal_id, numero, date_ecriture, reference, libelle, source_type, source_id, statut, total_debit, total_credit, acteur_user_id, validee_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'validee', ?, ?, ?, NOW())",
@@ -2973,16 +3098,22 @@ async function postSystemEntry(uid, actorId, sourceType, sourceId, date, label, 
         [uid, entry.insertId, account, line.libelle || label, line.debit || 0, line.credit || 0, line.tiers || null, line.facture_id || null, line.paiement_id || null]
       );
     }
-    await conn.commit();
+    if (ownsConnection) await conn.commit();
     return { id: entry.insertId, numero, duplicate: false };
   } catch (err) {
-    await conn.rollback();
+    if (ownsConnection) await conn.rollback().catch(() => {});
     if (err.code === 'ER_DUP_ENTRY') {
-      const [rows] = await pool.query('SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = ? AND source_id = ? LIMIT 1', [uid, sourceType, sourceId]);
+      const lookup = ownsConnection ? pool : conn;
+      const [rows] = await lookup.query(
+        'SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = ? AND source_id = ? LIMIT 1',
+        [uid, sourceType, sourceId]
+      );
       if (rows.length) return { id: rows[0].id, numero: rows[0].numero, duplicate: true };
     }
     throw err;
-  } finally { conn.release(); }
+  } finally {
+    if (ownsConnection) conn.release();
+  }
 }
 
 router.get('/accounting/config', async (req, res, next) => {
@@ -3109,48 +3240,135 @@ router.get('/accounting/ledger', async (req, res, next) => {
 });
 
 router.post('/accounting/post-invoice/:id', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req);
-    const [rows] = await pool.query("SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'facture' AND statut <> 'annulee'", [req.params.id, uid]);
+    // Sérialiser l'enregistrement comptable avec une éventuelle annulation/réactivation :
+    // le statut ne peut pas basculer pendant que la première écriture est créée.
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      "SELECT * FROM factures WHERE id = ? AND user_id = ? AND type = 'facture' AND statut <> 'annulee' FOR UPDATE",
+      [req.params.id, uid]
+    );
     const invoice = rows[0];
-    if (!invoice) return res.status(404).json({ error: 'Facture non trouvée ou annulée.' });
+    if (!invoice) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture non trouvée ou annulée.' });
+    }
     const netSales = Math.round((Number(invoice.total) - Number(invoice.total_tva)) * 100) / 100;
     const lines = [{ code: '411', libelle: 'Client ' + invoice.id, debit: Number(invoice.total), credit: 0, facture_id: invoice.id }];
     if (netSales > 0) lines.push({ code: '706', libelle: 'Vente facture ' + invoice.numero, debit: 0, credit: netSales, facture_id: invoice.id });
     if (Number(invoice.total_tva) > 0) lines.push({ code: '443', libelle: 'TVA facture ' + invoice.numero, debit: 0, credit: Number(invoice.total_tva), facture_id: invoice.id });
-    const result = await postSystemEntry(uid, actor(req), 'facture', invoice.id, invoice.date_emission, 'Comptabilisation facture ' + invoice.numero, 'VE', lines);
+    const result = await postSystemEntry(uid, actor(req), 'facture', invoice.id, invoice.date_emission, 'Comptabilisation facture ' + invoice.numero, 'VE', lines, conn);
+    await conn.commit();
     res.status(result.duplicate ? 200 : 201).json(result);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.post('/accounting/post-payment/:id', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req);
-    const [rows] = await pool.query('SELECT p.*, f.numero FROM paiements p JOIN factures f ON f.id = p.facture_id WHERE p.id = ? AND p.user_id = ? AND f.user_id = ?', [req.params.id, uid, uid]);
+    // Le même verrou paiement est utilisé par le traitement des remboursements :
+    // les deux opérations ne peuvent pas créer des écritures concurrentes divergentes.
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      'SELECT * FROM paiements WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, uid]
+    );
     const payment = rows[0];
-    if (!payment) return res.status(404).json({ error: 'Paiement introuvable.' });
+    if (!payment) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Paiement introuvable.' });
+    }
+    // Lire le numéro de facture sans verrouiller celle-ci : le traitement du
+    // remboursement suit le même ordre de verrous (paiement, puis facture).
+    const [invoiceRows] = await conn.query(
+      'SELECT numero FROM factures WHERE id = ? AND user_id = ? LIMIT 1',
+      [payment.facture_id, uid]
+    );
+    if (!invoiceRows.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Facture du paiement introuvable.' });
+    }
+    const invoiceNumber = invoiceRows[0].numero;
     const bank = /wave|paydunya|orange|carte|virement/i.test(payment.methode || '');
-    const result = await postSystemEntry(uid, actor(req), 'paiement', payment.id, String(payment.date_paiement).slice(0,10), 'Encaissement facture ' + payment.numero, bank ? 'BQ' : 'CA', [
-      { code: bank ? '521' : '571', libelle: 'Règlement ' + payment.numero, debit: Number(payment.montant), credit: 0, paiement_id: payment.id },
-      { code: '411', libelle: 'Lettrage client ' + payment.numero, debit: 0, credit: Number(payment.montant), paiement_id: payment.id }
-    ]);
+    const result = await postSystemEntry(
+      uid,
+      actor(req),
+      'paiement',
+      payment.id,
+      String(payment.date_paiement).slice(0, 10),
+      'Encaissement facture ' + invoiceNumber,
+      bank ? 'BQ' : 'CA',
+      [
+        { code: bank ? '521' : '571', libelle: 'Règlement ' + invoiceNumber, debit: Number(payment.montant), credit: 0, paiement_id: payment.id },
+        { code: '411', libelle: 'Lettrage client ' + invoiceNumber, debit: 0, credit: Number(payment.montant), paiement_id: payment.id }
+      ],
+      conn
+    );
+    await conn.commit();
     res.status(result.duplicate ? 200 : 201).json(result);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.post('/accounting/post-expense/:id', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req);
-    const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [req.params.id, uid]);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    // Le verrou commun avec PUT/DELETE empêche une modification concurrente
+    // entre la lecture du mode de règlement et la création de l'écriture.
+    const [rows] = await conn.query(
+      'SELECT * FROM depenses WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, uid]
+    );
     const expense = rows[0];
-    if (!expense) return res.status(404).json({ error: 'Dépense introuvable.' });
+    if (!expense) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Dépense introuvable.' });
+    }
     const amount = Number(expense.montant);
-    const result = await postSystemEntry(uid, actor(req), 'depense', expense.id, expense.date_depense, 'Dépense ' + expense.libelle, 'CA', [
-      { code: '622', libelle: expense.categorie || expense.libelle, debit: amount, credit: 0 },
-      { code: '571', libelle: 'Règlement dépense', debit: 0, credit: amount }
-    ]);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Le montant de la dépense doit être positif avant comptabilisation.' });
+    }
+    const bank = expense.mode_reglement === 'banque';
+    const result = await postSystemEntry(
+      uid,
+      actor(req),
+      'depense',
+      expense.id,
+      expense.date_depense,
+      'Dépense ' + expense.libelle,
+      bank ? 'BQ' : 'CA',
+      [
+        { code: '622', libelle: expense.categorie || expense.libelle, debit: amount, credit: 0 },
+        { code: bank ? '521' : '571', libelle: bank ? 'Règlement bancaire dépense' : 'Règlement caisse dépense', debit: 0, credit: amount }
+      ],
+      conn
+    );
+    await conn.commit();
     res.status(result.duplicate ? 200 : 201).json(result);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 
