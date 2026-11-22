@@ -4090,28 +4090,49 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         // lorsqu'un ancêtre applique réellement un overflow qui peut masquer le texte.
         const clippingOverflow = [];
         let ancestor = titleElement;
-        while (ancestor) {
+        while (ancestor && titleRect) {
           const style = getComputedStyle(ancestor);
           const clipsX = ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowX);
           const clipsY = ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowY);
-          if (clipsX && ancestor.scrollWidth > ancestor.clientWidth + 1) {
+          const ancestorRect = ancestor.getBoundingClientRect();
+          // clientLeft/clientTop et clientWidth/clientHeight expriment la boîte
+          // réellement visible (hors bordures et barres de défilement). Recaler
+          // ces mesures sur getBoundingClientRect pour tenir compte des transforms.
+          const scaleX = ancestor.offsetWidth > 0 ? ancestorRect.width / ancestor.offsetWidth : 1;
+          const scaleY = ancestor.offsetHeight > 0 ? ancestorRect.height / ancestor.offsetHeight : 1;
+          const clipLeft = ancestorRect.left + ancestor.clientLeft * scaleX;
+          const clipRight = clipLeft + ancestor.clientWidth * scaleX;
+          const clipTop = ancestorRect.top + ancestor.clientTop * scaleY;
+          const clipBottom = clipTop + ancestor.clientHeight * scaleY;
+          const titleOutsideX = titleRect.left < clipLeft - 0.5 || titleRect.right > clipRight + 0.5;
+          const titleOutsideY = titleRect.top < clipTop - 0.5 || titleRect.bottom > clipBottom + 0.5;
+          // Pour le titre lui-même, scrollWidth/Height détecte un texte coupé
+          // à l'intérieur de sa propre boîte. Pour les parents, on ne signale un
+          // overflow que si la boîte du titre franchit vraiment leur zone visible.
+          const ownTextOverflowX = ancestor === titleElement &&
+            ancestor.scrollWidth > ancestor.clientWidth + 1;
+          const ownTextOverflowY = ancestor === titleElement &&
+            ancestor.scrollHeight > ancestor.clientHeight + 1;
+          if (clipsX && (titleOutsideX || ownTextOverflowX)) {
             clippingOverflow.push({
               axis: 'x',
               element: ancestor.tagName.toLowerCase(),
               className: String(ancestor.className || '').slice(0, 100),
               overflow: style.overflowX,
               scrollSize: ancestor.scrollWidth,
-              clientSize: ancestor.clientWidth
+              clientSize: ancestor.clientWidth,
+              titleOutsideClip: titleOutsideX
             });
           }
-          if (clipsY && ancestor.scrollHeight > ancestor.clientHeight + 1) {
+          if (clipsY && (titleOutsideY || ownTextOverflowY)) {
             clippingOverflow.push({
               axis: 'y',
               element: ancestor.tagName.toLowerCase(),
               className: String(ancestor.className || '').slice(0, 100),
               overflow: style.overflowY,
               scrollSize: ancestor.scrollHeight,
-              clientSize: ancestor.clientHeight
+              clientSize: ancestor.clientHeight,
+              titleOutsideClip: titleOutsideY
             });
           }
           if (ancestor === documentNode) break;
