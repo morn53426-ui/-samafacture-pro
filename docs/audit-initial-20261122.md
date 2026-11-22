@@ -748,7 +748,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 - Nouveau HEAD PR #130 `9722ca99`, draft=true. Tests Node/MySQL #1434, ESLint #485 et ZIP #1136 sont tous success; la recette visuelle responsive a réussi. PR non fusionnée, revue humaine requise.
 - Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
 
-### Branches sans PR — comparaison ciblée 62 (dates/CI non exhaustives)
+### Branches sans PR — comparaison ciblée 72 (dates/CI non exhaustives)
 Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble. Deux comparaisons complémentaires: `feat/enterprise-command-center-20261117` 8/400 (4 fichiers), `feat/enterprise-company-pagination-20261117` 0/359 (behind only).
 
 **Audit/sécurité:**
@@ -781,7 +781,7 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - Aucun paiement réel activé.
 
 ### Sécurité / préservation
-Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 61 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 51 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
 
 
 ### Documentation branch follow-up
@@ -810,3 +810,15 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 - `feat/sidebar-icon-label-navigation-20261117`: 1/313, 9 fichiers; `feat/sidebar-navigation-visual-refresh-20261117`: 0/390 (behind only).
 - `feat/enterprise-pages-v2-2026-11-13`: 174/703, 64 fichiers.
 - Les HEADs de ces 10 branches sont mis à jour dans l'inventaire. Aucun workflow CI non-PR n'est validé sur ce run.
+
+
+### Run 7 — onze branches supplémentaires accessibilité / viewport / navigation
+- `audit/ui-runtime-pages-polish-20261113`: 8/715, 5 fichiers.
+- `audit/visual-viewport-offset-regression-20261116`: 1/592, 1 fichier.
+- `automation/audit-fixes-20261116-0150`: 9/594, 2 fichiers; `automation/visual-viewport-notifications-20261116-0243`: 2/593, 2 fichiers.
+- `fix/a11y-settings-labels-20261116`: 0/419 (behind only).
+- `fix/sidebar-aria-current-2026-11-15`: 1/619, 2 fichiers.
+- `fix/light-dark-theme-consistency-20261118`: 0/251; `fix/navigation-compact-sidebar-2026-11-13`: 0/705 (behind only).
+- `fix/dashboard-donut-count-20261118`: 3/232, 2 fichiers.
+- `feat/dashboard-reference-layout` et `feat/sunupilot-dashboard-reference`: HEAD partagé `11d55850`, 0/201 behind only.
+- HEADs rafraîchis pour ces 11 noms; aucun run CI non-PR n'est validé sur cette collecte.
