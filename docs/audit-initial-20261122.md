@@ -191,3 +191,29 @@ Revue read-only de `server/routes/factures.js` et migrations 003/004/005 : `DELE
 
 ### Statut
 La branche audit PR #132 a été actualisée et CI est relancée. Les tests locaux, Docker, MySQL, Redis, PDF et recette complète restent non exécutés dans ce runtime.
+
+
+## 11. Actualisation — dépenses comptabilisées et état PR (03:38 UTC)
+
+### P1 confirmé — source dépense modifiable/supprimable après posting
+Revue de `server/routes/depenses.js` et `server/routes/professionnel.js`: `DELETE /depenses/:id` ne vérifiait pas l'écriture `pro_compta_ecritures` (`source_type='depense'`, `source_id`). `PUT /depenses/:id` pouvait modifier montant/date/libellé/catégorie après posting. Le grand livre conservait la source et pouvait diverger de la dépense. Le posting lisait la dépense avant la transaction; une édition concurrente pouvait faire comptabiliser une valeur obsolète.
+
+### Correction proposée — PR #136
+- Branche `fix/expense-ledger-protection-20261122`, PR draft https://github.com/morn53426-ui/-samafacture-pro/pull/136.
+- PUT/DELETE transactionnels avec `SELECT ... FOR UPDATE`; refus 409 `DEPENSE_COMPTABILISEE_PROTEGEE` après posting.
+- Posting verrouille la dépense et compare montant/date/libellé/catégorie avec les lignes proposées; un posting obsolète est refusé 409.
+- 3 tests: source comptabilisée protégée, non comptabilisée modifiable/supprimable, race édition/posting sans divergence.
+- CI (tests, ESLint, ZIP) en cours au dernier contrôle; tests locaux non exécutés. Ne pas merger avant résultats.
+
+### Mise à jour PR #135 — politique plus sûre
+La PR #135 a été renforcée: **toutes les factures émises ne peuvent plus être supprimées**, même sans historique. La suppression de produits peut détacher `facture_lignes.produit_id`; la présence de mouvements stock devient indétectable depuis la facture. Les factures doivent donc être annulées/contrepassées; les devis sans historique restent supprimables. Head `5d676373238d14c85dffd340d77f0940d6535968`, mergeable true, CI relancée.
+
+### État courant des refs/PRs
+- Branches distantes : **142**; head SHA uniques estimés **140**.
+- PR ouvertes : **19** (16 initiales + #134, #135, #136).
+- #134: ESLint/ZIP réussis; tests automatisés en cours.
+- #135: ESLint/ZIP réussis sur le head précédent; tests en cours sur le nouveau head après la règle de non-suppression de facture.
+- #136: tests, ESLint et ZIP en cours.
+- #132: tests en cours après actualisation de ce rapport.
+- #130: tests visuels toujours en échec sur le badge Entreprise, #133 sans checks; #134 est la correction indépendante.
+- `main` reste au SHA 8453ee6d8e633f151523236eecff1bc0e0cf877b, dernier run Tests automatisés réussi.
