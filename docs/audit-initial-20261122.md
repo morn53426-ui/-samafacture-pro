@@ -785,4 +785,4 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 
 
 ### Documentation branch follow-up
-- PR #132 branch head before this addendum was `ec5fc22ae39efb77f377db787888fdbd1a220d2a`; this addendum is the new head `a3c848d7d826abdcbcb194913415786b9035dd50`. Status and workflow-run queries for `a3c848d7` returned no items. Previous tests #1433 and ZIP #1135 were green on an earlier audit head; they do not validate the latest documentation commits.
+- Les commits documentaires ajoutés après #1433/#1135 ne disposent pas de run CI visible sur le HEAD interrogé (status et workflow-run queries vides). Les tests #1433 et ZIP #1135 étaient green sur un HEAD antérieur; ils ne valident pas les derniers commits documentaires.
