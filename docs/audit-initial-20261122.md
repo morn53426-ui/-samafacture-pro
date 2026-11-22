@@ -376,3 +376,66 @@ Revue ciblée PR #128: Standard normalisé en `starter`, Pro/Entreprise; `UTC_TI
 - #138 tests en cours sur head corrigé; ZIP vert.
 - #132 audit docs tests en cours.
 - 144 branches, 21 PR ouvertes; aucun merge ni suppression.
+
+
+## 19. Actualisation indépendante — 22 novembre 2026, 04:26 UTC
+
+### État GitHub revérifié
+- `main` : SHA `8453ee6d8e633f151523236eecff1bc0e0cf877b`, aucun changement sur la branche principale.
+- Branches distantes : **144**, **142 SHA de tête uniques**; pagination 100 + 44.
+- PR ouvertes : **21**; toutes les PR examinées restent ouvertes, aucun merge/close effectué.
+- `main` est signalée `protected=true` dans l'API branches. Un ruleset repository `protect main` (ID 27410527) est **active**. L'endpoint détaillé de branch protection répond 403; les règles exactes ne sont donc pas lisibles via ce connecteur.
+- 5 runs Actions les plus récents sur main consultés : tous `completed/success`, dont le run sur HEAD 8453ee6d. Le status API legacy renvoie `pending` sans status entries; les Actions check-runs sont retenus comme preuve CI.
+
+### Statuts CI actuels des PR prioritaires (sha exact contrôlé)
+| PR | Checks | État |
+|---|---|---|
+| #132 | Tests Node/MySQL, archive ZIP | **2/2 success** |
+| #134 | ESLint, Node/MySQL, ZIP | **3/3 success** |
+| #135 | Node/MySQL, ESLint, ZIP | **3/3 success** |
+| #136 | Node/MySQL, ESLint, ZIP | **3/3 success** |
+| #137 | ZIP success; Node/MySQL en cours après derniers commits | **1 success, 1 pending** |
+| #138 | ZIP en cours; Node/MySQL en cours après derniers commits | **2 pending** |
+| #130 | Node/MySQL failed; ESLint + ZIP success | **bloquée** |
+| #133 | aucun check-run visible; base sur #130 | **non validée, dépendance** |
+| #128 | ESLint, ZIP, Node/MySQL | **3/3 success** |
+| #117 | Node/MySQL, ESLint, ZIP | **3/3 success** |
+| #115 | Node/MySQL, ZIP | **2/2 success** |
+| #125 | ESLint, ZIP, Node/MySQL | **3/3 success** |
+| #127 | Node/MySQL, ZIP, ESLint | **3/3 success** |
+
+### Échec #130 — preuve du log
+La recette visuelle `verifyBusinessPagesAccessibility` échoue sur `parametres`: badge `span.invoice-template-tier.tier-enterprise`, foreground `rgb(10,122,69)`, background `rgb(23,61,43)`, ratio **2,23:1** vs requis 4,5:1. #134 est une correction indépendante depuis main, avec CI entièrement verte; #133 est empilée sur #130 et ne possède aucun check-run visible.
+
+### Revue approfondie supplémentaire — historique client (PR #137)
+L'examen du schéma main et migrations 003/005 a trouvé deux références enfant non protégées dans le premier correctif : `factures_recurrentes` (FK client `ON DELETE CASCADE`) et `pro_commandes` (FK `ON DELETE RESTRICT`). De plus, les vérifications initiales filtrées par `user_id` pouvaient ignorer des références anomalement cross-tenant, puis les cascades/SET NULL s'exécuter quand même.
+- Correctif commité sur la branche PR #137 : vérifier les références par `client_id` sans filtrage `user_id`, ajouter les comptes factures récurrentes et commandes, et bloquer aussi les documents/access portail/décisions/CRM.
+- Tests supplémentaires : modèle facture récurrente et commande professionnelle; refus 409 et conservation client/références. Tests existants facture+paiement, CRM et client sans historique maintenus.
+- Head actuel : `3792372ba36560a99045157a8dcfb13d482806d0`; archive ZIP réussie, Node/MySQL **en cours**. Le code a été vérifié, mais tests locaux non exécutés.
+
+### Revue approfondie supplémentaire — références d'achat produit (PR #138)
+Les migrations 004 montrent que `pro_commandes_fournisseurs_lignes.produit_id` et `pro_receptions_achats_lignes.produit_id` sont `ON DELETE SET NULL`. Le guard initial #138 protégeait stock, factures et mouvements, mais pas les lignes d'achat : supprimer le produit pouvait perdre le lien catalogue de l'historique achat.
+- Correctif commité : refuser la suppression si des lignes de commande fournisseur sont liées, en plus du stock catalogue/entrepôt, lignes facture et mouvements.
+- Test ajouté : produit à stock zéro lié à une ligne d'achat; DELETE 409, produit et référence achat conservés.
+- Vérification indépendante du test a détecté un import `pool` absent; import corrigé avant CI.
+- Head actuel : `e507b81c66fd306efba7f4f74322b0a99afdcca3`; archive et tests Node/MySQL **en cours**.
+
+### Corrections P1 — état confirmé
+- #135 facture : **tous les checks green** (tests, ESLint, archive). Toutes les factures émises protégées; devis sans historique supprimables; verrou partagé posting/delete; tests régression.
+- #136 dépenses : **tous les checks green** (tests, ESLint, archive). Dépenses comptabilisées protégées contre modification/suppression; posting verrouillé et vérification source.
+- #137 client : garde amélioré pour tous les enfants liés; CI incomplète en attente.
+- #138 produit : garde inclut achats; CI incomplète en attente.
+- #134 contraste badge : **3/3 checks green**.
+
+### Planning et décisions de sécurité
+1. Attendre CI des nouveaux heads #137/#138 et traiter tout nouvel échec avant de les déclarer prêts.
+2. Revue humaine des diff #134–#138, vérifier les lock-order, les références SQL, la couverture des enfants et l'absence de bypass tenant.
+3. Intégration #117 + #128 seulement via migration combinée version **21**; ne pas merge les versions 19/20 séparément.
+4. Rebase/recette #115, puis #125/#127; comparer doublons #118/#126, #114/#131 et #102/#110.
+5. Revue exhaustive des 144 branches, ahead/behind et CI reste non achevée; aucune branche ne doit être supprimée.
+6. Tests locaux, Docker, MySQL/Redis, PDF et recette responsive complète non exécutés depuis ce runtime. Les statuts ci-dessus sont CI GitHub sur SHA précis, pas une validation locale.
+
+### Actions réalisées pendant cette actualisation
+- PR #137 : deux commits de garde/tests ajoutés; description actualisée.
+- PR #138 : deux commits de garde/tests ajoutés puis correction d'import pool; description actualisée.
+- Rapport d'audit actualisé sur la branche dédiée #132; aucun merge, close, delete, volume, donnée, backup ou paiement réel.
