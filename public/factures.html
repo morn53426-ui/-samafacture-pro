@@ -164,7 +164,7 @@
       closePayModal();
       load().catch(err => alert(err.message));
     } catch (err) {
-      document.getElementById('pay-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('pay-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }
@@ -195,7 +195,7 @@
       closeSendModal();
       showSuccessNotice(`Email envoyé à ${sent_to} ✓`);
     } catch (err) {
-      document.getElementById('send-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('send-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }
