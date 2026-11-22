@@ -392,21 +392,17 @@ async function runMigrations(conn) {
     await conn.query(statement);
   }
 
-  // v22 : préserver la piste d'audit des contrepassations même si une facture est
-  // supprimée par une voie administrative. Les routes protègent déjà l'historique ;
-  // la contrainte DB empêche également sa suppression accidentelle par cascade.
+  // v22 : conserver l'identifiant de facture comme référence d'audit, sans FK
+  // vers factures. Une facture supprimée par une voie exceptionnelle ne doit pas
+  // effacer ses événements ; la FK user_id → users conserve la suppression complète
+  // et volontaire du tenant via ON DELETE CASCADE.
   const [invoiceEventForeignKeys] = await conn.query(
-    `SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
+    `SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS
      WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
        AND CONSTRAINT_NAME = 'fk_pro_compta_facture_events_invoice'`
   );
-  if (!invoiceEventForeignKeys.length || !['RESTRICT', 'NO ACTION'].includes(invoiceEventForeignKeys[0].DELETE_RULE)) {
-    if (invoiceEventForeignKeys.length) {
-      await conn.query('ALTER TABLE pro_compta_facture_events DROP FOREIGN KEY fk_pro_compta_facture_events_invoice');
-    }
-    await conn.query(
-      'ALTER TABLE pro_compta_facture_events ADD CONSTRAINT fk_pro_compta_facture_events_invoice FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE RESTRICT'
-    );
+  if (invoiceEventForeignKeys.length) {
+    await conn.query('ALTER TABLE pro_compta_facture_events DROP FOREIGN KEY fk_pro_compta_facture_events_invoice');
   }
 
   // v18 : 004 vient de créer pro_entrepots sur les nouvelles bases ; cet ajout conditionnel
