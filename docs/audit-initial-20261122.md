@@ -767,7 +767,7 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - `feat/subscription-engine-local-simulation-20261117`: 0/303; `feat/enterprise-multi-company-foundation-20261116`: 99/401, 32 fichiers; `feat/enterprise-workspace-ux-20261117`: 37/398, 27 fichiers.
 - `feat/invoice-templates-pro-enterprise-20261117`: 0/291; `feat/monthly-invoice-quota-v8-2026-11-15`: 1/617, 10 fichiers; `fix/monthly-invoice-quota-schema-v8-2026-11-15`: 1/616, 10 fichiers.
 - `fix/session-revocation-and-payment-timeouts-2026-11-15`: 5/618, 5 fichiers; `fix/revoke-jwt-on-logout-2026-11-15`: 2/618, 2 fichiers.
-- `feat/enterprise-command-center-20261117`: 99/401, 32 fichiers; `feat/enterprise-company-pagination-20261117`: 37/398, 27 fichiers.
+- `feat/enterprise-command-center-20261117`: 8/400, 4 fichiers; `feat/enterprise-company-pagination-20261117`: 0/359 (behind only).
 
 ### Revue de diff ciblée (branches non-PR)
 - Docker-secret test: branche `security/docker-ignore-local-secrets` ajoute sentinel .env/.server-env puis inspecte l'image; la branche est très ancienne (617 behind), porter le test sur main actuel plutôt que merger.
