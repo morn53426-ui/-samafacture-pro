@@ -2951,6 +2951,32 @@ async function postSystemEntry(uid, actorId, sourceType, sourceId, date, label, 
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
+    if (sourceType === 'depense') {
+      // Sérialiser le posting avec l'édition/suppression de la dépense.
+      const [expenseRows] = await conn.query(
+        'SELECT id, montant, date_depense, libelle, categorie FROM depenses WHERE id = ? AND user_id = ? FOR UPDATE',
+        [sourceId, uid]
+      );
+      const expense = expenseRows[0];
+      if (!expense) {
+        const err = new Error('Dépense introuvable ou supprimée.');
+        err.code = 'DEPENSE_NON_COMPTABILISABLE';
+        throw err;
+      }
+      const expectedAmount = Number(expense.montant);
+      const debitAmount = lines.reduce((sum, line) => sum + Number(line.debit || 0), 0);
+      const creditAmount = lines.reduce((sum, line) => sum + Number(line.credit || 0), 0);
+      const expectedLabel = expense.categorie || expense.libelle;
+      if (Math.abs(debitAmount - expectedAmount) > 0.01 ||
+          Math.abs(creditAmount - expectedAmount) > 0.01 ||
+          String(date).slice(0, 10) !== String(expense.date_depense).slice(0, 10) ||
+          label !== 'Dépense ' + expense.libelle ||
+          lines[0]?.libelle !== expectedLabel) {
+        const err = new Error('La dépense a été modifiée avant sa comptabilisation; relancez la comptabilisation.');
+        err.code = 'DEPENSE_MODIFIEE';
+        throw err;
+      }
+    }
     const [existing] = await conn.query('SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = ? AND source_id = ? LIMIT 1 FOR UPDATE', [uid, sourceType, sourceId]);
     if (existing.length) { await conn.commit(); return { id: existing[0].id, numero: existing[0].numero, duplicate: true }; }
     const journal = await journalId(uid, journalCode, conn);
@@ -3150,7 +3176,11 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
       { code: '571', libelle: 'Règlement dépense', debit: 0, credit: amount }
     ]);
     res.status(result.duplicate ? 200 : 201).json(result);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.code === 'DEPENSE_NON_COMPTABILISABLE') return res.status(404).json({ error: 'Dépense supprimée avant comptabilisation.' });
+    if (err.code === 'DEPENSE_MODIFIEE') return res.status(409).json({ error: 'La dépense a changé; actualisez puis relancez la comptabilisation.' });
+    next(err);
+  }
 });
 
 
