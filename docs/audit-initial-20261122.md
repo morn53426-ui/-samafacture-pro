@@ -337,3 +337,12 @@ Le code `server/config/db.js` vérifié dans les deux branches n'exécute `runMi
 - #137 and #138 have corrected heads; CI pending.
 - #132 report branch CI pending after latest documentation commit.
 - main remains unchanged at 8453ee6d.
+
+
+## 17. Inventaire final du run — 03:47 UTC
+
+- Branches distantes: **144**; heads SHA uniques estimés: **142**.
+- PR ouvertes: **21**; branches sans PR ouverte: **123**.
+- Branches sans PR par préfixe: `fix/` 43, `feat/` 31, `audit/` 12, `test/` 12, `docs/` 7, `security/` 3, `automation/` 2, `ci/` 2, `ui/` 2, autres 9.
+- Comparaisons ahead/behind/diff effectuées sur un échantillon de 15 branches non-PR et 16 PR; **les 144 branches ne sont pas toutes comparées en détail**. Noms complets des branches non-PR disponibles dans la liste GitHub.
+- Aucune branche supprimée; aucune fusion.
