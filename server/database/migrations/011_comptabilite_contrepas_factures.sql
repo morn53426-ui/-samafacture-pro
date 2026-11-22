@@ -1,6 +1,5 @@
 -- Migration 011 : journaliser les contrepassations comptables des annulations/réactivations de factures.
 -- Chaque transition possède un identifiant propre ; plusieurs cycles sur une même facture restent possibles.
--- La facture ne peut pas supprimer son historique d'événements par cascade.
 
 CREATE TABLE IF NOT EXISTS pro_compta_facture_events (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -12,9 +11,8 @@ CREATE TABLE IF NOT EXISTS pro_compta_facture_events (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_pro_compta_facture_events (user_id, facture_id, id),
   KEY idx_pro_compta_facture_events_entry (user_id, ecriture_id),
-  -- L'identifiant facture est conservé comme référence historique sans FK :
-  -- supprimer une facture ne doit pas effacer ses événements comptables.
-  -- La FK user_id conserve l'effacement complet du tenant.
   CONSTRAINT fk_pro_compta_facture_events_user
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pro_compta_facture_events_invoice
+    FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
