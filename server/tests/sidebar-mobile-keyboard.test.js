@@ -26,9 +26,15 @@ describe('Navigation mobile — clavier et restauration du focus', () => {
     assert.match(handler, /sidebar\?\.classList\.contains\('open'\)/);
     assert.match(handler, /event\.preventDefault\(\)/);
     assert.match(handler, /closeSidebar\(\)/);
-    assert.match(handler, /document\.getElementById\('mobile-toggle-btn'\)/);
-    assert.match(handler, /document\.querySelector\('\.enterprise-console-menu-toggle'\)/);
-    assert.match(handler, /toggle\.focus\(\{ preventScroll: true \}\)/);
+    assert.match(handler, /document\\.querySelector\\('\\.enterprise-console-menu-toggle'\\)/);
+    assert.match(handler, /document\\.getElementById\\('mobile-toggle-btn'\\)/);
+    assert.match(handler, /toggle\\?\\.isConnected && toggle\\.getClientRects\\(\\)\\.length/);
+    assert.match(handler, /toggle\\.focus\\(\\{ preventScroll: true \\}\\)/);
+    assert.ok(
+      handler.indexOf("document.querySelector('.enterprise-console-menu-toggle')") <
+      handler.indexOf("document.getElementById('mobile-toggle-btn')"),
+      'Le déclencheur du centre Groupe doit être prioritaire lorsqu’il est présent.'
+    );
   });
 
   test('un dialogue visible conserve la priorité sur la fermeture du menu', () => {
