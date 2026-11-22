@@ -1183,6 +1183,9 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
               right: rect ? rect.right : window.innerWidth + 1,
               width: rect ? rect.width : 0,
               linkCount: links.length,
+              totalLinkCount: document.querySelectorAll('.pro-workspace-guide a').length,
+              directPageLinkCount: Array.from(document.querySelectorAll('.pro-workspace-guide a'))
+                .filter(link => !link.getAttribute('href').startsWith('#')).length,
               missingTargets: links.filter(link => !document.getElementById(link.getAttribute('href').slice(1)))
                 .map(link => link.getAttribute('href')),
               groupCount: document.querySelectorAll('.pro-workspace-guide-group').length
@@ -1262,8 +1265,10 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   if (pageDefinition.name === 'professionnel') {
     const nav = metrics.proWorkspaceNavigation;
     assert.equal(nav?.found, true, 'L’espace professionnel doit présenter une navigation par activité.');
-    assert.equal(nav.groupCount, 4, 'Les outils professionnels doivent être rangés en quatre rubriques.');
-    assert.equal(nav.linkCount, 9, 'Les neuf modules professionnels doivent être accessibles depuis la navigation.');
+    assert.equal(nav.groupCount, 6, 'Les outils professionnels doivent être rangés en six domaines.');
+    assert.equal(nav.linkCount, 9, 'Les neuf raccourcis internes doivent rester accessibles depuis la navigation.');
+    assert.equal(nav.totalLinkCount, 11, 'Les onze accès directs, dont OHADA et Achats, doivent être présents.');
+    assert.equal(nav.directPageLinkCount, 2, 'Les liens vers les pages OHADA et Achats doivent être conservés.');
     assert.deepEqual(nav.missingTargets, [], 'Chaque accès rapide doit pointer vers un module existant.');
     assert.ok(nav.left >= -1 && nav.right <= metrics.viewport + 1,
       'La navigation professionnelle ne doit pas sortir de l’écran : ' + JSON.stringify(nav));
@@ -1271,6 +1276,16 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
       assert.equal(gridColumns.split(' ').length, 1,
         'Les rubriques professionnelles doivent s’empiler sur téléphone : ' + gridColumns);
+    }
+    if (viewport.width > 1100) {
+      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
+      assert.equal(gridColumns.split(' ').length, 3,
+        'Les six domaines doivent rester organisés en trois colonnes sur grand écran : ' + gridColumns);
+    }
+    if (viewport.width > 560 && viewport.width <= 1100) {
+      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
+      assert.equal(gridColumns.split(' ').length, 2,
+        'Les domaines doivent passer sur deux colonnes sur tablette : ' + gridColumns);
     }
     if (viewport.width === 1440) {
       await page.click('.pro-workspace-guide a[href="#pro-integrations"]');

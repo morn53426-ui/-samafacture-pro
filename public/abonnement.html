@@ -40,6 +40,7 @@
       </div>
     </section>
 
+    <section id="trial-banner" class="trial-status-banner" aria-live="polite" hidden></section>
     <div id="plan-msg" aria-live="polite"></div>
 
     <section class="subscription-offers" aria-labelledby="offers-title">
@@ -134,7 +135,7 @@
 
   const PLAN_LABELS = {
     gratuit: 'Gratuit',
-    starter: 'Starter',
+    starter: 'Standard',
     pro: 'Pro',
     entreprise: 'Entreprise'
   };
@@ -164,7 +165,7 @@
     },
     {
       id: 'starter',
-      nom: 'Starter',
+      nom: 'Standard',
       description: 'Pour une activité qui se développe.',
       icon: 'trending-up',
       comingSoon: true,
@@ -183,7 +184,7 @@
       popular: true,
       comingSoon: true,
       features: [
-        'Tous les avantages Starter',
+        'Tous les avantages Standard',
         'Signature électronique',
         '3 modèles premium de facture',
         'Export Excel',
@@ -207,13 +208,59 @@
     }
   ];
 
-  function renderCurrentPlan(planId) {
+  function trialEndDate(value) {
+    if (!value) return null;
+    const text = String(value).trim();
+    const normalized = text.includes(' ') ? text.replace(' ', 'T') + 'Z' : text;
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function renderCurrentPlan(userOrPlan) {
+    const user = userOrPlan && typeof userOrPlan === 'object' ? userOrPlan : { plan: userOrPlan };
+    const planId = user.plan || 'gratuit';
     const plan = PLAN_LABELS[planId] ? planId : 'gratuit';
+    const trialBanner = document.getElementById('trial-banner');
     document.getElementById('current-plan-name').textContent = PLAN_LABELS[plan];
     document.getElementById('current-plan-description').textContent = PLAN_DESCRIPTIONS[plan];
-    document.getElementById('current-plan-status').innerHTML =
-      '<span class="status-dot"></span> Formule associée à votre compte';
-    document.getElementById('plan-select').value = plan;
+
+    if (user.trial_status === 'trialing') {
+      const end = trialEndDate(user.trial_ends_at);
+      const remainingMs = end ? end.getTime() - Date.now() : 0;
+      const daysLeft = Math.max(0, Math.ceil(remainingMs / 86400000));
+      const trialPlan = PLAN_LABELS[user.trial_plan || plan] || PLAN_LABELS[plan];
+      document.getElementById('current-plan-status').innerHTML =
+        '<span class="status-dot"></span> Essai gratuit · ' + daysLeft + ' jour' + (daysLeft > 1 ? 's' : '') + ' restant' + (daysLeft > 1 ? 's' : '');
+      if (trialBanner) {
+        const endLabel = end ? new Intl.DateTimeFormat('fr-SN', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Africa/Dakar' }).format(end) : 'date de fin indisponible';
+        trialBanner.hidden = false;
+        trialBanner.innerHTML = '<div class="trial-status-copy"><span class="subscription-overline">ESSAI GRATUIT EN COURS</span>' +
+          '<h2>Votre formule ' + escapeHtml(trialPlan) + ' est offerte pendant 15 jours</h2>' +
+          '<p>Fin de l’essai : <strong>' + escapeHtml(endLabel) + '</strong>. Le compteur ne redémarre pas lorsque vous changez de formule.</p>' +
+          '<small>Aucune carte bancaire et aucun prélèvement automatique. À l’échéance, votre compte repasse au plan Gratuit et vos données restent conservées.</small></div>' +
+          '<div class="trial-plan-switch"><label for="trial-plan-change">Changer de formule pendant l’essai</label>' +
+          '<select id="trial-plan-change"><option value="starter">Standard</option><option value="pro">Pro</option><option value="entreprise">Entreprise</option></select>' +
+          '<button type="button" class="btn btn-outline" id="trial-plan-change-button" onclick="changeTrialPlan(this)">Appliquer sans réinitialiser le délai</button></div>';
+        const select = document.getElementById('trial-plan-change');
+        if (select) select.value = user.trial_plan || plan;
+        const button = document.getElementById('trial-plan-change-button');
+        if (button && remainingMs <= 0) button.disabled = true;
+      }
+    } else {
+      document.getElementById('current-plan-status').innerHTML =
+        '<span class="status-dot"></span> Formule associée à votre compte';
+      if (trialBanner) {
+        if (user.trial_status === 'expired') {
+          trialBanner.hidden = false;
+          trialBanner.innerHTML = '<div class="trial-status-copy"><span class="subscription-overline">PÉRIODE D’ESSAI TERMINÉE</span><h2>Votre compte est sur le plan Gratuit</h2><p>Votre espace, vos clients, vos factures et vos documents restent conservés.</p><small>Aucun paiement ni prélèvement automatique n’a été effectué.</small></div>';
+        } else {
+          trialBanner.hidden = true;
+          trialBanner.innerHTML = '';
+        }
+      }
+    }
+    // Le sélecteur de repli ne propose volontairement que Gratuit.
+    document.getElementById('plan-select').value = 'gratuit';
   }
 
   function renderPlanCard(plan, user, moyens) {
@@ -269,8 +316,17 @@
   }
 
   async function loadPlans() {
-    const user = Api.currentUser() || {};
-    renderCurrentPlan(user.plan || 'gratuit');
+    let user = Api.currentUser() || {};
+    try {
+      const session = await Api.get('/auth/me');
+      if (session && session.user) {
+        user = session.user;
+        localStorage.setItem('sf_user', JSON.stringify(user));
+      }
+    } catch (_) {
+      // Le cache local reste un repli d'affichage ; toutes les actions restent validées par l'API.
+    }
+    renderCurrentPlan(user);
 
     let moyens;
     try {
@@ -368,13 +424,30 @@
     intentionPaiement = null;
   });
 
+  async function changeTrialPlan(btn) {
+    const select = document.getElementById('trial-plan-change');
+    if (!select || !['starter', 'pro', 'entreprise'].includes(select.value)) return;
+    const restore = setButtonLoading(btn, 'Mise à jour…');
+    try {
+      const { user } = await Api.put('/auth/plan', { plan: select.value });
+      if (!user) throw new Error('Le serveur n’a pas renvoyé le profil mis à jour.');
+      localStorage.setItem('sf_user', JSON.stringify(user));
+      await loadPlans();
+      document.getElementById('plan-msg').innerHTML = '<div class="success-notice">Formule mise à jour. Votre date de fin d’essai reste inchangée.</div>';
+    } catch (err) {
+      document.getElementById('plan-msg').innerHTML = '<div class="error-box">' + escapeHtml(err.message) + '</div>';
+    } finally {
+      restore();
+    }
+  }
+
   async function changePlan(btn) {
     const plan = document.getElementById('plan-select').value;
     const restore = setButtonLoading(btn, 'Mise à jour…');
     try {
       const { user } = await Api.put('/auth/plan', { plan });
       localStorage.setItem('sf_user', JSON.stringify(user));
-      renderCurrentPlan(user.plan || plan);
+      renderCurrentPlan(user);
       document.getElementById('plan-msg').innerHTML =
         '<div class="success-notice"><span class="ic">' + Icon('check-circle') + '</span> Formule Gratuit activée. Rechargez la page pour actualiser les options.</div>';
       await loadPlans();
