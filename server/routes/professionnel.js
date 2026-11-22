@@ -2951,6 +2951,19 @@ async function postSystemEntry(uid, actorId, sourceType, sourceId, date, label, 
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
+    // Verrou commun avec DELETE /factures/:id : l'écriture ne doit pas être créée
+    // après que la suppression a vérifié l'absence d'historique puis supprimé le document.
+    if (sourceType === 'facture') {
+      const [invoiceRows] = await conn.query(
+        "SELECT id FROM factures WHERE id = ? AND user_id = ? AND type = 'facture' AND statut <> 'annulee' FOR UPDATE",
+        [sourceId, uid]
+      );
+      if (!invoiceRows.length) {
+        const err = new Error('Facture introuvable, supprimée ou annulée.');
+        err.code = 'FACTURE_NON_COMPTABILISABLE';
+        throw err;
+      }
+    }
     const [existing] = await conn.query('SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = ? AND source_id = ? LIMIT 1 FOR UPDATE', [uid, sourceType, sourceId]);
     if (existing.length) { await conn.commit(); return { id: existing[0].id, numero: existing[0].numero, duplicate: true }; }
     const journal = await journalId(uid, journalCode, conn);
@@ -3120,7 +3133,12 @@ router.post('/accounting/post-invoice/:id', async (req, res, next) => {
     if (Number(invoice.total_tva) > 0) lines.push({ code: '443', libelle: 'TVA facture ' + invoice.numero, debit: 0, credit: Number(invoice.total_tva), facture_id: invoice.id });
     const result = await postSystemEntry(uid, actor(req), 'facture', invoice.id, invoice.date_emission, 'Comptabilisation facture ' + invoice.numero, 'VE', lines);
     res.status(result.duplicate ? 200 : 201).json(result);
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.code === 'FACTURE_NON_COMPTABILISABLE') {
+      return res.status(409).json({ error: 'La facture a été supprimée ou annulée avant sa comptabilisation.' });
+    }
+    next(err);
+  }
 });
 
 router.post('/accounting/post-payment/:id', async (req, res, next) => {
