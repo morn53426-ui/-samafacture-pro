@@ -6,14 +6,14 @@ const {
   app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment
 } = require('./setup');
 
-let userId, token, clientId, productId;
+let userId, token, clientId, productId, serviceProductId;
 const originalEncryptionKey = process.env.DATA_ENCRYPTION_KEY;
 const originalAppUrl = process.env.APP_URL;
 const originalFetch = global.fetch;
 
-async function creerFacture({ amount = 1000, tax = 0, quantity = 1, product = false } = {}) {
+async function creerFacture({ amount = 1000, tax = 0, quantity = 1, product = false, freeText = false } = {}) {
   const line = { designation: 'Prestation de test', quantite: quantity, prix_unitaire: amount, tva: tax };
-  if (product) line.produit_id = productId;
+  if (!freeText) line.produit_id = product ? productId : serviceProductId;
   const response = await request(app)
     .post('/api/factures')
     .set('Authorization', 'Bearer ' + token)
@@ -41,6 +41,11 @@ before(async () => {
     .send({ nom: 'Produit recette multi-entrepôt', reference: 'PHASE24-001', prix_ht: 1000, prix_achat: 500, tva: 18, stock: 10 });
   assert.equal(product.status, 201, product.text);
   productId = product.body.produit.id;
+
+  const service = await request(app).post('/api/produits').set('Authorization', 'Bearer ' + token)
+    .send({ nom: 'Service recette comptable', type_catalogue: 'service', prix_ht: 1000, prix_achat: 0, tva: 0 });
+  assert.equal(service.status, 201, service.text);
+  serviceProductId = service.body.produit.id;
 });
 
 test('les clés marchandes sont chiffrées, spécifiques à l’entreprise et jamais renvoyées en lecture', async () => {
@@ -212,12 +217,31 @@ test('les achats et réceptions partielles mettent à jour le stock global et le
 });
 
 test('la comptabilité applique la partie double, publie la balance et empêche les écritures non équilibrées', async () => {
-  const invoice = await creerFacture({ amount: 5000, tax: 18 });
+  const invoice = await creerFacture({ amount: 5000, tax: 18, freeText: true });
   const config = await request(app).get('/api/pro/accounting/config').set('Authorization', 'Bearer ' + token);
   assert.equal(config.status, 200, config.text);
   assert.ok(config.body.comptes.some(account => account.code === '411'));
   assert.ok(config.body.comptes.some(account => account.code === '706'));
   assert.ok(config.body.journaux.some(journal => journal.code === 'VE'));
+
+  const defaultMappings = await request(app).get('/api/pro/accounting/mappings').set('Authorization', 'Bearer ' + token);
+  assert.equal(defaultMappings.status, 200, defaultMappings.text);
+  assert.equal(defaultMappings.body.correspondances.some(mapping => mapping.type_source === 'vente' && mapping.cle_source === 'saisie_libre'), false,
+    'une ligne libre ne doit pas être assimilée automatiquement à un service');
+  const missingTextMapping = await request(app).post('/api/pro/accounting/post-invoice/' + invoice.id)
+    .set('Authorization', 'Bearer ' + token).send({});
+  assert.equal(missingTextMapping.status, 409, missingTextMapping.text);
+  assert.equal(missingTextMapping.body.code, 'CORRESPONDANCE_COMPTABLE_MANQUANTE');
+  const [[missingTextEntry]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?",
+    [userId, invoice.id]
+  );
+  assert.equal(Number(missingTextEntry.total), 0, 'aucune écriture ne doit être créée sans classification explicite');
+
+  const explicitTextMapping = await request(app).put('/api/pro/accounting/mappings')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ type_source: 'vente', cle_source: 'saisie_libre', compte_id: config.body.comptes.find(account => account.code === '706').id });
+  assert.equal(explicitTextMapping.status, 200, explicitTextMapping.text);
 
   const posted = await request(app).post('/api/pro/accounting/post-invoice/' + invoice.id).set('Authorization', 'Bearer ' + token).send({});
   assert.ok([200,201].includes(posted.status), posted.text);
@@ -869,6 +893,17 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
     lignes: [{ designation: 'Ligne ancienne non classée', produit_id: unclassifiedId, quantite: 1, prix_unitaire: 100, tva: 0 }]
   });
   assert.equal(legacyInvoice.status, 201, legacyInvoice.text);
+  const missingLegacyMapping = await request(app).post('/api/pro/accounting/post-invoice/' + legacyInvoice.body.facture.id)
+    .set('Authorization', 'Bearer ' + token).send({});
+  assert.equal(missingLegacyMapping.status, 409, missingLegacyMapping.text);
+  assert.equal(missingLegacyMapping.body.code, 'CORRESPONDANCE_COMPTABLE_MANQUANTE');
+  const [[missingLegacyEntry]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?",
+    [userId, legacyInvoice.body.facture.id]
+  );
+  assert.equal(Number(missingLegacyEntry.total), 0, 'une fiche non classée ne doit pas être envoyée silencieusement en 706');
+  const explicitLegacyMapping = await setMapping('vente', 'non_classe', account('706'));
+  assert.equal(explicitLegacyMapping.status, 200, explicitLegacyMapping.text);
   const legacyPosted = await request(app).post('/api/pro/accounting/post-invoice/' + legacyInvoice.body.facture.id)
     .set('Authorization', 'Bearer ' + token).send({});
   assert.equal(legacyPosted.status, 201, legacyPosted.text);

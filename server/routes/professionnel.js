@@ -3191,8 +3191,11 @@ async function buildInvoiceAccountingLines(uid, invoice, conn) {
     const sourceKey = row.produit_id
       ? (['produit', 'service'].includes(currentType) ? currentType : 'non_classe')
       : 'saisie_libre';
-    const mapping = await requireAccountingCorrespondence(uid, 'vente', sourceKey, conn);
     const cents = invoiceLineToCents(row.quantite, row.prix_unitaire);
+    // Une ligne sans montant HT n'apporte aucun produit ; elle ne doit pas forcer
+    // une classification commerciale (ex. facture avec seuls frais de livraison).
+    if (cents === 0n) continue;
+    const mapping = await requireAccountingCorrespondence(uid, 'vente', sourceKey, conn);
     const groupKey = String(mapping.compte_id);
     const group = groups.get(groupKey) || {
       compte_id: Number(mapping.compte_id),
@@ -3288,8 +3291,6 @@ async function ensureAccountingDefaults(uid, conn = pool) {
   const defaultMappings = [
     ['vente', 'produit', '701'],
     ['vente', 'service', '706'],
-    ['vente', 'non_classe', '706'],
-    ['vente', 'saisie_libre', '706'],
     ['vente', 'frais_livraison', '707'],
     ['depense', '__default__', '638']
   ];
