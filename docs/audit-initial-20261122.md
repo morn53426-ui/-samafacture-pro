@@ -689,7 +689,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 ### PR ahead/behind (recalcul par SHA actuel; main = 8453ee6d)
 | PR | Ahead | Behind | Remarque |
 |---|---:|---:|---|
-| #132 | 43 | 0 | rapport documentaire, CI docs en cours |
+| #132 | 46 | 0 | rapport documentaire; dernier HEAD sans runs retournés |
 | #130 | 20 | 0 | HEAD corrigé 9722ca99, CI relancée |
 | #138 | 15 | 0 | stock/protection |
 | #140 | 4 | 0 | lint backend |
@@ -716,7 +716,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 ### CI fresh sur HEAD
 | PR | Tests Node/MySQL | ESLint | ZIP |
 |---|---|---|---|
-| #132 | #1446 in_progress (nouveau HEAD; #1433 success ancien) | — | #1148 in_progress (nouveau HEAD; #1135 success ancien) |
+| #132 | aucun run sur HEAD actuel; #1446 in_progress sur HEAD précédent, #1433 success plus ancien | — | aucun run sur HEAD actuel; #1148 in_progress sur HEAD précédent, #1135 success plus ancien |
 | #130 | #1430 failure sur ancien HEAD; nouveau #1434 in_progress | #484 success ancien; #485 in_progress nouveau | #1132 success ancien; #1136 success nouveau |
 | #138 | #1429 success | #483 success | #1131 success |
 | #140 | #1420 success | #476 success | #1122 success |
