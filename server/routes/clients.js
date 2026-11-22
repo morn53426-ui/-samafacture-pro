@@ -203,19 +203,24 @@ router.put('/:id', async (req, res, next) => {
  *       404: { description: Client introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.delete('/:id', async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
-    const [existingRows] = await pool.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
-    if (!existingRows.length) return res.status(404).json({ error: 'Client introuvable.' });
-
+    conn = await pool.getConnection();
     await conn.beginTransaction();
+    const [existingRows] = await conn.query(
+      'SELECT id FROM clients WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
+    if (!existingRows.length) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Client introuvable.' });
+    }
+    const clientId = existingRows[0].id;
 
-    // Une référence inter-entreprises anormale ne doit jamais être supprimée en cascade
-    // avec le client d'une autre entreprise. Les routes de création vérifient déjà le
-    // propriétaire, mais cette garde protège aussi les bases historiques/importées.
+    // Une référence inter-entreprises anormale ne doit jamais être supprimée en cascade.
     const [foreignInvoices] = await conn.query(
       'SELECT id FROM factures WHERE client_id = ? AND user_id <> ? LIMIT 1 FOR UPDATE',
-      [existingRows[0].id, req.tenantId]
+      [clientId, req.tenantId]
     );
     if (foreignInvoices.length) {
       await conn.rollback();
@@ -224,29 +229,41 @@ router.delete('/:id', async (req, res, next) => {
       });
     }
 
-    // Supprime d'abord les factures/devis du client (les lignes et paiements associés sont
-    // supprimés automatiquement grâce à ON DELETE CASCADE), afin que la suppression du client
-    // fonctionne toujours, même s'il a un historique de facturation.
-    // Restitue d'abord le stock de chaque facture active (même règle que DELETE /api/factures/:id) —
-    // sinon supprimer un client par ce chemin laissait le stock de ses produits durablement
-    // sous-évalué, sans que rien ne le signale.
-    const [facturesClient] = await conn.query(
-      `SELECT id FROM factures WHERE client_id = ? AND user_id = ? AND type = 'facture' AND statut != 'annulee'`,
-      [existingRows[0].id, req.tenantId]
+    // Protéger l'historique : la FK client -> facture ON DELETE CASCADE peut supprimer
+    // factures, lignes et paiements; d'autres tables cascade les accès portail/CRM.
+    // Un client ayant un historique doit être archivé (fonction à ajouter) plutôt que supprimé.
+    const [historyRows] = await conn.query(
+      `SELECT
+         (SELECT COUNT(*) FROM factures WHERE user_id = ? AND client_id = ?) AS factures,
+         (SELECT COUNT(*) FROM pro_documents WHERE user_id = ? AND client_id = ?) AS documents,
+         (SELECT COUNT(*) FROM pro_customer_portal_access WHERE user_id = ? AND client_id = ?) AS acces_portail,
+         (SELECT COUNT(*) FROM pro_portal_quote_decisions WHERE user_id = ? AND client_id = ?) AS decisions_portail,
+         (SELECT COUNT(*) FROM pro_crm_activities WHERE user_id = ? AND client_id = ?) AS activites_crm`,
+      [
+        req.tenantId, clientId,
+        req.tenantId, clientId,
+        req.tenantId, clientId,
+        req.tenantId, clientId,
+        req.tenantId, clientId
+      ]
     );
-    for (const f of facturesClient) {
-      await ajusterStockFacture(conn, f.id, req.tenantId, +1);
+    const history = historyRows[0];
+    if (Object.values(history).some(count => Number(count) > 0)) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Ce client possède un historique commercial, financier, documentaire ou portail. Archivez-le plutôt que de le supprimer.',
+        code: 'CLIENT_HISTORIQUE_PROTEGE'
+      });
     }
-    await conn.query('DELETE FROM factures WHERE client_id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
-    await conn.query('DELETE FROM clients WHERE id = ?', [existingRows[0].id]);
-    await conn.commit();
 
+    await conn.query('DELETE FROM clients WHERE id = ? AND user_id = ?', [clientId, req.tenantId]);
+    await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
