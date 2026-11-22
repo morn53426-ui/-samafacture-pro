@@ -314,3 +314,9 @@
 - HEAD #142 `d2a687ab`: ESLint et ZIP success; Tests automatisés run #1516 en cours (initialisation containers, tests/recette visuelle pas encore démarrés).
 - Inventaire après création des branches : **150 branches** (100+50); **26 PR ouvertes**, 113 fermées (94 merged/19 non-merged), **139 PR total**. Les 2 branches ajoutées à l'inventaire précédent : `fix/refund-payment-method-mapping-20261122`, `fix/refund-payment-method-mapping-rebased-20261122`.
 - Aucun merge/close/main touché; aucune donnée/volume/backup supprimé; aucun paiement réel.
+
+
+### CI/HEAD refresh — 12:43 UTC
+- #142 current head `b4e23b2a` (test query assertion scoped by source_type+source_id); run #1518 Tests automated **in progress**, container initialization. ESLint #525 and ZIP #1220 **success**.
+- The previous run #1516 on head `d2a687ab` was superseded by the test assertion refinement. Do not treat it as final.
+- #143 remains Draft, head `17d25a5e`, no CI returned and mergeability false against its stale base; same correction is included on #142 for CI.
