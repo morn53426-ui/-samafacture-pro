@@ -139,14 +139,14 @@ router.put('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Dépense introuvable.' });
     }
     const [postedRows] = await conn.query(
-      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1",
+      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE",
       [req.tenantId, existing.id]
     );
     if (postedRows.length) {
       await conn.rollback();
       return res.status(409).json({
         error: 'Cette dépense est déjà comptabilisée. Conservez-la et passez une écriture corrective pour toute modification.',
-        code: 'DEPENSE_COMPTABILISEE'
+        code: 'DEPENSE_COMPTABILISEE_PROTEGEE'
       });
     }
     const { libelle, montant, categorie, date_depense, notes } = req.body;
@@ -215,14 +215,14 @@ router.delete('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Dépense introuvable.' });
     }
     const [postedRows] = await conn.query(
-      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1",
+      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE",
       [req.tenantId, existingRows[0].id]
     );
     if (postedRows.length) {
       await conn.rollback();
       return res.status(409).json({
         error: 'Cette dépense est déjà comptabilisée. Elle doit être conservée dans la piste d’audit.',
-        code: 'DEPENSE_COMPTABILISEE'
+        code: 'DEPENSE_COMPTABILISEE_PROTEGEE'
       });
     }
     await conn.query('DELETE FROM depenses WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
