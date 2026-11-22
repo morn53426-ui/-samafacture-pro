@@ -3051,10 +3051,228 @@ const OHADA_STARTER_ACCOUNTS = [
   ['443','État, TVA facturée',4,'credit',0],['445','État, TVA récupérable',4,'debit',0],
   ['521','Banques',5,'debit',0],['571','Caisse',5,'debit',0],
   ['601','Achats de marchandises',6,'debit',0],['604','Achats de matières et fournitures',6,'debit',0],
-  ['622','Transports',6,'debit',0],['625','Déplacements et missions',6,'debit',0],['641','Rémunérations du personnel',6,'debit',0],
-  ['661','Charges d’intérêts',6,'debit',0],['701','Ventes de marchandises',7,'credit',0],
+  ['6181','Voyages et déplacements',6,'debit',0],['622','Locations et charges locatives',6,'debit',0],['625','Primes d’assurance',6,'debit',0],['641','Rémunérations du personnel',6,'debit',0],
+  ['638','Autres charges externes',6,'debit',0],['661','Charges d’intérêts',6,'debit',0],['701','Ventes de marchandises',7,'credit',0],
+  ['702','Ventes de produits finis',7,'credit',0],['703','Ventes de produits intermédiaires',7,'credit',0],
+  ['704','Ventes de produits résiduels',7,'credit',0],['705','Travaux facturés',7,'credit',0],
   ['706','Services vendus',7,'credit',0],['707','Produits accessoires',7,'credit',0],['758','Produits divers',7,'credit',0]
 ];
+
+
+const ACCOUNTING_SALE_MAPPING_KEYS = Object.freeze([
+  'produit', 'service', 'non_classe', 'saisie_libre', 'frais_livraison'
+]);
+
+function normalizeAccountingCategoryKey(value) {
+  return String(value == null ? '' : value)
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .slice(0, 100);
+}
+
+function accountingMappingError(message, code = 'CORRESPONDANCE_COMPTABLE_MANQUANTE') {
+  const error = new Error(message);
+  error.status = 409;
+  error.code = code;
+  return error;
+}
+
+async function findAccountingCorrespondence(uid, sourceType, sourceKey, conn = pool) {
+  const [rows] = await conn.query(
+    'SELECT m.id, m.compte_id, m.type_source, m.cle_source, c.code, c.libelle, c.classe, c.actif FROM pro_compta_correspondances m JOIN pro_compta_comptes c ON c.id = m.compte_id AND c.user_id = m.user_id WHERE m.user_id = ? AND m.type_source = ? AND m.cle_source = ? LIMIT 1',
+    [uid, sourceType, sourceKey]
+  );
+  return rows[0] || null;
+}
+
+async function requireAccountingCorrespondence(uid, sourceType, sourceKey, conn = pool) {
+  const mapping = await findAccountingCorrespondence(uid, sourceType, sourceKey, conn);
+  if (!mapping) {
+    throw accountingMappingError(
+      'Aucune correspondance comptable n’est configurée pour ' + sourceType + ' / ' + sourceKey + '.',
+      'CORRESPONDANCE_COMPTABLE_MANQUANTE'
+    );
+  }
+  const expectedClass = sourceType === 'vente' ? 7 : 6;
+  if (Number(mapping.actif) !== 1) {
+    throw accountingMappingError(
+      'Le compte ' + mapping.code + ' affecté à ' + sourceKey + ' est inactif. Choisissez un compte actif.',
+      'COMPTE_CORRESPONDANCE_INACTIF'
+    );
+  }
+  if (Number(mapping.classe) !== expectedClass) {
+    throw accountingMappingError(
+      'Le compte affecté à ' + sourceKey + ' doit appartenir à la classe ' + expectedClass + '.',
+      'CLASSE_COMPTE_CORRESPONDANCE_INVALIDE'
+    );
+  }
+  return mapping;
+}
+
+async function requireExpenseCorrespondence(uid, category, conn = pool) {
+  const key = normalizeAccountingCategoryKey(category);
+  if (key) {
+    const specific = await findAccountingCorrespondence(uid, 'depense', key, conn);
+    if (specific) {
+      if (Number(specific.actif) !== 1 || Number(specific.classe) !== 6) {
+        throw accountingMappingError(
+          'Le compte affecté à la catégorie « ' + key + ' » est inactif ou n’appartient plus à la classe 6.',
+          'CORRESPONDANCE_DEPENSE_INVALIDE'
+        );
+      }
+      return specific;
+    }
+  }
+  return requireAccountingCorrespondence(uid, 'depense', '__default__', conn);
+}
+
+function amountToCents(value, field) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number) || number < 0 || number > 999999999999) {
+    throw accountingMappingError('Montant invalide pour ' + field + '.', 'MONTANT_COMPTABLE_INVALIDE');
+  }
+  return BigInt(Math.round(number * 100));
+}
+
+function invoiceLineToCents(quantity, unitPrice) {
+  const qty = Number(quantity), price = Number(unitPrice);
+  if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price < 0) {
+    throw accountingMappingError('Une ligne de facture possède une quantité ou un prix invalide.', 'LIGNE_FACTURE_INVALIDE');
+  }
+  const qtyHundredths = BigInt(Math.round(qty * 100));
+  const priceCents = BigInt(Math.round(price * 100));
+  return (qtyHundredths * priceCents + 50n) / 100n;
+}
+
+function allocateCentsProportionally(totalCents, groups) {
+  const totalWeight = groups.reduce((sum, group) => sum + group.weight, 0n);
+  if (totalCents === 0n) return groups.map(() => 0n);
+  if (totalWeight <= 0n || totalCents < 0n || totalCents > totalWeight) {
+    throw accountingMappingError('La remise ne peut pas être répartie sur les lignes de vente.', 'REMISE_FACTURE_INVALIDE');
+  }
+  const allocations = groups.map((group, index) => {
+    const numerator = totalCents * group.weight;
+    return { index, cents: numerator / totalWeight, remainder: numerator % totalWeight };
+  });
+  let remaining = totalCents - allocations.reduce((sum, allocation) => sum + allocation.cents, 0n);
+  const order = [...allocations].sort((a, b) => {
+    if (a.remainder === b.remainder) return a.index - b.index;
+    return a.remainder > b.remainder ? -1 : 1;
+  });
+  for (const allocation of order) {
+    if (remaining <= 0n) break;
+    allocation.cents += 1n;
+    remaining -= 1n;
+  }
+  if (remaining !== 0n) throw accountingMappingError('Répartition de remise incomplète.', 'REMISE_FACTURE_INVALIDE');
+  return allocations.map(allocation => allocation.cents);
+}
+
+async function buildInvoiceAccountingLines(uid, invoice, conn) {
+  const [invoiceRows] = await conn.query(
+    'SELECT fl.id, fl.produit_id, fl.quantite, fl.prix_unitaire, p.type_catalogue FROM facture_lignes fl LEFT JOIN produits p ON p.id = fl.produit_id AND p.user_id = ? WHERE fl.facture_id = ? ORDER BY fl.id',
+    [uid, invoice.id]
+  );
+  if (!invoiceRows.length) {
+    throw accountingMappingError('La facture ne contient aucune ligne comptabilisable.', 'FACTURE_SANS_LIGNE');
+  }
+
+  const groups = new Map();
+  for (const row of invoiceRows) {
+    if (row.produit_id && row.type_catalogue == null) {
+      throw accountingMappingError(
+        'Une ligne référence un produit qui n’appartient pas à cette entreprise. Comptabilisation refusée.',
+        'PRODUIT_FACTURE_NON_AUTORISE'
+      );
+    }
+    const currentType = String(row.type_catalogue || 'non_classe');
+    const sourceKey = row.produit_id
+      ? (['produit', 'service'].includes(currentType) ? currentType : 'non_classe')
+      : 'saisie_libre';
+    const cents = invoiceLineToCents(row.quantite, row.prix_unitaire);
+    // Une ligne sans montant HT n'apporte aucun produit ; elle ne doit pas forcer
+    // une classification commerciale (ex. facture avec seuls frais de livraison).
+    if (cents === 0n) continue;
+    const mapping = await requireAccountingCorrespondence(uid, 'vente', sourceKey, conn);
+    const groupKey = String(mapping.compte_id);
+    const group = groups.get(groupKey) || {
+      compte_id: Number(mapping.compte_id),
+      code: mapping.code,
+      libelle: mapping.libelle,
+      weight: 0n
+    };
+    group.weight += cents;
+    groups.set(groupKey, group);
+  }
+
+  const grouped = [...groups.values()];
+  const lineSubtotal = grouped.reduce((sum, group) => sum + group.weight, 0n);
+  const invoiceSubtotal = amountToCents(invoice.sous_total, 'sous-total facture');
+  if (lineSubtotal !== invoiceSubtotal) {
+    throw accountingMappingError(
+      'Le total HT des lignes ne correspond pas au sous-total enregistré. Vérifiez la facture avant comptabilisation.',
+      'SOUS_TOTAL_FACTURE_INCOHERENT'
+    );
+  }
+  const discount = amountToCents(invoice.remise, 'remise facture');
+  const shipping = amountToCents(invoice.frais_livraison, 'frais de livraison');
+  const tax = amountToCents(invoice.total_tva, 'TVA facture');
+  const total = amountToCents(invoice.total, 'total facture');
+  if (discount > invoiceSubtotal || invoiceSubtotal - discount + shipping + tax !== total) {
+    throw accountingMappingError(
+      'Les totaux HT, remise, livraison, TVA et TTC de la facture sont incohérents.',
+      'TOTAUX_FACTURE_INCOHERENTS'
+    );
+  }
+
+  if (total === 0n) {
+    throw accountingMappingError(
+      'Cette facture a un total nul ; une écriture automatique équilibrée ne peut pas être créée avec les correspondances actuelles. Vérifiez la remise et les frais avant validation comptable.',
+      'FACTURE_TOTAL_NUL'
+    );
+  }
+  const allocations = allocateCentsProportionally(discount, grouped);
+  const lines = [{
+    code: '411',
+    libelle: 'Client ' + invoice.numero,
+    debit: Number(total) / 100,
+    credit: 0,
+    facture_id: invoice.id
+  }];
+  for (let index = 0; index < grouped.length; index++) {
+    const netCents = grouped[index].weight - allocations[index];
+    if (netCents <= 0n) continue;
+    lines.push({
+      code: grouped[index].code,
+      libelle: 'Vente ' + grouped[index].libelle + ' — facture ' + invoice.numero,
+      debit: 0,
+      credit: Number(netCents) / 100,
+      facture_id: invoice.id
+    });
+  }
+  if (tax > 0n) {
+    lines.push({
+      code: '443',
+      libelle: 'TVA facture ' + invoice.numero,
+      debit: 0,
+      credit: Number(tax) / 100,
+      facture_id: invoice.id
+    });
+  }
+  if (shipping > 0n) {
+    const shippingMapping = await requireAccountingCorrespondence(uid, 'vente', 'frais_livraison', conn);
+    lines.push({
+      code: shippingMapping.code,
+      libelle: 'Frais de livraison facture ' + invoice.numero,
+      debit: 0,
+      credit: Number(shipping) / 100,
+      facture_id: invoice.id
+    });
+  }
+  return lines;
+}
 
 async function ensureAccountingDefaults(uid, conn = pool) {
   for (const [code, label, classe, nature, lettrable] of OHADA_STARTER_ACCOUNTS) {
@@ -3066,6 +3284,22 @@ async function ensureAccountingDefaults(uid, conn = pool) {
   const journals = [['VE','Ventes','vente'],['AC','Achats','achat'],['BQ','Banque','banque'],['CA','Caisse','caisse'],['OD','Opérations diverses','od']];
   for (const [code, label, type] of journals) {
     await conn.query('INSERT IGNORE INTO pro_compta_journaux (user_id, code, libelle, type) VALUES (?, ?, ?, ?)', [uid, code, label, type]);
+  }
+
+  // Correspondances initiales compatibles avec le comportement historique.
+  // INSERT IGNORE ne remplace jamais les choix personnalisés de l'entreprise.
+  const defaultMappings = [
+    ['vente', 'produit', '701'],
+    ['vente', 'service', '706'],
+    ['vente', 'frais_livraison', '707'],
+    ['depense', '__default__', '638']
+  ];
+  for (const [sourceType, sourceKey, accountCode] of defaultMappings) {
+    const account = await accountId(uid, accountCode, conn);
+    await conn.query(
+      'INSERT IGNORE INTO pro_compta_correspondances (user_id, type_source, cle_source, compte_id) VALUES (?, ?, ?, ?)',
+      [uid, sourceType, sourceKey, account]
+    );
   }
 }
 
@@ -3191,6 +3425,93 @@ router.get('/accounting/config', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+router.get('/accounting/mappings', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    await ensureAccountingDefaults(uid);
+    const [mappingRows, categoryRows] = await Promise.all([
+      pool.query(
+        'SELECT m.type_source, m.cle_source, m.compte_id, c.code, c.libelle, c.classe, c.actif FROM pro_compta_correspondances m JOIN pro_compta_comptes c ON c.id = m.compte_id AND c.user_id = m.user_id WHERE m.user_id = ? ORDER BY m.type_source, m.cle_source',
+        [uid]
+      ),
+      pool.query(
+        "SELECT DISTINCT TRIM(categorie) AS categorie FROM depenses WHERE user_id = ? AND categorie IS NOT NULL AND TRIM(categorie) <> '' ORDER BY categorie",
+        [uid]
+      )
+    ]);
+    const mappings = mappingRows[0];
+    const fallback = mappings.find(row => row.type_source === 'depense' && row.cle_source === '__default__');
+    const categories = categoryRows[0].map(row => {
+      const key = normalizeAccountingCategoryKey(row.categorie);
+      const specific = mappings.find(mapping => mapping.type_source === 'depense' && mapping.cle_source === key);
+      const effective = specific || fallback || null;
+      return {
+        categorie: row.categorie,
+        cle_source: key,
+        personnalisee: Boolean(specific),
+        compte_id: effective?.compte_id ?? null,
+        code: effective?.code ?? null,
+        libelle: effective?.libelle ?? null
+      };
+    });
+    res.json({ correspondances: mappings, categories_depenses: categories });
+  } catch (err) { next(err); }
+});
+
+router.put('/accounting/mappings', async (req, res, next) => {
+  try {
+    const uid = owner(req);
+    const sourceType = String(req.body.type_source || '').trim().toLowerCase();
+    const rawKey = String(req.body.cle_source ?? '');
+    let sourceKey;
+    if (sourceType === 'vente') {
+      sourceKey = rawKey.trim().toLowerCase();
+      if (!ACCOUNTING_SALE_MAPPING_KEYS.includes(sourceKey)) {
+        return res.status(400).json({ error: 'Type de vente invalide.', code: 'TYPE_CORRESPONDANCE_INVALIDE' });
+      }
+    } else if (sourceType === 'depense') {
+      const normalizedCategory = String(rawKey).normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (rawKey === '__default__') {
+        sourceKey = '__default__';
+      } else if (!normalizedCategory || normalizedCategory.length > 100) {
+        return res.status(400).json({ error: 'Indiquez une catégorie de dépense valide (100 caractères maximum).', code: 'CATEGORIE_CORRESPONDANCE_INVALIDE' });
+      } else {
+        sourceKey = normalizedCategory;
+      }
+    } else {
+      return res.status(400).json({ error: 'La source doit être vente ou dépense.', code: 'SOURCE_CORRESPONDANCE_INVALIDE' });
+    }
+
+    const accountIdValue = Number(req.body.compte_id);
+    if (!idOk(accountIdValue)) return res.status(400).json({ error: 'Compte comptable invalide.' });
+    const expectedClass = sourceType === 'vente' ? 7 : 6;
+    const [accountRows] = await pool.query(
+      'SELECT id, code, libelle, classe FROM pro_compta_comptes WHERE id = ? AND user_id = ? AND actif = 1 LIMIT 1',
+      [accountIdValue, uid]
+    );
+    const account = accountRows[0];
+    if (!account) return res.status(404).json({ error: 'Compte actif introuvable dans cette entreprise.' });
+    if (Number(account.classe) !== expectedClass) {
+      return res.status(400).json({
+        error: 'Une vente doit être affectée à un compte de classe 7 et une dépense à un compte de classe 6.',
+        code: 'CLASSE_COMPTE_CORRESPONDANCE_INVALIDE'
+      });
+    }
+
+    await pool.query(
+      'INSERT INTO pro_compta_correspondances (user_id, type_source, cle_source, compte_id) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE compte_id = VALUES(compte_id)',
+      [uid, sourceType, sourceKey, accountIdValue]
+    );
+    await audit(req, 'comptabilite.correspondance_modifiee', 'compte', accountIdValue, {
+      type_source: sourceType,
+      cle_source: sourceKey,
+      code_compte: account.code
+    });
+    res.json({ success: true, correspondance: { type_source: sourceType, cle_source: sourceKey, compte_id: account.id, code: account.code, libelle: account.libelle } });
+  } catch (err) { next(err); }
+});
+
 router.post('/accounting/accounts', async (req, res, next) => {
   try {
     const code = String(req.body.code || '').trim().slice(0,20), libelle = String(req.body.libelle || '').trim().slice(0,190);
@@ -3307,8 +3628,6 @@ router.post('/accounting/post-invoice/:id', async (req, res, next) => {
   let conn;
   try {
     const uid = owner(req);
-    // Sérialiser l'enregistrement comptable avec une éventuelle annulation/réactivation :
-    // le statut ne peut pas basculer pendant que la première écriture est créée.
     conn = await pool.getConnection();
     await conn.beginTransaction();
     const [rows] = await conn.query(
@@ -3320,16 +3639,41 @@ router.post('/accounting/post-invoice/:id', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Facture non trouvée ou annulée.' });
     }
-    const netSales = Math.round((Number(invoice.total) - Number(invoice.total_tva)) * 100) / 100;
-    const lines = [{ code: '411', libelle: 'Client ' + invoice.id, debit: Number(invoice.total), credit: 0, facture_id: invoice.id }];
-    if (netSales > 0) lines.push({ code: '706', libelle: 'Vente facture ' + invoice.numero, debit: 0, credit: netSales, facture_id: invoice.id });
-    if (Number(invoice.total_tva) > 0) lines.push({ code: '443', libelle: 'TVA facture ' + invoice.numero, debit: 0, credit: Number(invoice.total_tva), facture_id: invoice.id });
-    const result = await postSystemEntry(uid, actor(req), 'facture', invoice.id, invoice.date_emission, 'Comptabilisation facture ' + invoice.numero, 'VE', lines, conn);
+
+    // Une écriture validée doit rester idempotente même si une correspondance a
+    // été modifiée ou si son compte est ensuite désactivé. Ne pas recalculer la pièce.
+    const [existingEntries] = await conn.query(
+      "SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ? LIMIT 1 FOR UPDATE",
+      [uid, invoice.id]
+    );
+    if (existingEntries.length) {
+      await conn.commit();
+      return res.status(200).json({
+        id: existingEntries[0].id,
+        numero: existingEntries[0].numero,
+        duplicate: true
+      });
+    }
+
+    await ensureAccountingDefaults(uid, conn);
+    const lines = await buildInvoiceAccountingLines(uid, invoice, conn);
+    const result = await postSystemEntry(
+      uid,
+      actor(req),
+      'facture',
+      invoice.id,
+      invoice.date_emission,
+      'Comptabilisation facture ' + invoice.numero,
+      'VE',
+      lines,
+      conn
+    );
     await conn.commit();
     res.status(result.duplicate ? 200 : 201).json(result);
   } catch (err) {
     if (conn) await conn.rollback().catch(() => {});
     if (err.code === 'FACTURE_NON_COMPTABILISABLE') return res.status(409).json({ error: 'La facture a été supprimée ou annulée avant sa comptabilisation.' });
+    if (err.status === 409 && err.code) return res.status(409).json({ error: err.message, code: err.code });
     next(err);
   } finally {
     if (conn) conn.release();
@@ -3414,11 +3758,29 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Dépense introuvable.' });
     }
+
+    // Une écriture déjà validée n'est jamais recalculée selon une correspondance
+    // modifiée ou un compte devenu inactif : le rejeu renvoie l'écriture d'origine.
+    const [existingEntries] = await conn.query(
+      "SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE",
+      [uid, expense.id]
+    );
+    if (existingEntries.length) {
+      await conn.commit();
+      return res.status(200).json({
+        id: existingEntries[0].id,
+        numero: existingEntries[0].numero,
+        duplicate: true
+      });
+    }
+
     const amount = Number(expense.montant);
     if (!Number.isFinite(amount) || amount <= 0) {
       await conn.rollback();
       return res.status(409).json({ error: 'Le montant de la dépense doit être positif avant comptabilisation.' });
     }
+    await ensureAccountingDefaults(uid, conn);
+    const expenseMapping = await requireExpenseCorrespondence(uid, expense.categorie, conn);
     const bank = expense.mode_reglement === 'banque';
     const result = await postSystemEntry(
       uid,
@@ -3429,7 +3791,7 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
       'Dépense ' + expense.libelle,
       bank ? 'BQ' : 'CA',
       [
-        { code: '622', libelle: expense.categorie || expense.libelle, debit: amount, credit: 0 },
+        { code: expenseMapping.code, libelle: expense.categorie || expense.libelle, debit: amount, credit: 0 },
         { code: bank ? '521' : '571', libelle: bank ? 'Règlement bancaire dépense' : 'Règlement caisse dépense', debit: 0, credit: amount }
       ],
       conn
@@ -3440,6 +3802,7 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
     if (conn) await conn.rollback().catch(() => {});
     if (err.code === 'DEPENSE_NON_COMPTABILISABLE') return res.status(404).json({ error: 'Dépense supprimée avant comptabilisation.' });
     if (err.code === 'DEPENSE_MODIFIEE') return res.status(409).json({ error: 'La dépense a changé; actualisez puis relancez la comptabilisation.' });
+    if (err.status === 409 && err.code) return res.status(409).json({ error: err.message, code: err.code });
     next(err);
   } finally {
     if (conn) conn.release();

@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 22;
+const CURRENT_SCHEMA_VERSION = 23;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -176,6 +176,7 @@ async function runMigrations(conn) {
   // v20 : mode de règlement des dépenses (caisse 571 / banque 521).
   // v21 : état et dates UTC de l'essai gratuit de 15 jours, sans attribution rétroactive.
   // v22 : les événements comptables de facture ne doivent pas être supprimés en cascade par une suppression de facture.
+  // v23 : correspondances comptables propres à chaque entreprise, pour ventes et catégories de dépenses.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -499,6 +500,30 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of saasSubscriptionsStatements) {
+    await conn.query(statement);
+  }
+
+
+  // v23 : la clé composée compte_id + user_id interdit une correspondance
+  // vers un compte comptable appartenant à une autre entreprise.
+  const [mappingAccountIndexRows] = await conn.query(
+    'SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?',
+    ['pro_compta_comptes', 'uk_pro_compta_compte_id_user']
+  );
+  if (Number(mappingAccountIndexRows[0].n) === 0) {
+    await conn.query('ALTER TABLE pro_compta_comptes ADD UNIQUE INDEX uk_pro_compta_compte_id_user (id, user_id)');
+  }
+
+  const accountingMappingsPath = path.join(__dirname, '..', 'database', 'migrations', '012_comptabilite_correspondances.sql');
+  const accountingMappingsSql = fs.readFileSync(accountingMappingsPath, 'utf8');
+  const accountingMappingsStatements = accountingMappingsSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of accountingMappingsStatements) {
     await conn.query(statement);
   }
 
