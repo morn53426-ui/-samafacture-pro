@@ -107,7 +107,8 @@ describe('Dashboard Sunupilot — structure de référence', () => {
   });
 
   test('les cartes sont accessibles au clavier et adaptatives', () => {
-    assert.match(dashboard, /<nav class="dashboard-modules" aria-label="Modules Sunupilot">/);
+    assert.match(dashboard, /<nav class="dashboard-modules" aria-label="Modules Sunupilot" tabindex="0">/,
+      'Le rail des modules doit rester focusable au clavier.');
     assert.match(styles, /\.dashboard-module-card:focus-visible/);
     assert.match(styles, /@media \(max-width: 1200px\)[\s\S]*?\.dashboard-modules/);
     assert.match(styles, /@media \(max-width: 560px\)[\s\S]*?\.dashboard-modules/);
