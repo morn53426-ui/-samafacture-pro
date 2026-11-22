@@ -139,7 +139,7 @@ router.put('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Dépense introuvable.' });
     }
     const [postedRows] = await conn.query(
-      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE",
+      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE FOR UPDATE",
       [req.tenantId, existing.id]
     );
     if (postedRows.length) {
@@ -215,7 +215,7 @@ router.delete('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Dépense introuvable.' });
     }
     const [postedRows] = await conn.query(
-      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE",
+      "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ? LIMIT 1 FOR UPDATE FOR UPDATE",
       [req.tenantId, existingRows[0].id]
     );
     if (postedRows.length) {
