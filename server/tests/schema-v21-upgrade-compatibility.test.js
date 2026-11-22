@@ -73,7 +73,7 @@ after(async () => {
   await teardownTestEnvironment();
 });
 
-test('une base v19 conservant un essai actif migre vers v21 sans perdre ses dates', async () => {
+test('une base v19 conservant un essai actif migre vers v22 sans perdre ses dates', async () => {
   const userId = await addUser('from-v19', true);
   const [[trialBefore]] = await pool.query(
     'SELECT trial_plan, trial_started_at, trial_ends_at, trial_status FROM users WHERE id = ?',
@@ -102,10 +102,10 @@ test('une base v19 conservant un essai actif migre vers v21 sans perdre ses date
 
   const migration = runMigrationInNewProcess();
   assert.equal(migration.error, undefined, migration.error?.message);
-  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v19 → v21 a échoué.');
+  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v19 → v22 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 21);
+  assert.equal(Number(meta.version), 22);
 
   const [[account]] = await pool.query(
     'SELECT plan, trial_plan, trial_started_at, trial_ends_at, trial_status FROM users WHERE id = ?',
@@ -125,7 +125,7 @@ test('une base v19 conservant un essai actif migre vers v21 sans perdre ses date
       trial_status: account.trial_status
     },
     trialBefore,
-    'La migration v19 → v21 ne doit ni redémarrer ni raccourcir l’essai actif.'
+    'La migration v19 → v22 ne doit ni redémarrer ni raccourcir l’essai actif.'
   );
 
   const [[expense]] = await pool.query(
@@ -172,10 +172,10 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
 
   const migration = runMigrationInNewProcess();
   assert.equal(migration.error, undefined, migration.error?.message);
-  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v20 → v21 a échoué.');
+  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v20 → v22 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 21);
+  assert.equal(Number(meta.version), 22);
 
   const [[account]] = await pool.query(
     'SELECT trial_plan, trial_started_at, trial_ends_at, trial_status FROM users WHERE id = ?',
@@ -206,7 +206,7 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   const repeatedMigration = runMigrationInNewProcess();
   assert.equal(repeatedMigration.error, undefined, repeatedMigration.error?.message);
   assert.equal(repeatedMigration.status, 0,
-    repeatedMigration.stderr || repeatedMigration.stdout || 'La migration répétée v20 → v21 a échoué.');
+    repeatedMigration.stderr || repeatedMigration.stdout || 'La migration répétée v20 → v22 a échoué.');
   const [[repeatedMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
   assert.equal(Number(repeatedMeta.version), 21);
   const [[repeatedExpense]] = await pool.query(
@@ -223,4 +223,89 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   assert.equal(repeatedAccount.trial_ends_at, null);
 
   await removeTestUser(userId);
+});
+
+test('une base v21 protège les événements comptables contre la suppression en cascade et rejoue la migration v22', async () => {
+  const userId = await addUser('from-v21', false);
+  let clientId = null;
+  let invoiceId = null;
+  try {
+    const [client] = await pool.query(
+      'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+      [userId, 'Client audit migration v22']
+    );
+    clientId = client.insertId;
+    const numero = 'AUDIT-EVENT-' + crypto.randomUUID().slice(0, 8);
+    const [invoice] = await pool.query(
+      `INSERT INTO factures
+        (user_id, client_id, numero, type, date_emission, statut, sous_total, total_tva, total, montant_paye)
+       VALUES (?, ?, ?, 'facture', UTC_DATE(), 'annulee', 0, 0, 0, 0)`,
+      [userId, clientId, numero]
+    );
+    invoiceId = invoice.insertId;
+    await pool.query(
+      'INSERT INTO pro_compta_facture_events (user_id, facture_id, transition, previous_ecriture_id) VALUES (?, ?, ?, ?)',
+      [userId, invoiceId, 'annulation', 1]
+    );
+
+    // Simuler précisément le schéma v21 : la FK facture était en ON DELETE CASCADE.
+    const [[fkBefore]] = await pool.query(
+      `SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
+         AND CONSTRAINT_NAME = 'fk_pro_compta_facture_events_invoice'`
+    );
+    assert.ok(fkBefore, 'la contrainte invoice-event doit exister en v21');
+    if (fkBefore.DELETE_RULE !== 'CASCADE') {
+      await pool.query('ALTER TABLE pro_compta_facture_events DROP FOREIGN KEY fk_pro_compta_facture_events_invoice');
+      await pool.query(
+        'ALTER TABLE pro_compta_facture_events ADD CONSTRAINT fk_pro_compta_facture_events_invoice FOREIGN KEY (facture_id) REFERENCES factures(id) ON DELETE CASCADE'
+      );
+    }
+    await pool.query('UPDATE _samafacture_schema_meta SET version = 21 WHERE id = 1');
+
+    const migration = runMigrationInNewProcess();
+    assert.equal(migration.error, undefined, migration.error?.message);
+    assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v21 → v22 a échoué.');
+
+    const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
+    assert.equal(Number(meta.version), 22);
+    const [[fkAfter]] = await pool.query(
+      `SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
+         AND CONSTRAINT_NAME = 'fk_pro_compta_facture_events_invoice'`
+    );
+    assert.equal(fkAfter.DELETE_RULE, 'RESTRICT');
+
+    await assert.rejects(
+      pool.query('DELETE FROM factures WHERE id = ? AND user_id = ?', [invoiceId, userId]),
+      err => err.code === 'ER_ROW_IS_REFERENCED_2',
+      'une facture référencée par l’historique comptable ne doit pas supprimer l’événement'
+    );
+    const [[eventAfterDeleteAttempt]] = await pool.query(
+      'SELECT id, facture_id, transition FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ?',
+      [userId, invoiceId]
+    );
+    assert.ok(eventAfterDeleteAttempt);
+    assert.equal(eventAfterDeleteAttempt.transition, 'annulation');
+
+    // Le chemin v21→v22 doit être rejouable sans remplacer ni perdre l'événement.
+    await pool.query('UPDATE _samafacture_schema_meta SET version = 21 WHERE id = 1');
+    const repeated = runMigrationInNewProcess();
+    assert.equal(repeated.error, undefined, repeated.error?.message);
+    assert.equal(repeated.status, 0, repeated.stderr || repeated.stdout || 'La migration v21 → v22 rejouée a échoué.');
+    const [[repeatMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
+    assert.equal(Number(repeatMeta.version), 22);
+    const [[repeatEvent]] = await pool.query(
+      'SELECT id, facture_id, transition FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ?',
+      [userId, invoiceId]
+    );
+    assert.deepEqual(repeatEvent, eventAfterDeleteAttempt);
+  } finally {
+    if (invoiceId) {
+      await pool.query('DELETE FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ?', [userId, invoiceId]);
+      await pool.query('DELETE FROM factures WHERE id = ? AND user_id = ?', [invoiceId, userId]);
+    }
+    if (clientId) await pool.query('DELETE FROM clients WHERE id = ? AND user_id = ?', [clientId, userId]);
+    await removeTestUser(userId);
+  }
 });
