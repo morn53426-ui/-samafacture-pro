@@ -1,17 +1,20 @@
-# Inventaire des branches distantes — 22 novembre 2026, 04:31 UTC
+# Inventaire des branches distantes — 22 novembre 2026, actualisation run 4
 
 Dépôt : `morn53426-ui/-samafacture-pro`  
 Référence : `main`  
-Branches : **144** ; SHA de tête uniques : **142**.  
-Protection de main : `protected=true`; ruleset actif `protect main`. L'endpoint de protection détaillée répond 403, donc les règles exactes ne sont pas visibles.
+Branches : **146** ; SHA de tête uniques : **144**.  
+Pull Requests ouvertes : **23**.  
+Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
+Ruleset `protect main` actif : blocage suppression/non-fast-forward, PR obligatoire, résolution des threads requise, checks obligatoires (Tests Node.js et MySQL, Build complete source archive); 0 approbation obligatoire. Le endpoint classic protection indique `protected=true` mais `protection.enabled=false`; le ruleset actif est la protection effectivement confirmée.  
 
-> Cet inventaire est read-only. Les SHAs sont abrégés à 8 caractères pour la lecture. L'ahead/behind et le diff détaillé n'ont pas été calculés pour toutes les branches; voir le rapport d'audit pour les comparaisons ciblées. Aucune branche n'a été supprimée.
+> Snapshot read-only via l’API branches (pagination 100+46). L’API branches ne fournit pas les dates de commit; elles ne sont donc pas inventées. Les comparaisons ahead/behind sont calculées pour les PR ciblées seulement. Aucune branche supprimée.
 
 ## Têtes partagées
 - `11d55850`: `feat/dashboard-reference-layout`, `feat/sunupilot-dashboard-reference`
 - `383c885a`: `fix/invoice-stock-principal-warehouse`, `rebase/pr106-main-20261121-run1`
 
 ## Branches par préfixe
+
 ### (sans préfixe) (1)
 
 | Branche | HEAD |
@@ -27,7 +30,7 @@ Protection de main : `protected=true`; ruleset actif `protect main`. L'endpoint 
 | `audit/fix-nginx-upstream-order-20261116` | `5e93abdc` |
 | `audit/fix-realtime-company-groups-20261116-run1` | `e5c3d802` |
 | `audit/fix-reset-email-docs-and-redaction-test-20261116` | `a53c96da` |
-| `audit/initial-review-20261122` | `75b71026` |
+| `audit/initial-review-20261122` | `5d9ece51` |
 | `audit/invoice-pdf-typography-print-20261118` | `7cb2d43c` |
 | `audit/npm-audit-gate-2026-11-16` | `63a344d9` |
 | `audit/rapport-approfondi-2026-11-16-run2` | `1aee9331` |
@@ -55,10 +58,11 @@ Protection de main : `protected=true`; ruleset actif `protect main`. L'endpoint 
 |---|---|
 | `chore/emil-design-skills-20261117` | `70f8ea19` |
 
-### ci (2)
+### ci (3)
 
 | Branche | HEAD |
 |---|---|
+| `ci/lint-history-protection-backend-20261122` | `c4125b4d` |
 | `ci/package-main-after-pr39-pr40` | `8c725a00` |
 | `ci/real-restore-smoke-20261117` | `8864ab94` |
 
@@ -120,12 +124,12 @@ Protection de main : `protected=true`; ruleset actif `protect main`. L'endpoint 
 |---|---|
 | `feature/video-presentation-spark-sunupilot` | `29dd7ccc` |
 
-### fix (52)
+### fix (53)
 
 | Branche | HEAD |
 |---|---|
 | `fix/a11y-settings-labels-20261116` | `4b275916` |
-| `fix/accessibility-contrast-focus-main-20261121` | `bf6a0231` |
+| `fix/accessibility-contrast-focus-main-20261121` | `378ff2a2` |
 | `fix/accessibility-template-preview-contrast-20261122` | `6b3cd9ff` |
 | `fix/accounting-invoice-cancellation-reversal-20261121` | `ba756d09` |
 | `fix/accounting-refund-journal-reversal-20261121` | `b45f4797` |
@@ -133,7 +137,7 @@ Protection de main : `protected=true`; ruleset actif `protect main`. L'endpoint 
 | `fix/atomic-encrypted-backups-2026-11-15` | `03a36a61` |
 | `fix/backup-retention-guard-2026-11-16` | `e277ca8a` |
 | `fix/ci-serial-tests-2026-11-15` | `4a74afa8` |
-| `fix/client-delete-history-protection-20261122` | `6c7c04c7` |
+| `fix/client-delete-history-protection-20261122` | `04de367f` |
 | `fix/dashboard-donut-count-20261118` | `2d4d7619` |
 | `fix/docker-context-secrets-and-lockfile-2026-11-15` | `52d4b81b` |
 | `fix/docker-local-startup-mysql-redis-swagger` | `2f021548` |
@@ -160,6 +164,7 @@ Protection de main : `protected=true`; ruleset actif `protect main`. L'endpoint 
 | `fix/pdf-worker-db-readiness-2026-11-16` | `59d341a1` |
 | `fix/pdf-worker-health-and-sidebar-icons-2026-11-15` | `04304461` |
 | `fix/pdf-worker-wait-for-api-health-2026-11-15` | `941f235f` |
+| `fix/pro-workspace-status-contrast-20261122` | `baa9ea6a` |
 | `fix/product-delete-stock-history-protection-20261122` | `d5bd445c` |
 | `fix/purchase-receipt-warehouse-deadlock-20261119` | `f0f43c3d` |
 | `fix/quota-registry-initialization-robustness-2026-11-15` | `c8ea3204` |
@@ -250,3 +255,7 @@ Protection de main : `protected=true`; ruleset actif `protect main`. L'endpoint 
 |---|---|
 | `ui/augmenter-logo-icones-sidebar` | `63af3d94` |
 | `ui/modern-responsive-polish` | `a2faa30e` |
+
+## Comparaisons ciblées
+
+Les comparaisons exhaustives des 146 branches restent à effectuer. Les 21 comparaisons ciblées sont consignées dans le rapport d’audit.
