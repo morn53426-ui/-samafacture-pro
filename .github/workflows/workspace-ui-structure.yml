@@ -1,0 +1,48 @@
+name: Workspace UI structure regression
+
+on:
+  pull_request:
+    paths:
+      - 'public/professionnel.html'
+      - 'public/parametres.html'
+      - 'public/css/enterprise-workspace.css'
+      - 'public/css/workspace-polish.css'
+      - 'public/js/sidebar.js'
+      - 'public/js/icons.js'
+      - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/parametres-accessibility.test.js'
+      - '.github/workflows/workspace-ui-structure.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'public/professionnel.html'
+      - 'public/parametres.html'
+      - 'public/css/enterprise-workspace.css'
+      - 'public/css/workspace-polish.css'
+      - 'public/js/sidebar.js'
+      - 'public/js/icons.js'
+      - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/parametres-accessibility.test.js'
+      - '.github/workflows/workspace-ui-structure.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  workspace-ui-structure:
+    name: Workspace navigation and settings structure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: Run static UI regression tests
+        run: node --test server/tests/workspace-navigation.test.js server/tests/parametres-accessibility.test.js
