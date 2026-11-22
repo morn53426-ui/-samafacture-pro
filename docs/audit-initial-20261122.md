@@ -644,3 +644,11 @@ Aucun merge, PR fermé, branche supprimée, modification directe de main, donné
 - #99/#102/#110 : tests CI failed sur HEAD; #133 aucun run CI sur head.
 - #137/#138 ont temporairement des modifications identiques de configuration lint à #140, afin de vérifier leurs propres fichiers avant merge. Après intégration autorisée, les duplications seront réconciliées/rebasées.
 - Aucun test local, Docker local, recette PDF manuelle, NVDA/VoiceOver ou merge effectué.
+
+
+## Run 4 — corrections supplémentaires après CI, 06:35 UTC
+- #130 test run 1415 sur head `378ff2a2` échoue encore à la recette visuelle, mais sur un second défaut : label sélectionné `Facture` dans `nouvelle-facture`, foreground `rgb(10,122,69)`, background `rgb(26,27,46)`, ratio 3,13:1. Le badge professionnel initial est corrigé; l’audit visuel continue et révèle le défaut de contraste du switch.
+- Correction #130 commit `c420c63abc00964d7e5b3e3b2aaad024df776b45`: `.invoice-type-switch label:has(input:checked)` utilise `var(--emerald-text)` au lieu de l’accent décoratif `var(--emerald)`. Ratio calculé pour #9DE7BC/#1A1B2E = 11,76:1; #066144/#EAF3EC = 6,62:1 (calcul local, recette CI encore en attente). Head c420c63 ESLint+ZIP+tests déclenchés; ZIP green, ESLint/tests in progress.
+- #138 : défaut découvert dans #138, suppression produit vérifiait `SUM(quantite)` entre entrepôts; des soldes +3 et -3 pourraient s’annuler et masquer des lignes non nulles. Correctif `SELECT id ... quantite <> 0 ... FOR UPDATE` et protection des lignes cross-tenant même si quantité nulle. Tests ajoutés pour net zéro et conservation des deux balances. Head `c4340b88`: ESLint green, ZIP green, tests en cours.
+- #137 head `f2aada8d`: ESLint+ZIP green, tests en cours. #140 head `d16c4c54`: ESLint+ZIP green, tests en cours.
+- #130/#138 CI en cours après nouveaux commits; aucune correction déclarée validée avant tests complets.
