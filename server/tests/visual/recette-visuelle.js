@@ -1406,6 +1406,36 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.deepEqual(metrics.invoiceLabels, ['N° facture', 'Client', 'Émission', 'Statut', 'Total TTC'],
       'Chaque information d’une facture doit rester nommée et visible sur mobile.');
   }
+  if (pageDefinition.name === 'dashboard' && viewport.width <= 560) {
+    const modulesRail = await page.$eval('.dashboard-modules', element => {
+      const style = getComputedStyle(element);
+      return {
+        columns: style.gridTemplateColumns,
+        flow: style.gridAutoFlow,
+        overflowX: style.overflowX,
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        tabIndex: element.tabIndex,
+        cardCount: element.querySelectorAll('.dashboard-module-card').length,
+        inViewport: (() => {
+          const rect = element.getBoundingClientRect();
+          return rect.left >= -1 && rect.right <= window.innerWidth + 1;
+        })()
+      };
+    });
+    assert.equal(modulesRail.flow, 'column',
+      'Les modules du dashboard doivent former un rail horizontal sur mobile : ' + JSON.stringify(modulesRail));
+    assert.equal(modulesRail.overflowX, 'auto',
+      'Le rail des modules doit défiler horizontalement : ' + JSON.stringify(modulesRail));
+    assert.ok(modulesRail.scrollWidth > modulesRail.clientWidth,
+      'Les cartes suivantes doivent être accessibles par défilement horizontal : ' + JSON.stringify(modulesRail));
+    assert.equal(modulesRail.tabIndex, 0,
+      'Le rail des modules doit être focusable au clavier.');
+    assert.equal(modulesRail.cardCount, 5,
+      'Les cinq modules professionnels doivent rester accessibles.');
+    assert.equal(modulesRail.inViewport, true,
+      'Le rail doit rester dans la largeur du viewport sans élargir la page.');
+  }
   assert.deepEqual(pageErrors, [],
     pageDefinition.name + ' a généré des erreurs JavaScript: ' + pageErrors.join(' | '));
 
@@ -1604,6 +1634,34 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'Les trois catégories de ventes doivent rester visibles sur mobile.');
     assert.equal(legendMetrics.valuesFit, true,
       'Les montants TTC doivent tenir sur leur ligne en vue mobile : ' + JSON.stringify(legendMetrics));
+  }
+
+
+  if (pageDefinition.name === 'dashboard' && viewport.name === 'mobile-320') {
+    await page.$eval('.workspace-skip-link', element => element.focus());
+    await page.waitForFunction(() => {
+      const element = document.querySelector('.workspace-skip-link');
+      if (!element) return false;
+      const rect = element.getBoundingClientRect();
+      return rect.top >= 0 && rect.bottom <= Math.min(70, window.innerHeight);
+    }, { timeout: 3000 });
+    const skipLink = await page.$eval('.workspace-skip-link', element => {
+      const rect = element.getBoundingClientRect();
+      const main = document.getElementById(element.getAttribute('href').slice(1));
+      return {
+        target: element.getAttribute('href'),
+        mainExists: Boolean(main && main.tagName === 'MAIN' && main.tabIndex === -1),
+        top: rect.top,
+        bottom: rect.bottom,
+        viewportHeight: window.innerHeight
+      };
+    });
+    assert.equal(skipLink.target, '#main-content');
+    assert.equal(skipLink.mainExists, true,
+      'Le lien clavier doit viser le main focusable du tableau de bord.');
+    assert.ok(skipLink.top >= 0 && skipLink.bottom <= Math.min(70, skipLink.viewportHeight),
+      'Le raccourci doit apparaître après focus et transition CSS : ' + JSON.stringify(skipLink));
+    await page.evaluate(() => document.activeElement?.blur());
   }
 
   const filename = pageDefinition.name + '-' + viewport.name + '-' + DATASET + '.png';
