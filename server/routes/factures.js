@@ -1232,8 +1232,19 @@ router.delete('/:id', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Facture introuvable.' });
     }
+    // Une facture émise est un document final : elle ne se supprime pas, même sans
+    // paiement ou posting. L'annulation/contrepassation conserve sa piste d'audit.
+    // Cette règle évite aussi de perdre le lien stock si un produit a été détaché
+    // de facture_lignes après suppression du catalogue.
+    if (existing.type === 'facture') {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Une facture émise ne peut pas être supprimée. Utilisez son annulation ou une contrepassation pour conserver la traçabilité.',
+        code: 'DOCUMENT_HISTORIQUE_PROTEGE'
+      });
+    }
 
-    // Avant toute suppression, protéger l'historique financier, comptable, commercial,
+    // Avant toute suppression de devis, protéger l'historique financier, commercial,
     // documentaire et les mouvements de stock. Les cascades FK peuvent supprimer paiements,
     // liens/checkouts ou décisions portail; les lignes comptables peuvent perdre leur facture.
     // Un mouvement de stock n'ayant pas de facture_id, les factures avec produits sont
