@@ -251,7 +251,7 @@ test('une base v21 protège les événements comptables contre la suppression en
     // Simuler précisément le schéma v21 : la FK facture était en ON DELETE CASCADE.
     const [[fkBefore]] = await pool.query(
       `SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
+       WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
          AND CONSTRAINT_NAME = 'fk_pro_compta_facture_events_invoice'`
     );
     assert.ok(fkBefore, 'la contrainte invoice-event doit exister en v21');
@@ -271,22 +271,22 @@ test('une base v21 protège les événements comptables contre la suppression en
     assert.equal(Number(meta.version), 22);
     const [[fkAfter]] = await pool.query(
       `SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
+       WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
          AND CONSTRAINT_NAME = 'fk_pro_compta_facture_events_invoice'`
     );
-    assert.equal(fkAfter.DELETE_RULE, 'RESTRICT');
+    assert.equal(fkAfter, undefined,
+      'aucune FK facture→événement ne doit permettre à MySQL de supprimer l’historique ou de bloquer la purge du tenant');
 
-    await assert.rejects(
-      pool.query('DELETE FROM factures WHERE id = ? AND user_id = ?', [invoiceId, userId]),
-      err => err.code === 'ER_ROW_IS_REFERENCED_2',
-      'une facture référencée par l’historique comptable ne doit pas supprimer l’événement'
-    );
-    const [[eventAfterDeleteAttempt]] = await pool.query(
+    // Une suppression exceptionnelle de facture peut laisser une référence d'audit :
+    // l'événement reste attribué au tenant et garde l'identifiant original.
+    await pool.query('DELETE FROM factures WHERE id = ? AND user_id = ?', [invoiceId, userId]);
+    const [[eventAfterInvoiceDelete]] = await pool.query(
       'SELECT id, facture_id, transition FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ?',
       [userId, invoiceId]
     );
-    assert.ok(eventAfterDeleteAttempt);
-    assert.equal(eventAfterDeleteAttempt.transition, 'annulation');
+    assert.ok(eventAfterInvoiceDelete);
+    assert.equal(Number(eventAfterInvoiceDelete.facture_id), Number(invoiceId));
+    assert.equal(eventAfterInvoiceDelete.transition, 'annulation');
 
     // Le chemin v21→v22 doit être rejouable sans remplacer ni perdre l'événement.
     await pool.query('UPDATE _samafacture_schema_meta SET version = 21 WHERE id = 1');
@@ -301,8 +301,8 @@ test('une base v21 protège les événements comptables contre la suppression en
     );
     assert.deepEqual(repeatEvent, eventAfterDeleteAttempt);
 
-    // La suppression du compte doit pouvoir effacer les données de test via les FK
-    // user→invoice et user→event, sans que la FK invoice→event ne la bloque.
+    // La suppression du compte doit pouvoir effacer les données de test via la FK
+    // user→event et les autres cascades, tandis que l'audit est conservé tant que le tenant vit.
     await pool.query('DELETE FROM users WHERE id = ?', [userId]);
     const createdIndex = createdUserIds.indexOf(userId);
     if (createdIndex !== -1) createdUserIds.splice(createdIndex, 1);
