@@ -423,7 +423,7 @@ test('les dépenses distinguent caisse et banque et deviennent immuables après 
   );
   assert.deepEqual(bankLines.map(line => ({ code: line.code, debit: Number(line.debit), credit: Number(line.credit) })), [
     { code: '521', debit: 0, credit: 8500 },
-    { code: '622', debit: 8500, credit: 0 }
+    { code: '638', debit: 8500, credit: 0 }
   ]);
 
   const bankReplay = await postExpense(bankExpense.body.depense.id);
@@ -671,8 +671,12 @@ test('la comptabilisation des dépenses est équilibrée, idempotente et isolée
   assert.equal(config.status, 200, config.text);
   const expenseAccount = config.body.comptes.find(account => account.code === '622');
   const cashAccount = config.body.comptes.find(account => account.code === '571');
-  assert.ok(expenseAccount, 'le compte de charges 622 doit être disponible');
+  assert.ok(expenseAccount, 'le compte de loyers 622 doit être disponible');
   assert.ok(cashAccount, 'le compte de caisse 571 doit être disponible');
+  const mappingLoyer = await request(app).put('/api/pro/accounting/mappings')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ type_source: 'depense', cle_source: 'Loyer', compte_id: expenseAccount.id });
+  assert.equal(mappingLoyer.status, 200, mappingLoyer.text);
 
   const posted = await request(app)
     .post('/api/pro/accounting/post-expense/' + expenseId)
@@ -762,6 +766,7 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
   assert.ok(account('707'));
   assert.ok(account('6181'));
   assert.ok(account('625'));
+  assert.ok(account('638'));
   assert.ok(account('702'));
   assert.ok(account('703'));
   assert.ok(account('704'));
@@ -771,7 +776,7 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
   assert.equal(defaults.status, 200, defaults.text);
   assert.ok(defaults.body.correspondances.some(row => row.type_source === 'vente' && row.cle_source === 'produit' && row.code === '701'));
   assert.ok(defaults.body.correspondances.some(row => row.type_source === 'vente' && row.cle_source === 'service' && row.code === '706'));
-  assert.ok(defaults.body.correspondances.some(row => row.type_source === 'depense' && row.cle_source === '__default__' && row.code === '622'));
+  assert.ok(defaults.body.correspondances.some(row => row.type_source === 'depense' && row.cle_source === '__default__' && row.code === '638'));
 
   const invalidClass = await setMapping('vente', 'produit', account('521'));
   assert.equal(invalidClass.status, 400);

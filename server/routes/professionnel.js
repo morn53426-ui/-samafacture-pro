@@ -3470,9 +3470,13 @@ router.put('/accounting/mappings', async (req, res, next) => {
         return res.status(400).json({ error: 'Type de vente invalide.', code: 'TYPE_CORRESPONDANCE_INVALIDE' });
       }
     } else if (sourceType === 'depense') {
-      sourceKey = rawKey === '__default__' ? '__default__' : normalizeAccountingCategoryKey(rawKey);
-      if (!sourceKey || sourceKey.length > 100) {
+      const normalizedCategory = String(rawKey).normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (rawKey === '__default__') {
+        sourceKey = '__default__';
+      } else if (!normalizedCategory || normalizedCategory.length > 100) {
         return res.status(400).json({ error: 'Indiquez une catégorie de dépense valide (100 caractères maximum).', code: 'CATEGORIE_CORRESPONDANCE_INVALIDE' });
+      } else {
+        sourceKey = normalizedCategory;
       }
     } else {
       return res.status(400).json({ error: 'La source doit être vente ou dépense.', code: 'SOURCE_CORRESPONDANCE_INVALIDE' });

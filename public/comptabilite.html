@@ -38,7 +38,7 @@
 
   <section class="card" style="margin-bottom:20px" id="accounting-mappings">
     <h2 style="margin-top:0">Correspondances comptables automatiques</h2>
-    <p class="pro-note">Affectez les ventes et les dépenses à des comptes de votre entreprise. Les changements ne modifient jamais les écritures déjà validées. Les anciennes fiches non classées restent non classées ; leur compte de repli peut être ajusté ici. Attention : le réglage « produit catalogue » s’applique à tous les produits de ce type. En SYSCOHADA, 701 concerne les marchandises revendues sans transformation, 702 les produits finis fabriqués, 703 les produits intermédiaires, 704 les produits résiduels, 705 les travaux et 706 les services. Choisissez le compte selon la nature réelle de votre activité ; les entreprises ayant plusieurs natures de produits doivent les distinguer avant la comptabilisation automatique.</p>
+    <p class="pro-note">Affectez les ventes et les dépenses à des comptes de votre entreprise. Les changements ne modifient jamais les écritures déjà validées. Les anciennes fiches non classées restent non classées ; leur compte de repli peut être ajusté ici. Attention : le réglage « produit catalogue » s’applique à tous les produits de ce type. En SYSCOHADA, 701 concerne les marchandises revendues sans transformation, 702 les produits finis fabriqués, 703 les produits intermédiaires, 704 les produits résiduels, 705 les travaux et 706 les services. Choisissez le compte selon la nature réelle de votre activité. Pour les dépenses, 638 est le compte de repli « autres charges externes » ; configurez un compte précis pour les catégories connues (loyer 622, déplacements 6181, assurance 625, etc.). Les comptes existants des entreprises ne sont pas renommés automatiquement.</p>
     <form id="mapping-form" class="grid grid-3">
       <div class="field">
         <label for="mapping-key">Opération à paramétrer</label>
@@ -48,7 +48,7 @@
           <option value="vente:non_classe">Vente — fiche non classée (historique)</option>
           <option value="vente:saisie_libre">Vente — ligne saisie libre</option>
           <option value="vente:frais_livraison">Vente — frais de livraison</option>
-          <option value="depense:__default__">Dépense — catégorie par défaut</option>
+          <option value="depense:__default__">Dépense — autres charges externes par défaut (638)</option>
           <option value="depense:custom">Dépense — catégorie précise</option>
         </select>
       </div>
@@ -134,7 +134,7 @@ function renderAccountingMappings(data){
     non_classe:'Vente — fiche non classée',
     saisie_libre:'Vente — saisie libre',
     frais_livraison:'Vente — livraison',
-    __default__:'Dépense — défaut'
+    __default__:'Dépense — repli autres charges externes (638)'
   };
   const rows=(data.correspondances||[]).map(mapping=>{
     const label=mapping.type_source==='vente'?(labels[mapping.cle_source]||mapping.cle_source):'Dépense';
