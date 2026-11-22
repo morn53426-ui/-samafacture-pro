@@ -504,3 +504,14 @@ Comparaison directe `main...branch` sur 19 refs ouvertes ciblées. Ces résultat
 - Comparaisons ahead/behind/diffs réalisées sur 19 PRs prioritaires seulement, pas les 144 branches.
 - Aucun clone local, test local, Docker local, MySQL local, Redis local, PDF ou recette responsive complète exécutés.
 - Aucun merge/close, aucune branche/data/volume/backup supprimé, main inchangé, paiement réel désactivé.
+
+
+## 21. Vérification de sérialisation stock — 22 novembre 2026, 04:31 UTC
+
+Lecture ciblée de `server/routes/professionnel.js` main (3 397 lignes) :
+- `POST /inventory/adjustments` verrouille le produit avec `SELECT ... FOR UPDATE` avant d'ajuster stock et mouvement.
+- `POST /inventory/transfers` verrouille le produit avant transfert et lignes d'entrepôt.
+- La réception fournisseur verrouille le produit avant d'incrémenter le stock.
+- Ces chemins utilisent le même verrou parent produit que le DELETE de PR #138, ce qui réduit le risque de course stock/delete sur les opérations examinées.
+- Les enfants cross-tenant peuvent être créés uniquement via données anomalement liées/imports/direct SQL, mais les guards #137/#138 les protègent explicitement au DELETE.
+- Ce contrôle de lock-order est ciblé; toutes les routes qui peuvent modifier produit, achats, factures ou stock n'ont pas été auditées exhaustivement.
