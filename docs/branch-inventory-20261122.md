@@ -1,12 +1,12 @@
-# Inventaire des branches distantes — 22 novembre 2026, actualisation run 4
+# Inventaire des branches distantes — 22 novembre 2026, run 4
 
 Dépôt : `morn53426-ui/-samafacture-pro`  
 Référence : `main`  
-Branches : **146** ; SHA de tête uniques : **144**.  
+Branches : **146** ; SHA uniques : **144**.  
 PR ouvertes : **23**. Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
-Ruleset `protect main` actif : deletion et non-fast-forward interdits, PR obligatoire, résolution de threads, checks `Tests Node.js et MySQL` et `Build complete source archive`, 0 approbation requise, bypass none. L’API classic indique `protected=true` mais `protection.enabled=false`; le ruleset actif est la protection confirmée.
+Ruleset `protect main` actif : suppression/non-fast-forward interdits, PR obligatoire, résolution des threads, checks `Tests Node.js et MySQL` et `Build complete source archive`, 0 approbation requise, bypass none. API classic `protected=true` mais `protection.enabled=false`; ruleset actif confirmé.
 
-> Pagination 100+46; l’API branches ne fournit pas les dates de commit. Ahead/behind exhaustif non calculé; comparaisons ciblées dans le rapport. Aucune branche supprimée.
+> Branches API paginées 100+46. L’endpoint ne fournit pas la date des commits; dates non inventées. Comparaisons ahead/behind ciblées (21 PR) uniquement; aucune branche supprimée.
 
 ## Têtes partagées
 - `11d55850`: `feat/dashboard-reference-layout`, `feat/sunupilot-dashboard-reference`
@@ -29,7 +29,7 @@ Ruleset `protect main` actif : deletion et non-fast-forward interdits, PR obliga
 | `audit/fix-nginx-upstream-order-20261116` | `5e93abdc` |
 | `audit/fix-realtime-company-groups-20261116-run1` | `e5c3d802` |
 | `audit/fix-reset-email-docs-and-redaction-test-20261116` | `a53c96da` |
-| `audit/initial-review-20261122` | `f85f3a05` |
+| `audit/initial-review-20261122` | `1a5be8b0` |
 | `audit/invoice-pdf-typography-print-20261118` | `7cb2d43c` |
 | `audit/npm-audit-gate-2026-11-16` | `63a344d9` |
 | `audit/rapport-approfondi-2026-11-16-run2` | `1aee9331` |
@@ -61,7 +61,7 @@ Ruleset `protect main` actif : deletion et non-fast-forward interdits, PR obliga
 
 | Branche | HEAD |
 |---|---|
-| `ci/lint-history-protection-backend-20261122` | `4656d588` |
+| `ci/lint-history-protection-backend-20261122` | `d16c4c54` |
 | `ci/package-main-after-pr39-pr40` | `8c725a00` |
 | `ci/real-restore-smoke-20261117` | `8864ab94` |
 
@@ -136,7 +136,7 @@ Ruleset `protect main` actif : deletion et non-fast-forward interdits, PR obliga
 | `fix/atomic-encrypted-backups-2026-11-15` | `03a36a61` |
 | `fix/backup-retention-guard-2026-11-16` | `e277ca8a` |
 | `fix/ci-serial-tests-2026-11-15` | `4a74afa8` |
-| `fix/client-delete-history-protection-20261122` | `04de367f` |
+| `fix/client-delete-history-protection-20261122` | `f2aada8d` |
 | `fix/dashboard-donut-count-20261118` | `2d4d7619` |
 | `fix/docker-context-secrets-and-lockfile-2026-11-15` | `52d4b81b` |
 | `fix/docker-local-startup-mysql-redis-swagger` | `2f021548` |
@@ -164,7 +164,7 @@ Ruleset `protect main` actif : deletion et non-fast-forward interdits, PR obliga
 | `fix/pdf-worker-health-and-sidebar-icons-2026-11-15` | `04304461` |
 | `fix/pdf-worker-wait-for-api-health-2026-11-15` | `941f235f` |
 | `fix/pro-workspace-status-contrast-20261122` | `baa9ea6a` |
-| `fix/product-delete-stock-history-protection-20261122` | `d5bd445c` |
+| `fix/product-delete-stock-history-protection-20261122` | `44d02021` |
 | `fix/purchase-receipt-warehouse-deadlock-20261119` | `f0f43c3d` |
 | `fix/quota-registry-initialization-robustness-2026-11-15` | `c8ea3204` |
 | `fix/quote-executive-a4-pagination-20261121` | `9bfc8aea` |
@@ -257,4 +257,4 @@ Ruleset `protect main` actif : deletion et non-fast-forward interdits, PR obliga
 
 ## Comparaisons ciblées
 
-21 branches de PR prioritaires comparées à main; les comparaisons des 146 branches restantes ne sont pas exhaustives. Voir `docs/audit-initial-20261122.md`.
+21 PR branches comparées à main; comparaisons exhaustives des 146 branches restantes à poursuivre. Détails dans le rapport d’audit.
