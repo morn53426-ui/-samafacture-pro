@@ -1406,6 +1406,37 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.deepEqual(metrics.invoiceLabels, ['N° facture', 'Client', 'Émission', 'Statut', 'Total TTC'],
       'Chaque information d’une facture doit rester nommée et visible sur mobile.');
   }
+  if (pageDefinition.name === 'dashboard' && viewport.width <= 560) {
+    const modulesRail = await page.$eval('.dashboard-modules', element => {
+      const style = getComputedStyle(element);
+      return {
+        columns: style.gridTemplateColumns,
+        flow: style.gridAutoFlow,
+        overflowX: style.overflowX,
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        tabIndex: element.tabIndex,
+        cardCount: element.querySelectorAll('.dashboard-module-card').length,
+        inViewport: (() => {
+          const rect = element.getBoundingClientRect();
+          return rect.left >= -1 && rect.right <= window.innerWidth + 1;
+        })()
+      };
+    });
+    assert.equal(modulesRail.flow, 'column',
+      'Les modules du dashboard doivent former un rail horizontal sur mobile : ' + JSON.stringify(modulesRail));
+    assert.equal(modulesRail.overflowX, 'auto',
+      'Le rail des modules doit défiler horizontalement : ' + JSON.stringify(modulesRail));
+    assert.ok(modulesRail.scrollWidth > modulesRail.clientWidth,
+      'Les cartes suivantes doivent être accessibles par défilement horizontal : ' + JSON.stringify(modulesRail));
+    assert.equal(modulesRail.tabIndex, 0,
+      'Le rail des modules doit être focusable au clavier.');
+    assert.equal(modulesRail.cardCount, 5,
+      'Les cinq modules professionnels doivent rester accessibles.');
+    assert.equal(modulesRail.inViewport, true,
+      'Le rail doit rester dans la largeur du viewport sans élargir la page.');
+  }
+
   assert.deepEqual(pageErrors, [],
     pageDefinition.name + ' a généré des erreurs JavaScript: ' + pageErrors.join(' | '));
 
