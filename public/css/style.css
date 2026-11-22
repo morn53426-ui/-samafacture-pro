@@ -7275,18 +7275,26 @@ a.btn .icon {
   background: linear-gradient(125deg, #1355B5, #1A62CA) !important;
 }
 .reports-kpi-green {
-  background: linear-gradient(125deg, #08724F, #0A7F59) !important;
+  /* Stops plus sombres : contraste AA même avec le texte clair du thème sombre. */
+  background: linear-gradient(125deg, #0B765C, #087A61) !important;
 }
 .reports-kpi-purple {
   background: linear-gradient(125deg, #7138E8, #8B38F1) !important;
 }
 .reports-kpi-amber {
-  background: linear-gradient(125deg, #905700, #A86500) !important;
+  /* Les deux stops doivent satisfaire le contraste, pas uniquement la première couleur. */
+  background: linear-gradient(125deg, #9C5A00, #8E4E00) !important;
 }
 .reports-kpi-blue .stat-label,
 .reports-kpi-green .stat-label,
 .reports-kpi-purple .stat-label,
-.reports-kpi-amber .stat-label { color: #fff; }
+.reports-kpi-amber .stat-label,
+.reports-kpi-blue .stat-value,
+.reports-kpi-green .stat-value,
+.reports-kpi-purple .stat-value,
+.reports-kpi-amber .stat-value {
+  color: #fff !important;
+}
 
 
 
