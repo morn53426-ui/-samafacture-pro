@@ -445,15 +445,17 @@ function bindWorkspaceNotificationDismiss() {
     );
     if (anotherDialogIsOpen) return;
 
-    // Le menu mobile est une navigation divulgable, pas une modale : Échap le
+    // Le menu mobile est une navigation déployable, pas une modale : Échap le
     // referme et rend le focus au bouton qui l'a ouvert (y compris le centre Groupe).
     const sidebar = document.getElementById('app-sidebar');
     if (sidebar?.classList.contains('open')) {
       event.preventDefault();
       closeSidebar();
-      const toggle = document.getElementById('mobile-toggle-btn') ||
-        document.querySelector('.enterprise-console-menu-toggle');
-      if (toggle?.isConnected) toggle.focus({ preventScroll: true });
+      const toggle = document.querySelector('.enterprise-console-menu-toggle') ||
+        document.getElementById('mobile-toggle-btn');
+      if (toggle?.isConnected && toggle.getClientRects().length) {
+        toggle.focus({ preventScroll: true });
+      }
       return;
     }
 
