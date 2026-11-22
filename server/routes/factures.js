@@ -1274,6 +1274,7 @@ router.delete('/:id', async (req, res, next) => {
         req.tenantId, existing.id,
         req.tenantId, existing.id,
         req.tenantId, existing.id,
+        req.tenantId, existing.id,
         existing.id
       ]
     );
