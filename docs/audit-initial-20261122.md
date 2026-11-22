@@ -568,3 +568,60 @@ Le log du run `44985277196` indique sur la page Professionnel `span.pro-status`,
 5. Rebaser #115; comparer #125/#127 pour recette PDF; poursuivre les comparaisons détaillées des branches restantes.
 
 Aucune modification directe de main, aucun merge/close, aucune suppression de branche, donnée, volume ou sauvegarde; paiements réels désactivés. Tests locaux et Docker local non exécutés.
+
+## Actualisation run 4 — 22 novembre 2026, 06:28 UTC
+
+### État frais du dépôt
+- Pagination branches : **146** (100 + 46), **144 SHA uniques**; 23 PR ouvertes.
+- Main toujours `8453ee6d8e633f151523236eecff1bc0e0cf877b`. Workflow Actions #1296 (21 nov. 19:20 UTC) : `Tests automatisés` success. Aucun commit sur main.
+- Ruleset `protect main` ID 27410527 actif, ciblant main : règles deletion et non-fast-forward, PR obligatoire, résolution de threads, checks requis `Tests Node.js et MySQL` et `Build complete source archive`, approbations requises 0; bypass none. L’API classic branch protection signale `protected=true` mais `protection.enabled=false`; le ruleset est actif et vérifié.
+- 21 branches de PR comparées à main (a/b ci-dessous), les 146 comparaisons exhaustives restent à faire. Les dates de commit pour chaque branche ne sont pas disponibles via la liste branches, donc non renseignées.
+
+### Comparaisons ahead/behind actualisées
+| PR | Ahead | Behind | Statut compare | Conclusion |
+|---|---:|---:|---|---|
+| #99 | 21 | 228 | diverged | Rebrand très ancien; CI tests failed |
+| #102 | 13 | 228 | diverged | CI tests failed; très ancien |
+| #110 | 15 | 53 | diverged | CI tests failed; rebase nécessaire |
+| #114 | 4 | 50 | diverged | CI green mais roadmap ancienne |
+| #115 | 1 | 23 | diverged | CI tests+ZIP green; rebase nécessaire |
+| #117 | 47 | 0 | ahead | CI tests+ZIP+ESLint green; réconciliation migration #128 requise |
+| #118 | 42 | 23 | diverged | CI tests+ZIP green; comparer avec #126 |
+| #125 | 43 | 0 | ahead | CI 3/3 green; recette PDF à vérifier manuellement |
+| #126 | 30 | 0 | ahead | CI tests+ZIP green; portage vidéo candidat |
+| #127 | 5 | 0 | ahead | CI 3/3 green; recette devis A4 |
+| #128 | 39 | 0 | ahead | CI tests+ZIP+ESLint green; intégration migration #117 version 21 |
+| #130 | 16 | 0 | ahead | Nouveau head `378ff2a2`; CI tests en cours après port badge pro |
+| #131 | 4 | 0 | ahead | CI tests+ZIP green; feuille de route récente |
+| #133 | 13 | 0 | ahead | Aucun run CI sur head; branch review requise |
+| #134 | 3 | 0 | ahead | CI 3/3 green |
+| #135 | 11 | 0 | ahead | CI 3/3 green |
+| #136 | 5 | 0 | ahead | CI 3/3 green |
+| #137 | 8 | 0 | ahead | CI Tests+ZIP green; ESLint non déclenché pour ces chemins |
+| #138 | 8 | 0 | ahead | CI Tests+ZIP green; ESLint non déclenché pour ces chemins |
+| #139 | 1 | 0 | ahead | CI Tests+ZIP green |
+| #140 | 2 | 0 | ahead | CI tests+ESLint en cours; ZIP green |
+
+### CI actualisée — heads ouverts
+- #134, #135, #136 : 3/3 checks success.
+- #137, #138 : tests Node/MySQL et ZIP success; **aucun ESLint run** sur leurs HEAD, car le workflow `.github/workflows/lint.yml` ne couvre pas les routes clients/produits ni les tests concernés.
+- #139 : Tests automatisés et ZIP success.
+- #130 : ancien run échoue uniquement à la recette visuelle (badge `span.pro-status` 2,23:1). Cause confirmée dans les logs. Correctif port de #139 ajouté dans `public/css/enterprise-workspace.css`, commit `378ff2a2ce0b8e18355ce3ec374421b487b04187`. Sur ce head, ESLint+ZIP success, tests Node/MySQL encore in_progress.
+- #140 : nouvelle PR draft pour étendre ESLint aux routes `server/routes/clients.js`, `server/routes/produits.js` et tests `client-history-protection`, `stock`, `produits-delete`; commit head `c4125b4d`. Tests et ESLint in_progress, ZIP success.
+- #129 : tests+ESLint+ZIP green; #131 tests+ZIP green; #117/#128/#125/#127 tests+ZIP green; #126/#118 tests+ZIP green.
+- #110/#102/#99 : tests failed, ESLint et ZIP green. #114 tests+ZIP green mais 50 commits behind. #115 tests+ZIP green mais 23 behind. #133 aucun run sur head.
+
+### Corrections et nouveaux constats
+- #130 : port du sélecteur contrasté `.pro-workspace-guide-head .pro-status` (clair `#066144`, sombre/sombre-système `#9DE7BC`) depuis la PR #139. Le test visuel #130 est à revalider sur head `378ff2a2`; ne pas déclarer la PR validée avant sa CI complète.
+- #137 et #138 : tests CI Node/MySQL et package réussis; les jobs ESLint n’ont pas été déclenchés pour les fichiers modifiés. PR #140 corrige le périmètre du lint, mais ne lint pas encore le code de #137/#138 (PR #140 est basée sur main). Après validation #140, il faudra intégrer/rebaser la config sur ces branches et relancer leurs CI, sans merge automatique.
+- #140 : 2 fichiers modifiés (`.github/workflows/lint.yml`, `eslint.config.mjs`), ajout de 5 chemins backend/test à la configuration et à la commande. CI en cours.
+
+### Plan
+1. Attendre les CI #130 et #140; examiner les logs en cas d’échec.
+2. Si #140 green, rebaser/porter sa configuration lint dans les branches #137/#138 pour vérifier les fichiers réellement modifiés.
+3. Revue des correctifs P1 #134–#139, puis migration combinée #117/#128 version 21 additive/idempotente.
+4. Rebase #115; recette PDF/Responsive #125/#127; analyse doublons #118/#126, #114/#131, #102/#110.
+5. Continuer l’audit détaillé des branches restantes; tests locaux/Docker/PDF/backup manuels non exécutés dans cet environnement.
+
+### Protections
+Aucun merge, PR fermé, branche supprimée, modification directe de main, donnée/volume/backups supprimé, ni paiement réel activé. Les corrections restent en PR draft.
