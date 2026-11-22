@@ -716,7 +716,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 ### CI fresh sur HEAD
 | PR | Tests Node/MySQL | ESLint | ZIP |
 |---|---|---|---|
-| #132 | aucun run sur HEAD avant ce commit; #1451 in_progress sur HEAD précédent, #1433 success plus ancien | — | aucun run sur HEAD avant ce commit; #1153 success sur HEAD précédent, #1148 in_progress plus ancien |
+| #132 | aucun run sur HEAD avant ce commit; #1451 in_progress sur HEAD précédent, #1446 in_progress plus ancien, #1433 success antérieur | — | aucun run sur HEAD avant ce commit; #1153 success sur HEAD précédent, #1148 in_progress plus ancien, #1135 success antérieur |
 | #130 | #1430 failure ancien HEAD; #1434 success nouveau | #484 success ancien; #485 success nouveau | #1132 success ancien; #1136 success nouveau |
 | #138 | #1429 success | #483 success | #1131 success |
 | #140 | #1420 success | #476 success | #1122 success |
@@ -784,8 +784,8 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Ahead/behind est désormais comparé pour les 122 branches sans PR ouverte (aucune restante non comparée). Les 146 HEADs sont rafraîchis, sauf branche d'audit auto-référente #132. Revue détaillée diff/date/CI et tests de chaque branche restent à compléter.
 
 
-### Documentation branch follow-up
-- PR #132 latest head `9f6e89ff` is 43 ahead/0 behind; current CI Tests #1446 and ZIP #1148 are in_progress. Previous #1433/#1135 were green on an earlier HEAD; they do not validate the latest inventory updates.
+### Documentation branch follow-up (historique du snapshot précédent)
+- HEAD `9f6e89ff` avait 43 ahead/0 behind; Tests #1446 et ZIP #1148 étaient in_progress. Les commits documentaires ultérieurs ont actualisé le rapport et l'inventaire; les statuts de ce HEAD ancien ne valident pas les commits récents.
 
 
 ### Run 7 — vingt comparaisons supplémentaires PDF / responsive (branches sans PR ouverte)
@@ -893,4 +893,4 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 
 
 ### État PR #132 après la couverture ahead/behind complète
-- Avant le refresh d'inventaire et cette correction documentaire, HEAD `b7109a14` était 63 ahead/0 behind. Le commit inventaire et les mises à jour de rapport ajoutent trois commits; le HEAD attendu après cette correction est 66 ahead/0 behind, Draft. Status/workflow-run queries précédentes étaient vides; CI du HEAD après commit à vérifier, tests locaux toujours non exécutés.
+- Avant ce dernier commit documentaire, HEAD `8331513e` était 66 ahead/0 behind, Draft, sans workflow-run visible. Ce commit final ajoute un commit (ahead attendu 67); aucune CI locale ou produit n'est validée, et le workflow du HEAD après commit doit être vérifié.
