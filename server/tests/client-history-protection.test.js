@@ -8,6 +8,7 @@ const {
 describe('Protection de l’historique client', () => {
   let userId;
   let token;
+  let userIdB;
 
   before(async () => {
     await setupTestDatabase();
@@ -23,9 +24,21 @@ describe('Protection de l’historique client', () => {
     userId = registration.body.user.id;
     token = registration.body.token;
     await pool.query("UPDATE users SET plan = 'pro' WHERE id = ?", [userId]);
+
+    const registrationB = await request(app)
+      .post('/api/auth/register')
+      .send({
+        nom: 'Compte référence inter-entreprise',
+        email: emailDeTest('client-history-cross-tenant'),
+        password: 'motdepasse123',
+        acceptTerms: true
+      });
+    assert.equal(registrationB.status, 201, registrationB.text);
+    userIdB = registrationB.body.user.id;
   });
 
   after(async () => {
+    await nettoyerUtilisateur(userIdB);
     await nettoyerUtilisateur(userId);
   });
 
@@ -119,6 +132,29 @@ describe('Protection de l’historique client', () => {
     const [[order]] = await pool.query('SELECT id FROM pro_commandes WHERE id = ? AND client_id = ?', [created.insertId, client.id]);
     assert.ok(storedClient, 'client conservé');
     assert.ok(order, 'commande conservée');
+  });
+
+  test('une référence CRM cross-tenant empêche la cascade et conserve les données', async () => {
+    const client = await createClient('Client référence cross-tenant');
+    const [activity] = await pool.query(
+      `INSERT INTO pro_crm_activities
+       (user_id, client_id, acteur_user_id, type, titre, description, statut)
+       VALUES (?, ?, ?, 'note', 'Référence inter-entreprise', 'Test de garde de cascade', 'terminee')`,
+      [userIdB, client.id, userIdB]
+    );
+    const deletion = await request(app)
+      .delete(`/api/clients/${client.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(deletion.status, 409, deletion.text);
+    assert.equal(deletion.body.code, 'CLIENT_HISTORIQUE_PROTEGE');
+    const [[storedClient]] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [client.id, userId]);
+    const [[storedActivity]] = await pool.query(
+      'SELECT id, user_id, client_id FROM pro_crm_activities WHERE id = ?',
+      [activity.insertId]
+    );
+    assert.ok(storedClient, 'client conservé');
+    assert.equal(Number(storedActivity.user_id), Number(userIdB), 'référence de l’autre entreprise conservée');
+    assert.equal(Number(storedActivity.client_id), Number(client.id), 'lien client conservé');
   });
 
   test('un client sans historique reste supprimable', async () => {
