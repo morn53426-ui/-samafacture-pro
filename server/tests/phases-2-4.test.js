@@ -356,7 +356,7 @@ test('annulation et réactivation contre-passent chaque écriture facture sans d
     .delete('/api/factures/' + invoice.id)
     .set('Authorization', 'Bearer ' + token);
   assert.equal(deletePostedInvoice.status, 409, deletePostedInvoice.text);
-  assert.equal(deletePostedInvoice.body.code, 'FACTURE_COMPTABILISEE');
+  assert.equal(deletePostedInvoice.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
   const [[retainedInvoice]] = await pool.query(
     'SELECT id, statut FROM factures WHERE id = ? AND user_id = ?',
     [invoice.id, userId]
@@ -381,8 +381,15 @@ test('annulation et réactivation contre-passent chaque écriture facture sans d
   const deleteUnpostedInvoice = await request(app)
     .delete('/api/factures/' + unpostedInvoice.id)
     .set('Authorization', 'Bearer ' + token);
-  assert.equal(deleteUnpostedInvoice.status, 200, deleteUnpostedInvoice.text,
-    'un document sans écriture comptable reste supprimable');
+  assert.equal(deleteUnpostedInvoice.status, 409, deleteUnpostedInvoice.text,
+    'une facture émise reste dans l’historique même sans écriture comptable');
+  assert.equal(deleteUnpostedInvoice.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
+  const [[retainedUnpostedInvoice]] = await pool.query(
+    'SELECT id, statut FROM factures WHERE id = ? AND user_id = ?',
+    [unpostedInvoice.id, userId]
+  );
+  assert.equal(Number(retainedUnpostedInvoice.id), Number(unpostedInvoice.id));
+  assert.equal(retainedUnpostedInvoice.statut, 'annulee');
 });
 
 test('les dépenses distinguent caisse et banque et deviennent immuables après comptabilisation', async () => {
@@ -425,11 +432,11 @@ test('les dépenses distinguent caisse et banque et deviennent immuables après 
   const updatePosted = await request(app).put('/api/depenses/' + bankExpense.body.depense.id)
     .set('Authorization', 'Bearer ' + token).send({ montant: 9999, mode_reglement: 'caisse' });
   assert.equal(updatePosted.status, 409, updatePosted.text);
-  assert.equal(updatePosted.body.code, 'DEPENSE_COMPTABILISEE');
+  assert.equal(updatePosted.body.code, 'DEPENSE_COMPTABILISEE_PROTEGEE');
   const deletePosted = await request(app).delete('/api/depenses/' + bankExpense.body.depense.id)
     .set('Authorization', 'Bearer ' + token);
   assert.equal(deletePosted.status, 409, deletePosted.text);
-  assert.equal(deletePosted.body.code, 'DEPENSE_COMPTABILISEE');
+  assert.equal(deletePosted.body.code, 'DEPENSE_COMPTABILISEE_PROTEGEE');
 
   const listed = await request(app).get('/api/depenses').set('Authorization', 'Bearer ' + token);
   assert.equal(listed.status, 200, listed.text);
@@ -566,6 +573,77 @@ test('un remboursement réellement exécuté contre-passe le journal du paiement
     { code: '411', debit: 400, credit: 0 },
     { code: '571', debit: 0, credit: 400 }
   ]);
+
+  // Le chèque est un moyen bancaire : l'écriture doit utiliser 521, pas 571.
+  const chequeInvoice = await creerFacture({ amount: 2000, tax: 0 });
+  const chequePayment = await createPayment(chequeInvoice.id, 1500, 'Chèque');
+  const postedCheque = await request(app)
+    .post('/api/pro/accounting/post-payment/' + chequePayment.id)
+    .set('Authorization', 'Bearer ' + token)
+    .send({});
+  assert.equal(postedCheque.status, 201, postedCheque.text);
+  const [[chequeEntry]] = await pool.query(
+    "SELECT e.id, j.code AS journal_code FROM pro_compta_ecritures e JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id WHERE e.user_id = ? AND e.source_type = 'paiement' AND e.source_id = ?",
+    [userId, chequePayment.id]
+  );
+  assert.equal(chequeEntry.journal_code, 'BQ');
+  const [chequeLines] = await pool.query(
+    'SELECT c.code, l.debit, l.credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id WHERE l.user_id = ? AND l.ecriture_id = ? ORDER BY c.code',
+    [userId, chequeEntry.id]
+  );
+  assert.deepEqual(chequeLines.map(line => ({ code: line.code, debit: Number(line.debit), credit: Number(line.credit) })), [
+    { code: '411', debit: 0, credit: 1500 },
+    { code: '521', debit: 1500, credit: 0 }
+  ]);
+
+  // Si l'écriture paiement manque, le remboursement du chèque doit la recréer sur 521.
+  const chequeRefundInvoice = await creerFacture({ amount: 2000, tax: 0 });
+  const chequeRefundPayment = await createPayment(chequeRefundInvoice.id, 1000, 'Chèque');
+  const chequeRefundRequest = await requestRefund(chequeRefundPayment.id, 300, 'Remboursement chèque test');
+  assert.equal(chequeRefundRequest.status, 201, chequeRefundRequest.text);
+  const chequeRefundCompleted = await completeRefund(chequeRefundRequest.body.id, 'REF-CHEQUE-001');
+  assert.equal(chequeRefundCompleted.status, 200, chequeRefundCompleted.text);
+  const [[autoChequeEntry]] = await pool.query(
+    "SELECT e.id, j.code AS journal_code FROM pro_compta_ecritures e JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id WHERE e.user_id = ? AND e.source_type = 'paiement' AND e.source_id = ?",
+    [userId, chequeRefundPayment.id]
+  );
+  assert.equal(autoChequeEntry.journal_code, 'BQ');
+  const [[chequeRefundEntry]] = await pool.query(
+    "SELECT e.id, e.total_debit, e.total_credit, j.code AS journal_code FROM pro_compta_ecritures e JOIN pro_compta_journaux j ON j.id = e.journal_id AND j.user_id = e.user_id WHERE e.user_id = ? AND e.source_type = 'remboursement' AND e.source_id = ?",
+    [userId, chequeRefundRequest.body.id]
+  );
+  assert.equal(chequeRefundEntry.journal_code, 'BQ');
+  assert.equal(Number(chequeRefundEntry.total_debit), 300);
+  assert.equal(Number(chequeRefundEntry.total_credit), 300);
+  const [chequeRefundLines] = await pool.query(
+    'SELECT c.code, l.debit, l.credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id WHERE l.user_id = ? AND l.ecriture_id = ? ORDER BY c.code',
+    [userId, chequeRefundEntry.id]
+  );
+  assert.deepEqual(chequeRefundLines.map(line => ({ code: line.code, debit: Number(line.debit), credit: Number(line.credit) })), [
+    { code: '411', debit: 300, credit: 0 },
+    { code: '521', debit: 0, credit: 300 }
+  ]);
+
+  // Une méthode libre inconnue ne doit jamais être devinée comme caisse.
+  const unknownInvoice = await creerFacture({ amount: 1500, tax: 0 });
+  const unknownPayment = await createPayment(unknownInvoice.id, 1000, 'Mode personnalisé');
+  const unknownPost = await request(app)
+    .post('/api/pro/accounting/post-payment/' + unknownPayment.id)
+    .set('Authorization', 'Bearer ' + token)
+    .send({});
+  assert.equal(unknownPost.status, 409, unknownPost.text);
+  assert.equal(unknownPost.body.code, 'METHODE_PAIEMENT_NON_RECONNUE');
+  const unknownRefundRequest = await requestRefund(unknownPayment.id, 250, 'Remboursement méthode inconnue');
+  assert.equal(unknownRefundRequest.status, 201, unknownRefundRequest.text);
+  const unknownRefundCompleted = await completeRefund(unknownRefundRequest.body.id, 'REF-UNKNOWN-001');
+  assert.equal(unknownRefundCompleted.status, 409, unknownRefundCompleted.text);
+  assert.equal(unknownRefundCompleted.body.code, 'METHODE_PAIEMENT_NON_RECONNUE');
+  const [[unknownEntries]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM pro_compta_ecritures WHERE user_id = ? AND ((source_type = 'paiement' AND source_id = ?) OR (source_type = 'remboursement' AND source_id = ?))",
+    [userId, unknownPayment.id, unknownRefundRequest.body.id]
+  );
+  assert.equal(Number(unknownEntries.total), 0, 'aucuna écriture ne doit être créée pour une méthode non reconnue');
+
   const balance = await request(app)
     .get('/api/pro/accounting/trial-balance')
     .set('Authorization', 'Bearer ' + token);

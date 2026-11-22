@@ -143,7 +143,8 @@ test('supprimer une ancienne facture après un refus ne libère pas de quota', a
   const deleted = await request(app)
     .delete(`/api/factures/${invoiceIds[0]}`)
     .set('Authorization', `Bearer ${token}`);
-  assert.equal(deleted.status, 200, deleted.text);
+  assert.equal(deleted.status, 409, deleted.text);
+  assert.equal(deleted.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
 
   const blocked = await request(app)
     .post('/api/factures')

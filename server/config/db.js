@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 20;
+const CURRENT_SCHEMA_VERSION = 22;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -173,7 +173,9 @@ async function runMigrations(conn) {
   // v17 : entrepôt de sortie mémorisé sur les factures pour des mouvements multi-entrepôts réversibles.
   // v18 : marqueur transactionnel pour reprendre une seule fois la ventilation des stocks historiques.
   // v19 : historique des contrepassations et réactivations comptables des factures.
-  // v20 : mode de règlement des dépenses pour distinguer caisse (571) et banque (521).
+  // v20 : mode de règlement des dépenses (caisse 571 / banque 521).
+  // v21 : état et dates UTC de l'essai gratuit de 15 jours, sans attribution rétroactive.
+  // v22 : les événements comptables de facture ne doivent pas être supprimés en cascade par une suppression de facture.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -196,6 +198,10 @@ async function runMigrations(conn) {
     { table: 'users', column: 'terms_accepted_at', definition: 'DATETIME NULL' },
     { table: 'users', column: 'terms_version', definition: 'VARCHAR(30) NULL' },
     { table: 'users', column: 'privacy_version', definition: 'VARCHAR(30) NULL' },
+    { table: 'users', column: 'trial_plan', definition: 'VARCHAR(20) NULL' },
+    { table: 'users', column: 'trial_started_at', definition: 'DATETIME NULL' },
+    { table: 'users', column: 'trial_ends_at', definition: 'DATETIME NULL' },
+    { table: 'users', column: 'trial_status', definition: "VARCHAR(20) NOT NULL DEFAULT 'not_started'" },
     { table: 'users', column: 'pays_code', definition: "VARCHAR(2) NOT NULL DEFAULT 'SN'" },
     { table: 'users', column: 'langue', definition: "VARCHAR(5) NOT NULL DEFAULT 'fr'" },
     { table: 'users', column: 'locale', definition: "VARCHAR(12) NOT NULL DEFAULT 'fr-SN'" },
@@ -297,6 +303,7 @@ async function runMigrations(conn) {
 
   const indexesToEnsure = [
     { table: 'users', name: 'idx_users_reset_token_hash', columns: '(reset_token_hash)' },
+    { table: 'users', name: 'idx_users_trial_status_end', columns: '(trial_status, trial_ends_at)' },
     { table: 'abonnement_paiements', name: 'idx_abonnement_paiements_internal_reference', columns: '(internal_reference)' },
     // Compteurs par statut (tableau de bord) + passage auto en "en_retard".
     { table: 'factures', name: 'idx_factures_user_type_statut', columns: '(user_id, type, statut)' },
@@ -370,8 +377,8 @@ async function runMigrations(conn) {
     await conn.query(statement);
   }
 
-  // Historique des transitions comptables des factures : chaque annulation/réactivation
-  // crée une écriture inverse liée à un événement unique, y compris après plusieurs cycles.
+  // v19 : historique des transitions comptables des factures. CREATE TABLE IF NOT EXISTS
+  // rend la reprise sûre pour les bases déjà migrées vers la version v20 ou inférieure.
   const invoiceAccountingEventsPath = path.join(__dirname, '..', 'database', 'migrations', '011_comptabilite_contrepas_factures.sql');
   const invoiceAccountingEventsSql = fs.readFileSync(invoiceAccountingEventsPath, 'utf8');
   const invoiceAccountingEventsStatements = invoiceAccountingEventsSql
@@ -383,6 +390,19 @@ async function runMigrations(conn) {
     .filter(Boolean);
   for (const statement of invoiceAccountingEventsStatements) {
     await conn.query(statement);
+  }
+
+  // v22 : conserver l'identifiant de facture comme référence d'audit, sans FK
+  // vers factures. Une facture supprimée par une voie exceptionnelle ne doit pas
+  // effacer ses événements ; la FK user_id → users conserve la suppression complète
+  // et volontaire du tenant via ON DELETE CASCADE.
+  const [invoiceEventForeignKeys] = await conn.query(
+    `SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
+       AND CONSTRAINT_NAME = 'fk_pro_compta_facture_events_invoice'`
+  );
+  if (invoiceEventForeignKeys.length) {
+    await conn.query('ALTER TABLE pro_compta_facture_events DROP FOREIGN KEY fk_pro_compta_facture_events_invoice');
   }
 
   // v18 : 004 vient de créer pro_entrepots sur les nouvelles bases ; cet ajout conditionnel
