@@ -310,3 +310,30 @@ Le code `server/config/db.js` vérifié dans les deux branches n'exécute `runMi
 - #135 tests sur head corrigé en attente; ESLint/ZIP green sur head précédent.
 - #136, #137, #138 et #132 tests en cours.
 - main reste 8453ee6d; aucune fusion.
+
+
+## 16. Actualisation — PR #137/#138 CI failures and corrections (03:46 UTC)
+
+### PR #137
+- CI #44981654268: Tests Node/MySQL failed in the legacy stock test `supprimer le client restitue aussi le stock de ses factures actives`, which expected client deletion to restore stock (old destructive behavior).
+- Test corrected on branch `fix/client-delete-history-protection-20261122` (head `93817546...`): delete client with invoice must return 409; stock unchanged; explicit invoice cancellation restores stock; client remains.
+- CI rerun pending; do not declare PR green.
+
+### PR #138
+- CI #44981742132: Tests Node/MySQL failed in test `supprimer un produit sans stock mais avec mouvements est refusé`; the test had changed catalog stock via PUT, which did not create movement records, so deletion correctly returned 200.
+- Test corrected on branch `fix/product-delete-stock-history-protection-20261122` (head `36b088d3...`): create real inventory adjustments +5 and -5 via `POST /api/pro/inventory/adjustments`, leaving zero stock with movement history; delete must return 409 and product remain.
+- CI rerun pending; do not declare PR green.
+
+### PR #136 validation
+- Tests Node/MySQL: success, run `44981448565`.
+- ESLint: success, run `44981448557`.
+- ZIP: success, run `44981448559`.
+- Head `4e0f2a89...`; PR #136 has all three checks green.
+
+### Current status
+- #134 all checks green.
+- #135 tests in progress on corrected head `2c7f3cbd...`; ESLint and ZIP green.
+- #136 fully green.
+- #137 and #138 have corrected heads; CI pending.
+- #132 report branch CI pending after latest documentation commit.
+- main remains unchanged at 8453ee6d.
