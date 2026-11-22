@@ -304,3 +304,13 @@
 
 - `ui/augmenter-logo-icones-sidebar`
 - `ui/modern-responsive-polish`
+
+
+## Follow-up du run 9 — correction comptable (12:42 UTC)
+- Deux branches de correction dédiées ont été créées : `fix/refund-payment-method-mapping-20261122` (base obsolète, conservée) et `fix/refund-payment-method-mapping-rebased-20261122` (PR #143, Draft). L'intégration #142 avançait pendant le travail; le head #142 est désormais `d2a687ab`.
+- Cause prouvée : le formulaire `public/factures.html` propose « Chèque »; les deux regex comptables (post-payment et fallback refund) ne l'incluaient pas. La méthode libre inconnue était classée caisse par défaut.
+- Correctif/test portés sur #142 : mapping normalisé explicite; chèque→521, espèces→571; inconnues bloquées 409; tests d'écriture chèque, remboursement chèque, méthode inconnue et balance. Commits #142 : `cbcd674b` (test), `d2a687ab` (route).
+- PR #143 reste Draft et ne reçoit pas de runs CI sur sa base de branche; sa comparaison montre 2 commits ahead/10 behind et mergeability false. La correction est aussi portée sur #142 pour obtenir CI main.
+- HEAD #142 `d2a687ab`: ESLint et ZIP success; Tests automatisés run #1516 en cours (initialisation containers, tests/recette visuelle pas encore démarrés).
+- Inventaire après création des branches : **150 branches** (100+50); **26 PR ouvertes**, 113 fermées (94 merged/19 non-merged), **139 PR total**. Les 2 branches ajoutées à l'inventaire précédent : `fix/refund-payment-method-mapping-20261122`, `fix/refund-payment-method-mapping-rebased-20261122`.
+- Aucun merge/close/main touché; aucune donnée/volume/backup supprimé; aucun paiement réel.
