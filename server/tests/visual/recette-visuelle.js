@@ -2398,11 +2398,15 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     const soon = getComputedStyle(probe);
     const proBadge = document.querySelector('.invoice-template-tier.tier-pro');
     const pro = proBadge ? getComputedStyle(proBadge) : null;
+    const enterpriseBadge = document.querySelector('.invoice-template-tier.tier-enterprise');
+    const enterprise = enterpriseBadge ? getComputedStyle(enterpriseBadge) : null;
     const result = {
       soonText: soon.color,
       soonBackground: soon.backgroundColor,
       proText: pro ? pro.color : null,
-      proBackground: pro ? pro.backgroundColor : null
+      proBackground: pro ? pro.backgroundColor : null,
+      enterpriseText: enterprise ? enterprise.color : null,
+      enterpriseBackground: enterprise ? enterprise.backgroundColor : null
     };
     probe.remove();
     return result;
@@ -2414,13 +2418,25 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   const goldBadgeColorsDark = await readGoldBadgeColors();
   const soonBadgeLightContrast = contrastRatio(goldBadgeColorsLight.soonText, goldBadgeColorsLight.soonBackground);
   const proBadgeLightContrast = contrastRatio(goldBadgeColorsLight.proText, goldBadgeColorsLight.proBackground);
+  const enterpriseBadgeLightContrast = contrastRatio(goldBadgeColorsLight.enterpriseText, goldBadgeColorsLight.enterpriseBackground);
   const soonBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.soonText, goldBadgeColorsDark.soonBackground);
   const proBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.proText, goldBadgeColorsDark.proBackground);
+  const enterpriseBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.enterpriseText, goldBadgeColorsDark.enterpriseBackground);
+  await settingsPage.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+  await settingsPage.evaluate(() => window.SamaTheme.definir('auto'));
+  const goldBadgeColorsSystemDark = await readGoldBadgeColors();
+  const enterpriseBadgeSystemDarkContrast = contrastRatio(
+    goldBadgeColorsSystemDark.enterpriseText,
+    goldBadgeColorsSystemDark.enterpriseBackground
+  );
   for (const [label, contrast] of [
     ['Disponibilité clair', soonBadgeLightContrast],
     ['Modèle Pro clair', proBadgeLightContrast],
+    ['Modèle Entreprise clair', enterpriseBadgeLightContrast],
     ['Disponibilité sombre', soonBadgeDarkContrast],
-    ['Modèle Pro sombre', proBadgeDarkContrast]
+    ['Modèle Pro sombre', proBadgeDarkContrast],
+    ['Modèle Entreprise sombre', enterpriseBadgeDarkContrast],
+    ['Modèle Entreprise système sombre', enterpriseBadgeSystemDarkContrast]
   ]) {
     assert.ok(contrast >= 4.5,
       label + ' doit conserver un contraste de 4,5:1. Valeur : ' + contrast.toFixed(2));
