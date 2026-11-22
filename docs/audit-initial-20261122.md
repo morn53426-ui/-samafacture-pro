@@ -677,3 +677,108 @@ PR #117 has CURRENT_SCHEMA_VERSION 20 (accounting invoice reversal v19, expense 
 
 ### Safety and scope
 No direct main update, no merge/close, no branch deletion, no data/volume/backup deletion, no real payments enabled. Local tests/Docker and manual SYSCOHADA certification were not performed. Full diff/date review of non-PR branches remains outstanding.
+
+
+## Addendum — run 7, 22 novembre 2026 (09:23 UTC)
+
+### État actuel et limites de vérification
+- Main confirmé au SHA `8453ee6d8e633f151523236eecff1bc0e0cf877b`; le commit récent est le merge PR #123. Les endpoints status et workflow-runs accessibles ont renvoyé zéro status et zéro run pour main; le run main #1296 mentionné dans l'addendum précédent n'est donc **pas revalidé sur ce run**.
+- Branch names: 146; deux pages 100 + 46; noms identiques à l'inventaire précédent. Les 144 SHA uniques et les dates de dernier commit n'ont pas été recalculés pour toutes les branches. HEADs actualisés ci-dessous pour 23 PR et 30 branches sélectionnées.
+- 23 PR ouvertes confirmées. Comparaisons fraîches main...head pour les 23; CI consultée pour les 23.
+
+### PR ahead/behind (recalcul par SHA actuel; main = 8453ee6d)
+| PR | Ahead | Behind | Remarque |
+|---|---:|---:|---|
+| #132 | 29 | 0 | rapport documentaire |
+| #130 | 20 | 0 | HEAD corrigé 9722ca99, CI relancée |
+| #138 | 15 | 0 | stock/protection |
+| #140 | 4 | 0 | lint backend |
+| #137 | 10 | 0 | protection clients |
+| #139 | 1 | 0 | contraste pro |
+| #135 | 11 | 0 | protection factures |
+| #136 | 5 | 0 | protection dépenses |
+| #134 | 3 | 0 | badge Entreprise |
+| #117 | 47 | 0 | contrepassations |
+| #115 | 1 | 23 | diverged; rebase requis |
+| #133 | 13 | 0 | base #130; non-mergeable, PR empilée |
+| #125 | 43 | 0 | PDF page finale |
+| #126 | 30 | 0 | vidéo landing |
+| #131 | 4 | 0 | roadmap |
+| #118 | 42 | 23 | diverged |
+| #99 | 21 | 228 | diverged ancien |
+| #114 | 4 | 50 | roadmap ancienne |
+| #102 | 13 | 228 | diverged ancien |
+| #110 | 15 | 53 | diverged ancien |
+| #129 | 9 | 0 | workspace |
+| #127 | 5 | 0 | devis Executive |
+| #128 | 39 | 0 | essai 15 jours |
+
+### CI fresh sur HEAD
+| PR | Tests Node/MySQL | ESLint | ZIP |
+|---|---|---|---|
+| #132 | #1433 success | — | #1135 success |
+| #130 | #1430 failure sur ancien HEAD; nouveau #1434 in_progress | #484 success ancien; #485 in_progress nouveau | #1132 success ancien; #1136 success nouveau |
+| #138 | #1429 success | #483 success | #1131 success |
+| #140 | #1420 success | #476 success | #1122 success |
+| #137 | #1421 success | #477 success | #1123 success |
+| #139 | #1412 success | workflow lint absent | #1114 success |
+| #135 | #1393 success | #470 success | #1095 success |
+| #136 | #1381 success | #464 success | #1083 success |
+| #134 | #1376 success | #461 success | #1078 success |
+| #117 | #1355 success | #446 success | #1057 success |
+| #115 | #1220 success | workflow lint absent | #925 success |
+| #133 | aucun run trouvé | aucun run | aucun run |
+| #125 | #1369 success | #456 success | #1071 success |
+| #126 | #1310 success | workflow lint absent | #1012 success |
+| #131 | #1364 success | workflow lint absent | #1066 success |
+| #118 | #1288 success | workflow lint absent | #992 success |
+| #99 | #1014 failure | #165 success | #728 success |
+| #114 | #1221 success | workflow lint absent | #926 success |
+| #102 | #1120 failure | #268 success | #832 success |
+| #110 | #1276 failure | #390 success | #981 success |
+| #129 | #1326 success | #417 success | #1028 success |
+| #127 | #1314 success | #405 success | #1016 success |
+| #128 | #1331 success | #422 success | #1033 success |
+
+### #130 — diagnostic CI et correctif run 7
+- Tests Node/MySQL #1430 sur HEAD `780b357a` : les tests unitaires/integration, restauration chiffrée et smoke test Docker/MySQL/Redis ont terminé success; échec de la **recette visuelle** sur `groupe-entreprise`.
+- Logs: `button#workspace-notification-toggle` foreground `#E8F1FB` sur surface `#F6F7F5`, ratio 1,06:1. Les labels localization/logout héritaient également du texte pâle sur surface/fallback clair (ratios signalés 1,06/1,14). Cause: override topbar qui forçait le texte pâle sur boutons à surface claire, contradictoire avec son commentaire.
+- Correctif commit `9722ca99809cff46317ff82c5e604f86937c3790`, fichier `public/css/enterprise-workspace.css`: variables theme-aware navy `#082B50` en light, pâle `#E8F1FB` en dark, hover emerald adapté aux surfaces. Diff relu après commit.
+- Calculs de couleur (non-browser): navy/cream 13,28:1; emerald foncé/green-light 6,80:1; texte clair/dark surface 11,91:1; hover dark 5,28:1. **Ces calculs ne remplacent pas la recette visuelle.**
+- Nouveau HEAD PR #130 `9722ca99`, mergeable=true, draft=true. Run #1434 Tests in_progress, #485 ESLint in_progress, #1136 ZIP success. Validation visuelle encore attendue.
+- Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
+
+### Branches sans PR — comparaison ciblée 30 (dates/CI non exhaustives)
+Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble.
+
+**Audit/sécurité:**
+- `audit/fix-backup-and-runtime-20261110`: 126/774, 41 fichiers; `audit/fix-enterprise-migration-invitation-20261116`: 14/585, 12 fichiers; `audit/fix-nginx-upstream-order-20261116`: 2/587, 2 fichiers; `audit/fix-realtime-company-groups-20261116-run1`: 3/585, 2 fichiers.
+- `audit/fix-reset-email-docs-and-redaction-test-20261116`: 0/405; `audit/npm-audit-gate-2026-11-16`: 0/589; `audit/securite-2026-11-15`: 0/651; `audit/security-multisocietes-review-20261116-run3`: 0/402.
+- `security/docker-ignore-local-secrets-2026-11-15`: 2/617, 2 fichiers; `security/immediate-session-revocation-2026-11-16`: 2/598, 1 fichier de test; `security/redact-secret-urls-in-logs-2026-11-16`: 10/588, 6 fichiers.
+
+**Sauvegardes/Docker/workers/stock:**
+- `fix/atomic-backup-publish-2026-11-15`: 1/617, 2 fichiers; `fix/atomic-encrypted-backups-2026-11-15`: 1/617, 2 fichiers; `fix/backup-retention-guard-2026-11-16`: 19/596, 8 fichiers.
+- `fix/docker-context-secrets-and-lockfile-2026-11-15`: 3/614, 3 fichiers; `fix/docker-local-startup-mysql-redis-swagger`: 2/622, 4 fichiers.
+- `fix/pdf-worker-db-readiness-2026-11-16`: 4/591, 3 fichiers; `fix/pdf-worker-health-and-sidebar-icons-2026-11-15`: 1/614, 2 fichiers; `fix/pdf-worker-wait-for-api-health-2026-11-15`: 1/620, 2 fichiers.
+- `fix/purchase-receipt-warehouse-deadlock-20261119`: 0/70 (behind only).
+
+**Comptabilité/abonnements/workspace/UI:**
+- `fix/accounting-refund-journal-reversal-20261121`: 43/23, 18 fichiers; PR #120 closed/merged into `feat/accounting-expense-payment-mode-20261121` (non-main base). Cette branche feature est 44/23; #117 head contient la branche feature comme ancêtre et est 47/0.
+- `feat/subscription-engine-local-simulation-20261117`: 0/303; `feat/enterprise-multi-company-foundation-20261116`: 99/401, 32 fichiers; `feat/enterprise-workspace-ux-20261117`: 37/398, 27 fichiers.
+- `feat/invoice-templates-pro-enterprise-20261117`: 0/291; `feat/monthly-invoice-quota-v8-2026-11-15`: 1/617, 10 fichiers; `fix/monthly-invoice-quota-schema-v8-2026-11-15`: 1/616, 10 fichiers.
+- `fix/session-revocation-and-payment-timeouts-2026-11-15`: 5/618, 5 fichiers; `fix/revoke-jwt-on-logout-2026-11-15`: 2/618, 2 fichiers.
+- `feat/enterprise-command-center-20261117`: 99/401, 32 fichiers; `feat/enterprise-company-pagination-20261117`: 37/398, 27 fichiers.
+
+### Revue de diff ciblée (branches non-PR)
+- Docker-secret test: branche `security/docker-ignore-local-secrets` ajoute sentinel .env/.server-env puis inspecte l'image; la branche est très ancienne (617 behind), porter le test sur main actuel plutôt que merger.
+- Session revocation: branche `security/immediate-session-revocation` contient tests pour relecture `token_version` inter-worker, mais 598 behind et n'apporte pas de code d'implémentation dans le diff consulté; ne pas intégrer seule.
+- Atomic backup: branches `fix/atomic-backup-publish` et `fix/atomic-encrypted-backups` publient via fichier temporaire + rename atomique et testent les fichiers temporaires; 617 behind, diff utile à porter/retester sur main.
+- Backup retention branch: commit consulté concerne `require('dotenv').config()` dans restore script; 596 behind, pas une PR, revalider config/env sur main.
+- Branches PDF-worker et startup Docker: peu de commits ahead, centaines behind; conserver les idées, pas intégrer sans rebase et CI.
+
+### Schéma comptable / essai gratuit
+- #117 et #128 restent CI green mais versions de schéma concurrentes (20 et 19). #120 est une PR fermée/merged sur une base feature, pas main; comparaison montre sa branche feature ancêtre de #117 head. Préparer une intégration combinée version 21, tests migration et isolation, sans merge.
+- Aucun paiement réel activé.
+
+### Sécurité / préservation
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 116 branches restantes (diff, dates, CI) est encore incomplet.
