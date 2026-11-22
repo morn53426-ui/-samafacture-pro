@@ -526,3 +526,45 @@ Lecture ciblée de `server/routes/professionnel.js` main (3 397 lignes) :
 - #133 reste Draft, base branch #130 (base SHA ancien `c607f397`), aucun check-run; il n'est pas validé et sa base est en retard sur #130.
 - #130/#134 doublons partiels : #130 contient l'accessibilité générale + le badge désormais; #134 badge seul, green. Préférer #130 après CI green, mais ne pas fermer #134 sans autorisation.
 - Aucun merge/close, aucun delete de branche, données, volumes ou backups; main inchangé. Tests locaux et Docker non exécutés.
+
+
+## Actualisation du run 3 — 22 novembre 2026, 05:27 UTC
+
+### Inventaire et état de référence
+- Branches distantes : **145** (pagination 100 + 45). Cet endpoint renvoie les noms seulement; le nombre de SHA uniques n'a pas été recalculé.
+- PR ouvertes : **22** (`is:open`). L'historique des PR fermées/fusionnées n'a pas été interrogé exhaustivement.
+- `main` reste au HEAD `8453ee6d8e633f151523236eecff1bc0e0cf877b` d'après le commit récent retourné. L'endpoint Actions utilisé filtre les runs liés aux PR et ne retourne pas de runs main; le statut Actions de main n'est pas vérifié dans cette actualisation.
+
+### CI vérifiée sur les HEAD des PR prioritaires
+| PR | HEAD | Tests automatisés | ESLint | Archive ZIP | Note |
+|---|---|---|---|---|---|
+| #134 | 52021018 | succès | succès | succès | badge Entreprise |
+| #135 | 2c7f3cbd | succès | succès | succès | facture émise protégée |
+| #136 | 4e0f2a89 | succès | succès | succès | dépenses comptabilisées |
+| #137 | 04de367f | en cours lors de l'actualisation | non retourné | succès | teardown corrigé après échec FK RESTRICT |
+| #138 | d5bd445c | succès | non retourné | succès | stock/historique produit |
+| #130 | bf6a0231 | **échec** | succès | succès | recette visuelle: `span.pro-status` page `professionnel`, contraste 2,23:1 (4,5:1 requis) |
+| #139 | baa9ea6a | en cours | non retourné | succès | correction CSS dédiée badge résumé professionnel |
+| #132 | 7b35953e | succès | non retourné | succès | rapport audit |
+| #117 | ba756d09 | succès | succès | succès | base/head ancien; rebase/integration à vérifier |
+| #128 | e3b91dc4 | succès | succès | succès | essai 15 jours/workspace; migration v19 à réconcilier avec #117 |
+| #115 | 3873c1d1 | succès | non retourné | succès | base SHA plus ancien que main; rebase requis |
+| #125 | 7d9617d0 | succès | succès | succès | pagination PDF long |
+| #127 | 9bfc8aea | succès | succès | succès | devis Executive A4 |
+
+### Échec CI #130 — cause confirmée
+Le log du run `44985277196` indique sur la page Professionnel `span.pro-status`, texte « 9 outils · 4 rubriques », couleur `rgb(10,122,69)` sur `rgb(23,61,43)`, ratio **2,23:1**. Ce défaut de contraste préexistant sur main bloque la recette de la PR d'accessibilité.
+
+### Corrections nouvelles dans ce run
+- PR #139 draft : `fix/pro-workspace-status-contrast-20261122`, commit `baa9ea6a688121c580b9f95c1933a2a15663f07f`; CSS badge professionnel clair/sombre/sombre système. Ratios calculés pour surfaces de thème : 6,62:1 clair et 9,29:1 sombre; CI doit vérifier les couleurs calculées réellement rendues.
+- PR #137 : commit de test `04de367f7c8ecbdbec03282c0ccac3edbc3a5488` nettoie explicitement le fixture de commande avant teardown, car `pro_commandes.client_id` utilise RESTRICT. CI relancée; statut non encore retourné.
+- PR #138 : tests automatisés et archive ZIP green sur HEAD actuel.
+
+### Priorités immédiates
+1. Finir CI #139 et #137; si #137 échoue encore, examiner le log avant correction.
+2. #130 reste bloquée par `.pro-status`; le correctif #139 doit être validé puis porté/rebasé dans la branche #130, sans merge autorisé.
+3. Conserver #135/#136/#134 green; #138 green, revue humaine requise.
+4. Réconcilier migrations #117/#128 (version combinée 21) avant intégration; ne pas merge.
+5. Rebaser #115; comparer #125/#127 pour recette PDF; poursuivre les comparaisons détaillées des branches restantes.
+
+Aucune modification directe de main, aucun merge/close, aucune suppression de branche, donnée, volume ou sauvegarde; paiements réels désactivés. Tests locaux et Docker local non exécutés.
