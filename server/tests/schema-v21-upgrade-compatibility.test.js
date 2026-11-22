@@ -275,7 +275,7 @@ test('une base v21 protège les événements comptables contre la suppression en
     );
     assert.equal(Number(mappingTable.n), 1, 'la migration v23 doit créer la table des correspondances comptables');
     const [[mappingAccountIndex]] = await pool.query(
-      "SELECT COUNT(*) AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_comptes' AND INDEX_NAME = 'uk_pro_compta_compte_id_user'"
+      "SELECT COUNT(DISTINCT INDEX_NAME) AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_comptes' AND INDEX_NAME = 'uk_pro_compta_compte_id_user'"
     );
     assert.equal(Number(mappingAccountIndex.n), 1, 'la clé composée compte + entreprise doit exister');
     const [[mappingForeignKey]] = await pool.query(

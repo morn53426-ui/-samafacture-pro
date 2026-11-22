@@ -777,6 +777,9 @@ test('la comptabilisation des dépenses est équilibrée, idempotente et isolée
 
 
 test('les correspondances OHADA ventilent les ventes par type et les dépenses par catégorie sans reclasser les données', async () => {
+  // Ce scénario crée plusieurs factures. Le plan pro est simulé uniquement dans
+  // la base de test afin que le quota Gratuit ne masque pas les tests de mapping.
+  await pool.query("UPDATE users SET plan = 'pro' WHERE id = ?", [userId]);
   const getMappings = () => request(app).get('/api/pro/accounting/mappings').set('Authorization', 'Bearer ' + token);
   const setMapping = (type_source, cle_source, account) => request(app)
     .put('/api/pro/accounting/mappings')
