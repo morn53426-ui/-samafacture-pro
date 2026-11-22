@@ -98,19 +98,19 @@
       <div class="card invoice-summary-card" style="align-self:start;">
         <div class="invoice-section-heading"><span class="ic"><i class="ic" data-icon="receipt"></i></span><div><h3>Récapitulatif</h3><p>Vérifiez les montants avant de créer le document.</p></div></div>
         <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
-          <span>Sous-total HT</span><span class="mono" id="rec-sous-total">0 FCFA</span>
+          <span>Sous-total HT</span><span class="mono" id="rec-sous-total">0</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
-          <span>TVA</span><span class="mono" id="rec-tva">0 FCFA</span>
+          <span>TVA</span><span class="mono" id="rec-tva">0</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
-          <span>Remise</span><span class="mono" id="rec-remise">- 0 FCFA</span>
+          <span>Remise</span><span class="mono" id="rec-remise">- 0</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
-          <span>Livraison</span><span class="mono" id="rec-livraison">0 FCFA</span>
+          <span>Livraison</span><span class="mono" id="rec-livraison">0</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:14px 0; font-weight:700; font-size:1.15rem;">
-          <span>Total</span><span class="mono" id="rec-total" style="color:var(--emerald);">0 FCFA</span>
+          <span>Total</span><span class="mono" id="rec-total" style="color:var(--emerald);">0</span>
         </div>
         <button id="submit-facture-btn" class="btn btn-primary invoice-submit-button" style="width:100%; padding:12px;" onclick="submitFacture()"><i class="ic" data-icon="file-check"></i> Créer le document</button>
       </div>
@@ -171,7 +171,7 @@
     syncDocumentType();
     const { user } = await Api.get('/auth/me');
     try {
-      const { parametres } = await Api.get('/pro/localization');
+      const { parametres } = await Api.get('/pro/company-context');
       companyCurrency = parametres?.devise || user?.devise || companyCurrency;
     } catch (_) {
       companyCurrency = user?.devise || companyCurrency;
