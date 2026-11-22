@@ -112,7 +112,13 @@ describe('Protection des dépenses comptabilisées', () => {
       assert.ok(entry, 'une comptabilisation réussie doit avoir une écriture');
       assert.equal(Number(entry.total_debit), Number(stored.montant));
       assert.equal(Number(entry.total_credit), Number(stored.montant));
-      assert.equal(update.status, 409, 'si le posting gagne, l’édition doit être refusée');
+      if (update.status === 409) {
+        assert.equal(Number(stored.montant), 6000, 'si le posting verrouille d’abord, la source reste inchangée');
+      } else {
+        assert.equal(update.status, 200);
+        assert.equal(Number(stored.montant), 7000, 'si l’édition précède le posting, la nouvelle source est comptabilisée');
+        assert.equal(stored.libelle, 'Race dépense modifiée');
+      }
     } else {
       assert.equal(entry, undefined, 'un posting refusé ne doit pas laisser d’écriture');
       assert.equal(update.status, 200, 'si l’édition gagne, le posting stale doit être refusé');
