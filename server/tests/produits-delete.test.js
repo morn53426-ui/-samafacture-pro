@@ -154,7 +154,7 @@ describe('Suppression de produit', () => {
       [produit.body.produit.id, userIdA]
     );
     assert.ok(storedProduct, 'produit conservé');
-    assert.deepEqual(storedStocks.map(row => Number(row.quantite)), [-3, 3].sort((a, b) => a - b));
+    assert.deepEqual(storedStocks.map(row => Number(row.quantite)).sort((a, b) => a - b), [-3, 3]);
   });
 
   test('un stock d’entrepôt référencé depuis une autre entreprise bloque la suppression', async () => {
