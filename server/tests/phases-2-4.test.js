@@ -747,6 +747,121 @@ test('la comptabilisation des dépenses est équilibrée, idempotente et isolée
   }
 });
 
+
+test('les correspondances OHADA ventilent les ventes par type et les dépenses par catégorie sans reclasser les données', async () => {
+  const getMappings = () => request(app).get('/api/pro/accounting/mappings').set('Authorization', 'Bearer ' + token);
+  const setMapping = (type_source, cle_source, account) => request(app)
+    .put('/api/pro/accounting/mappings')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ type_source, cle_source, compte_id: account.id });
+  const config = await request(app).get('/api/pro/accounting/config').set('Authorization', 'Bearer ' + token);
+  assert.equal(config.status, 200, config.text);
+  const account = code => config.body.comptes.find(item => item.code === code);
+  assert.ok(account('701'));
+  assert.ok(account('706'));
+  assert.ok(account('707'));
+  assert.ok(account('625'));
+
+  const defaults = await getMappings();
+  assert.equal(defaults.status, 200, defaults.text);
+  assert.ok(defaults.body.correspondances.some(row => row.type_source === 'vente' && row.cle_source === 'produit' && row.code === '701'));
+  assert.ok(defaults.body.correspondances.some(row => row.type_source === 'vente' && row.cle_source === 'service' && row.code === '706'));
+  assert.ok(defaults.body.correspondances.some(row => row.type_source === 'depense' && row.cle_source === '__default__' && row.code === '622'));
+
+  const invalidClass = await setMapping('vente', 'produit', account('521'));
+  assert.equal(invalidClass.status, 400);
+  assert.equal(invalidClass.body.code, 'CLASSE_COMPTE_CORRESPONDANCE_INVALIDE');
+
+  const product = await pool.query('SELECT type_catalogue FROM produits WHERE id = ? AND user_id = ?', [productId, userId]);
+  assert.equal(product[0][0].type_catalogue, 'produit');
+  const serviceResponse = await request(app).post('/api/produits')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ nom: 'Service correspondance', type_catalogue: 'service', prix_ht: 1000, prix_achat: 0, tva: 0 });
+  assert.equal(serviceResponse.status, 201, serviceResponse.text);
+  const serviceId = serviceResponse.body.produit.id;
+
+  const productMapping = await setMapping('vente', 'produit', account('707'));
+  assert.equal(productMapping.status, 200, productMapping.text);
+  const serviceMapping = await setMapping('vente', 'service', account('706'));
+  assert.equal(serviceMapping.status, 200, serviceMapping.text);
+
+  const invoice = await request(app).post('/api/factures').set('Authorization', 'Bearer ' + token).send({
+    client_id: clientId,
+    type: 'facture',
+    remise: 500,
+    frais_livraison: 100,
+    lignes: [
+      { designation: 'Marchandise comptable', produit_id: productId, quantite: 1, prix_unitaire: 1000, tva: 0 },
+      { designation: 'Prestation comptable', produit_id: serviceId, quantite: 1, prix_unitaire: 1000, tva: 0 }
+    ]
+  });
+  assert.equal(invoice.status, 201, invoice.text);
+  assert.equal(Number(invoice.body.facture.total), 1600);
+
+  const posted = await request(app).post('/api/pro/accounting/post-invoice/' + invoice.body.facture.id)
+    .set('Authorization', 'Bearer ' + token).send({});
+  assert.equal(posted.status, 201, posted.text);
+  const [[entry]] = await pool.query(
+    "SELECT id, total_debit, total_credit FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?",
+    [userId, invoice.body.facture.id]
+  );
+  assert.equal(Number(entry.total_debit), 1600);
+  assert.equal(Number(entry.total_credit), 1600);
+  const [revenueLines] = await pool.query(
+    "SELECT c.code, SUM(l.credit) AS credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id WHERE l.user_id = ? AND l.ecriture_id = ? AND c.classe = 7 GROUP BY c.code ORDER BY c.code",
+    [userId, entry.id]
+  );
+  assert.deepEqual(revenueLines.map(row => ({ code: row.code, credit: Number(row.credit) })), [
+    { code: '706', credit: 750 },
+    { code: '707', credit: 850 }
+  ]);
+
+  const unclassified = await request(app).post('/api/produits').set('Authorization', 'Bearer ' + token)
+    .send({ nom: 'Ancienne fiche non classée', type_catalogue: 'non_classe', stock: 2, prix_ht: 100, tva: 0 });
+  assert.equal(unclassified.status, 201, unclassified.text);
+  const unclassifiedId = unclassified.body.produit.id;
+  const legacyInvoice = await request(app).post('/api/factures').set('Authorization', 'Bearer ' + token).send({
+    client_id: clientId, type: 'facture',
+    lignes: [{ designation: 'Ligne ancienne non classée', produit_id: unclassifiedId, quantite: 1, prix_unitaire: 100, tva: 0 }]
+  });
+  assert.equal(legacyInvoice.status, 201, legacyInvoice.text);
+  const legacyPosted = await request(app).post('/api/pro/accounting/post-invoice/' + legacyInvoice.body.facture.id)
+    .set('Authorization', 'Bearer ' + token).send({});
+  assert.equal(legacyPosted.status, 201, legacyPosted.text);
+  const [[legacyType]] = await pool.query('SELECT type_catalogue FROM produits WHERE id = ? AND user_id = ?', [unclassifiedId, userId]);
+  assert.equal(legacyType.type_catalogue, 'non_classe', 'la correspondance ne doit jamais reclasser automatiquement la fiche historique');
+  const [legacyRevenue] = await pool.query(
+    "SELECT c.code FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id JOIN pro_compta_ecritures e ON e.id = l.ecriture_id AND e.user_id = l.user_id WHERE l.user_id = ? AND e.source_type = 'facture' AND e.source_id = ? AND l.credit > 0 AND c.classe = 7",
+    [userId, legacyInvoice.body.facture.id]
+  );
+  assert.deepEqual(legacyRevenue.map(row => row.code), ['706']);
+
+  const categoryExpense = await request(app).post('/api/depenses').set('Authorization', 'Bearer ' + token)
+    .send({ libelle: 'Déplacement client', montant: 500, categorie: 'Déplacements', mode_reglement: 'banque', date_depense: '2026-11-22' });
+  assert.equal(categoryExpense.status, 201, categoryExpense.text);
+  const categoryMapping = await setMapping('depense', 'déplacements', account('625'));
+  assert.equal(categoryMapping.status, 200, categoryMapping.text);
+  const expensePosted = await request(app).post('/api/pro/accounting/post-expense/' + categoryExpense.body.depense.id)
+    .set('Authorization', 'Bearer ' + token).send({});
+  assert.equal(expensePosted.status, 201, expensePosted.text);
+  const [[expenseEntry]] = await pool.query(
+    "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'depense' AND source_id = ?",
+    [userId, categoryExpense.body.depense.id]
+  );
+  const [expenseLines] = await pool.query(
+    'SELECT c.code, l.debit, l.credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id WHERE l.user_id = ? AND l.ecriture_id = ? ORDER BY c.code',
+    [userId, expenseEntry.id]
+  );
+  assert.deepEqual(expenseLines.map(row => ({ code: row.code, debit: Number(row.debit), credit: Number(row.credit) })), [
+    { code: '521', debit: 0, credit: 500 },
+    { code: '625', debit: 500, credit: 0 }
+  ]);
+
+  const readBack = await getMappings();
+  assert.equal(readBack.status, 200, readBack.text);
+  assert.ok(readBack.body.categories_depenses.some(row => row.categorie === 'Déplacements' && row.personnalisee && row.code === '625'));
+});
+
 after(async () => {
   try {
     await nettoyerUtilisateur(userId);
