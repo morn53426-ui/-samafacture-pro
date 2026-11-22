@@ -748,7 +748,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 - Nouveau HEAD PR #130 `9722ca99`, draft=true. Tests Node/MySQL #1434, ESLint #485 et ZIP #1136 sont tous success; la recette visuelle responsive a réussi. PR non fusionnée, revue humaine requise.
 - Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
 
-### Branches sans PR — comparaison ciblée 104 (dates/CI non exhaustives)
+### Branches sans PR — comparaison ciblée 116 (dates/CI non exhaustives)
 Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble. Deux comparaisons complémentaires: `feat/enterprise-command-center-20261117` 8/400 (4 fichiers), `feat/enterprise-company-pagination-20261117` 0/359 (behind only).
 
 **Audit/sécurité:**
@@ -781,7 +781,7 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - Aucun paiement réel activé.
 
 ### Sécurité / préservation
-Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 18 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 6 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
 
 
 ### Documentation branch follow-up
@@ -867,3 +867,16 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 - `qa/test-pdf-24-modeles`: 0/599 (behind only).
 - `rebase/pr106-main-20261121-run1`: 0/51 (behind only; SHA partagé avec `fix/invoice-stock-principal-warehouse`).
 - HEADs rafraîchis pour ces dix branches; CI non-PR non vérifiée. Branches invitation/email large divergence nécessitent revue de dépendances et portage ciblé, pas fusion directe.
+
+
+### Run 7 — douze comparaisons supplémentaires CI / entreprise / thème / PDF
+- `ci/package-main-after-pr39-pr40`: 1/608, compare indique 0 fichier (commit de packaging).
+- `ci/real-restore-smoke-20261117`: 1/399, 1 fichier.
+- `docs/correct-one-time-plan-billing-2026-11-16`: 2/584, 1 fichier.
+- `docs/fix-staging-compose-runbook-20261116`: 0/412 (behind only).
+- `feat/enterprise-page-structure-2026-11-13`: 35/704, 23 fichiers; `feat/enterprise-page-structure-v2-2026-11-13`: 8/703, 8 fichiers.
+- `test/accessibility-audit-business-pages-20261118`: 8/229, 5 fichiers.
+- `test/pdf-font-embedding-and-visual-print-20261118`: 8/239, 5 fichiers.
+- `test/theme-dark-sweep-20261118`: 4/236, 2 fichiers; `test/theme-light-desktop-sweep-20261118`: 2/233, 1 fichier; `test/theme-light-mobile-sweep-20261118`: 1/234, 1 fichier.
+- `ui/augmenter-logo-icones-sidebar`: 2/610, 2 fichiers.
+- HEADs rafraîchis pour ces douze branches; CI non-PR non vérifiée. Les branches enterprise page structure sont larges et très en retard; préférer le portage sélectif des tests/fixes plutôt que leur intégration directe.
