@@ -356,7 +356,7 @@ test('annulation et réactivation contre-passent chaque écriture facture sans d
     .delete('/api/factures/' + invoice.id)
     .set('Authorization', 'Bearer ' + token);
   assert.equal(deletePostedInvoice.status, 409, deletePostedInvoice.text);
-  assert.equal(deletePostedInvoice.body.code, 'FACTURE_COMPTABILISEE');
+  assert.equal(deletePostedInvoice.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
   const [[retainedInvoice]] = await pool.query(
     'SELECT id, statut FROM factures WHERE id = ? AND user_id = ?',
     [invoice.id, userId]
@@ -381,8 +381,15 @@ test('annulation et réactivation contre-passent chaque écriture facture sans d
   const deleteUnpostedInvoice = await request(app)
     .delete('/api/factures/' + unpostedInvoice.id)
     .set('Authorization', 'Bearer ' + token);
-  assert.equal(deleteUnpostedInvoice.status, 200, deleteUnpostedInvoice.text,
-    'un document sans écriture comptable reste supprimable');
+  assert.equal(deleteUnpostedInvoice.status, 409, deleteUnpostedInvoice.text,
+    'une facture émise reste dans l’historique même sans écriture comptable');
+  assert.equal(deleteUnpostedInvoice.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
+  const [[retainedUnpostedInvoice]] = await pool.query(
+    'SELECT id, statut FROM factures WHERE id = ? AND user_id = ?',
+    [unpostedInvoice.id, userId]
+  );
+  assert.equal(Number(retainedUnpostedInvoice.id), Number(unpostedInvoice.id));
+  assert.equal(retainedUnpostedInvoice.statut, 'annulee');
 });
 
 test('les dépenses distinguent caisse et banque et deviennent immuables après comptabilisation', async () => {
