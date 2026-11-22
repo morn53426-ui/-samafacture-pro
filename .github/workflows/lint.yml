@@ -20,6 +20,9 @@ on:
       - 'server/services/accounting-invoice-lifecycle.js'
       - 'server/tests/phases-2-4.test.js'
       - 'server/tests/setup.js'
+      - 'server/routes/clients.js'
+      - 'server/tests/client-history-protection.test.js'
+      - 'server/tests/stock.test.js'
       - 'server/tests/company-group-ui.test.js'
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
@@ -80,6 +83,9 @@ jobs:
           server/services/accounting-invoice-lifecycle.js
           server/tests/phases-2-4.test.js
           server/tests/setup.js
+          server/routes/clients.js
+          server/tests/client-history-protection.test.js
+          server/tests/stock.test.js
           server/tests/company-group-ui.test.js
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
