@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 18;
+const CURRENT_SCHEMA_VERSION = 21;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -172,6 +172,9 @@ async function runMigrations(conn) {
   // v16 : type structuré des fiches catalogue ; les anciennes fiches restent non classées.
   // v17 : entrepôt de sortie mémorisé sur les factures pour des mouvements multi-entrepôts réversibles.
   // v18 : marqueur transactionnel pour reprendre une seule fois la ventilation des stocks historiques.
+  // v19 : historique des contrepassations et réactivations comptables des factures.
+  // v20 : mode de règlement des dépenses (caisse 571 / banque 521).
+  // v21 : état et dates UTC de l'essai gratuit de 15 jours, sans attribution rétroactive.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -194,6 +197,10 @@ async function runMigrations(conn) {
     { table: 'users', column: 'terms_accepted_at', definition: 'DATETIME NULL' },
     { table: 'users', column: 'terms_version', definition: 'VARCHAR(30) NULL' },
     { table: 'users', column: 'privacy_version', definition: 'VARCHAR(30) NULL' },
+    { table: 'users', column: 'trial_plan', definition: 'VARCHAR(20) NULL' },
+    { table: 'users', column: 'trial_started_at', definition: 'DATETIME NULL' },
+    { table: 'users', column: 'trial_ends_at', definition: 'DATETIME NULL' },
+    { table: 'users', column: 'trial_status', definition: "VARCHAR(20) NOT NULL DEFAULT 'not_started'" },
     { table: 'users', column: 'pays_code', definition: "VARCHAR(2) NOT NULL DEFAULT 'SN'" },
     { table: 'users', column: 'langue', definition: "VARCHAR(5) NOT NULL DEFAULT 'fr'" },
     { table: 'users', column: 'locale', definition: "VARCHAR(12) NOT NULL DEFAULT 'fr-SN'" },
@@ -218,6 +225,7 @@ async function runMigrations(conn) {
     { table: 'factures', column: 'reference_externe', definition: 'VARCHAR(100)' },
     { table: 'factures', column: 'date_validite', definition: 'DATE NULL' },
     { table: 'factures', column: 'conditions_reglement', definition: 'TEXT' },
+    { table: 'depenses', column: 'mode_reglement', definition: "VARCHAR(10) NOT NULL DEFAULT 'caisse' AFTER categorie" },
     { table: 'paiements', column: 'idempotency_key', definition: 'VARCHAR(100)' },
     { table: 'factures_recurrentes', column: 'envoi_auto_email', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
     { table: 'factures_recurrentes', column: 'jour_ancre', definition: 'TINYINT UNSIGNED NULL AFTER prochaine_date' },
@@ -294,6 +302,7 @@ async function runMigrations(conn) {
 
   const indexesToEnsure = [
     { table: 'users', name: 'idx_users_reset_token_hash', columns: '(reset_token_hash)' },
+    { table: 'users', name: 'idx_users_trial_status_end', columns: '(trial_status, trial_ends_at)' },
     { table: 'abonnement_paiements', name: 'idx_abonnement_paiements_internal_reference', columns: '(internal_reference)' },
     // Compteurs par statut (tableau de bord) + passage auto en "en_retard".
     { table: 'factures', name: 'idx_factures_user_type_statut', columns: '(user_id, type, statut)' },
@@ -364,6 +373,21 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of accountingPurchasingStatements) {
+    await conn.query(statement);
+  }
+
+  // v19 : historique des transitions comptables des factures. CREATE TABLE IF NOT EXISTS
+  // rend la reprise sûre pour les bases déjà migrées vers la version v20 ou inférieure.
+  const invoiceAccountingEventsPath = path.join(__dirname, '..', 'database', 'migrations', '011_comptabilite_contrepas_factures.sql');
+  const invoiceAccountingEventsSql = fs.readFileSync(invoiceAccountingEventsPath, 'utf8');
+  const invoiceAccountingEventsStatements = invoiceAccountingEventsSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of invoiceAccountingEventsStatements) {
     await conn.query(statement);
   }
 
