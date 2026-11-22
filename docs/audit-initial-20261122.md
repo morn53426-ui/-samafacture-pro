@@ -717,7 +717,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 | PR | Tests Node/MySQL | ESLint | ZIP |
 |---|---|---|---|
 | #132 | aucun run sur HEAD actuel; #1446 in_progress sur HEAD précédent, #1433 success plus ancien | — | aucun run sur HEAD actuel; #1148 in_progress sur HEAD précédent, #1135 success plus ancien |
-| #130 | #1430 failure sur ancien HEAD; nouveau #1434 in_progress | #484 success ancien; #485 in_progress nouveau | #1132 success ancien; #1136 success nouveau |
+| #130 | #1430 failure ancien HEAD; #1434 success nouveau | #484 success ancien; #485 success nouveau | #1132 success ancien; #1136 success nouveau |
 | #138 | #1429 success | #483 success | #1131 success |
 | #140 | #1420 success | #476 success | #1122 success |
 | #137 | #1421 success | #477 success | #1123 success |
@@ -745,7 +745,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 - Logs: `button#workspace-notification-toggle` foreground `#E8F1FB` sur surface `#F6F7F5`, ratio 1,06:1. Les labels localization/logout héritaient également du texte pâle sur surface/fallback clair (ratios signalés 1,06/1,14). Cause: override topbar qui forçait le texte pâle sur boutons à surface claire, contradictoire avec son commentaire.
 - Correctif commit `9722ca99809cff46317ff82c5e604f86937c3790`, fichier `public/css/enterprise-workspace.css`: variables theme-aware navy `#082B50` en light, pâle `#E8F1FB` en dark, hover emerald adapté aux surfaces. Diff relu après commit.
 - Calculs de couleur (non-browser): navy/cream 13,28:1; emerald foncé/green-light 6,80:1; texte clair/dark surface 11,91:1; hover dark 5,28:1. **Ces calculs ne remplacent pas la recette visuelle.**
-- Nouveau HEAD PR #130 `9722ca99`, mergeable=true, draft=true. Run #1434 Tests in_progress, #485 ESLint in_progress, #1136 ZIP success. Validation visuelle encore attendue.
+- Nouveau HEAD PR #130 `9722ca99`, draft=true. Tests Node/MySQL #1434, ESLint #485 et ZIP #1136 sont tous success; la recette visuelle responsive a réussi. PR non fusionnée, revue humaine requise.
 - Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
 
 ### Branches sans PR — comparaison ciblée 62 (dates/CI non exhaustives)
