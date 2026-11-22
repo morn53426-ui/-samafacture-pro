@@ -7421,8 +7421,10 @@ a.btn .icon {
 
   .invoice-doc .sf-document-table th,
   .invoice-doc .sf-document-table td {
-    padding: 4px 5px !important;
-    line-height: 1.28 !important;
+    /* Rester cohérent avec l'espacement print défini plus haut : plus lisible
+       que l'ancien 4px sans forcer les factures longues sur une page supplémentaire. */
+    padding: 6px 6px !important;
+    line-height: 1.35 !important;
   }
   .invoice-doc .sf-document-table tbody td {
     font-size: 9pt !important;
@@ -7450,6 +7452,52 @@ a.btn .icon {
   .invoice-doc [style*="font-size:.74rem"] {
     font-size: 9pt !important;
     line-height: 1.3 !important;
+  }
+
+  /* Modèle Consolidé : réduire uniquement les marges des blocs périphériques.
+     Le tableau et sa police de 9 pt restent identiques aux autres modèles. */
+  .invoice-doc .sf-consolide-header {
+    padding: 17px 40px 15px !important;
+    margin-bottom: 15px !important;
+  }
+  .invoice-doc .sf-consolide-meta {
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+  }
+  .invoice-doc .sf-consolide-meta > div {
+    padding: 7px 8px !important;
+  }
+  .invoice-doc .sf-consolide-meta strong {
+    margin-top: 3px !important;
+    line-height: 1.2 !important;
+  }
+  .invoice-doc .sf-consolide-client {
+    margin-bottom: 12px !important;
+    padding: 9px 12px !important;
+  }
+  .invoice-doc .sf-doc-meta-consolide {
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+    padding: 8px 10px !important;
+  }
+  .invoice-doc .sf-doc-meta-consolide .sf-doc-meta-label {
+    margin-bottom: 2px !important;
+  }
+  .invoice-doc .sf-consolide-totals {
+    margin-top: 12px !important;
+  }
+  .invoice-doc .sf-consolide-totals > div {
+    padding: 9px 12px !important;
+  }
+  .invoice-doc .sf-consolide-footer {
+    margin-top: 20px !important;
+  }
+  .invoice-doc .sf-doc-extras-consolide {
+    gap: 6px !important;
+    margin-top: 10px !important;
+  }
+  .invoice-doc .sf-doc-extras-consolide .sf-extra-panel {
+    padding: 8px 10px !important;
   }
 
 }
@@ -7657,6 +7705,371 @@ a.btn .icon {
     font-weight: 750;
   }
 }
+
+/* Modèle Executive : réduire les espacements périphériques en A4 sans toucher
+   aux colonnes, aux lignes, aux montants ni à la typographie du tableau. */
+@media print {
+  .invoice-doc.tpl-executive .sf-executive-header {
+    padding: 17px 40px 15px !important;
+    margin-bottom: 15px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-meta {
+    gap: 10px !important;
+    margin-bottom: 13px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-recipient {
+    padding: 9px 11px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-references {
+    padding: 9px 11px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-references > div {
+    line-height: 1.5 !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-totals {
+    margin-top: 12px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-totals > div {
+    padding: 9px 12px !important;
+  }
+  .invoice-doc.tpl-executive .sf-doc-meta {
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+    padding: 8px 10px !important;
+  }
+  .invoice-doc.tpl-executive .sf-doc-footer {
+    margin-top: 18px !important;
+  }
+  .invoice-doc.tpl-executive .sf-doc-extras {
+    gap: 6px !important;
+    margin-top: 10px !important;
+  }
+  .invoice-doc.tpl-executive .sf-doc-extras > * + * {
+    margin-top: 6px !important;
+  }
+  .invoice-doc.tpl-executive .sf-extra-panel {
+    padding: 8px 10px !important;
+  }
+  .invoice-doc.tpl-executive .sf-acceptance-copy {
+    margin-bottom: 8px !important;
+    line-height: 1.4 !important;
+  }
+  .invoice-doc.tpl-executive .sf-acceptance-grid {
+    gap: 9px !important;
+  }
+  .invoice-doc.tpl-executive .sf-sign-field {
+    gap: 10px !important;
+  }
+}
+
+
+/* Modèle Signature : compacter uniquement les blocs périphériques en A4.
+   Le tableau garde sa police 9 pt, ses colonnes et ses espacements lisibles. */
+@media print {
+  .invoice-doc.tpl-signature .sf-signature-header {
+    padding: 16px 40px 14px !important;
+    margin-bottom: 14px !important;
+  }
+  .invoice-doc.tpl-signature .sf-signature-meta {
+    gap: 12px !important;
+    margin-bottom: 12px !important;
+  }
+  .invoice-doc.tpl-signature .sf-signature-references {
+    padding: 8px 11px !important;
+    line-height: 1.6 !important;
+  }
+  .invoice-doc.tpl-signature .sf-signature-references > div {
+    line-height: 1.55 !important;
+  }
+  .invoice-doc.tpl-signature .sf-signature-totals {
+    margin-top: 12px !important;
+  }
+  .invoice-doc.tpl-signature .sf-signature-totals > div {
+    padding: 9px 12px !important;
+  }
+  .invoice-doc.tpl-signature .sf-doc-meta-signature {
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+    padding: 8px 10px !important;
+  }
+  .invoice-doc.tpl-signature .sf-doc-meta-signature .sf-doc-meta-label {
+    margin-bottom: 2px !important;
+  }
+  .invoice-doc.tpl-signature .sf-signature-footer {
+    margin-top: 16px !important;
+  }
+  .invoice-doc.tpl-signature .sf-doc-extras-signature {
+    gap: 6px !important;
+    margin-top: 10px !important;
+  }
+  .invoice-doc.tpl-signature .sf-doc-extras-signature > * + * {
+    margin-top: 6px !important;
+  }
+  .invoice-doc.tpl-signature .sf-extra-panel {
+    padding: 8px 10px !important;
+  }
+  .invoice-doc.tpl-signature .sf-acceptance-copy {
+    margin-bottom: 8px !important;
+    line-height: 1.4 !important;
+  }
+  .invoice-doc.tpl-signature .sf-acceptance-grid {
+    gap: 9px !important;
+  }
+  .invoice-doc.tpl-signature .sf-sign-field {
+    gap: 10px !important;
+  }
+}
+
+
+/* Platine A4 : récupérer la hauteur du pied de page et des totaux pour garder
+   le bloc Bon pour accord sur la dernière feuille. La police du tableau reste à 9 pt. */
+@media print {
+  .invoice-doc .sf-platine-header {
+    padding-bottom: 12px !important;
+    margin-bottom: 14px !important;
+  }
+  .invoice-doc .sf-platine-meta {
+    margin-bottom: 12px !important;
+    column-gap: 14px !important;
+    row-gap: 8px !important;
+  }
+  .invoice-doc .sf-doc-meta-platine {
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+    padding: 7px 10px !important;
+  }
+  .invoice-doc .sf-platine-table th,
+  .invoice-doc .sf-platine-table td {
+    /* Conserver 9 pt ; réduire uniquement le remplissage vertical des lignes. */
+    padding: 1px 5px !important;
+    font-size: 9pt !important;
+    line-height: 1.15 !important;
+  }
+  .invoice-doc .sf-doc-tax-platine {
+    margin-top: 8px !important;
+    padding: 8px 10px !important;
+  }
+  .invoice-doc .sf-doc-tax-platine .sf-doc-tax-title {
+    margin-bottom: 4px !important;
+  }
+  .invoice-doc .sf-doc-tax-platine .sf-doc-tax-row,
+  .invoice-doc .sf-doc-tax-platine .sf-doc-tax-total {
+    padding: 2px 0 !important;
+  }
+  .invoice-doc .sf-doc-tax-platine .sf-doc-tax-total {
+    margin-top: 3px !important;
+    padding-top: 5px !important;
+  }
+  .invoice-doc .sf-platine-totals {
+    margin-top: 8px !important;
+  }
+  .invoice-doc .sf-platine-totals > div {
+    padding: 8px 12px !important;
+  }
+  .invoice-doc .sf-platine-totals .sf-total-row {
+    padding: 4px 0 !important;
+  }
+  .invoice-doc .sf-platine-totals .sf-total-row.sf-total-grand {
+    margin-top: 3px !important;
+    padding: 7px 0 3px !important;
+  }
+  .invoice-doc .sf-platine-footer {
+    margin-top: 8px !important;
+    gap: 8px !important;
+  }
+  .invoice-doc .sf-platine-verification img[alt="QR code de vérification"] {
+    width: 52px !important;
+    height: 52px !important;
+  }
+  .invoice-doc .sf-platine-verification .stamp {
+    width: 56px !important;
+    height: 56px !important;
+    font-size: 0.56rem !important;
+  }
+  .invoice-doc .sf-doc-extras-platine {
+    margin-top: 6px !important;
+    gap: 4px !important;
+  }
+  .invoice-doc .sf-doc-extras-platine > * + * {
+    margin-top: 4px !important;
+  }
+  .invoice-doc .sf-doc-extras-platine .sf-extra-panel:not(.sf-acceptance-panel) {
+    padding: 8px 10px !important;
+  }
+  .invoice-doc .sf-doc-extras-platine .sf-acceptance-panel {
+    padding: 6px 9px !important;
+  }
+  .invoice-doc .sf-doc-extras-platine .sf-acceptance-copy {
+    margin-bottom: 6px !important;
+    line-height: 1.35 !important;
+  }
+  .invoice-doc .sf-doc-extras-platine .sf-acceptance-grid {
+    gap: 10px !important;
+  }
+  .invoice-doc .sf-doc-extras-platine .sf-sign-field {
+    gap: 10px !important;
+  }
+  .invoice-doc .sf-doc-extras-platine .sf-sign-line {
+    height: 18px !important;
+  }
+}
+
+/* Modèle Luxe — compacter l'impression A4 sans réduire la taille des caractères.
+   Les classes sont propres au modèle pour ne pas modifier les autres factures/devis. */
+@media print {
+  .invoice-doc .sf-luxe-header {
+    margin-bottom: 16px !important;
+    padding-top: 20px !important;
+    padding-bottom: 18px !important;
+  }
+  .invoice-doc .sf-luxe-header > div:first-child > div:first-child > div:nth-child(2) {
+    margin-top: 6px !important;
+  }
+  .invoice-doc .sf-luxe-header > div:first-child > div:first-child > div:nth-child(3) {
+    line-height: 1.4 !important;
+  }
+  .invoice-doc .sf-luxe-header > div:nth-child(2) {
+    margin-top: 16px !important;
+    padding-top: 9px !important;
+  }
+  .invoice-doc .sf-luxe-client-grid {
+    gap: 14px !important;
+    margin-bottom: 14px !important;
+  }
+  .invoice-doc .sf-luxe-client-grid > div:first-child {
+    padding: 10px 12px !important;
+  }
+  .invoice-doc .sf-luxe-client-grid > div:first-child > div:first-child {
+    margin-bottom: 5px !important;
+  }
+  .invoice-doc .sf-luxe-client-grid > div:last-child {
+    padding: 10px 12px !important;
+    line-height: 1.65 !important;
+  }
+  .invoice-doc .sf-luxe-table th,
+  .invoice-doc .sf-luxe-table td {
+    /* Police 9 pt maintenue ; seuls les espacements verticaux diminuent. */
+    padding: 3px 5px !important;
+    font-size: 9pt !important;
+    line-height: 1.25 !important;
+  }
+  .invoice-doc .sf-luxe-totals {
+    margin-top: 14px !important;
+  }
+  .invoice-doc .sf-luxe-totals > div {
+    padding: 12px 14px !important;
+  }
+}
+
+/* Modèle Tech — pagination A4 longue : compactage ciblé, typographie conservée. */
+@media print {
+  .invoice-doc .sf-tech-header {
+    margin-bottom: 14px !important;
+    padding-top: 17px !important;
+    padding-bottom: 16px !important;
+  }
+  .invoice-doc .sf-tech-meta {
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+  }
+  .invoice-doc .sf-tech-meta > div {
+    padding: 8px 9px !important;
+  }
+  .invoice-doc .sf-tech-client {
+    margin-bottom: 12px !important;
+    padding: 9px 12px !important;
+  }
+  .invoice-doc .sf-tech-client > div:first-child {
+    margin-bottom: 4px !important;
+  }
+  .invoice-doc .sf-tech-table th,
+  .invoice-doc .sf-tech-table td {
+    padding: 2px 5px !important;
+    font-size: 9.5pt !important;
+    line-height: 15px !important;
+  }
+  /* Le média print générique impose 9pt aux cellules. Ce sélecteur plus spécifique
+     conserve 9,5pt pour Tech, y compris après les règles communes du tableau. */
+  .invoice-doc .sf-document-table.sf-tech-table tbody td {
+    font-size: 9.5pt !important;
+  }
+  .invoice-doc .sf-tech-totals {
+    margin-top: 12px !important;
+  }
+  .invoice-doc .sf-tech-totals > div {
+    padding: 11px 14px !important;
+  }
+}
+
+/* Modèle Majesté — préserver l'acceptation sur la troisième page des devis longs.
+   Le tableau conserve ses 9 pt ; seuls les espacements de fin de document diminuent. */
+@media print {
+  .invoice-doc.tpl-majeste .sf-doc-footer {
+    margin-top: 12px !important;
+    gap: 8px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-footer img[alt="QR code de vérification"] {
+    width: 52px !important;
+    height: 52px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-footer .stamp {
+    width: 64px !important;
+    height: 64px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-tax {
+    margin-top: 6px !important;
+    padding: 5px 8px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-document-table th {
+    padding: 5px 5px !important;
+    font-size: 9pt !important;
+  }
+  .invoice-doc.tpl-majeste .sf-document-table tbody td {
+    /* Garder 9 pt mais rapprocher les lignes longues pour éviter une page 4 dédiée
+       à la seule acceptation sur les devis volumineux. */
+    padding: 1px 5px !important;
+    font-size: 9pt !important;
+    line-height: 1.15 !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-tax-title {
+    margin-bottom: 3px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-tax-row {
+    padding: 2px 0 !important;
+  }
+  .invoice-doc.tpl-majeste .sf-total-row {
+    padding: 3px 0 !important;
+  }
+  .invoice-doc.tpl-majeste .sf-total-row.sf-total-grand {
+    margin-top: 3px !important;
+    padding-top: 6px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste {
+    margin-top: 6px !important;
+    gap: 4px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-extra-panel {
+    padding: 6px 9px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-extra-title {
+    margin-bottom: 3px !important;
+    line-height: 1.3 !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-acceptance-copy {
+    margin-bottom: 6px !important;
+    line-height: 1.35 !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-acceptance-grid {
+    gap: 8px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-sign-field {
+    gap: 8px !important;
+  }
+  .invoice-doc.tpl-majeste .sf-doc-extras-majeste .sf-sign-line {
+    height: 14px !important;
+  }
+}
+
 
 /* Raccourci clavier commun : accès direct au contenu principal des pages métier. */
 .workspace-skip-link {
