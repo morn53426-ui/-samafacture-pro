@@ -748,7 +748,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 - Nouveau HEAD PR #130 `9722ca99`, draft=true. Tests Node/MySQL #1434, ESLint #485 et ZIP #1136 sont tous success; la recette visuelle responsive a réussi. PR non fusionnée, revue humaine requise.
 - Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
 
-### Branches sans PR — comparaison ciblée 87 (dates/CI non exhaustives)
+### Branches sans PR — comparaison ciblée 94 (dates/CI non exhaustives)
 Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble. Deux comparaisons complémentaires: `feat/enterprise-command-center-20261117` 8/400 (4 fichiers), `feat/enterprise-company-pagination-20261117` 0/359 (behind only).
 
 **Audit/sécurité:**
@@ -781,7 +781,7 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - Aucun paiement réel activé.
 
 ### Sécurité / préservation
-Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 36 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 28 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
 
 
 ### Documentation branch follow-up
@@ -843,3 +843,13 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 - `test/backup-atomic-visibility-2026-11-15`: 1/615, 1 fichier.
 - `tooling/local-docker-test-bundle-20261112`: 1/715, 1 fichier.
 - HEADs rafraîchis pour ces cinq branches. Les trois behind-only sont candidates obsolètes; les deux diverged ont très peu d'avance et doivent être portées/retestées. CI non-PR non vérifiée.
+
+
+### Run 7 — six comparaisons supplémentaires PDF / abonnements
+- `audit/invoice-pdf-typography-print-20261118`: 9/250, 6 fichiers.
+- `docs/subscription-monthly-architecture-20261117`: 2/238, 1 fichier.
+- `docs/subscriptions-current-state-20261117`: 2/393, 2 fichiers.
+- `feat/professional-subscription-page-2026-11-15`: 4/654, 4 fichiers.
+- `fix/invoice-stock-principal-warehouse`: 0/51 (behind only; SHA partagé avec `rebase/pr106-main-20261121-run1`).
+- `test/invoice-short-pdf-one-page-main-20261121`: 0/23 (behind only; commit merge #112).
+- HEADs rafraîchis pour ces six branches; CI non-PR non vérifiée. Les behind-only sont déjà en retard sur main; ne pas réintroduire sans diff et tests.
