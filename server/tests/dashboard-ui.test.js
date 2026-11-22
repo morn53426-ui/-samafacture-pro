@@ -19,9 +19,10 @@ describe('Dashboard Sunupilot — structure de référence', () => {
     const skipLink = dashboard.match(/<a class="workspace-skip-link" href="#main-content">([^<]+)<\/a>/);
     assert.ok(skipLink, 'Un raccourci d’évitement doit être présent dès le chargement.');
     assert.equal(skipLink[1].trim(), 'Aller au contenu principal');
-    assert.match(dashboard, /<main\\b[^>]*id="main-content"[^>]*tabindex="-1"[^>]*class="main-content workspace-page page-dashboard"|<main\\b[^>]*class="main-content workspace-page page-dashboard"[^>]*id="main-content"[^>]*tabindex="-1"/);
-    assert.match(styles, /\.workspace-skip-link\\s*\\{/);
-    assert.match(styles, /\.workspace-skip-link:focus\\s*\\{[^}]*transform:\\s*translateY\\(0\\)/);
+    assert.ok(dashboard.includes('<main class="main-content workspace-page page-dashboard" id="main-content" tabindex="-1">'));
+    assert.ok(styles.includes('.workspace-skip-link {'));
+    assert.ok(styles.includes('.workspace-skip-link:focus {'));
+    assert.ok(styles.includes('transform: translateY(0);'));
   });
 
   test('le graphique des ventes facturées couvre six ou douze mois et conserve les mois sans vente', () => {
