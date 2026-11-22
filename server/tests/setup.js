@@ -73,6 +73,10 @@ function emailDeTest(prefixe = 'test') {
  */
 async function nettoyerUtilisateur(userId) {
   if (!userId) return;
+  // Les demandes de remboursement protègent le paiement référencé (ON DELETE RESTRICT).
+  // Les supprimer explicitement avant l'utilisateur permet ensuite aux cascades des
+  // factures et paiements de s'exécuter sans contourner l'intégrité référentielle.
+  await pool.query('DELETE FROM pro_refund_requests WHERE user_id = ?', [userId]);
   await pool.query('DELETE FROM users WHERE id = ?', [userId]);
 }
 
