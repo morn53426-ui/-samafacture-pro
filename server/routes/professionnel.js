@@ -24,6 +24,23 @@ const money = (value) => {
   if (!Number.isFinite(amount) || amount <= 0 || amount > 999999999999) return null;
   return Math.round((amount + Number.EPSILON) * 100) / 100;
 };
+
+function paymentTreasuryAccount(method) {
+  const normalized = String(method || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  const bankMethods = new Set([
+    'wave', 'orange money', 'paydunya', 'virement bancaire', 'virement',
+    'cheque', 'carte bancaire', 'carte'
+  ]);
+  if (bankMethods.has(normalized)) return '521';
+  if (['especes', 'cash'].includes(normalized)) return '571';
+  return null;
+}
+
 async function safeDateForUser(value, userId) {
   const valid = optionalIsoDate(value);
   if (valid) return valid;
@@ -430,7 +447,14 @@ async function postRefundAccountingEntry(conn, uid, actorId, payment, invoice, r
     [uid, payment.id]
   );
   if (!paymentEntries.length) {
-    const bank = /wave|paydunya|orange|carte|virement/i.test(payment.methode || '');
+    const treasuryAccount = paymentTreasuryAccount(payment.methode);
+    if (!treasuryAccount) {
+      const error = new Error('La méthode du paiement d’origine ne permet pas de déterminer le compte de trésorerie. Le remboursement est bloqué pour éviter une écriture comptable incorrecte.');
+      error.status = 409;
+      error.code = 'METHODE_PAIEMENT_NON_RECONNUE';
+      throw error;
+    }
+    const bank = treasuryAccount === '521';
     await postSystemEntry(
       uid,
       actorId,
@@ -3340,7 +3364,15 @@ router.post('/accounting/post-payment/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Facture du paiement introuvable.' });
     }
     const invoiceNumber = invoiceRows[0].numero;
-    const bank = /wave|paydunya|orange|carte|virement/i.test(payment.methode || '');
+    const treasuryAccount = paymentTreasuryAccount(payment.methode);
+    if (!treasuryAccount) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'La méthode de paiement ne permet pas de déterminer le compte de trésorerie.',
+        code: 'METHODE_PAIEMENT_NON_RECONNUE'
+      });
+    }
+    const bank = treasuryAccount === '521';
     const result = await postSystemEntry(
       uid,
       actor(req),
