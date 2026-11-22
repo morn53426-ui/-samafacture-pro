@@ -26,6 +26,23 @@ describe('Factures : calcul et numérotation', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ nom: 'Client de Test' });
     clientId = client.body.client.id;
+
+    // Les tests de protection comptable utilisent des lignes de facture libres.
+    // Cette fixture attribue explicitement le compte de services ; aucune valeur
+    // par défaut n'est devinée par l'API de production.
+    const accounting = await request(app)
+      .get('/api/pro/accounting/config')
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(accounting.status, 200, accounting.text);
+    const freeTextMapping = await request(app)
+      .put('/api/pro/accounting/mappings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        type_source: 'vente',
+        cle_source: 'saisie_libre',
+        compte_id: accounting.body.comptes.find(account => account.code === '706').id
+      });
+    assert.equal(freeTextMapping.status, 200, freeTextMapping.text);
   });
 
   after(async () => {
@@ -382,6 +399,144 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(Number(detail.body.facture.montant_paye), 10000, 'les 5 paiements simultanés doivent tous être comptabilisés');
     assert.equal(detail.body.paiements.length, 5);
     assert.equal(detail.body.facture.statut, 'payee');
+  });
+
+  test('une facture avec paiement ne peut pas être supprimée et conserve son règlement', async () => {
+    const facture = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Historique paiement', quantite: 1, prix_unitaire: 1000, tva: 0 }] });
+    assert.equal(facture.status, 201, facture.text);
+
+    const paiement = await request(app)
+      .post(`/api/factures/${facture.body.facture.id}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ montant: 400, methode: 'Espèces' });
+    assert.equal(paiement.status, 201, paiement.text);
+
+    const suppression = await request(app)
+      .delete(`/api/factures/${facture.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(suppression.status, 409, suppression.text);
+    assert.equal(suppression.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
+
+    const [[document]] = await pool.query('SELECT id, montant_paye FROM factures WHERE id = ? AND user_id = ?', [facture.body.facture.id, userId]);
+    const [[paiements]] = await pool.query('SELECT COUNT(*) AS n FROM paiements WHERE user_id = ? AND facture_id = ?', [userId, facture.body.facture.id]);
+    assert.ok(document, 'la facture doit rester présente');
+    assert.equal(Number(document.montant_paye), 400);
+    assert.equal(Number(paiements.n), 1, 'le règlement doit rester présent');
+  });
+
+  test('une facture comptabilisée ne peut pas être supprimée et conserve son écriture', async () => {
+    const facture = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Historique comptable', quantite: 1, prix_unitaire: 2000, tva: 0 }] });
+    assert.equal(facture.status, 201, facture.text);
+
+    const comptabilisation = await request(app)
+      .post(`/api/pro/accounting/post-invoice/${facture.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(comptabilisation.status, 201, comptabilisation.text);
+
+    const suppression = await request(app)
+      .delete(`/api/factures/${facture.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(suppression.status, 409, suppression.text);
+    assert.equal(suppression.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
+
+    const [[document]] = await pool.query('SELECT id FROM factures WHERE id = ? AND user_id = ?', [facture.body.facture.id, userId]);
+    const [[entries]] = await pool.query(
+      "SELECT COUNT(*) AS n FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?",
+      [userId, facture.body.facture.id]
+    );
+    assert.ok(document, 'la facture comptabilisée doit rester présente');
+    assert.equal(Number(entries.n), 1, 'l’écriture comptable doit rester présente');
+  });
+
+  test('une facture avec article de stock ne peut pas être supprimée (mouvement non lié au document)', async () => {
+    const product = await request(app)
+      .post('/api/produits')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Article stock suppression protégée', type_catalogue: 'produit', prix_ht: 1000, prix_achat: 500, tva: 0, stock: 10 });
+    assert.equal(product.status, 201, product.text);
+
+    const facture = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'facture',
+        lignes: [{ produit_id: product.body.produit.id, designation: product.body.produit.nom, quantite: 1, prix_unitaire: 1000, tva: 0 }]
+      });
+    assert.equal(facture.status, 201, facture.text);
+
+    const suppression = await request(app)
+      .delete(`/api/factures/${facture.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(suppression.status, 409, suppression.text);
+    assert.equal(suppression.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
+
+    const [[storedInvoice]] = await pool.query('SELECT id FROM factures WHERE id = ? AND user_id = ?', [facture.body.facture.id, userId]);
+    const [[storedProduct]] = await pool.query('SELECT stock FROM produits WHERE id = ? AND user_id = ?', [product.body.produit.id, userId]);
+    assert.ok(storedInvoice, 'la facture doit rester présente');
+    assert.equal(Number(storedProduct.stock), 9, 'le stock décompté doit rester cohérent tant que la facture n’est pas annulée');
+  });
+
+  test('suppression et comptabilisation concurrentes ne créent pas d’écriture orpheline', async () => {
+    const facture = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Race suppression/compta', quantite: 1, prix_unitaire: 3000, tva: 0 }] });
+    assert.equal(facture.status, 201, facture.text);
+
+    const invoiceId = facture.body.facture.id;
+    const [suppression, comptabilisation] = await Promise.all([
+      request(app).delete(`/api/factures/${invoiceId}`).set('Authorization', `Bearer ${token}`),
+      request(app).post(`/api/pro/accounting/post-invoice/${invoiceId}`).set('Authorization', `Bearer ${token}`)
+    ]);
+
+    assert.equal(suppression.status, 409, suppression.text);
+    assert.equal(suppression.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
+    assert.equal(comptabilisation.status, 201, comptabilisation.text);
+    const [[stored]] = await pool.query('SELECT id FROM factures WHERE id = ? AND user_id = ?', [invoiceId, userId]);
+    const [[entries]] = await pool.query(
+      "SELECT COUNT(*) AS n FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?",
+      [userId, invoiceId]
+    );
+    assert.ok(stored, 'la facture finale doit rester présente');
+    assert.equal(Number(entries.n), 1, 'la comptabilisation doit rester reliée à la facture conservée');
+  });
+
+  test('une facture de service émise sans historique ne peut pas être supprimée', async () => {
+    const facture = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Service sans mouvement de stock', quantite: 1, prix_unitaire: 5000, tva: 0 }] });
+    assert.equal(facture.status, 201, facture.text);
+
+    const suppression = await request(app)
+      .delete(`/api/factures/${facture.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(suppression.status, 409, suppression.text);
+    assert.equal(suppression.body.code, 'DOCUMENT_HISTORIQUE_PROTEGE');
+    const [[stored]] = await pool.query('SELECT id FROM factures WHERE id = ? AND user_id = ?', [facture.body.facture.id, userId]);
+    assert.ok(stored, 'toute facture émise doit rester dans l’historique');
+  });
+
+  test('un devis sans historique reste supprimable', async () => {
+    const devis = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'devis', lignes: [{ designation: 'Devis à supprimer', quantite: 1, prix_unitaire: 5000, tva: 0 }] });
+    assert.equal(devis.status, 201, devis.text);
+
+    const suppression = await request(app)
+      .delete(`/api/factures/${devis.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(suppression.status, 200, suppression.text);
+    const [[stored]] = await pool.query('SELECT id FROM factures WHERE id = ? AND user_id = ?', [devis.body.facture.id, userId]);
+    assert.equal(stored, undefined);
   });
 });
 

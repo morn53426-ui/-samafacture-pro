@@ -102,7 +102,10 @@ describe('Dashboard — régression et scalabilité', () => {
     const dbSource = fs.readFileSync(path.join(__dirname, '..', 'config', 'db.js'), 'utf8');
     const professionalSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'professionnel.js'), 'utf8');
     const schemaSource = fs.readFileSync(path.join(__dirname, '..', 'database', 'schema.sql'), 'utf8');
-    assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 18/);
+    assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 23/);
+    assert.match(dbSource, /v19 : historique des contrepassations/);
+    assert.match(dbSource, /v20 : mode de règlement des dépenses/);
+    assert.match(dbSource, /v21 : état et dates UTC de l'essai gratuit/);
     assert.match(dbSource, /v17 : entrepôt de sortie mémorisé sur les factures/);
     assert.match(dbSource, /table: 'factures', column: 'entrepot_id', definition: 'INT UNSIGNED NULL AFTER client_id'/);
     assert.match(schemaSource, /entrepot_id INT UNSIGNED NULL/);
