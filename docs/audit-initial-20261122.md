@@ -625,3 +625,11 @@ Aucune modification directe de main, aucun merge/close, aucune suppression de br
 
 ### Protections
 Aucun merge, PR fermé, branche supprimée, modification directe de main, donnée/volume/backups supprimé, ni paiement réel activé. Les corrections restent en PR draft.
+
+
+## Run 4 — suivi correctif CI #140, 06:30 UTC
+- Le premier lint #140 (`44993878778`) a échoué parce que la commande ESLint listait `server/tests/client-history-protection.test.js`, fichier absent de main (il est ajouté par #137). Log exact : « No files matching the pattern ... were found. »
+- Correction minimaliste : commit `4656d588b321ae8e75b1cb0bc475a6ffabcd846b` retire ce fichier absent de la commande exécutée sur main, tout en gardant son chemin dans les filtres de déclenchement et la configuration ESLint. Lorsque #137 ajoute le test, le workflow pourra l’inclure.
+- Head PR #140 maintenant `4656d588`; un nouveau run lint/test est attendu. Le run initial #140 tests Node/MySQL est encore en cours, ZIP green; lint initial failure, corrigé dans le nouveau commit, pas encore validé.
+- #130 head `378ff2a2`: ESLint+ZIP green, tests Node/MySQL toujours in_progress au dernier contrôle.
+- Inventaire des branches actualisé pour refléter le head #140 `4656d588`.
