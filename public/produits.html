@@ -66,10 +66,10 @@
       <div class="field"><label for="nom">Nom *</label><input type="text" id="nom" required /></div>
       <div class="field"><label for="reference">Référence</label><input type="text" id="reference" /></div>
       <div class="workspace-modal-fields" style="display:flex; gap:12px;">
-        <div class="field" style="flex:1;"><label for="prix_ht">Prix de vente HT (FCFA) *</label><input type="number" id="prix_ht" min="0" step="1" required /></div>
+        <div class="field" style="flex:1;"><label for="prix_ht">Prix de vente HT (<span id="currency-prix-ht">FCFA</span>) *</label><input type="number" id="prix_ht" min="0" step="0.01" required /></div>
         <div class="field" style="flex:1;"><label for="tva">TVA (%)</label><input type="number" id="tva" min="0" max="100" step="1" value="0" /></div>
       </div>
-      <div class="field"><label for="prix_achat">Prix d’achat (FCFA)</label><input type="number" id="prix_achat" min="0" step="1" value="0" /><small class="helper">Utilisé pour estimer la marge. Laissez 0 si le coût est inconnu.</small></div>
+      <div class="field"><label for="prix_achat">Prix d’achat (<span id="currency-prix-achat">FCFA</span>)</label><input type="number" id="prix_achat" min="0" step="0.01" value="0" /><small class="helper">Utilisé pour estimer la marge. Laissez 0 si le coût est inconnu.</small></div>
       <div id="stock-fields">
         <div class="field"><label for="stock">Stock disponible</label><input type="number" id="stock" min="0" step="0.001" value="0" /></div>
         <div class="field"><label for="stock_minimum">Seuil minimum de stock</label><input type="number" id="stock_minimum" min="0" step="0.001" value="0" /><small class="helper">Une alerte peut être envoyée lorsque le stock atteint ce seuil.</small></div>
@@ -94,8 +94,25 @@
 
   let produits = [];
   let currentPage = 1;
+  let companyCurrency = (Api.currentUser() || {}).devise || 'FCFA';
+  let companyCurrencyLoaded = false;
+
+  async function syncCompanyCurrency() {
+    if (!companyCurrencyLoaded) {
+      companyCurrencyLoaded = true;
+      try {
+        const { parametres } = await Api.get('/pro/localization');
+        companyCurrency = parametres?.devise || companyCurrency;
+      } catch (_) {
+        // Les rôles sans accès aux paramètres internationaux gardent la devise de session.
+      }
+    }
+    document.getElementById('currency-prix-ht').textContent = companyCurrency;
+    document.getElementById('currency-prix-achat').textContent = companyCurrency;
+  }
   async function load(page) {
     if (page !== undefined) currentPage = page;
+    await syncCompanyCurrency();
     const { produits: rows, pagination } = await Api.get(`/produits?page=${currentPage}`);
     produits = rows;
     document.getElementById('produits-body').innerHTML = produits.length ? produits.map(p => `
@@ -104,8 +121,8 @@
         <td data-label="Nom" class="product-name">${escapeHtml(p.nom)}</td>
         <td data-label="Type">${p.type_catalogue === 'produit' ? 'Produit' : p.type_catalogue === 'service' ? 'Service' : 'Non classé'}</td>
         <td data-label="Référence" class="mono">${escapeHtml(p.reference) || '—'}</td>
-        <td data-label="Prix HT" class="mono">${formatMontant(p.prix_ht)}</td>
-        <td data-label="Prix d'achat" class="mono">${formatMontant(p.prix_achat || 0)}</td>
+        <td data-label="Prix HT" class="mono">${formatMontant(p.prix_ht, companyCurrency)}</td>
+        <td data-label="Prix d'achat" class="mono">${formatMontant(p.prix_achat || 0, companyCurrency)}</td>
         <td data-label="TVA" class="mono">${p.tva}%</td>
         <td data-label="Stock" class="mono">${p.type_catalogue === 'service' ? '—' : p.stock}</td>
         <td data-label="Actions" style="text-align:right;" onclick="event.stopPropagation();">
