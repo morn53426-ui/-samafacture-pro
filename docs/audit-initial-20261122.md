@@ -346,3 +346,33 @@ Le code `server/config/db.js` vérifié dans les deux branches n'exécute `runMi
 - Branches sans PR par préfixe: `fix/` 43, `feat/` 31, `audit/` 12, `test/` 12, `docs/` 7, `security/` 3, `automation/` 2, `ci/` 2, `ui/` 2, autres 9.
 - Comparaisons ahead/behind/diff effectuées sur un échantillon de 15 branches non-PR et 16 PR; **les 144 branches ne sont pas toutes comparées en détail**. Noms complets des branches non-PR disponibles dans la liste GitHub.
 - Aucune branche supprimée; aucune fusion.
+
+
+## 18. Actualisation — sécurité, essais et dépendances d'intégration (03:48 UTC)
+
+### Contrôles sécurité ciblés
+- Authentification: `token_version` vérifiée par JWT, logout incrémente version et révoque les Bearer; réinitialisation de mot de passe incrémente également la version. Contrôle code, pas de test complet de toutes les routes.
+- CORS: politique restrictive en production, `ALLOWED_ORIGINS` explicite; sans variable, production refuse les origines cross-origin.
+- Isolation groupe multi-sociétés: membership ajouté seulement après acceptation email/token; `resolveTenant` vérifie membership et plan Enterprise. Contrôle ciblé positif, pas une recette adversariale complète.
+- Résiduel P2: CSP `script-src/style-src unsafe-inline` (front inline historique) et /api/docs exclu; documented in SECURITY_REPORT. À réduire progressivement.
+- Paiements réels: route abonnement `/payer` renvoie 503 `PAIEMENT_RECURRENT_NON_CONFIGURE`, aucun checkout/paiement activé.
+
+### Trial 15 jours
+Revue ciblée PR #128: Standard normalisé en `starter`, Pro/Entreprise; `UTC_TIMESTAMP()` et `DATE_ADD(... INTERVAL 15 DAY)`; fin exclusive; expiration ramène plan Gratuit; changement de formule conserve dates; invitations pending ne reçoivent pas un essai concurrent. Tests dédiés couvrent les 15 jours exacts, expiration, plan change et invitation. CI sur head consulté réussie. Intégration reste bloquée par migration version.
+
+### Dépendances d'intégration
+- #117 et #128: conflit version/schema/migrations et workflows CI; combiner en version21 avant intégration.
+- #135/#136 touchent `professionnel.js`; #135 `factures.js`; #136 `depenses.js`; PR #117 touche ces routes et workflows. Rebase après intégration du lot accounting.
+- #137 modifie `clients.js` et `stock.test.js`; rebase après #135 pour aligner les tests sur la politique non-suppression factures.
+- #138 modifie `produits.js` et `produits-delete.test.js`; rebase après les migrations/PRs stock.
+- #134 chevauche #130/#133 sur paramètres et visual test; CI #134 verte indépendante.
+- #126/#118, #131/#114 et #110/#102 sont doublons probables; comparer diffs avant intégration.
+
+### Statut courant
+- #134 CI complète verte.
+- #136 tests+lint+ZIP verts.
+- #135 tests toujours en cours sur head corrigé; lint/ZIP verts.
+- #137 tests en cours sur head corrigé; ZIP vert.
+- #138 tests en cours sur head corrigé; ZIP vert.
+- #132 audit docs tests en cours.
+- 144 branches, 21 PR ouvertes; aucun merge ni suppression.
