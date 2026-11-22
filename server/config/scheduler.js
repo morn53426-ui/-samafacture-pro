@@ -3,6 +3,7 @@ const { captureException } = require('./monitoring');
 const { sendMail, isSmtpConfigured } = require('./mailer');
 const { deliverPendingWebhooks } = require('../utils/pro-webhooks');
 const { localDateString } = require('../utils/local-date');
+const { formatAmountWithCurrency, normalizeCurrency } = require('../utils/money-format');
 
 /**
  * Marque comme "expirée" toute tentative de paiement d'abonnement restée bloquée en
@@ -236,30 +237,58 @@ async function executerRelancesAutomatiques() {
             }
             const jours = Math.min(120, Math.max(1, Number(config.jours_retard) || 7));
             const frequence = Math.min(90, Math.max(1, Number(config.frequence_jours) || 7));
-            const [clients] = await pool.query(
-              "SELECT c.id, c.nom, c.email, COUNT(f.id) AS nb_factures, SUM(f.total - f.montant_paye) AS solde, GROUP_CONCAT(CONCAT(f.numero, ' (reste ', FORMAT(f.total - f.montant_paye, 2), ')') ORDER BY f.date_echeance SEPARATOR '\\n') AS details " +
+            const [invoices] = await pool.query(
+              "SELECT c.id AS client_id, c.nom, c.email, f.numero, f.total, f.montant_paye, f.devise " +
               "FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id " +
               "WHERE f.user_id = ? AND f.type = 'facture' AND f.statut IN ('en_attente','en_retard') " +
               "AND f.date_echeance IS NOT NULL AND f.date_echeance <= DATE_SUB(?, INTERVAL ? DAY) " +
-              "AND f.total > f.montant_paye AND c.email IS NOT NULL AND c.email <> '' GROUP BY c.id, c.nom, c.email",
+              "AND f.total > f.montant_paye AND c.email IS NOT NULL AND c.email <> '' " +
+              "ORDER BY c.id ASC, f.devise ASC, f.date_echeance ASC, f.id ASC",
               [automation.user_id, companyLocalDate, jours]
             );
+            const remindersByClientCurrency = new Map();
+            for (const invoice of invoices) {
+              const devise = normalizeCurrency(invoice.devise);
+              const key = String(invoice.client_id) + ':' + devise;
+              let reminder = remindersByClientCurrency.get(key);
+              if (!reminder) {
+                reminder = {
+                  id: invoice.client_id,
+                  nom: invoice.nom,
+                  email: invoice.email,
+                  devise,
+                  factures: [],
+                  solde: 0
+                };
+                remindersByClientCurrency.set(key, reminder);
+              }
+              const reste = Number(invoice.total) - Number(invoice.montant_paye);
+              reminder.factures.push({ numero: invoice.numero, reste });
+              reminder.solde += reste;
+            }
             let sent = 0, failed = false;
-            for (const client of clients) {
-              // Le délai de répétition démarre à la date du dernier email envoyé à ce client.
-              // Évite les rappels trop rapprochés lorsque la règle est créée en milieu de période.
+            for (const client of remindersByClientCurrency.values()) {
+              // Les clés historiques impaye:<client>:<timestamp> restent reconnues
+              // pendant la fenêtre de répétition. Les nouvelles clés isolent chaque devise.
+              const deviseRunPattern = 'impaye:' + client.id + ':' + client.devise + ':%';
+              const legacyRunPattern = 'impaye:' + client.id + ':%';
+              const currencyRunPattern = 'impaye:' + client.id + ':%:%';
               const [prior] = await pool.query(
-                "SELECT id FROM pro_automation_runs WHERE automation_id = ? AND entity_type = 'client' AND entity_id = ? AND result = 'succes' AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT 1",
-                [automation.id, client.id, frequence]
+                "SELECT id FROM pro_automation_runs WHERE automation_id = ? AND entity_type = 'client' AND entity_id = ? AND result = 'succes' " +
+                "AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY) AND (run_key LIKE ? OR (run_key LIKE ? AND run_key NOT LIKE ?)) LIMIT 1",
+                [automation.id, client.id, frequence, deviseRunPattern, legacyRunPattern, currencyRunPattern]
               );
               if (prior.length) continue;
-              const runKey = 'impaye:' + client.id + ':' + Date.now();
+              const runKey = 'impaye:' + client.id + ':' + client.devise + ':' + Date.now();
+              const details = client.factures.map(facture =>
+                facture.numero + ' (reste ' + formatAmountWithCurrency(facture.reste, client.devise) + ')'
+              ).join('\n');
               const result = await sendMail({
                 to: client.email,
                 subject: 'Rappel automatique de factures en attente',
                 text: 'Bonjour ' + client.nom + ',\n\nCertaines factures restent en attente de règlement :\n' +
-                  client.details + '\n\nSolde total restant : ' + Number(client.solde).toLocaleString('fr-FR') +
-                  ' FCFA. Merci de prendre contact avec notre entreprise si le règlement a déjà été effectué.'
+                  details + '\n\nSolde total restant : ' + formatAmountWithCurrency(client.solde, client.devise) +
+                  '. Merci de prendre contact avec notre entreprise si le règlement a déjà été effectué.'
               });
               if (result.sent) {
                 await pool.query(
