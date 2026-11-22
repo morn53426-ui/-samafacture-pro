@@ -26,5 +26,5 @@ test('une devise absente retombe sur FCFA et les valeurs invalides valent 0', ()
 });
 
 test('le résultat ne contient pas d’espace insécable', () => {
-  assert.ok(!/[\\u202F\\u00A0]/.test(formatAmountWithCurrency(1234567, 'FCFA')));
+  assert.ok(!/[\u202F\u00A0]/.test(formatAmountWithCurrency(1234567, 'FCFA')));
 });
