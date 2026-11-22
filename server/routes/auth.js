@@ -11,6 +11,7 @@ const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = req
 const { sendMail } = require('../config/mailer');
 const { incrementerTokenVersion, invaliderCacheVersion } = require('../utils/session');
 const { normalizeTrialPlan } = require('../utils/free-trial');
+const { SUPPORTED_CURRENCIES } = require('../config/localization');
 
 function echapperHtml(valeur) {
   return String(valeur == null ? '' : valeur).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -654,7 +655,31 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
     }
 
     const [[userRow]] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
-    const proActif = isProPlan(userRow?.plan);
+    if (!userRow) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+
+    // La devise de base est définie une seule fois avant les premiers mouvements métier.
+    // Cet endpoint historique coexiste avec /pro/localization : il doit donc appliquer
+    // la même règle et ne jamais réinitialiser silencieusement une devise omise.
+    const currentCurrency = String(userRow.devise || 'FCFA').toUpperCase();
+    const requestedCurrency = devise === undefined || devise === null || String(devise).trim() === ''
+      ? currentCurrency
+      : String(devise).trim().toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(requestedCurrency)) {
+      return res.status(400).json({ error: 'Devise de base non prise en charge.' });
+    }
+    if (requestedCurrency !== currentCurrency) {
+      const [[history]] = await pool.query(
+        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
+        [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id]
+      );
+      const hasBusinessHistory = Object.values(history || {}).some(value => Number(value) > 0);
+      if (hasBusinessHistory) {
+        return res.status(409).json({
+          error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents, produits tarifés, modèles récurrents ou mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
+        });
+      }
+    }
+    const proActif = isProPlan(userRow.plan);
 
     if (signature_default) {
       if (!proActif) {
@@ -708,7 +733,7 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
         texteOptionnel(entreprise_rib, userRow.entreprise_rib, 100),
         texteOptionnel(entreprise_conditions_reglement, userRow.entreprise_conditions_reglement, 5000),
         texteOptionnel(entreprise_mentions_legales, userRow.entreprise_mentions_legales, 2000),
-        devise || 'FCFA', template, signature_default || null,
+        requestedCurrency, template, signature_default || null,
         personnalisationValidee ? JSON.stringify(personnalisationValidee) : null, req.user.id
       ]
     );
