@@ -400,7 +400,15 @@ router.get('/', async (req, res, next) => {
        ORDER BY f.date_emission DESC, f.id DESC LIMIT ? OFFSET ?`,
       [...params, limite, offset]
     );
-    res.json({ factures: rows, pagination: buildPaginationMeta(page, limite, total) });
+    // Le code protège les liens publics de consultation complète. Il n'est pas nécessaire
+    // à la liste (le détail le fournit après contrôle du compte) et ne doit pas être diffusé
+    // à tous les consommateurs autorisés à simplement lister les factures.
+    const factures = rows.map((row) => {
+      const safeRow = { ...row };
+      delete safeRow.verification_code;
+      return safeRow;
+    });
+    res.json({ factures, pagination: buildPaginationMeta(page, limite, total) });
   } catch (err) { next(err); }
 });
 
