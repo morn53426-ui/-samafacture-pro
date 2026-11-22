@@ -323,3 +323,40 @@
 
 ### CI step progress — 12:44 UTC
 - #142 run #1518 : Docker build + secrets check success; npm install en cours; audit dépendances/tests/restore/cluster/visual non encore démarrés. ESLint #525 et ZIP #1220 restent success.
+
+## Run 2 — vérification fraîche et CI complète (22 novembre 2026, 13:24 UTC)
+
+### Inventaire revérifié
+- 150 branches distantes : 100 sur page 1, 50 sur page 2 (pagination terminée).
+- 139 PR : 26 ouvertes (19 Draft, 7 prêtes), 113 fermées; parmi les fermées, 94 merged et 19 non merged.
+- `main` HEAD `8453ee6d8e633f151523236eecff1bc0e0cf877b`, inchangée. 12 derniers commits revus; derniers changements PDF/print/mobile.
+- PR #142 : HEAD `9355eb37493a33ae08e64ef6ce742a12ab6f9dd4`, 74 commits ahead, 0 behind, 48 fichiers, clean/mergeable. Aucun review, aucun thread.
+
+### CI finale #142 — preuves
+- Tests run `45024413918` : success. Job complet; 576 tests, 575 pass, 0 fail, 1 skipped. Tests MySQL, Docker image/secret-sentinel, restauration réelle backup chiffré (1 test pass), cluster MySQL/Redis smoke, recette responsive.
+- ESLint run `45024413890` : success.
+- ZIP run `45024413895` : success.
+- npm audit dans le job tests : 0 vulnérabilité (info/low/moderate/high/critical = 0).
+- Recette visuelle : 147 captures, 7 largeurs; artefact `samafacture-recette-visuelle-1521`, 87,112,943 octets, expiration indiquée 14 jours.
+- Un test est skipped; aucune raison n'a été déterminée dans ce rapport. CI verte ne remplace pas revue humaine.
+
+### Correctif chèques — revue indépendante
+Le mapping `paymentTreasuryAccount` et le test d'encaissement « Chèque » sur journal BQ/compte 521 sont identiques entre la branche #143 et le HEAD #142. #142 contient aussi les tests de remboursement par chèque et rejet méthode inconnue portés pour exécution CI. #143 reste Draft, sans checks, divergé de la base d'intégration (3 commits ahead, 13 behind); ne pas fusionner sa copie redondante.
+
+### Main CI et limite API
+Sur main, le check-run Tests Node.js et MySQL associé à HEAD a conclu success. Le combined status endpoint renvoie néanmoins `pending` avec 0 status contexts; cette incohérence de statut API est notée, sans prétendre que la main a une CI récente complète. Lecture branch-protection/ruleset non confirmée dans cette session.
+
+### Risques et décisions
+- #142 reste Draft : aucun merge ni approbation; main reste inchangée.
+- La PR #143 est redondante pour les modifications de mapping déjà intégrées à #142. Conserver ouverte, ne pas merger/fermer sans autorisation.
+- Revue comptable indépendante requise : annulation d'une facture déjà payée, articulation écriture facture/encaissement/contrepassation, permanence de l'événement d'audit (la migration définit une FK facture ON DELETE CASCADE; la route protège la suppression, mais un bypass DB pourrait supprimer les événements).
+- Aucun test local n'a été exécuté; les preuves proviennent de GitHub Actions.
+- Les branches non-PR n'ont pas toutes été comparées individuellement à main : inventaire de noms complet, audit SHA/ahead-behind incomplet pour ce sous-ensemble.
+
+### Planning ajusté
+1. P0 : revue comptable indépendante de #142 (annulation facture avec paiements, événements d'audit, tenant isolation) avant sortir Draft/merge.
+2. P1 : résoudre la PR #143 redondante après décision autorisée; #138 protection produit/stock, #140 lint routes historique.
+3. P1 : recette PDF/devis (#125/#127) puis rebase et CI; conserver les échecs #99/#102/#110 bloquants.
+4. P2 : workspace (#128/#129/#141) sans duplication; accessibilité #133 rebase.
+5. P3 : audit SHA/ancestry des 122 branches non-PR restantes, sécurité Docker/backup/session et OHADA.
+
