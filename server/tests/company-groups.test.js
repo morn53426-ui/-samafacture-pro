@@ -40,6 +40,24 @@ function getVerificationTokens(verificationUrl) {
   };
 }
 
+async function deferTeamInvitationOutbox(entityType, entityId) {
+  const [[message]] = await pool.query(
+    'SELECT statut FROM email_outbox WHERE entity_type = ? AND entity_id = ? LIMIT 1',
+    [entityType, entityId]
+  );
+  assert.ok(message, 'le message email de test doit exister dans l’outbox');
+  if (['queued', 'retry', 'processing'].includes(message.statut)) {
+    await pool.query(
+      `UPDATE email_outbox
+       SET statut = CASE WHEN statut = 'processing' THEN 'retry' ELSE statut END,
+           prochaine_tentative = DATE_ADD(NOW(), INTERVAL 1 HOUR),
+           verrouille_le = NULL, lock_token = NULL, updated_at = NOW()
+       WHERE entity_type = ? AND entity_id = ? AND statut IN ('queued', 'retry', 'processing')`,
+      [entityType, entityId]
+    );
+  }
+}
+
 async function register(prefix, companyName) {
   const response = await request(app)
     .post('/api/auth/register')
@@ -420,6 +438,7 @@ test('les invitations classiques exigent une preuve email, un envoi outbox et un
     .set('Authorization', 'Bearer ' + groupOwnerToken)
     .send({ email: expiryRecipient.user.email, role: 'employe' });
   assert.equal(expiryInvitation.status, 201, expiryInvitation.text);
+  await deferTeamInvitationOutbox('team_invitation', expiryInvitation.body.id);
   const [[expiryInviteOutbox]] = await pool.query(
     "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation' AND entity_id = ?",
     [expiryInvitation.body.id]
@@ -434,6 +453,7 @@ test('les invitations classiques exigent une preuve email, un envoi outbox et un
     'SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ?',
     [expiryInvitation.body.id]
   );
+  await deferTeamInvitationOutbox('team_invitation_verification', expiryProof.id);
   const [[expiryProofOutbox]] = await pool.query(
     "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = ?",
     [expiryProof.id]
@@ -464,6 +484,7 @@ test('les invitations classiques exigent une preuve email, un envoi outbox et un
     .set('Authorization', 'Bearer ' + groupOwnerToken)
     .send({ email: changedRecipient.user.email, role: 'employe' });
   assert.equal(changedInvitation.status, 201, changedInvitation.text);
+  await deferTeamInvitationOutbox('team_invitation', changedInvitation.body.id);
   const [[changedInviteOutbox]] = await pool.query(
     "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation' AND entity_id = ?",
     [changedInvitation.body.id]
@@ -478,6 +499,7 @@ test('les invitations classiques exigent une preuve email, un envoi outbox et un
     'SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ?',
     [changedInvitation.body.id]
   );
+  await deferTeamInvitationOutbox('team_invitation_verification', changedProof.id);
   const [[changedProofOutbox]] = await pool.query(
     "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = ?",
     [changedProof.id]
