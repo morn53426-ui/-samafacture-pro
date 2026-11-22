@@ -300,7 +300,7 @@ test('une base v21 protège les événements comptables contre la suppression en
       'SELECT id, facture_id, transition FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ?',
       [userId, invoiceId]
     );
-    assert.deepEqual(repeatEvent, eventAfterDeleteAttempt);
+    assert.deepEqual(repeatEvent, eventAfterInvoiceDelete);
 
     // La suppression du compte doit pouvoir effacer les données de test via la FK
     // user→event et les autres cascades, tandis que l'audit est conservé tant que le tenant vit.
