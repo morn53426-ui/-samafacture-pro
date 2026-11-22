@@ -37,7 +37,7 @@ before(async () => {
   const key = await request(app)
     .post('/api/pro/integrations/api-keys')
     .set('Authorization', 'Bearer ' + registration.body.token)
-    .send({ nom: 'Clé API devise', scopes: ['invoices:write', 'clients:read'] });
+    .send({ nom: 'Clé API devise', scopes: ['invoices:write', 'invoices:read', 'clients:read'] });
   assert.equal(key.status, 201, key.text);
   apiKey = key.body.token;
 });
@@ -73,7 +73,8 @@ test('la création par API utilise la devise de l’entreprise et sa date locale
   const list = await request(app)
     .get('/api/v1/invoices')
     .set('X-SamaFacture-Key', apiKey);
-  assert.equal(list.status, 403, 'la clé ne possède pas invoices:read');
+  assert.equal(list.status, 200, list.text);
+  assert.equal(list.body.data.find(invoice => Number(invoice.id) === Number(created.body.facture.id))?.devise, 'EUR');
 
   // Une valeur JSON valide mais de forme incorrecte doit être refusée de façon sûre.
   const crypto = require('node:crypto');
