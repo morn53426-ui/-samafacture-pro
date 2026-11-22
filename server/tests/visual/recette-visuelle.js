@@ -4163,7 +4163,7 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
             const acceptanceGrid = style('.sf-doc-extras-platine .sf-acceptance-grid');
             const signField = style('.sf-doc-extras-platine .sf-sign-field');
             const signLine = style('.sf-doc-extras-platine .sf-sign-line');
-            const tax = style('.sf-doc-tax');
+            const tax = style('.sf-doc-tax-platine');
             const taxRow = style('.sf-doc-tax-row');
             const taxTotal = style('.sf-doc-tax-total');
             const totalRow = style('.sf-platine-totals .sf-total-row');
