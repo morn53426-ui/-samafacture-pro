@@ -389,3 +389,12 @@ Sur main, le check-run Tests Node.js et MySQL associé à HEAD a conclu success.
 - #145 previous head `c59e3f0`: ZIP/ESLint success; tests #45027993526 in progress at test suite. New head tests #45028257640 initializing.
 - #132 latest report head `1d837da`: ZIP success, tests in progress. Previous report head `13d6bce` completed success.
 - No local test execution. No merge, close, deletion, or main modification.
+
+## Run 6 — protections main et CI en cours (22 novembre 2026)
+
+- Ruleset GitHub `protect main` id `27410527` : active, ciblé sur `refs/heads/main`.
+- Ruleset confirmé : bloque deletion et non-fast-forward; PR requise; status checks requis `Tests Node.js et MySQL` + `Build complete source archive`; résolution des threads de revue requise; approvals count = 0; bypass actors = none / current_user_can_bypass = never.
+- Endpoint branch protection classique inaccessible (403 Resource not accessible by integration), mais le ruleset actif est lisible.
+- #142 head `decb8da` : ZIP/ESLint verts, tests #45027909669 en cours (step test).
+- #145 head `35adb125` après correction d'assertion : ZIP, ESLint, tests tous relancés; tests #45028257640 en cours, étape Docker build/secret sentinel.
+- #132 report head `4c5fe5fd` : ZIP #45028296928 vert, tests #45028297015 en cours.
