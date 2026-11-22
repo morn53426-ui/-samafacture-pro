@@ -82,7 +82,12 @@ export default [
       'server/tests/company-group-ui.test.js',
       'server/tests/company-groups.test.js',
       'server/tests/invoice-quota-migration-v8.test.js',
-      'server/tests/paiements.test.js'
+      'server/tests/paiements.test.js',
+      'server/routes/clients.js',
+      'server/routes/produits.js',
+      'server/tests/client-history-protection.test.js',
+      'server/tests/stock.test.js',
+      'server/tests/produits-delete.test.js'
     ],
     languageOptions: {
       ecmaVersion: 'latest',
