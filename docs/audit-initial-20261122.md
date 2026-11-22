@@ -652,3 +652,28 @@ Aucun merge, PR fermé, branche supprimée, modification directe de main, donné
 - #138 : défaut découvert dans #138, suppression produit vérifiait `SUM(quantite)` entre entrepôts; des soldes +3 et -3 pourraient s’annuler et masquer des lignes non nulles. Correctif `SELECT id ... quantite <> 0 ... FOR UPDATE` et protection des lignes cross-tenant même si quantité nulle. Tests ajoutés pour net zéro et conservation des deux balances. Head `c4340b88`: ESLint green, ZIP green, tests en cours.
 - #137 head `f2aada8d`: ESLint+ZIP green, tests en cours. #140 head `d16c4c54`: ESLint+ZIP green, tests en cours.
 - #130/#138 CI en cours après nouveaux commits; aucune correction déclarée validée avant tests complets.
+
+
+## Addendum — run 6, 22 novembre 2026
+
+### État actuel confirmé
+- `main` HEAD `8453ee6d8e633f151523236eecff1bc0e0cf877b`; CI Tests automatisés #1296 green.
+- Ruleset `protect main` enforcement active; deletion/non-fast-forward blocked; PR required; required checks `Tests Node.js et MySQL` et `Build complete source archive`; thread resolution required; no bypass actors. Required approvals = 0. Classic branch-protection endpoint reports protected=true but protection.enabled=false; enforcement comes from the active ruleset.
+- Branches 146, HEAD uniques 144, 23 PR ouvertes. L'inventaire complet noms/HEAD a été régénéré dans `docs/branch-inventory-20261122.md` (commit e0efa178) à partir des deux pages REST.
+
+### Corrections et CI
+- PR #137 client history protection: Tests Node/MySQL #1421, ESLint #477, ZIP #1123 green.
+- PR #138 product/stock protection: Tests Node/MySQL #1429, ESLint #483, ZIP #1131 green. Net-zero warehouse balances (+3/-3) test included and passing.
+- PR #139 pro-workspace contrast: Tests #1412 and ZIP #1114 green.
+- PR #140 ESLint backend coverage: Tests #1420, ESLint #476, ZIP #1122 green.
+- #134/#135/#136: all three checks green.
+- PR #130 current head `780b357a`: ESLint #484 and ZIP #1132 green; Tests Node/MySQL #1430 still in progress. Previous #1428 visual failure on group-company page was caused by dark topbar controls and the percentage label on the conic-gradient. CSS correction was pushed only to the PR branch; do not declare the PR green until #1430 completes.
+
+### Branch comparison and stale failures
+All 23 open PR heads were compared with current main. #118, #115, #114 are ahead/behind or divergent and must not be integrated without rebase. #110/#102/#99 visual tests fail on their current heads; logs confirm #110 expense amount contrast 4.23:1, #102 native date input focus invisible, #99 dark availability badge 3.97:1. #129/#125/#127/#133/#132 have no workflow run visible on the queried heads.
+
+### Schema integration blocker
+PR #117 has CURRENT_SCHEMA_VERSION 20 (accounting invoice reversal v19, expense payment method v20); PR #128 has CURRENT_SCHEMA_VERSION 19 for the 15-day trial columns. Both CI suites are green, but direct integration would collide in version numbering. Plan a combined schema v21: retain accounting reversal and expense-payment migration, add trial fields in v21, ensure additive/idempotent migrations, and test upgrading main v18, accounting v20, and trial v19 databases with data preservation and re-run safety. No merge performed.
+
+### Safety and scope
+No direct main update, no merge/close, no branch deletion, no data/volume/backup deletion, no real payments enabled. Local tests/Docker and manual SYSCOHADA certification were not performed. Full diff/date review of non-PR branches remains outstanding.
