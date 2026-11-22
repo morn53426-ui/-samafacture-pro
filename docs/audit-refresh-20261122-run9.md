@@ -360,3 +360,13 @@ Sur main, le check-run Tests Node.js et MySQL associé à HEAD a conclu success.
 4. P2 : workspace (#128/#129/#141) sans duplication; accessibilité #133 rebase.
 5. P3 : audit SHA/ancestry des 122 branches non-PR restantes, sécurité Docker/backup/session et OHADA.
 
+## Run 3 — protection des événements comptables et CI empilée (22 novembre 2026)
+
+- Cause audit : la migration 011 avait une FK invoice-event `ON DELETE CASCADE`, pouvant effacer l'historique de contrepassation si une facture était supprimée hors de la route protégée.
+- Correctif v22 en PR Draft #145 : nouvelle FK RESTRICT, migration idempotente v21→22, tests pour suppression facture bloquée, conservation événement, re-run et effacement cascade tenant.
+- PR #144 reste ouverte Draft comme tentative précédente sans CI; #145 est reprise sur le head intégration actuel pour déclencher les workflows.
+- PR #142 head `decb8da` : ZIP #45027909640 success, ESLint #45027909637 success, Tests #45027909669 en cours (Docker build/secret verification). Head 77 commits ahead main, 0 behind, 48 fichiers.
+- PR #145 head `c59e3f0`, base intégration `decb8da` : ZIP et ESLint verts, Tests #45027993526 en cours (démarrage). Aucun test local.
+- PR #132 audit head `13d6bce` : ZIP #45027535450 success; Tests #45027535457 en cours à la recette visuelle responsive.
+- Les filtres CI de test, lint et ZIP ont été ajoutés sur la branche intégration pour permettre les PR empilées; ces modifications sont elles-mêmes sous CI #142.
+- Aucune fusion/fermeture, main préservée.
