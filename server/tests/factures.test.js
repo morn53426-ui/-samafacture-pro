@@ -95,7 +95,16 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(detail.status, 200, detail.text);
     assert.equal(detail.body.facture.verification_code, verificationCode,
       'le détail authentifié conserve le code nécessaire au QR et à la consultation');
-    assert.match(detail.body.verify_url, new RegExp('/consulter/' + invoiceId + '/' + verificationCode + '
+    assert.ok(detail.body.verify_url.includes('verifier.html?id=' + invoiceId + '&code=' + verificationCode),
+      'le lien QR doit continuer à porter le code de vérification');
+
+    const publicConsultation = await request(app)
+      .get('/api/public/consulter/' + invoiceId + '/' + verificationCode);
+    assert.equal(publicConsultation.status, 200, publicConsultation.text);
+    assert.equal(Object.hasOwn(publicConsultation.body.facture, 'verification_code'), false,
+      'la réponse publique ne doit pas révéler le code qui protège la consultation');
+  });
+
     const res = await request(app)
       .post('/api/factures')
       .set('Authorization', `Bearer ${token}`)
