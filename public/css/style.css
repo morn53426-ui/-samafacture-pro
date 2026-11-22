@@ -7706,3 +7706,6 @@ a.btn .icon {
   outline: 2px solid var(--emerald);
   outline-offset: 2px;
 }
+
+/* Le badge PILOT est posé sur un dégradé or : utiliser un texte bleu nuit contrasté. */
+.sidebar-brand .brand-pro { color: #17233B !important; }
