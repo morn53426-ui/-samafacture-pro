@@ -716,7 +716,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 ### CI fresh sur HEAD
 | PR | Tests Node/MySQL | ESLint | ZIP |
 |---|---|---|---|
-| #132 | aucun run sur HEAD actuel; #1446 in_progress sur HEAD précédent, #1433 success plus ancien | — | aucun run sur HEAD actuel; #1148 in_progress sur HEAD précédent, #1135 success plus ancien |
+| #132 | aucun run sur HEAD avant ce commit; #1451 in_progress sur HEAD précédent, #1433 success plus ancien | — | aucun run sur HEAD avant ce commit; #1153 success sur HEAD précédent, #1148 in_progress plus ancien |
 | #130 | #1430 failure ancien HEAD; #1434 success nouveau | #484 success ancien; #485 success nouveau | #1132 success ancien; #1136 success nouveau |
 | #138 | #1429 success | #483 success | #1131 success |
 | #140 | #1420 success | #476 success | #1122 success |
@@ -890,3 +890,8 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 - `docs/ui-polish-plans-20261117`: 3/312, 17 fichiers.
 - `rebase/pr110-main-20261121-run1`: 3/53, 3 fichiers.
 - HEADs rafraîchis pour les six branches. **Ahead/behind compare maintenant couvert pour les 122 branches sans PR ouverte.** Il reste une revue diff ligne par ligne, dates de commit et CI/ tests pour toutes les branches non-PR; workflow-run endpoint ne retourne pas les runs non-PR.
+
+
+### État PR #132 après la couverture ahead/behind complète
+- Avant le dernier commit documentaire: HEAD `974ebe24`, 62 ahead/0 behind, Draft. Status/workflow-run query vide.
+- Ce commit documentaire ajoutera un commit supplémentaire (ahead 63); il ne constitue pas une validation produit. CI du HEAD après commit à vérifier, tests locaux toujours non exécutés.
