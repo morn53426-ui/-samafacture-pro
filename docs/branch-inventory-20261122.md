@@ -3,11 +3,10 @@
 Dépôt : `morn53426-ui/-samafacture-pro`  
 Référence : `main`  
 Branches : **146** ; SHA de tête uniques : **144**.  
-Pull Requests ouvertes : **23**.  
-Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
-Ruleset `protect main` actif : blocage suppression/non-fast-forward, PR obligatoire, résolution des threads requise, checks obligatoires (Tests Node.js et MySQL, Build complete source archive); 0 approbation obligatoire. Le endpoint classic protection indique `protected=true` mais `protection.enabled=false`; le ruleset actif est la protection effectivement confirmée.  
+PR ouvertes : **23**. Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
+Ruleset `protect main` actif : deletion et non-fast-forward interdits, PR obligatoire, résolution de threads, checks `Tests Node.js et MySQL` et `Build complete source archive`, 0 approbation requise, bypass none. L’API classic indique `protected=true` mais `protection.enabled=false`; le ruleset actif est la protection confirmée.
 
-> Snapshot read-only via l’API branches (pagination 100+46). L’API branches ne fournit pas les dates de commit; elles ne sont donc pas inventées. Les comparaisons ahead/behind sont calculées pour les PR ciblées seulement. Aucune branche supprimée.
+> Pagination 100+46; l’API branches ne fournit pas les dates de commit. Ahead/behind exhaustif non calculé; comparaisons ciblées dans le rapport. Aucune branche supprimée.
 
 ## Têtes partagées
 - `11d55850`: `feat/dashboard-reference-layout`, `feat/sunupilot-dashboard-reference`
@@ -30,7 +29,7 @@ Ruleset `protect main` actif : blocage suppression/non-fast-forward, PR obligato
 | `audit/fix-nginx-upstream-order-20261116` | `5e93abdc` |
 | `audit/fix-realtime-company-groups-20261116-run1` | `e5c3d802` |
 | `audit/fix-reset-email-docs-and-redaction-test-20261116` | `a53c96da` |
-| `audit/initial-review-20261122` | `5d9ece51` |
+| `audit/initial-review-20261122` | `f85f3a05` |
 | `audit/invoice-pdf-typography-print-20261118` | `7cb2d43c` |
 | `audit/npm-audit-gate-2026-11-16` | `63a344d9` |
 | `audit/rapport-approfondi-2026-11-16-run2` | `1aee9331` |
@@ -62,7 +61,7 @@ Ruleset `protect main` actif : blocage suppression/non-fast-forward, PR obligato
 
 | Branche | HEAD |
 |---|---|
-| `ci/lint-history-protection-backend-20261122` | `c4125b4d` |
+| `ci/lint-history-protection-backend-20261122` | `4656d588` |
 | `ci/package-main-after-pr39-pr40` | `8c725a00` |
 | `ci/real-restore-smoke-20261117` | `8864ab94` |
 
@@ -258,4 +257,4 @@ Ruleset `protect main` actif : blocage suppression/non-fast-forward, PR obligato
 
 ## Comparaisons ciblées
 
-Les comparaisons exhaustives des 146 branches restent à effectuer. Les 21 comparaisons ciblées sont consignées dans le rapport d’audit.
+21 branches de PR prioritaires comparées à main; les comparaisons des 146 branches restantes ne sont pas exhaustives. Voir `docs/audit-initial-20261122.md`.
