@@ -240,3 +240,27 @@ La PR #135 a été renforcée: **toutes les factures émises ne peuvent plus êt
 - #137 : tests automatisés en cours; package/lint en cours.
 - #132 : tests automatisés en cours après actualisation du rapport.
 - main toujours SHA `8453ee6d...`, aucune modification.
+
+
+## 13. Actualisation — protection du stock catalogue (03:41 UTC)
+
+### P1 confirmé — DELETE produit supprimait stock et détachait documents
+`server/routes/produits.js` supprimait les produits avec stock positif, cascadait sur `pro_stocks_entrepots` et détachait les lignes de facture (`produit_id=NULL`). Les mouvements stock pouvaient perdre leur lien produit. Le test historique `produits-delete.test.js` confirmait explicitement cette suppression d'un produit stock 10 lié à une facture.
+
+### PR #138
+- Branche `fix/product-delete-stock-history-protection-20261122`, PR draft https://github.com/morn53426-ui/-samafacture-pro/pull/138.
+- Refus 409 `PRODUIT_HISTORIQUE_PROTEGE` si stock catalogue/entrepôt non nul, facture liée ou mouvement historique; ne détache plus les lignes.
+- Suppression permise uniquement si stock nul et aucun lien/historique.
+- Tests modifiés/ajoutés pour produit vide, stock positif, mouvement à stock nul, facture liée et isolation tenant.
+- CI déclenchée; tests locaux non exécutés.
+
+### Inventaire actuel
+- Branches : **144**; SHA de tête uniques estimés **142**.
+- PR ouvertes : **21** (16 initiales + #134–#138).
+- #134 : CI entièrement réussie (Node/MySQL, visuel responsive, Docker Compose, smoke cluster MySQL+Redis, restauration sauvegarde chiffrée, ESLint, ZIP).
+- #135: tests en cours, ESLint/ZIP réussis sur head 5d676; mergeable true.
+- #136: tests en cours, branch mergeable true.
+- #137: tests en cours; head 922756; draft.
+- #138: CI déclenchée; head aa954; mergeable true.
+- #132: CI en cours après actualisation du rapport.
+- main demeure 8453ee6d, inchangé.
