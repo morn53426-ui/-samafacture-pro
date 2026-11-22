@@ -785,7 +785,7 @@ function createFactureTemplates(helpers) {
         </div>
       </div>
 
-      <table>
+      <table class="sf-platine-table">
         <thead><tr><th>Désignation</th><th>Qté</th><th>Prix U.</th><th>TVA</th><th style="text-align:right;">Total</th></tr></thead>
         <tbody>${lignesRowsHtml(lignes)}</tbody>
       </table>
