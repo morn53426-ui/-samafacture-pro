@@ -126,6 +126,22 @@ test('l’expiration ramène au Gratuit avant les routes protégées sans suppri
     [userId]
   );
 
+  // La première requête protégée après expiration tente directement de réactiver
+  // un plan payant : elle ne doit pas dépendre d'un passage préalable par /auth/me.
+  const directAttempt = await request(app)
+    .put('/api/auth/plan')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ plan: 'pro' });
+  assert.equal(directAttempt.status, 403, directAttempt.text);
+  assert.equal(directAttempt.body.code, 'PAIEMENT_REQUIS');
+
+  const [[expiredAccount]] = await pool.query(
+    'SELECT plan, trial_status FROM users WHERE id = ?',
+    [userId]
+  );
+  assert.equal(expiredAccount.plan, 'gratuit');
+  assert.equal(expiredAccount.trial_status, 'expired');
+
   const me = await request(app)
     .get('/api/auth/me')
     .set('Authorization', 'Bearer ' + token);
@@ -138,13 +154,6 @@ test('l’expiration ramène au Gratuit avant les routes protégées sans suppri
     [userId]
   );
   assert.equal(Number(remaining.total), 1);
-
-  const attempt = await request(app)
-    .put('/api/auth/plan')
-    .set('Authorization', 'Bearer ' + token)
-    .send({ plan: 'pro' });
-  assert.equal(attempt.status, 403);
-  assert.equal(attempt.body.code, 'PAIEMENT_REQUIS');
 });
 
 test('un nouveau compte créé avec une invitation d’équipe ne reçoit pas un essai individuel concurrent', async () => {
