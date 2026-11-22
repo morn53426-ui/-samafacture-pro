@@ -405,3 +405,47 @@ Sur main, le check-run Tests Node.js et MySQL associé à HEAD a conclu success.
 - #145 run `45028257640` on head `35adb125`: Docker build/secret sentinel step active; previous head `c59e3f0` test suite still running at last check.
 - #132 latest head `cdd380e1`: ZIP and tests runs initiated; tests currently in progress.
 - Logs for the completed #142 test step are not yet downloadable while the job remains active (GitHub log endpoint returned BlobNotFound); test counts are not claimed until the job finishes and logs are readable.
+
+
+## Run 10 — état GitHub vérifié, CI finalisée et blocage de merge détecté (22 novembre 2026, 14:25 UTC)
+
+### Inventaire recalculé
+- Branches : **152** (page 1 = 100, page 2 = 52, page 3 = 0).
+- Pull Requests : **27 ouvertes**, **114 fermées** (95 merged, 19 fermées sans merge), **141 au total**. Les comptes ont été recalculés via les collections GitHub.
+- Dépôt public, non archivé, branche par défaut main. Permission GitHub de cette connexion : push/admin/maintain, mais les règles de protection sont respectées volontairement.
+- Les 15 commits récents sur main incluent le merge #117 à f0ae8b08 (2026-11-22 14:14:05 UTC), tests de dépenses/tenant, #119/#120 et les merges PDF/mobile précédents.
+- CI directement associée à main HEAD f0ae8b08c4e7e35abc333c53a9380deee48fd88b : run **45031708395 — Tests automatisés — success**. Le endpoint combined-status renvoie encore une liste vide de contexts; l'Actions run sur le SHA est une preuve séparée et positive.
+- Ruleset protect main ID 27410527, enforcement active : deletion et non-fast-forward bloqués, PR obligatoire, résolution des threads requise, checks Tests Node.js et MySQL et Build complete source archive requis, 0 approbations requises dans la règle, aucun bypass. L'autorisation utilisateur explicite de merger reste nécessaire selon le mandat de cet audit.
+
+### PR prioritaires — état exact
+- **#142** head decb8da2e48e8f7a93fc63202f00fe0b4170e6e2, base main, Draft. Compare main→branch : **77 ahead / 48 behind**, status diverged. GitHub retourne mergeable=false, mergeable_state=dirty : conflit/blockage de merge confirmé. Trois workflows sur ce head sont success : Tests #45027909669, ZIP #45027909640, ESLint #45027909637. Aucun review, aucun reviewer demandé, aucun thread de revue. La CI verte ne rend pas cette branche mergeable.
+- **#145** head 5b6ba8bf3b05e4155697159c60cf4b5051196bf8, base branche intégration #142. Compare base→head : **15 ahead / 0 behind**, status ahead; PR clean. Tests #45029642007, ZIP #45029642014 et ESLint #45029642012 : **success**. Aucun review ou reviewer demandé. Le code v22 droppe la FK invoice-event nommée fk_pro_compta_facture_events_invoice; la migration 011 confirme le même nom et la FK tenant-user ON DELETE CASCADE demeure. Les tests couvrent v19/v20/v21, répétition de migration, événement conservé après suppression de facture et nettoyage tenant. Validation CI positive, mais revue humaine/comptable toujours absente.
+- **#143** head 17d25a5e3686f0016e94da9fe354b2f6e23b7afe, base intégration. Compare : **3 ahead / 16 behind**, diverged; aucun workflow associé au head. Le correctif chèques/méthodes inconnues est déjà présent dans #142; ne pas merger la copie #143. Garder ouverte, sans fermeture non autorisée.
+- **#128** essai 15 jours autonome, non-Draft, head e3b91dc4ae459fc4fdd65b63dd440f632ccd4217. Compare main→branch : **39 ahead / 48 behind**, diverged; Tests #44953881513, ZIP #44953881519, ESLint #44953881514 : success. Chevauchement important avec le trial déjà inclus dans #142; décider d'une stratégie de consolidation (une seule source de changements) avant intégration.
+- **#138** protection produit/stock : Tests #44998176886, ZIP #44998176877, ESLint #44998176880 : success; nécessite mise à jour de base et revue.
+- **#140** lint protection backend : Tests #44994109148, ZIP #44994109135, ESLint #44994109141 : success; vérifier l'intégration des listes de fichiers/chevauchements avec #142.
+- **#125** PDF page 3 : Tests #44966806951, ZIP #44966806957, ESLint #44966806986 : success; branch behind main.
+- **#127** devis Executive A4 : Tests #44949738678, ZIP #44949738615, ESLint #44949738607 : success; branch behind main.
+- #132 rapport audit reste Draft. Ce run met à jour le document sur la branche d'audit dédiée, pas sur main.
+
+### Revue technique indépendante — points de risque et arbitrages
+1. #142 est un lot large (77 commits ahead, 48 behind main, 46 fichiers touchés dans le diff PR) regroupant lifecycle facture, remboursement, protections historiques, trial, workspace, migrations et CI. Même avec CI verte, la divergence et l'état dirty imposent résolution de conflits sur une branche dédiée et CI complète sur le nouveau SHA avant review.
+2. #145 migration v22 : la migration droppe la FK facture/event spécifique, laissant l'événement avec son ID de facture historique, mais conservant la FK tenant-user (confirmée par migration 011 et le test de suppression du tenant). Risque résiduel : la route métier doit continuer à empêcher les suppressions de factures postées; la migration protège la piste d'audit des suppressions exceptionnelles.
+3. #143 est redondante et diverge de sa base; conserver sans merge/close.
+4. #128 et #142 implémentent le trial sur des branches concurrentes; éviter les doubles merges et valider que le délai de 15 jours ne se réinitialise pas, qu'une invitation de workspace exclut l'essai individuel et que les changements de plan ne nécessitent aucun paiement pendant l'essai.
+5. #138/#140/#125/#127 ont CI verte, mais la fraîcheur des bases et l'intégration dans main doivent être vérifiées avant tout merge.
+6. Revue des PR #142/#145 : aucune approbation indépendante ni reviewer demandé. Les règles GitHub actuelles n'exigent pas un nombre d'approbations, mais le processus de projet ne doit pas merger sans revue humaine et autorisation explicite.
+
+### Planning priorisé actualisé
+- **P0** : traiter la divergence/conflict #142. Préserver l'intégration sur une branche de travail; résoudre avec main sans toucher main; vérifier migrations v19→v21, annulation facture payée, remboursement partiel/total, journal caisse/banque, tenant isolation et trial expiration; relancer Tests, ZIP, ESLint, backup-restore, smoke cluster et recette visuelle sur le nouveau SHA.
+- **P0** : revue indépendante #145 (v22) et validation du scénario invoice delete→event retained et tenant cleanup. Pas de merge tant que revue et CI sur la base consolidée.
+- **P1** : décider si #128 est abandonnée comme source de trial au profit du code intégré #142 (sans fermer la PR sans autorisation); rebaser/porter #138 et #140 et vérifier protections client/dépense/facture/stock avec tests.
+- **P1** : rebase #125/#127 puis recette PDF/impression facture/devis A4 1/2/3+ pages, logos, cachet, QR, polices et données longues sur desktop/mobile.
+- **P2** : consolider #129/#141, rebaser #133; résoudre les échecs de contraste/focus #99/#102/#110 avant intégration.
+- **P3** : audit SHA/ahead/behind complet des branches non-PR; sécurité JWT/session, secrets, Docker, backups et dépendances; revue OHADA (balance, contrepassations, lettrage, journaux, piste d'audit) avec validation comptable externe.
+
+### Limites
+- Aucun clone local/runtime disponible; aucun test local, Docker local ou inspection visuelle locale n'a été exécuté.
+- Les preuves de test sont les runs GitHub Actions listés; aucun nombre de tests ne doit être inventé sans logs lisibles.
+- Les 122 branches hors main et PR ouvertes n'ont pas toutes été comparées individuellement à main dans ce run. L'inventaire de noms est complet; l'analyse de divergence commit par commit reste à faire.
+- Aucun merge/close, aucune suppression, aucune modification de main, aucun paiement réel, aucune donnée/backup/volume modifié ou supprimé.
