@@ -19,24 +19,24 @@ Ce document distingue les changements présents sur une branche, les contrôles 
 
 | Priorité | Chantier | Référence | État vérifié |
 |---|---|---|---|
-| P1 | PDF A4 multipages, factures et devis | PR #125 | CI complète verte sur HEAD `8eebb236` ; HEAD avancé ensuite à `057b0a40` avec un compactage supplémentaire de Majesté ; CI à relancer/terminer sur ce dernier HEAD |
+| P1 | PDF A4 multipages, factures et devis | PR #125 | CI complète verte sur le dernier HEAD `057b0a40` ; 31 modèles facture et 31 modèles devis, 28 lignes longues, 3 pages A4 maximum |
 | P1 | Essai gratuit et espace professionnel | PR #128 | CI verte sur HEAD `e3b91dc4` ; essai de 15 jours sur Standard, Pro et Entreprise, avec règles de non-réinitialisation et d'expiration testées |
 | P1 | Cycle de vie comptable des factures et dépenses | PR #117 | CI complète verte sur le HEAD synchronisé `ba756d09` ; tests dépense/isolation de #115 inclus |
-| P1 | Contraste et navigation clavier clair/sombre | PR #130 | Correctifs sur une branche neuve ; ESLint et ZIP verts sur un commit précédent ; suite Chromium/MySQL en cours sur le dernier HEAD |
-| P1 | Vidéo de présentation Sunupilot | PR #126 | Code du lecteur, capture locale et tests présents ; master MP4 final absent du dépôt, donc le lecteur reste sur l'animation de secours |
+| P1 | Contraste et navigation clavier clair/sombre | PR #130 | Correctifs montant/solde/badge/focus ajoutés ; ESLint et ZIP verts sur HEAD `c4d8a188` ; tests MySQL/Chromium en cours |
+| P1 | Vidéo de présentation Sunupilot | PR #126 | Master 1080p silencieux retrouvé et validé localement, avec déclinaison mobile, VTT et poster ; binaire pas encore commité dans la branche, lecteur encore sur le secours |
 | P2 | Gouvernance et feuille de route | PR #131 (ce document) | Mise à jour proposée sur la base du `main` actuel |
 | P2 | Identité visuelle/rebranding étendu | PR #99 | Ancienne branche divergente ; ne pas intégrer sans revue indépendante et validation de marque |
 
 ## 1. PDF facture et devis — P1
 
 **PR de travail :** [#125](https://github.com/morn53426-ui/-samafacture-pro/pull/125)  
-**HEAD contrôlé :** `8eebb2363a9fa0e5de58f5f49407771b61b40908`
+**HEAD contrôlé :** `057b0a4084f92fe64c79b2aedd813373384353f6`
 
 La branche a été synchronisée avec le `main` de référence sans réécriture forcée. La CI complète du HEAD a réussi : tests Node/MySQL, sauvegarde chiffrée et restauration, smoke test MySQL/Redis, ESLint, packaging et recette Chromium.
 
 La recette a généré 324 captures et deux PDF de démonstration réels A4. Le rapport vérifie les 31 modèles pour les factures et les 31 modèles pour les devis, avec 28 lignes longues. Tous les modèles produisent au plus trois pages. Les contrôles confirment les bandeaux sans débordement, les titres, les images chargées (logos, QR et signatures), les totaux et les panneaux complémentaires. Les documents de démonstration contrôlés ont chacun trois pages A4 ; le panneau « Bon pour accord » est visible sur la troisième page du devis, pas isolé sur une quatrième.
 
-Le modèle Tech conserve 9,5 pt ; le modèle Majesté conserve 9 pt et emploie un espacement d'impression plus compact. Après la CI verte sur `8eebb236`, deux commits supplémentaires ont abaissé le padding vertical Majesté à 1 px et son interligne à 13,8 px, sans réduire la police. La recette complète doit confirmer le nouveau HEAD `057b0a40` avant de réutiliser le statut de succès. Les seuils de pagination ne sont pas abaissés.
+Le modèle Tech conserve 9,5 pt ; le modèle Majesté conserve 9 pt et emploie un espacement d'impression plus compact. La CI complète est maintenant verte sur `057b0a40` après le compactage Majesté : padding vertical de 1 px, interligne 13,8 px et police conservée à 9 pt. Les 31 modèles de facture et 31 de devis ont passé la recette avec 28 lignes longues et trois pages A4 maximum ; deux PDF réels A4 ont été inspectés, chacun en trois pages, avec TVA/totaux/acceptation présents et non coupés. L'artefact final est `samafacture-recette-visuelle-1359`. Les seuils de pagination n'ont pas été abaissés.
 
 **À faire avant clôture :** conserver la PR en brouillon jusqu'à la revue humaine d'un échantillon imprimé sur Chrome/Safari et sur une imprimante réelle. Ne pas fusionner automatiquement à la seule lecture d'une CI verte.
 
@@ -102,7 +102,7 @@ La page d'accueil possède un lecteur natif MP4 avec un lecteur animé de secour
 
 **Blocage explicite :** le master MP4 final attendu n'est pas présent dans `main`, dans la branche #126 ni dans les fichiers accessibles recherchés. La vidéo finale ne peut donc pas être considérée comme intégrée ou silencieuse sur la base du seul lecteur de secours.
 
-**À faire :** fournir le master vidéo final souhaité, retirer sa piste audio si la version demandée est silencieuse, l'ajouter à `public/videos/sunupilot-presentation.mp4`, exécuter `npm run validate:video-asset`, puis contrôler la lecture réelle dans Chrome, Safari et sur mobile. Ne pas fusionner #126 comme une vidéo finalisée avant cette recette. La PR #118 est une variante antérieure et ne doit pas être fusionnée en parallèle.
+**État du master :** un master vidéo silencieux a été retrouvé dans les fichiers de travail et validé : H.264 1920×1080, 24 i/s, 45,4167 s, 4 677 778 octets, aucune piste audio. Une déclinaison H.264 1280×720, elle aussi sans audio, est également prête. Le VTT français (7 repères jusqu'à 45,4 s) et le poster SVG de la PR sont réunis dans un paquet d'intégration. Le master n'est toutefois pas encore commité dans la branche GitHub ; le lecteur reste sur son animation de secours tant que le fichier n'est pas poussé dans `public/videos/sunupilot-presentation.mp4`. Exécuter `npm run validate:video-asset` après ajout, puis contrôler Chrome, Safari et mobile.
 
 ## 6. PR remplacées ou basées sur un ancien main
 
@@ -128,10 +128,10 @@ Une PR remplacée peut rester ouverte le temps de vérifier son historique ; sa 
 | Date / référence | Résultat vérifié |
 |---|---|
 | 21/11/2026 — main `8453ee6` | Référence de départ de ce plan |
-| 21/11/2026 — PR #125 / run `44963765145` / HEAD `8eebb236` | CI complète verte ; 31 modèles facture et 31 modèles devis ; 28 lignes longues ; plafond de trois pages ; 324 captures |\n| 22/11/2026 — PR #125 / HEAD `057b0a40` | Nouveau compactage Majesté à 9 pt ; CI complète en cours sur le nouveau HEAD |
+| 21/11/2026 — PR #125 / run `44963765145` / HEAD `8eebb236` | CI complète verte ; 31 modèles facture et 31 modèles devis ; 28 lignes longues ; plafond de trois pages ; 324 captures |\n| 22/11/2026 — PR #125 / run `44964949778` / HEAD `057b0a40` | CI complète verte ; recette visuelle 31 × 2 modèles, 28 lignes, 3 pages A4 max ; PDF facture/devis A4 inspectés |
 | 21/11/2026 — PR #128 / HEAD `e3b91dc4` | Tests d'essai 15 jours, changement de formule et expiration validés ; CI verte |
 | 22/11/2026 — PR #117 / HEAD `ba756d09` / run `44964496620` | CI complète verte ; tests de dépense/idempotence/isolation intégrés ; branche à jour avec main |
-| 21–22/11/2026 — PR #130 / HEAD `1075c737` | Contraste montants, badges, dégradés et focus corrigés ; CI actuelle en cours |
-| 21/11/2026 — PR #126 | Tests du lecteur et capture locale verts ; MP4 final absent du dépôt |
+| 22/11/2026 — PR #130 / HEAD `c4d8a188` | Contraste des soldes/indicateur sécurisé/badge Payée et focus de date corrigés ; ESLint/ZIP verts ; CI visuelle en cours |
+| 22/11/2026 — PR #126 | Master 1080p + mobile 720p vérifiés sans audio ; paquet d'intégration préparé ; commit binaire GitHub restant |
 
 Ce plan doit être mis à jour à chaque nouveau résultat CI, sans transformer une étape « en cours » en étape « validée ».
