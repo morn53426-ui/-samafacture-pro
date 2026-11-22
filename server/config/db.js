@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 18;
+const CURRENT_SCHEMA_VERSION = 20;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -172,6 +172,8 @@ async function runMigrations(conn) {
   // v16 : type structuré des fiches catalogue ; les anciennes fiches restent non classées.
   // v17 : entrepôt de sortie mémorisé sur les factures pour des mouvements multi-entrepôts réversibles.
   // v18 : marqueur transactionnel pour reprendre une seule fois la ventilation des stocks historiques.
+  // v19 : historique des contrepassations et réactivations comptables des factures.
+  // v20 : mode de règlement des dépenses pour distinguer caisse (571) et banque (521).
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -218,6 +220,7 @@ async function runMigrations(conn) {
     { table: 'factures', column: 'reference_externe', definition: 'VARCHAR(100)' },
     { table: 'factures', column: 'date_validite', definition: 'DATE NULL' },
     { table: 'factures', column: 'conditions_reglement', definition: 'TEXT' },
+    { table: 'depenses', column: 'mode_reglement', definition: "VARCHAR(10) NOT NULL DEFAULT 'caisse' AFTER categorie" },
     { table: 'paiements', column: 'idempotency_key', definition: 'VARCHAR(100)' },
     { table: 'factures_recurrentes', column: 'envoi_auto_email', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
     { table: 'factures_recurrentes', column: 'jour_ancre', definition: 'TINYINT UNSIGNED NULL AFTER prochaine_date' },
@@ -364,6 +367,21 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of accountingPurchasingStatements) {
+    await conn.query(statement);
+  }
+
+  // Historique des transitions comptables des factures : chaque annulation/réactivation
+  // crée une écriture inverse liée à un événement unique, y compris après plusieurs cycles.
+  const invoiceAccountingEventsPath = path.join(__dirname, '..', 'database', 'migrations', '011_comptabilite_contrepas_factures.sql');
+  const invoiceAccountingEventsSql = fs.readFileSync(invoiceAccountingEventsPath, 'utf8');
+  const invoiceAccountingEventsStatements = invoiceAccountingEventsSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of invoiceAccountingEventsStatements) {
     await conn.query(statement);
   }
 
