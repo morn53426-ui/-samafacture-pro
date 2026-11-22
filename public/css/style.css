@@ -2676,7 +2676,7 @@ textarea { line-height: 1.55; }
 .invoice-type-switch label:has(input:checked) {
   border-color: var(--line);
   background: var(--paper);
-  color: var(--emerald);
+  color: var(--emerald-text);
   box-shadow: var(--shadow-xs);
 }
 .invoice-type-switch input {
