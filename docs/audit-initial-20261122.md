@@ -515,3 +515,14 @@ Lecture ciblée de `server/routes/professionnel.js` main (3 397 lignes) :
 - Ces chemins utilisent le même verrou parent produit que le DELETE de PR #138, ce qui réduit le risque de course stock/delete sur les opérations examinées.
 - Les enfants cross-tenant peuvent être créés uniquement via données anomalement liées/imports/direct SQL, mais les guards #137/#138 les protègent explicitement au DELETE.
 - Ce contrôle de lock-order est ciblé; toutes les routes qui peuvent modifier produit, achats, factures ou stock n'ont pas été auditées exhaustivement.
+
+
+## 22. État final du run — 22 novembre 2026, 04:32 UTC
+- #130 head `bf6a023194`: ESLint + ZIP success; Node/MySQL en cours après fix badge.
+- #137 head `6c7c04c772`: ZIP success; Node/MySQL en cours après test cross-tenant.
+- #138 head `d5bd445c86`: ZIP success; Node/MySQL en cours après test achats + stock cross-tenant.
+- #132 dernier commit docs `b2cb7f0787`: aucun check-run retourné; les commits sont documentation-only. L'ancien SHA initial #132 `69bcf74f` avait Tests Node/MySQL + archive green.
+- #134/#135/#136: 3/3 checks green sur heads contrôlés.
+- #133 reste Draft, base branch #130 (base SHA ancien `c607f397`), aucun check-run; il n'est pas validé et sa base est en retard sur #130.
+- #130/#134 doublons partiels : #130 contient l'accessibilité générale + le badge désormais; #134 badge seul, green. Préférer #130 après CI green, mais ne pas fermer #134 sans autorisation.
+- Aucun merge/close, aucun delete de branche, données, volumes ou backups; main inchangé. Tests locaux et Docker non exécutés.
