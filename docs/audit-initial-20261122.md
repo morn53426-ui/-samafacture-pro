@@ -217,3 +217,26 @@ La PR #135 a été renforcée: **toutes les factures émises ne peuvent plus êt
 - #132: tests en cours après actualisation de ce rapport.
 - #130: tests visuels toujours en échec sur le badge Entreprise, #133 sans checks; #134 est la correction indépendante.
 - `main` reste au SHA 8453ee6d8e633f151523236eecff1bc0e0cf877b, dernier run Tests automatisés réussi.
+
+
+## 12. Actualisation — suppression client et nouvelles PRs (03:40 UTC)
+
+### P1 confirmé — suppression client cascadait sur factures et paiements
+`server/routes/clients.js` supprimait les factures/devis du client puis le client, sans préserver le grand livre. La FK client→factures `ON DELETE CASCADE` pouvait supprimer lignes et paiements; l'accès portail/CRM pouvait aussi disparaître en cascade. La restauration stock ne protège pas l'historique comptable.
+
+### PR #137 — protection historique client
+- Branche `fix/client-delete-history-protection-20261122`, PR draft https://github.com/morn53426-ui/-samafacture-pro/pull/137.
+- Refus 409 `CLIENT_HISTORIQUE_PROTEGE` si facture, document, accès portail, décision portail ou activité CRM liée; client sans historique reste supprimable.
+- DELETE transactionnel et verrou du client; plus de suppression de factures ni restauration de stock dans ce chemin.
+- 3 tests: client facture/paiement préservés, activité CRM préservée, suppression sans historique autorisée.
+- CI en cours; tests locaux non exécutés. Ne pas merge avant contrôles.
+
+### Inventaire actuel
+- Branches : **143**, SHA de tête uniques estimés **141**.
+- PR ouvertes : **20** (16 initiales + #134, #135, #136, #137).
+- #134 : **tous les contrôles verts**, Tests Node/MySQL, recette visuelle, Docker Compose, smoke cluster MySQL+Redis, restauration sauvegarde chiffrée, ESLint et ZIP.
+- #135 : Tests automatisés en cours sur le head `5d676373...`; ESLint/ZIP réussis; mergeable true.
+- #136 : tests automatisés en cours; branch mergeable true.
+- #137 : tests automatisés en cours; package/lint en cours.
+- #132 : tests automatisés en cours après actualisation du rapport.
+- main toujours SHA `8453ee6d...`, aucune modification.
