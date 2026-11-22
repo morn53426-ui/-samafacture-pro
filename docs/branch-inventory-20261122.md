@@ -2,7 +2,7 @@
 
 Dépôt : `morn53426-ui/-samafacture-pro`  
 Référence : `main`  
-Branches : **147** (noms confirmés run 8 follow-up) ; **146 SHA enregistrés / 144 uniques**, HEADs actualisés pour toutes les refs (la branche d’audit est auto-référente et n’a pas de SHA dans le tableau).  
+Branches : **147** (noms confirmés run 8 follow-up) ; **146 SHA enregistrés / 144 uniques**, HEADs des PR ouvertes rafraîchis; les 122 branches non-PR conservent leurs SHA run 7 (la branche d’audit est auto-référente et n’a pas de SHA dans le tableau).  
 PR ouvertes : **24** (têtes et comparaisons run 8). Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
 CI main : aucune status/run fraîche retournée run 8; ruleset `protect main` attesté run 6 mais non revalidé run 8.
 
@@ -305,6 +305,6 @@ Current main SHA remains 8453ee6d8e633f151523236eecff1bc0e0cf877b. Combined stat
 - PR ouvertes: **24**.
 - #141: head f16f127b, base feat/workspace-settings-navigation-20261121 (PR #129), 1 ahead/0 behind, 1 fichier (.github/workflows/workspace-ui-structure.yml), Draft. Workflow-run/status query vide au contrôle; CI non confirmée.
 - #129: head 868027e1, 9 ahead/0 behind main, Draft; workflow-runs/status query vide.
-- #132 après mise à jour des documents: head 30329590 (auto-refreshed), 69 ahead/0 behind, deux fichiers docs; Tests automatisés en cours, ZIP success. SHA précis du run #132 à confirmer dans PR.
+- #132: les checks précédemment vus (Tests in_progress, ZIP success) concernaient le head c77da4b8 avant les commits documentaires de follow-up. Ces commits avancent encore le head auto-référentiel; le statut de CI du head live doit être revérifié, aucune CI complète verte n'est revendiquée.
 - Les HEAD des 122 branches sans PR ne sont pas rafraîchis dans ce follow-up; leurs SHA restent run7. Le head de la branche audit #132 est auto-référentiel.
 - main reste 8453ee6d; CI main non visible par les endpoints interrogés.
