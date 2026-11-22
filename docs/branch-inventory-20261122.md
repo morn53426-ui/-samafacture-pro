@@ -6,7 +6,7 @@ Branches : **146** ; SHA de tête uniques : **144**.
 PR ouvertes : **23**. Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
 CI main : workflow Tests automatisés #1296 réussi. Ruleset `protect main` actif.
 
-> Branches API paginées 100+46. Les dates de dernier commit ne sont pas retournées par cette collecte. Ahead/behind a été recalculé pour les 23 PR ouvertes; les branches sans PR n'ont pas toutes été comparées à main. Aucune branche supprimée.
+> Branches API paginées 100+46. La ligne de cette branche d’audit est auto-référente : son HEAD est le commit de mise à jour du présent inventaire, consultable dans PR #132. Les dates de dernier commit ne sont pas retournées par cette collecte. Ahead/behind a été recalculé pour les 23 PR ouvertes; les branches sans PR n'ont pas toutes été comparées à main. Aucune branche supprimée.
 
 ## Têtes partagées
 - `11d55850`: `feat/dashboard-reference-layout`, `feat/sunupilot-dashboard-reference`
@@ -29,7 +29,7 @@ CI main : workflow Tests automatisés #1296 réussi. Ruleset `protect main` acti
 | `audit/fix-nginx-upstream-order-20261116` | `5e93abdc` |
 | `audit/fix-realtime-company-groups-20261116-run1` | `e5c3d802` |
 | `audit/fix-reset-email-docs-and-redaction-test-20261116` | `a53c96da` |
-| `audit/initial-review-20261122` | `1faa9a7c` |
+| `audit/initial-review-20261122` | (self; see PR #132 head) |
 | `audit/invoice-pdf-typography-print-20261118` | `7cb2d43c` |
 | `audit/npm-audit-gate-2026-11-16` | `63a344d9` |
 | `audit/rapport-approfondi-2026-11-16-run2` | `1aee9331` |
