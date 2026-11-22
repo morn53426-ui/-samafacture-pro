@@ -4,8 +4,8 @@
 - Dépôt : `morn53426-ui/-samafacture-pro`
 - Branche de référence : `main`
 - HEAD observé : `8453ee6d8e633f151523236eecff1bc0e0cf877b` (merge PR #123, 21 novembre 2026 19:20 UTC).
-- Inventaire branches distantes : 138 noms retournés, pagination terminée (100 + 38).
-- PR ouvertes visibles dans la recherche : 15. La recherche des PR « all states » via ce connecteur a retourné un résultat vide non exploitable; cet audit confirme les PR ouvertes, pas un historique exhaustif des PR fermées/fusionnées.
+- Inventaire branches distantes : 140 noms retournés, pagination terminée (100 + 40).
+- PR ouvertes visibles dans la recherche : 16. La recherche des PR « all states » via ce connecteur a retourné un résultat vide non exploitable; cet audit confirme les PR ouvertes, pas un historique exhaustif des PR fermées/fusionnées.
 - Permissions GitHub disponibles : admin/maintain/push sur le dépôt. Aucun changement sur main.
 - Aucun clone local ni environnement d'exécution de tests n'est disponible via le connecteur utilisé; tests locaux non exécutés dans cette session.
 
@@ -21,7 +21,7 @@
 138 branches distantes recensées; aucun branch delete ni réécriture de ref effectuée. Les branches comprennent de nombreux lots historiques `audit/`, `fix/`, `feat/`, `test/`, `docs/`, `security/`, `integration/` et `rebase/`. L'inventaire complet est consultable dans l'onglet Branches GitHub; cette session n'a supprimé ni renommé ni fusionné aucune branche.
 
 ## 4. PR ouvertes prioritaires et statut CI observé
-- #132 — audit initial/plan, draft, head `audit/initial-review-20261122`, SHA `8ac30297c21add6f75d731202cab18fe52208795`: Tests automatisés success, Package source ZIP success.
+- #132 — audit initial/plan, draft, head `audit/initial-review-20261122`, SHA `b195b6cd07e61409b8721e932e488d9a47fc6dbe`: Tests automatisés success, Package source ZIP success.
 - #128 — essai 15 jours + workspace + accès plan OHADA, draft, SHA `e3b91dc4ae459fc4fdd65b63dd440f632ccd4217`: Tests success, ESLint success, Package ZIP success.
 - #117 — contrepassation annulation/réactivation facture, ouverte non-draft, SHA `ba756d09888474477a19c182b42c1298ef092dd8`: Tests success, ESLint success, Package ZIP success.
 - #115 — intégrité comptabilisation dépenses et isolation tenant, ouverte non-draft, SHA `3873c1d1dbaa114af2aec991b1f49e48702f82a1`: Tests success, Package ZIP success.
@@ -111,3 +111,57 @@ Les statuts ci-dessus sont un échantillon vérifié par SHA de PR; ils ne repr�
 - Mise à jour du rapport d'audit sur la branche dédiée `audit/initial-review-20261122` uniquement.
 - Main, PR (merge/close), branches, volumes, données et sauvegardes: non modifiés/supprimés.
 - Paiement réel: non activé.
+
+
+## 9. Actualisation indépendante — 22 novembre 2026, 03:29 UTC
+
+### Référence GitHub actuelle
+- `main` reste au SHA `8453ee6d8e633f151523236eecff1bc0e0cf877b`; aucune modification directe.
+- Branches distantes : **140** (100 + 40), **138 SHA de tête uniques**; les refs doublonnées ne sont pas supprimées.
+- PR ouvertes : **16**.
+- Les 10 derniers runs consultés sur `main`: **9 réussites**, **1 échec plus ancien**. Le run sur le HEAD 8453ee6d a réussi. Ce constat corrige l'ancienne note indiquant aucun run visible.
+- Le statut legacy combiné sur le commit n'a pas de status entries; les Actions check-runs sont la source consultée pour cette vérification.
+
+### Échec P2 confirmé et correction proposée en PR
+- **PR #130** : run Tests automatisés échoué sur `server/tests/visual/recette-visuelle.js`, fonction `verifyBusinessPagesAccessibility`, page Paramètres, badge `invoice-template-tier.tier-enterprise`. Texte `rgb(10,122,69)`, fond `rgb(23,61,43)`, ratio **2,23:1** vs seuil 4,5:1. Lint et package ZIP réussis.
+- **PR #133** : tentative de correction du badge sur la branche dépendante de #130; **aucun check-run** retourné. Les workflows `pull_request` ciblent seulement `main`, la branche multi-sociétés et `fix/invoice-pdf-continuation-identity-20261121`; le target branch de #133 ne déclenche donc pas les contrôles usuels.
+- **PR #134 (nouvelle correction indépendante depuis main)** : `fix/enterprise-badge-contrast-main-20261122`, 2 fichiers, 3 commits, 33 additions / 4 deletions selon compare. Palette explicite en clair/sombre et assertion Puppeteer sur le contraste calculé du badge Entreprise en thème clair, sombre et système-sombre. Ratios calculés: 6,61:1 et 8,39:1. ESLint et ZIP réussis; Tests automatisés **en cours** au dernier contrôle. Aucun merge.
+
+### Conflit d'intégration P1 — version du schéma
+- PR #117 `fix/accounting-invoice-cancellation-reversal-20261121`: `CURRENT_SCHEMA_VERSION=20`, v19 contrepassations facture, v20 mode de règlement dépense; tests de migration attendent 20.
+- PR #128 `feat/15-day-trial-entitlements-20261121`: `CURRENT_SCHEMA_VERSION=19`, v19 dates/état d'essai; tests attendent 19.
+- Les deux branches ajoutent des colonnes différentes de façon additive, mais elles ne peuvent pas être intégrées telles quelles sans harmoniser `db.js`, commentaires de migration et tests d'attente. Le plan d'intégration doit définir une version combinée (par exemple v21), réconcilier les deux ensembles d'ajouts et rerun migrations/tests sur la base main courante. Aucun changement de migration n'a été fait pendant cette exécution.
+
+### PR ouvertes — actualisation des statuts et recommandations
+| PR | Statut CI observé | Base / divergence | Recommandation |
+|---|---|---|---|
+| #134 | ESLint + ZIP OK; tests en cours | main courant, ahead | Attendre tests visuels avant merge |
+| #130 | Tests échoués; ESLint + ZIP OK | main courant, ahead 13 | Bloquée par contraste; corriger et rerun |
+| #133 | aucun check-run | dépend de #130 | ne pas considérer validée; workflow ne déclenche pas sur cette base |
+| #128 | tests, ESLint, ZIP OK (run sur SHA courant consulté) | main courant, ahead 39 | garder draft; résoudre collision version 19/20 avec #117 |
+| #117 | tests, ESLint, ZIP OK | ahead 47; 18 fichiers dans compare | revue ciblée, intégrer avec version de schéma combinée |
+| #115 | tests + ZIP OK | diverged, behind 23 | rebase sur main puis CI; ne pas fusionner sur ancien base |
+| #125 | tests, ESLint, ZIP OK | main courant, ahead 43, 5 fichiers | candidate après revue PDF et tests visuels |
+| #127 | tests, ESLint, ZIP OK | main courant, ahead 5, 3 fichiers | candidate après recette A4 devis Executive |
+| #129 | tests, ESLint, ZIP OK | main courant, ahead 9, 6 fichiers | candidate après revue des URL/actions et recette UX |
+| #126 | tests + ZIP OK | main courant, ahead 30, 20 fichiers | préférer l'évaluation de cette PR « portage sur main » à #118 si le diff confirme le doublon |
+| #118 | tests + ZIP OK | diverged, behind 23 | comparer au #126; ne pas intégrer les deux sans justification |
+| #131 | tests + ZIP OK | main courant, ahead 4 | feuille de route plus récente; comparer/remplacer #114 |
+| #114 | tests + ZIP OK | diverged, behind 50 | obsolète/duplicata probable de #131, conserver pour historique |
+| #110 | tests échoués; lint + ZIP OK | diverged, behind 53 | rebase puis analyser les échecs; doublon #102 |
+| #102 | tests échoués; lint + ZIP OK | diverged, behind 228 | ancienne branche de tests accessibilité; préférer #110 après rebase si le diff reste utile |
+| #99 | tests échoués; lint + ZIP OK | diverged, behind 228, 84 fichiers | très large rebranding; corriger/rebaser et revue complète avant intégration |
+| #132 | tests + ZIP OK | main courant, ahead 2 | audit doc; garder draft tant que rapport complet non fini |
+
+### Branches non PR — comparaison partielle avec main
+Les comparaisons effectuées sur un échantillon de 15 refs révèlent plusieurs branches uniquement en retard (par exemple `audit/npm-audit-gate-2026-11-16`, `audit/securite-2026-11-15`, `audit/security-multisocietes-review-20261116-run3`) et de nombreuses refs divergeantes. Certaines branches de backup/runtime ou UI anciennes ont de gros écarts d'historique. **La comparaison ahead/behind et le diff de toutes les 140 branches ne sont pas entièrement terminés dans cette exécution**; ne supprimer aucune branche sur cette base. La liste complète des noms est sur GitHub.
+
+### Correction effectuée dans cette exécution
+- Création de la branche `fix/enterprise-badge-contrast-main-20261122` depuis main.
+- Deux commits de correction et tests; PR draft **#134** créée. Main n'a pas été modifiée.
+- CI GitHub déclenchée; tests automatisés encore en cours. Tests locaux non exécutés (aucun clone/environnement local disponible dans ce runtime).
+
+### Limites / prochain lot
+- Revue code approfondie de toutes les 140 branches, tous les commits, diffs, dates et CI n'est pas achevée; cette actualisation couvre branches (noms et SHA), PR ouvertes et comparaisons ciblées.
+- Le statut de protection main n'a pas pu être lu via endpoint de protection (403 de l'intégration); la protection reste attestée par la metadata branch `protected=true`.
+- Priorité prochaine: attendre CI #134, corriger/revalider #130, préparer la migration combinée #117/#128, rebaser #115 et comparer les PR doublons #118/#126, #114/#131, #102/#110.
