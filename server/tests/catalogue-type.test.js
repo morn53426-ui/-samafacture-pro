@@ -35,7 +35,7 @@ describe('Catalogue — distinction produit/service', () => {
   test('la migration attribue non_classe aux fiches historiques sans deviner leur nature', () => {
     assert.match(migration, /column: 'type_catalogue', definition: "VARCHAR\(20\) NOT NULL DEFAULT 'non_classe' AFTER nom"/);
     assert.match(schema, /type_catalogue VARCHAR\(20\) NOT NULL DEFAULT 'non_classe'/);
-    assert.match(migration, /CURRENT_SCHEMA_VERSION = 20/);
+    assert.match(migration, /CURRENT_SCHEMA_VERSION = 21/);
     assert.doesNotMatch(migration, /UPDATE produits SET type_catalogue/);
   });
 

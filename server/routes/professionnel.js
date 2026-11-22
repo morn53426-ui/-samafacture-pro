@@ -24,6 +24,23 @@ const money = (value) => {
   if (!Number.isFinite(amount) || amount <= 0 || amount > 999999999999) return null;
   return Math.round((amount + Number.EPSILON) * 100) / 100;
 };
+
+function paymentTreasuryAccount(method) {
+  const normalized = String(method || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  const bankMethods = new Set([
+    'wave', 'orange money', 'paydunya', 'virement bancaire', 'virement',
+    'cheque', 'carte bancaire', 'carte'
+  ]);
+  if (bankMethods.has(normalized)) return '521';
+  if (['especes', 'cash'].includes(normalized)) return '571';
+  return null;
+}
+
 async function safeDateForUser(value, userId) {
   const valid = optionalIsoDate(value);
   if (valid) return valid;
@@ -430,7 +447,14 @@ async function postRefundAccountingEntry(conn, uid, actorId, payment, invoice, r
     [uid, payment.id]
   );
   if (!paymentEntries.length) {
-    const bank = /wave|paydunya|orange|carte|virement/i.test(payment.methode || '');
+    const treasuryAccount = paymentTreasuryAccount(payment.methode);
+    if (!treasuryAccount) {
+      const error = new Error('La méthode du paiement d’origine ne permet pas de déterminer le compte de trésorerie. Le remboursement est bloqué pour éviter une écriture comptable incorrecte.');
+      error.status = 409;
+      error.code = 'METHODE_PAIEMENT_NON_RECONNUE';
+      throw error;
+    }
+    const bank = treasuryAccount === '521';
     await postSystemEntry(
       uid,
       actorId,
@@ -3064,6 +3088,46 @@ async function postSystemEntry(uid, actorId, sourceType, sourceId, date, label, 
     await ensureAccountingDefaults(uid, conn);
     if (ownsConnection) await conn.beginTransaction();
 
+    if (sourceType === 'facture') {
+      // Verrou commun avec DELETE /factures/:id : aucun posting ne peut se créer
+      // après une vérification d'absence d'historique suivie d'une suppression.
+      const [invoiceRows] = await conn.query(
+        "SELECT id FROM factures WHERE id = ? AND user_id = ? AND type = 'facture' AND statut <> 'annulee' FOR UPDATE",
+        [sourceId, uid]
+      );
+      if (!invoiceRows.length) {
+        const err = new Error('Facture introuvable, supprimée ou annulée.');
+        err.code = 'FACTURE_NON_COMPTABILISABLE';
+        throw err;
+      }
+    }
+    if (sourceType === 'depense') {
+      // Verrou commun avec PUT/DELETE /depenses et contrôle de cohérence de la source.
+      const [expenseRows] = await conn.query(
+        'SELECT id, montant, date_depense, libelle, categorie FROM depenses WHERE id = ? AND user_id = ? FOR UPDATE',
+        [sourceId, uid]
+      );
+      const expense = expenseRows[0];
+      if (!expense) {
+        const err = new Error('Dépense introuvable ou supprimée.');
+        err.code = 'DEPENSE_NON_COMPTABILISABLE';
+        throw err;
+      }
+      const expectedAmount = Number(expense.montant);
+      const debitAmount = lines.reduce((sum, line) => sum + Number(line.debit || 0), 0);
+      const creditAmount = lines.reduce((sum, line) => sum + Number(line.credit || 0), 0);
+      const expectedLabel = expense.categorie || expense.libelle;
+      if (Math.abs(debitAmount - expectedAmount) > 0.01 ||
+          Math.abs(creditAmount - expectedAmount) > 0.01 ||
+          String(date).slice(0, 10) !== String(expense.date_depense).slice(0, 10) ||
+          label !== 'Dépense ' + expense.libelle ||
+          lines[0]?.libelle !== expectedLabel) {
+        const err = new Error('La dépense a été modifiée avant sa comptabilisation; relancez la comptabilisation.');
+        err.code = 'DEPENSE_MODIFIEE';
+        throw err;
+      }
+    }
+
     const [existing] = await conn.query(
       'SELECT id, numero FROM pro_compta_ecritures WHERE user_id = ? AND source_type = ? AND source_id = ? LIMIT 1 FOR UPDATE',
       [uid, sourceType, sourceId]
@@ -3265,6 +3329,7 @@ router.post('/accounting/post-invoice/:id', async (req, res, next) => {
     res.status(result.duplicate ? 200 : 201).json(result);
   } catch (err) {
     if (conn) await conn.rollback().catch(() => {});
+    if (err.code === 'FACTURE_NON_COMPTABILISABLE') return res.status(409).json({ error: 'La facture a été supprimée ou annulée avant sa comptabilisation.' });
     next(err);
   } finally {
     if (conn) conn.release();
@@ -3299,7 +3364,15 @@ router.post('/accounting/post-payment/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Facture du paiement introuvable.' });
     }
     const invoiceNumber = invoiceRows[0].numero;
-    const bank = /wave|paydunya|orange|carte|virement/i.test(payment.methode || '');
+    const treasuryAccount = paymentTreasuryAccount(payment.methode);
+    if (!treasuryAccount) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'La méthode de paiement ne permet pas de déterminer le compte de trésorerie.',
+        code: 'METHODE_PAIEMENT_NON_RECONNUE'
+      });
+    }
+    const bank = treasuryAccount === '521';
     const result = await postSystemEntry(
       uid,
       actor(req),
@@ -3365,6 +3438,8 @@ router.post('/accounting/post-expense/:id', async (req, res, next) => {
     res.status(result.duplicate ? 200 : 201).json(result);
   } catch (err) {
     if (conn) await conn.rollback().catch(() => {});
+    if (err.code === 'DEPENSE_NON_COMPTABILISABLE') return res.status(404).json({ error: 'Dépense supprimée avant comptabilisation.' });
+    if (err.code === 'DEPENSE_MODIFIEE') return res.status(409).json({ error: 'La dépense a changé; actualisez puis relancez la comptabilisation.' });
     next(err);
   } finally {
     if (conn) conn.release();

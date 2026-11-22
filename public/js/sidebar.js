@@ -62,7 +62,7 @@ function renderSidebar(activePage) {
     }
   }
 
-  const planLabels = { gratuit: 'Plan Gratuit', starter: 'Plan Starter', pro: 'Plan Pro', entreprise: 'Plan Entreprise' };
+  const planLabels = { gratuit: 'Plan Gratuit', starter: 'Plan Standard', pro: 'Plan Pro', entreprise: 'Plan Entreprise' };
   const isEnterpriseConsole = location.pathname.endsWith('/groupe-entreprise.html');
   document.body.classList.toggle('enterprise-console-shell', isEnterpriseConsole);
   // Le centre Entreprise démarre en rail compact ; les autres pages respectent la préférence
@@ -108,7 +108,7 @@ function renderSidebar(activePage) {
       <div class="sidebar-foot">
         <button type="button" class="install-app-btn" style="display:none;" onclick="installApp()"><span class="ic">${Icon('smartphone')}</span> Installer l'application</button>
         <div class="sidebar-user-info">
-          <div class="plan-badge">${planLabels[user?.plan] || 'Plan Gratuit'}</div>
+          <div class="plan-badge">${user?.trial_status === 'trialing' ? `Essai ${planLabels[user?.trial_plan || user?.plan]?.replace(/^Plan /, '') || 'Standard'}` : (planLabels[user?.plan] || 'Plan Gratuit')}</div>
           <div class="sidebar-user-name">${escapeHtml(user?.entreprise_nom || user?.nom || 'Mon compte')}</div>
         </div>
         <button type="button" class="sidebar-logout" onclick="Api.clearSession(); location.href='login.html';" aria-label="Se déconnecter" title="Se déconnecter"><span class="ic" aria-hidden="true">${Icon('log-out')}</span><span class="sidebar-logout-label">Se déconnecter</span></button>

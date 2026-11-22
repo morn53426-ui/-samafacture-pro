@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const { jetonEstValide } = require('../utils/session');
+const { pool } = require('../config/db');
+const { getSessionContext } = require('../utils/session');
 
 // Méthodes qui modifient un état côté serveur — précisément celles qu'une requête intersites
 // forgée (CSRF) chercherait à déclencher. GET/HEAD/OPTIONS ne devraient jamais avoir d'effet de
@@ -47,15 +48,35 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Session invalide ou expirée. Veuillez vous reconnecter.' });
   }
 
-  // Révocation : le jeton doit correspondre à la version courante du compte (voir utils/session.js).
+  // La base valide la version du JWT et fournit l'état du plan. L'expiration est
+  // appliquée ici, avant les routes et les quotas qui lisent users.plan directement.
   try {
-    if (!(await jetonEstValide(payload))) {
+    const account = await getSessionContext(payload);
+    if (!account) {
       return res.status(401).json({ error: 'Session invalide ou expirée. Veuillez vous reconnecter.' });
     }
+    if (Number(account.trial_expired) === 1) {
+      await pool.query(
+        `UPDATE users
+         SET plan = 'gratuit', trial_status = 'expired'
+         WHERE id = ? AND trial_status = 'trialing'
+           AND (trial_ends_at IS NULL OR trial_ends_at <= UTC_TIMESTAMP())`,
+        [payload.id]
+      );
+      account.plan = 'gratuit';
+      account.trial_status = 'expired';
+    }
+    req.user = {
+      ...payload,
+      plan: account.plan || 'gratuit',
+      trial_plan: account.trial_plan || null,
+      trial_status: account.trial_status || 'not_started',
+      trial_started_at: account.trial_started_at || null,
+      trial_ends_at: account.trial_ends_at || null
+    };
   } catch (err) {
     return res.status(503).json({ error: 'Service temporairement indisponible.' });
   }
-  req.user = payload; // { id, email, role, nom, tv }
   next();
 }
 
