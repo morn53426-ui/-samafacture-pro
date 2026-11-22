@@ -159,6 +159,7 @@ router.post('/', async (req, res, next) => {
  *     responses:
  *       200: { description: Client mis à jour. }
  *       404: { description: Client introuvable., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: Client avec historique protégé., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.put('/:id', async (req, res, next) => {
   try {
