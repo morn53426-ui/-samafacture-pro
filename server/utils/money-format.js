@@ -22,7 +22,7 @@ function formatAmountWithCurrency(amount, devise) {
     maximumFractionDigits: decimals
   }).format(roundMoney(amount));
   // Les espaces fines insécables de fr-FR s'affichent mal dans certains clients email texte.
-  return `${formatted.replace(/[\\u202F\\u00A0]/g, ' ')} ${code}`;
+  return `${formatted.replace(/[\u202F\u00A0]/g, ' ')} ${code}`;
 }
 
 module.exports = { formatAmountWithCurrency, roundMoney, normalizeCurrency };
