@@ -4009,6 +4009,19 @@ router.put('/crm/activities/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* ---------------------- CONTEXTE ENTREPRISE ---------------------------- */
+router.get('/company-context', async (req, res, next) => {
+  try {
+    const [[company]] = await pool.query(
+      'SELECT devise FROM users WHERE id = ? LIMIT 1',
+      [owner(req)]
+    );
+    if (!company) return res.status(404).json({ error: 'Entreprise introuvable.' });
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ devise: String(company.devise || 'FCFA').toUpperCase() });
+  } catch (err) { next(err); }
+});
+
 /* ---------------------- PARAMÈTRES INTERNATIONAUX ---------------------- */
 router.get('/localization', async (req, res, next) => {
   try {
