@@ -7,8 +7,8 @@
 - Les recherches ont été relancées sur l'état courant, sans reprendre les comptes des anciens rapports.
 
 ## Inventaire GitHub
-- **Branches : 148 noms** (100 + 48, pagination terminée; page suivante vide lors de la vérification précédente). Noms complets ci-dessous.
-- **Pull Requests : 25 ouvertes, 113 fermées, 94 fermées-merged, 19 fermées non-merged; 138 PR au total.** Les fenêtres de création Novembre 1–10, 11–15, 16–18 et 19–22 donnent respectivement 3, 40, 54, 16 fermées (merged : 2, 30, 48, 14). Aucune PR ouverte ou fermée antérieure au 1er novembre n'a été retournée.
+- **Branches : 152 noms** (100 + 48, pagination terminée; page suivante vide lors de la vérification précédente). Noms complets ci-dessous.
+- **Pull Requests : 28 ouvertes, 113 fermées, 94 fermées-merged, 19 fermées non-merged; 141 PR au total.** Les fenêtres de création Novembre 1–10, 11–15, 16–18 et 19–22 donnent respectivement 3, 40, 54, 16 fermées (merged : 2, 30, 48, 14). Aucune PR ouverte ou fermée antérieure au 1er novembre n'a été retournée.
 - Attention : « merged » peut signifier fusion dans une branche de PR, pas dans `main`. #119 et #120 ont été fusionnées dans la chaîne #117/#119; elles ne sont pas sur main.
 - Head SHA de toutes les PR ouvertes consultées; comparaisons fraîches main↔PR réalisées. Les branches non-PR (122 branches hors main et PR ouvertes) n'ont pas reçu de comparaison de SHA/ahead-behind fraîche ce run.
 
@@ -370,3 +370,13 @@ Sur main, le check-run Tests Node.js et MySQL associé à HEAD a conclu success.
 - PR #132 audit head `13d6bce` : ZIP #45027535450 success; Tests #45027535457 en cours à la recette visuelle responsive.
 - Les filtres CI de test, lint et ZIP ont été ajoutés sur la branche intégration pour permettre les PR empilées; ces modifications sont elles-mêmes sous CI #142.
 - Aucune fusion/fermeture, main préservée.
+
+## Run 4 — inventaire après création des PR v22 (22 novembre 2026)
+
+- Pagination branches fraîche : 152 branches (100 + 52).
+- PR fraîche : 28 ouvertes (21 Draft, 7 prêtes), 113 fermées (94 merged, 19 non merged), 141 total.
+- Les deux nouvelles branches de correction v22 : `fix/accounting-event-audit-retention-v22-20261122` (#144, sans CI) et `fix/accounting-event-audit-retention-v22-run2-20261122` (#145, CI déclenchée).
+- #145 : head `c59e3f0`, base `decb8da`, mergeable. ZIP #45027993524 et ESLint #45027993538 verts; Tests #45027993526 en cours.
+- #142 : head `decb8da`, ZIP #45027909640 et ESLint #45027909637 verts; Tests #45027909669 en cours.
+- #132 : head report précédent `57e9743`, ZIP #45027535450 vert, Tests #45027535457 en cours. Le rapport sera relancé après cette mise à jour.
+- #144 demeure ouverte Draft sans checks et est superseded par #145; aucune PR fermée.
