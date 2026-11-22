@@ -51,7 +51,8 @@ async function safeDateForUser(value, userId) {
   return localDateString(accounts?.[0]?.fuseau_horaire || 'Africa/Dakar');
 }
 function normalizeExpenseCategoryMapping(value) {
-  const raw = String(value == null ? '' : value).trim();
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
   if (raw === '__sans_categorie__') return { key: raw, label: 'Sans catégorie' };
   const label = raw.normalize('NFKC').replace(/\s+/g, ' ');
   if (!label || label.length > 100) return null;
@@ -3207,7 +3208,7 @@ router.get('/accounting/expense-mappings', async (req, res, next) => {
               c.code AS compte_code, c.libelle AS compte_libelle,
               c.classe AS compte_classe, c.actif AS compte_actif
        FROM pro_compta_affectations_depenses m
-       JOIN pro_compta_comptes c ON c.id = m.compte_id
+       JOIN pro_compta_comptes c ON c.id = m.compte_id AND c.user_id = m.user_id
        WHERE m.user_id = ? ORDER BY m.categorie_label`,
       [owner(req)]
     );
@@ -3248,7 +3249,7 @@ router.put('/accounting/expense-mappings', async (req, res, next) => {
               c.code AS compte_code, c.libelle AS compte_libelle,
               c.classe AS compte_classe, c.actif AS compte_actif
        FROM pro_compta_affectations_depenses m
-       JOIN pro_compta_comptes c ON c.id = m.compte_id
+       JOIN pro_compta_comptes c ON c.id = m.compte_id AND c.user_id = m.user_id
        WHERE m.user_id = ? AND m.categorie_key = ? LIMIT 1`,
       [uid, mapping.key]
     );
