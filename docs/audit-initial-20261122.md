@@ -968,3 +968,16 @@ Cette revue ciblée n'est pas une revue exhaustive de tout le dépôt et aucun c
 
 ### Protections et limites
 Aucun changement direct main, merge/close PR, suppression de branche, volume, donnée ou sauvegarde; aucun paiement réel. Tests locaux et Docker local non exécutés. CI GitHub des PR citées uniquement. Certification SYSCOHADA et validations manuelles clavier/lecteurs d'écran restent requises.
+
+
+## Run 8 follow-up — CI structure PR #141 (22 novembre 2026, 10:33 UTC)
+
+- Nouveau branch: ci/workspace-ui-structure-tests-20261122, créé depuis la branche PR #129 (pas depuis main), commit f16f127b.
+- PR #141 est Draft et empilée sur #129; compare base #129 = 1 ahead/0 behind, un seul fichier modifié (.github/workflows/workspace-ui-structure.yml). À sa création, mergeability a ensuite été retournée true par l'API.
+- Workflow proposé: Node 26, permissions contents:read, tests statiques Node builtin workspace-navigation.test.js + parametres-accessibility.test.js, sans DB/dependencies. Déclenchement sur PR/push main et chemins workspace/paramètres, tests et workflow.
+- Status/workflow-runs sur head #141 f16f127b: aucune entrée retournée au contrôle; **tests non exécutés/validation CI non confirmée**. Le PR est Draft, sans merge.
+- PR #129 head 868027e1, 9 commits/6 fichiers, Draft, mergeable; status/runs non retournés. La branche #141 fournit une CI structurelle dédiée, mais ne remplace pas la recette visuelle responsive complète.
+- Après création #141, branche count actualisé à **147** (100+47, page terminale vide) et PR ouvertes à **24**. L'inventaire run 8 précédent est complété par cette branche.
+- #132 docs head c77da4b8: Tests automatisés run 45012834066 encore in_progress; ZIP run 45012833989 success. Compare main: 69 ahead/0 behind, deux fichiers docs. Ne pas déclarer la CI complète verte tant que le job test ne termine pas.
+
+Aucun code produit modifié. Aucun merge, close, delete de branche, donnée, volume ou sauvegarde; main inchangée; paiement réel désactivé.
