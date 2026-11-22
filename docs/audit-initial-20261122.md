@@ -439,3 +439,68 @@ Les migrations 004 montrent que `pro_commandes_fournisseurs_lignes.produit_id` e
 - PR #137 : deux commits de garde/tests ajoutés; description actualisée.
 - PR #138 : deux commits de garde/tests ajoutés puis correction d'import pool; description actualisée.
 - Rapport d'audit actualisé sur la branche dédiée #132; aucun merge, close, delete, volume, donnée, backup ou paiement réel.
+
+
+## 20. Actualisation — 22 novembre 2026, 04:30 UTC
+
+### Comparaison ahead/behind ciblée des PR
+Comparaison directe `main...branch` sur 19 refs ouvertes ciblées. Ces résultats ne remplacent pas la comparaison exhaustive de toutes les branches.
+| PR | ahead | behind | commits | fichiers |
+|---|---:|---:|---:|---:|
+| #134 | 3 | 0 | 3 | 2 |
+| #135 | 11 | 0 | 11 | 6 |
+| #136 | 5 | 0 | 5 | 3 |
+| #137 | 6 | 0 | 6 | 3 (avant derniers commits de test) |
+| #138 | 6 | 0 | 6 | 2 (avant derniers commits de test) |
+| #128 | 39 | 0 | 39 | 26 |
+| #117 | 47 | 0 | 47 | 18 |
+| #115 | 1 | 23 | 1 | 1 |
+| #125 | 43 | 0 | 43 | 5 |
+| #127 | 5 | 0 | 5 | 3 |
+| #129 | 9 | 0 | 9 | 6 |
+| #130 | 13 | 0 | 13 | 6 (avant fix badge) |
+| #133 | 13 | 0 | 13 | 6; stacked on #130 |
+| #131 | 4 | 0 | 4 | 1 |
+| #114 | 4 | 50 | 4 | 1 |
+| #118 | 42 | 23 | 42 | 15 |
+| #126 | 30 | 0 | 30 | 20 |
+| #102 | 13 | 228 | 13 | 3 |
+| #110 | 15 | 53 | 15 | 5 |
+
+### CI failures anciennes branches — diagnostics de log
+- **#99 rebrand/optigest** : recette visuelle, contraste sombre de disponibilité **3,97:1** au lieu de 4,5:1; ESLint et archive ZIP green. PR non intégrable en l'état.
+- **#102 accessibilité** : recette échoue sur focus visible des champs date natifs dans page Rapports, `input#from` et `input#to`, `focusVisible=false`, aucun indicateur. ESLint/ZIP green.
+- **#110 accessibilité rebased** : recette échoue sur texte rouge des dépenses `td.mono`, contraste **4,23:1** au lieu de 4,5:1; ESLint/ZIP green. #130 contient des changements pour montants rouges et focus, mais doit passer la CI.
+- #114/#131 feuilles de route : #114 est 50 commits derrière et diverge; #131 est basée sur main. Préférer la revue de #131, garder #114 historique.
+- #118/#126 Sunupilot : #118 diverge et est 23 commits behind; #126 est basée sur main. #126 est candidate après revue diff (30 commits, 20 fichiers, 1 447 changements) et vérification média vidéo.
+- #102/#110 : #102 est 228 commits behind, #110 53 commits behind; #110 est la base plus récente, mais CI encore en échec. Rebase/fix avant candidate.
+
+### Actualisation #130 — correctif badge porté dans le lot accessibilité
+- Le log CI #130 initial confirme badge 2,23:1; #134 standalone est green.
+- Pour valider la correction complète du parcours accessibilité, les palettes du badge Entreprise et assertions de contraste (clair, sombre explicite, sombre système) de #134 ont été portées sur la branche #130.
+- Head #130 : `bf6a02319439ac4b2c700ca3100e73bec01dfd06`; CI ESLint, tests et archive **en cours** au dernier contrôle. PR #134 reste séparée, green; aucun merge.
+
+### Actualisation #137 — références cross-tenant
+- Le test couvre maintenant aussi une activité CRM appartenant à l'entreprise B et référencée vers le client A; la suppression A doit être refusée et conserver la référence B. Le nettoyage test supprime B avant A.
+- Head #137 : `6c7c04c772d7a78c4b7b9737b1f0931b7616fb2c`; ZIP success, Node/MySQL en cours. Tests locaux non exécutés.
+
+### Actualisation #138 — stock et mouvements cross-tenant
+- Les vérifications stock entrepôt et mouvements sont désormais par `produit_id` (pas `user_id`), car les FK cascade/SET NULL peuvent supprimer/détacher des références cross-tenant anormales.
+- Test supplémentaire : stock entrepôt entreprise B référençant produit A; DELETE produit A doit renvoyer 409 et stock B reste 3.
+- Head #138 : `d5bd445c8625013e75f02144e2a524b68fc336d7`; CI relancée après ces modifications, statut en attente.
+
+### Branches — catégories exactes par préfixe
+144 refs, 142 SHA de tête uniques : `fix/` 52, `feat/` 33, `test/` 15, `audit/` 13, `docs/` 9, `security/` 3, `automation/` 2, `ci/` 2, `improve/` 2, `integration/` 2, `rebase/` 2, `ui/` 2, puis `brand/` 1, `chore/` 1, `feature/` 1, sans préfixe 1, `qa/` 1, `rebrand/` 1, `tooling/` 1. Toutes les refs sont conservées.
+
+### État CI du dernier contrôle
+- #132 : ZIP success; Node/MySQL en cours après le rapport actualisé.
+- #130 : 3 jobs en cours après le correctif badge.
+- #137 : ZIP success; Node/MySQL en cours après test cross-tenant.
+- #138 : ZIP success; Node/MySQL en cours après tests achat et cross-tenant.
+- #134, #135, #136 : checks complets green sur heads précédents; #135/#136 n'ont pas reçu de commits depuis le contrôle green.
+- #129, #131, #114, #118, #126 : tests Node/MySQL et ZIP green (ESLint aussi pour #129); #102/#110/#99 restent CI failing.
+
+### Limites
+- Comparaisons ahead/behind/diffs réalisées sur 19 PRs prioritaires seulement, pas les 144 branches.
+- Aucun clone local, test local, Docker local, MySQL local, Redis local, PDF ou recette responsive complète exécutés.
+- Aucun merge/close, aucune branche/data/volume/backup supprimé, main inchangé, paiement réel désactivé.
