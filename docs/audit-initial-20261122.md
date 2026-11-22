@@ -683,7 +683,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 
 ### État actuel et limites de vérification
 - Main confirmé au SHA `8453ee6d8e633f151523236eecff1bc0e0cf877b`; le commit récent est le merge PR #123. Les endpoints status et workflow-runs accessibles ont renvoyé zéro status et zéro run pour main; le run main #1296 mentionné dans l'addendum précédent n'est donc **pas revalidé sur ce run**.
-- Branch names: 146; deux pages 100 + 46; noms identiques à l'inventaire précédent. L'inventaire mixte contient 145 SHA enregistrés et 143 valeurs uniques (self branch sans SHA); ce n'est pas un refresh global des refs. Dates de dernier commit non disponibles. HEADs actualisés pour 22 branches de PR et 52 branches sélectionnées sans PR ouverte.
+- Branch names: 146; deux pages 100 + 46; noms identiques à l'inventaire précédent. L'inventaire mixte contient 145 SHA enregistrés et 143 valeurs uniques (self branch sans SHA); ce n'est pas un refresh global des refs. Dates de dernier commit non disponibles. HEADs actualisés pour 22 branches de PR et 62 branches sélectionnées sans PR ouverte.
 - 23 PR ouvertes confirmées. Comparaisons fraîches main...head pour les 23; CI consultée pour les 23.
 
 ### PR ahead/behind (recalcul par SHA actuel; main = 8453ee6d)
@@ -748,7 +748,7 @@ No direct main update, no merge/close, no branch deletion, no data/volume/backup
 - Nouveau HEAD PR #130 `9722ca99`, mergeable=true, draft=true. Run #1434 Tests in_progress, #485 ESLint in_progress, #1136 ZIP success. Validation visuelle encore attendue.
 - Commentaire de suivi ajouté à la PR #130 (comment ID 7077143189).
 
-### Branches sans PR — comparaison ciblée 52 (dates/CI non exhaustives)
+### Branches sans PR — comparaison ciblée 62 (dates/CI non exhaustives)
 Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas été examinées diff ligne par ligne; les comparaisons et commits de tête sont rafraîchis pour ce sous-ensemble. Deux comparaisons complémentaires: `feat/enterprise-command-center-20261117` 8/400 (4 fichiers), `feat/enterprise-company-pagination-20261117` 0/359 (behind only).
 
 **Audit/sécurité:**
@@ -781,7 +781,7 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 - Aucun paiement réel activé.
 
 ### Sécurité / préservation
-Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 71 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
+Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 61 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
 
 
 ### Documentation branch follow-up
@@ -798,3 +798,15 @@ Aucune modification directe à main, merge/close de PR ouvertes, suppression de 
 - `fix/visual-qr-fixture-20261121`: 1/21; `fix/ui-responsive-polish-20261117`: 0/301; `feat/responsive-scaling-2026-11-15`: 0/655; `ui/modern-responsive-polish`: 0/803 (behind only).
 - `test/workspace-zoom-200-sweep-20261118`: 4/231; `test/dark-theme-zoom-200-sweep-20261118`: 2/230; `test/theme-dark-mobile-sweep-20261118`: 3/235.
 - Les commits de tête de ces 20 branches sont rafraîchis dans l'inventaire. Les statuts CI de ces branches non-PR ne sont pas vérifiés (le connecteur workflow-runs ne retourne que les runs PR). Les branches behind-only semblent déjà intégrées/obsolètes au regard de main; celles qui sont diverged sont à porter sélectivement, jamais merge direct.
+
+
+### Run 7 — dix comparaisons supplémentaires abonnements / workspace / modules
+- `feat/abonnement-choix-moyen-paiement`: 0/568 (behind only).
+- `feat/phases-2-4-paiements-compta-achats-20261112`: 45/717, 17 fichiers.
+- `feat/phases-5-7-portal-international-automation-20261112`: 84/716, 23 fichiers.
+- `feat/topbar-notifications-bell-20261112`: 5/718, 3 fichiers.
+- `feat/ui-motion-visual-recette-20261112`: 0/753 (behind only).
+- `feat/dashboard-reference-modules-20261119`: 0/74; `feat/dashboard-reference-redesign-20261112`: 0/719 (behind only).
+- `feat/sidebar-icon-label-navigation-20261117`: 1/313, 9 fichiers; `feat/sidebar-navigation-visual-refresh-20261117`: 0/390 (behind only).
+- `feat/enterprise-pages-v2-2026-11-13`: 174/703, 64 fichiers.
+- Les HEADs de ces 10 branches sont mis à jour dans l'inventaire. Aucun workflow CI non-PR n'est validé sur ce run.
