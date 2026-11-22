@@ -32,7 +32,7 @@ describe('Suppression de produit', () => {
     const produit = await request(app)
       .post('/api/produits')
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ nom: 'Table', prix_ht: 15000, tva: 18, stock: 5 });
+      .send({ nom: 'Table', prix_ht: 15000, tva: 18, stock: 0 });
     const produitId = produit.body.produit.id;
 
     const suppression = await request(app)
@@ -44,11 +44,52 @@ describe('Suppression de produit', () => {
     assert.ok(!liste.body.produits.some(p => p.id === produitId), 'le produit supprimé ne doit plus apparaître dans la liste');
   });
 
+  test('supprimer un produit avec stock positif est refusé et conserve la quantité', async () => {
+    const produit = await request(app)
+      .post('/api/produits')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ nom: 'Produit stock actif', type_catalogue: 'produit', prix_ht: 1000, tva: 0, stock: 5 });
+    assert.equal(produit.status, 201, produit.text);
+    const deletion = await request(app)
+      .delete(`/api/produits/${produit.body.produit.id}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    assert.equal(deletion.status, 409, deletion.text);
+    assert.equal(deletion.body.code, 'PRODUIT_HISTORIQUE_PROTEGE');
+    const list = await request(app).get('/api/produits').set('Authorization', `Bearer ${tokenA}`);
+    const stored = list.body.produits.find(p => p.id === produit.body.produit.id);
+    assert.ok(stored);
+    assert.equal(Number(stored.stock), 5);
+  });
+
+  test('supprimer un produit sans stock mais avec mouvements est refusé', async () => {
+    const produit = await request(app)
+      .post('/api/produits')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ nom: 'Produit mouvements historiques', type_catalogue: 'produit', prix_ht: 1000, tva: 0, stock: 5 });
+    assert.equal(produit.status, 201, produit.text);
+    const update = await request(app)
+      .put(`/api/produits/${produit.body.produit.id}`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ stock: 0 });
+    assert.equal(update.status, 200, update.text);
+
+    const deletion = await request(app)
+      .delete(`/api/produits/${produit.body.produit.id}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    assert.equal(deletion.status, 409, deletion.text);
+    assert.equal(deletion.body.code, 'PRODUIT_HISTORIQUE_PROTEGE');
+    const [[movement]] = await require('./setup').pool.query(
+      'SELECT COUNT(*) AS n FROM pro_mouvements_stock WHERE user_id = ? AND produit_id = ?',
+      [userIdA, produit.body.produit.id]
+    );
+    assert.ok(Number(movement.n) > 0);
+  });
+
   test('supprimer un produit déjà supprimé renvoie 404 (pas de double suppression silencieuse)', async () => {
     const produit = await request(app)
       .post('/api/produits')
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ nom: 'Chaise pliante', prix_ht: 8000, tva: 18, stock: 3 });
+      .send({ nom: 'Chaise pliante', prix_ht: 8000, tva: 18, stock: 0 });
     const produitId = produit.body.produit.id;
 
     await request(app).delete(`/api/produits/${produitId}`).set('Authorization', `Bearer ${tokenA}`);
@@ -75,7 +116,7 @@ describe('Suppression de produit', () => {
     assert.ok(liste.body.produits.some(p => p.id === produitId));
   });
 
-  test('supprimer un produit lié à une ligne de facture existante détache la ligne au lieu de bloquer (ou d\'effacer l\'historique)', async () => {
+  test('supprimer un produit lié à une facture est refusé et conserve le lien et le stock', async () => {
     const client = await request(app)
       .post('/api/clients')
       .set('Authorization', `Bearer ${tokenA}`)
@@ -84,7 +125,7 @@ describe('Suppression de produit', () => {
     const produit = await request(app)
       .post('/api/produits')
       .set('Authorization', `Bearer ${tokenA}`)
-      .send({ nom: 'Produit facturé', prix_ht: 2000, tva: 18, stock: 10 });
+      .send({ nom: 'Produit facturé', type_catalogue: 'produit', prix_ht: 2000, tva: 18, stock: 10 });
     const produitId = produit.body.produit.id;
 
     const facture = await request(app)
@@ -95,17 +136,22 @@ describe('Suppression de produit', () => {
         type: 'facture',
         lignes: [{ designation: 'Produit facturé', quantite: 2, prix_unitaire: 2000, tva: 18, produit_id: produitId }]
       });
+    assert.equal(facture.status, 201, facture.text);
 
     const suppression = await request(app)
       .delete(`/api/produits/${produitId}`)
       .set('Authorization', `Bearer ${tokenA}`);
-    assert.equal(suppression.status, 200, 'la suppression ne doit pas être bloquée par la contrainte de clé étrangère');
+    assert.equal(suppression.status, 409, suppression.text);
+    assert.equal(suppression.body.code, 'PRODUIT_HISTORIQUE_PROTEGE');
 
-    // La facture existante doit rester consultable (ligne détachée, pas de perte de l'historique).
     const factureApres = await request(app)
       .get(`/api/factures/${facture.body.facture.id}`)
       .set('Authorization', `Bearer ${tokenA}`);
     assert.equal(factureApres.status, 200);
+    assert.equal(factureApres.body.lignes[0].produit_id, produitId, 'le lien catalogue doit rester');
+    const liste = await request(app).get('/api/produits').set('Authorization', `Bearer ${tokenA}`);
+    assert.ok(liste.body.produits.some(p => p.id === produitId), 'le produit doit rester dans le catalogue');
+    assert.equal(Number(liste.body.produits.find(p => p.id === produitId).stock), 8, 'le stock vendu reste cohérent');
   });
 });
 
