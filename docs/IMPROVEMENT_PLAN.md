@@ -19,7 +19,7 @@ Ce document distingue les changements présents sur une branche, les contrôles 
 
 | Priorité | Chantier | Référence | État vérifié |
 |---|---|---|---|
-| P1 | PDF A4 multipages, factures et devis | PR #125 | CI complète verte sur HEAD `8eebb236` ; 31 modèles facture et 31 modèles devis vérifiés avec 28 lignes longues ; maximum constaté et exigé : 3 pages A4 |
+| P1 | PDF A4 multipages, factures et devis | PR #125 | CI complète verte sur HEAD `8eebb236` ; HEAD avancé ensuite à `057b0a40` avec un compactage supplémentaire de Majesté ; CI à relancer/terminer sur ce dernier HEAD |
 | P1 | Essai gratuit et espace professionnel | PR #128 | CI verte sur HEAD `e3b91dc4` ; essai de 15 jours sur Standard, Pro et Entreprise, avec règles de non-réinitialisation et d'expiration testées |
 | P1 | Cycle de vie comptable des factures et dépenses | PR #117 | CI complète verte sur le HEAD synchronisé `ba756d09` ; tests dépense/isolation de #115 inclus |
 | P1 | Contraste et navigation clavier clair/sombre | PR #130 | Correctifs sur une branche neuve ; ESLint et ZIP verts sur un commit précédent ; suite Chromium/MySQL en cours sur le dernier HEAD |
@@ -36,7 +36,7 @@ La branche a été synchronisée avec le `main` de référence sans réécriture
 
 La recette a généré 324 captures et deux PDF de démonstration réels A4. Le rapport vérifie les 31 modèles pour les factures et les 31 modèles pour les devis, avec 28 lignes longues. Tous les modèles produisent au plus trois pages. Les contrôles confirment les bandeaux sans débordement, les titres, les images chargées (logos, QR et signatures), les totaux et les panneaux complémentaires. Les documents de démonstration contrôlés ont chacun trois pages A4 ; le panneau « Bon pour accord » est visible sur la troisième page du devis, pas isolé sur une quatrième.
 
-Le modèle Tech conserve 9,5 pt ; le modèle Majesté conserve 9 pt et emploie un espacement d'impression plus compact. Les seuils de pagination ne sont pas abaissés.
+Le modèle Tech conserve 9,5 pt ; le modèle Majesté conserve 9 pt et emploie un espacement d'impression plus compact. Après la CI verte sur `8eebb236`, deux commits supplémentaires ont abaissé le padding vertical Majesté à 1 px et son interligne à 13,8 px, sans réduire la police. La recette complète doit confirmer le nouveau HEAD `057b0a40` avant de réutiliser le statut de succès. Les seuils de pagination ne sont pas abaissés.
 
 **À faire avant clôture :** conserver la PR en brouillon jusqu'à la revue humaine d'un échantillon imprimé sur Chrome/Safari et sur une imprimante réelle. Ne pas fusionner automatiquement à la seule lecture d'une CI verte.
 
@@ -128,7 +128,7 @@ Une PR remplacée peut rester ouverte le temps de vérifier son historique ; sa 
 | Date / référence | Résultat vérifié |
 |---|---|
 | 21/11/2026 — main `8453ee6` | Référence de départ de ce plan |
-| 21/11/2026 — PR #125 / run `44963765145` | CI complète verte ; 31 modèles facture et 31 modèles devis ; 28 lignes longues ; plafond de trois pages ; 324 captures |
+| 21/11/2026 — PR #125 / run `44963765145` / HEAD `8eebb236` | CI complète verte ; 31 modèles facture et 31 modèles devis ; 28 lignes longues ; plafond de trois pages ; 324 captures |\n| 22/11/2026 — PR #125 / HEAD `057b0a40` | Nouveau compactage Majesté à 9 pt ; CI complète en cours sur le nouveau HEAD |
 | 21/11/2026 — PR #128 / HEAD `e3b91dc4` | Tests d'essai 15 jours, changement de formule et expiration validés ; CI verte |
 | 22/11/2026 — PR #117 / HEAD `ba756d09` / run `44964496620` | CI complète verte ; tests de dépense/idempotence/isolation intégrés ; branche à jour avec main |
 | 21–22/11/2026 — PR #130 / HEAD `1075c737` | Contraste montants, badges, dégradés et focus corrigés ; CI actuelle en cours |
