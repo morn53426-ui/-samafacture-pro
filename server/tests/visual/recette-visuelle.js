@@ -1406,6 +1406,28 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.deepEqual(metrics.invoiceLabels, ['N° facture', 'Client', 'Émission', 'Statut', 'Total TTC'],
       'Chaque information d’une facture doit rester nommée et visible sur mobile.');
   }
+  if (pageDefinition.name === 'dashboard' && viewport.name === 'mobile-320') {
+    const skipLink = await page.$eval('.workspace-skip-link', element => {
+      element.focus();
+      const rect = element.getBoundingClientRect();
+      const main = document.getElementById(element.getAttribute('href').slice(1));
+      return {
+        target: element.getAttribute('href'),
+        mainExists: Boolean(main && main.tagName === 'MAIN' && main.tabIndex === -1),
+        top: rect.top,
+        bottom: rect.bottom,
+        viewportHeight: window.innerHeight,
+        transform: getComputedStyle(element).transform
+      };
+    });
+    assert.equal(skipLink.target, '#main-content');
+    assert.equal(skipLink.mainExists, true,
+      'Le lien clavier doit viser le main focusable du tableau de bord.');
+    assert.ok(skipLink.top >= 0 && skipLink.bottom <= Math.min(70, skipLink.viewportHeight),
+      'Le raccourci doit apparaître dans la fenêtre après focus clavier : ' + JSON.stringify(skipLink));
+    await page.evaluate(() => document.activeElement?.blur());
+  }
+
   assert.deepEqual(pageErrors, [],
     pageDefinition.name + ' a généré des erreurs JavaScript: ' + pageErrors.join(' | '));
 
