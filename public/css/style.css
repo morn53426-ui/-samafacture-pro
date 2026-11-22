@@ -7979,9 +7979,11 @@ a.btn .icon {
     font-size: 9pt !important;
   }
   .invoice-doc.tpl-majeste .sf-document-table tbody td {
-    padding: 2px 5px !important;
+    /* Garder 9 pt mais rapprocher les lignes longues pour éviter une page 4 dédiée
+       à la seule acceptation sur les devis volumineux. */
+    padding: 1px 5px !important;
     font-size: 9pt !important;
-    line-height: 1.25 !important;
+    line-height: 1.15 !important;
   }
   .invoice-doc.tpl-majeste .sf-doc-tax-title {
     margin-bottom: 3px !important;
