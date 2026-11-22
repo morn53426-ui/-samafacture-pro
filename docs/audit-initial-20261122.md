@@ -782,3 +782,7 @@ Les nombres ci-dessous sont ahead/behind de main. Toutes ces branches n'ont pas 
 
 ### Sécurité / préservation
 Aucune modification directe à main, merge/close de PR ouvertes, suppression de branche, données, sauvegarde ou volume Docker. Tests locaux/Docker et certification SYSCOHADA non exécutés. Audit des 91 branches restantes sans PR ouverte (diff, dates, CI) est encore incomplet.
+
+
+### Documentation branch follow-up
+- PR #132 latest head at this update: `ec5fc22ae39efb77f377db787888fdbd1a220d2a` (inventory header updated to mark main CI/ruleset as not freshly reverified; count correction included). The workflow query for this head returned no runs. Previous tests #1433 and ZIP #1135 were green on an earlier audit head; they do not validate the latest documentation commits.
