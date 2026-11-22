@@ -1241,7 +1241,7 @@ router.delete('/:id', async (req, res, next) => {
     const [historyRows] = await conn.query(
       `SELECT
          (SELECT COUNT(*) FROM paiements WHERE user_id = ? AND facture_id = ?) AS paiements,
-         (SELECT COUNT(*) FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id WHERE r.user_id = ? AND p.facture_id = ?) AS remboursements,
+         (SELECT COUNT(*) FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id AND p.user_id = r.user_id WHERE r.user_id = ? AND p.facture_id = ?) AS remboursements,
          (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?) AS ecritures_facture,
          (SELECT COUNT(*) FROM pro_compta_lignes WHERE user_id = ? AND facture_id = ?) AS lignes_comptables,
          (SELECT COUNT(*) FROM pro_avoirs WHERE user_id = ? AND facture_id = ?) AS avoirs,
