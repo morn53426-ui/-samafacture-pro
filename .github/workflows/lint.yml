@@ -11,6 +11,7 @@ on:
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/local-date-format.test.js'
       - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - 'server/config/db.js'
       - 'server/email-outbox.js'
@@ -32,6 +33,7 @@ on:
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/local-date-format.test.js'
       - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
 
@@ -64,6 +66,7 @@ jobs:
           server/tests/visual/recette-visuelle.js
           server/tests/local-date-format.test.js
           server/tests/workspace-navigation.test.js
+          server/tests/accounting-expense-mappings.test.js
           server/tests/workspace-modal-accessibility.test.js
           server/config/db.js
           server/email-outbox.js
