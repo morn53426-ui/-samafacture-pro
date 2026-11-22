@@ -26,10 +26,10 @@ describe('Navigation mobile — clavier et restauration du focus', () => {
     assert.match(handler, /sidebar\?\.classList\.contains\('open'\)/);
     assert.match(handler, /event\.preventDefault\(\)/);
     assert.match(handler, /closeSidebar\(\)/);
-    assert.match(handler, /document\\.querySelector\\('\\.enterprise-console-menu-toggle'\\)/);
-    assert.match(handler, /document\\.getElementById\\('mobile-toggle-btn'\\)/);
-    assert.match(handler, /toggle\\?\\.isConnected && toggle\\.getClientRects\\(\\)\\.length/);
-    assert.match(handler, /toggle\\.focus\\(\\{ preventScroll: true \\}\\)/);
+    assert.ok(handler.includes("document.querySelector('.enterprise-console-menu-toggle')"));
+    assert.ok(handler.includes("document.getElementById('mobile-toggle-btn')"));
+    assert.ok(handler.includes('toggle?.isConnected && toggle.getClientRects().length'));
+    assert.ok(handler.includes('toggle.focus({ preventScroll: true })'));
     assert.ok(
       handler.indexOf("document.querySelector('.enterprise-console-menu-toggle')") <
       handler.indexOf("document.getElementById('mobile-toggle-btn')"),
