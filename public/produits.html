@@ -101,7 +101,7 @@
     if (!companyCurrencyLoaded) {
       companyCurrencyLoaded = true;
       try {
-        const { parametres } = await Api.get('/pro/localization');
+        const { parametres } = await Api.get('/pro/company-context');
         companyCurrency = parametres?.devise || companyCurrency;
       } catch (_) {
         // Les rôles sans accès aux paramètres internationaux gardent la devise de session.
