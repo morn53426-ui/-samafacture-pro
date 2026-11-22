@@ -432,11 +432,11 @@ test('les dépenses distinguent caisse et banque et deviennent immuables après 
   const updatePosted = await request(app).put('/api/depenses/' + bankExpense.body.depense.id)
     .set('Authorization', 'Bearer ' + token).send({ montant: 9999, mode_reglement: 'caisse' });
   assert.equal(updatePosted.status, 409, updatePosted.text);
-  assert.equal(updatePosted.body.code, 'DEPENSE_COMPTABILISEE');
+  assert.equal(updatePosted.body.code, 'DEPENSE_COMPTABILISEE_PROTEGEE');
   const deletePosted = await request(app).delete('/api/depenses/' + bankExpense.body.depense.id)
     .set('Authorization', 'Bearer ' + token);
   assert.equal(deletePosted.status, 409, deletePosted.text);
-  assert.equal(deletePosted.body.code, 'DEPENSE_COMPTABILISEE');
+  assert.equal(deletePosted.body.code, 'DEPENSE_COMPTABILISEE_PROTEGEE');
 
   const listed = await request(app).get('/api/depenses').set('Authorization', 'Bearer ' + token);
   assert.equal(listed.status, 200, listed.text);
