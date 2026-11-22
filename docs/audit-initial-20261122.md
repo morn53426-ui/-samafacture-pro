@@ -633,3 +633,14 @@ Aucun merge, PR fermé, branche supprimée, modification directe de main, donné
 - Head PR #140 maintenant `4656d588`; un nouveau run lint/test est attendu. Le run initial #140 tests Node/MySQL est encore en cours, ZIP green; lint initial failure, corrigé dans le nouveau commit, pas encore validé.
 - #130 head `378ff2a2`: ESLint+ZIP green, tests Node/MySQL toujours in_progress au dernier contrôle.
 - Inventaire des branches actualisé pour refléter le head #140 `4656d588`.
+
+
+## Run 4 — actualisation CI après couverture ESLint, 06:32 UTC
+- HEADs actualisés : #137 `f2aada8d`, #138 `44d02021`, #140 `d16c4c54`; inventory branch list regenerated (146 branches / 144 unique heads, 23 PR).
+- #137/#138 : le workflow ESLint manquait les routes et tests backend. Les fichiers `.github/workflows/lint.yml` et `eslint.config.mjs` de #140 ont été portés sur les deux branches. **ESLint green sur les nouveaux heads** (#137 run 477, #138 run 478) et ZIP green; tests Node/MySQL en cours sur #137 run 1421 et #138 run 1422.
+- #140 : ESLint green sur head `d16c4c54` (run 476), ZIP green (1122); tests Node/MySQL en cours (1420). Le premier lint failure #474 était causé par test absent sur main; condition de présence ajoutée pour que le test #137 soit linté lorsqu’il existe.
+- #130 : head `378ff2a2`, ESLint green (473), ZIP green (1117), tests Node/MySQL/recette visuelle toujours in_progress (1415). Le badge professionnel corrigé; la recette visuelle est en cours.
+- #139 : Tests et ZIP green; #134/#135/#136 3 checks green; #117/#128/#125/#127 3 checks green; #129 3 green; #131 tests+ZIP green; #118/#126 tests+ZIP green; #114 tests+ZIP green mais 50 behind; #115 tests+ZIP green mais 23 behind.
+- #99/#102/#110 : tests CI failed sur HEAD; #133 aucun run CI sur head.
+- #137/#138 ont temporairement des modifications identiques de configuration lint à #140, afin de vérifier leurs propres fichiers avant merge. Après intégration autorisée, les duplications seront réconciliées/rebasées.
+- Aucun test local, Docker local, recette PDF manuelle, NVDA/VoiceOver ou merge effectué.
