@@ -288,3 +288,25 @@ Le code `server/config/db.js` vérifié dans les deux branches n'exécute `runMi
 - #134 CI entièrement verte.
 - #135, #136, #137, #138 et #132 tests automatisés en cours; aucun résultat final n'est déclaré.
 - #117 et #128 CI réussies sur leurs heads; ne pas fusionner avant version21 et rebase/intégration contrôlée.
+
+
+## 15. Actualisation — échec CI PR #135 et correctifs de test (03:43 UTC)
+
+### Résultat CI #135 (head `5d676373...`)
+- ESLint: success.
+- Package ZIP: success.
+- Tests Node/MySQL: **failure**, 546 tests, 540 pass, 5 fail, 1 skipped.
+- Échec 1: SQL parse error dans la suppression de devis, liste des paramètres de la sous-requête `pro_portal_quote_decisions` décalée (pair tenant manquant).
+- Échecs 2–5: tests historiques attendaient 200 sur DELETE facture, désormais 409 (quota-paths, quota registry recovery, stock test et warehouse stock test). Le changement de politique est intentionnel; les tests doivent utiliser l'annulation et vérifier 409.
+
+### Corrections préparées sur la même branche
+- SQL: nombre de paramètres corrigé, requête simplifiée aux sous-requêtes historiques nécessaires; suppression du code de restitution stock de la route DELETE (les factures émises sont refusées; devis n'ont pas de mouvement stock).
+- Tests: quota deletion désormais 409 et quota toujours compté; tests stock utilisent annulation/contrepassation au lieu de suppression et vérifient le stock; devis sans historique reste supprimable.
+- Head courant PR #135 `2c7f3cbde915e19ea484236c7a76ad7008f485ae`; nouvelle CI en attente. Aucun test n'est déclaré réussi sur ce head avant résultats.
+
+### Statut actuel
+- Branches: 144; PRs ouvertes: 21.
+- #134 CI entièrement verte.
+- #135 tests sur head corrigé en attente; ESLint/ZIP green sur head précédent.
+- #136, #137, #138 et #132 tests en cours.
+- main reste 8453ee6d; aucune fusion.
