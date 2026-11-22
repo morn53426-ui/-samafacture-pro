@@ -92,6 +92,38 @@ describe('Suppression de produit', () => {
     assert.equal(Number(stored.stock), 0);
   });
 
+  test('supprimer un produit lié à une ligne d’achat est refusé et conserve le lien', async () => {
+    const produit = await request(app)
+      .post('/api/produits')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ nom: 'Produit achat historique', type_catalogue: 'produit', prix_ht: 1000, tva: 0, stock: 0 });
+    assert.equal(produit.status, 201, produit.text);
+    const [supplier] = await pool.query(
+      'INSERT INTO pro_fournisseurs (user_id, nom) VALUES (?, ?)',
+      [userIdA, 'Fournisseur test achat']
+    );
+    const orderNumber = `TEST-PRODUCT-HISTORY-${Date.now()}`;
+    const [order] = await pool.query(
+      'INSERT INTO pro_commandes_fournisseurs (user_id, fournisseur_id, numero, date_commande) VALUES (?, ?, ?, ?)',
+      [userIdA, supplier.insertId, orderNumber, '2026-11-22']
+    );
+    const [line] = await pool.query(
+      `INSERT INTO pro_commandes_fournisseurs_lignes
+       (user_id, commande_id, produit_id, designation, quantite, prix_unitaire, total_ligne)
+       VALUES (?, ?, ?, 'Produit achat historique', 1, 1000, 1000)`,
+      [userIdA, order.insertId, produit.body.produit.id]
+    );
+    const deletion = await request(app)
+      .delete(`/api/produits/${produit.body.produit.id}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    assert.equal(deletion.status, 409, deletion.text);
+    assert.equal(deletion.body.code, 'PRODUIT_HISTORIQUE_PROTEGE');
+    const [[stored]] = await pool.query('SELECT id FROM produits WHERE id = ? AND user_id = ?', [produit.body.produit.id, userIdA]);
+    const [[storedLine]] = await pool.query('SELECT id, produit_id FROM pro_commandes_fournisseurs_lignes WHERE id = ?', [line.insertId]);
+    assert.ok(stored, 'produit conservé');
+    assert.equal(Number(storedLine.produit_id), Number(produit.body.produit.id), 'lien au produit conservé');
+  });
+
   test('supprimer un produit déjà supprimé renvoie 404 (pas de double suppression silencieuse)', async () => {
     const produit = await request(app)
       .post('/api/produits')
