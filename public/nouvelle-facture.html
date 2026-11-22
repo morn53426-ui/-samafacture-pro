@@ -318,7 +318,7 @@
       const { facture } = await Api.post('/factures', payload);
       location.href = `factures.html?highlight=${facture.id}`;
     } catch (err) {
-      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+      errorBox.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
       restore();
     }
   }
