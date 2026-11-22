@@ -124,6 +124,39 @@ describe('Suppression de produit', () => {
     assert.equal(Number(storedLine.produit_id), Number(produit.body.produit.id), 'lien au produit conservé');
   });
 
+  test('des soldes entrepôts opposés non nuls bloquent la suppression', async () => {
+    const produit = await request(app)
+      .post('/api/produits')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ nom: 'Produit soldes entrepôts opposés', type_catalogue: 'produit', prix_ht: 1000, tva: 0, stock: 0 });
+    assert.equal(produit.status, 201, produit.text);
+    const suffix = Date.now();
+    const [w1] = await pool.query(
+      'INSERT INTO pro_entrepots (user_id, code, nom) VALUES (?, ?, ?)',
+      [userIdA, `TEST-NETZERO-A-${suffix}`, 'Entrepôt test solde positif']
+    );
+    const [w2] = await pool.query(
+      'INSERT INTO pro_entrepots (user_id, code, nom) VALUES (?, ?, ?)',
+      [userIdA, `TEST-NETZERO-B-${suffix}`, 'Entrepôt test solde legacy négatif']
+    );
+    await pool.query(
+      'INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, ?), (?, ?, ?, ?)',
+      [userIdA, w1.insertId, produit.body.produit.id, 3, userIdA, w2.insertId, produit.body.produit.id, -3]
+    );
+    const deletion = await request(app)
+      .delete(`/api/produits/${produit.body.produit.id}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    assert.equal(deletion.status, 409, deletion.text);
+    assert.equal(deletion.body.code, 'PRODUIT_HISTORIQUE_PROTEGE');
+    const [[storedProduct]] = await pool.query('SELECT id FROM produits WHERE id = ? AND user_id = ?', [produit.body.produit.id, userIdA]);
+    const [storedStocks] = await pool.query(
+      'SELECT quantite FROM pro_stocks_entrepots WHERE produit_id = ? AND user_id = ? ORDER BY entrepot_id',
+      [produit.body.produit.id, userIdA]
+    );
+    assert.ok(storedProduct, 'produit conservé');
+    assert.deepEqual(storedStocks.map(row => Number(row.quantite)), [-3, 3].sort((a, b) => a - b));
+  });
+
   test('un stock d’entrepôt référencé depuis une autre entreprise bloque la suppression', async () => {
     const produit = await request(app)
       .post('/api/produits')
