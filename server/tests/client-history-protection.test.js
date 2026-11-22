@@ -38,6 +38,11 @@ describe('Protection de l’historique client', () => {
   });
 
   after(async () => {
+    // Le test de commande utilise une FK RESTRICT : nettoyer explicitement le fixture
+    // avant de supprimer les utilisateurs, afin que le teardown ne laisse pas d'échec.
+    if (userId) {
+      await pool.query('DELETE FROM pro_commandes WHERE user_id = ? AND numero = ?', [userId, 'TEST-CLIENT-HISTORY-001']);
+    }
     await nettoyerUtilisateur(userIdB);
     await nettoyerUtilisateur(userId);
   });
