@@ -3146,6 +3146,7 @@ function invoiceLineToCents(quantity, unitPrice) {
 
 function allocateCentsProportionally(totalCents, groups) {
   const totalWeight = groups.reduce((sum, group) => sum + group.weight, 0n);
+  if (totalCents === 0n) return groups.map(() => 0n);
   if (totalWeight <= 0n || totalCents < 0n || totalCents > totalWeight) {
     throw accountingMappingError('La remise ne peut pas être répartie sur les lignes de vente.', 'REMISE_FACTURE_INVALIDE');
   }
@@ -3221,6 +3222,12 @@ async function buildInvoiceAccountingLines(uid, invoice, conn) {
     );
   }
 
+  if (total === 0n) {
+    throw accountingMappingError(
+      'Cette facture a un total nul ; une écriture automatique équilibrée ne peut pas être créée avec les correspondances actuelles. Vérifiez la remise et les frais avant validation comptable.',
+      'FACTURE_TOTAL_NUL'
+    );
+  }
   const allocations = allocateCentsProportionally(discount, grouped);
   const lines = [{
     code: '411',

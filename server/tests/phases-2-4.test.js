@@ -816,6 +816,30 @@ test('les correspondances OHADA ventilent les ventes par type et les dépenses p
     { code: '707', credit: 850 }
   ]);
 
+  const shippingOnlyInvoice = await request(app).post('/api/factures').set('Authorization', 'Bearer ' + token).send({
+    client_id: clientId,
+    type: 'facture',
+    frais_livraison: 250,
+    lignes: [{ designation: 'Ligne sans prix — frais de transport', quantite: 1, prix_unitaire: 0, tva: 0 }]
+  });
+  assert.equal(shippingOnlyInvoice.status, 201, shippingOnlyInvoice.text);
+  assert.equal(Number(shippingOnlyInvoice.body.facture.total), 250);
+  const shippingOnlyPosted = await request(app).post('/api/pro/accounting/post-invoice/' + shippingOnlyInvoice.body.facture.id)
+    .set('Authorization', 'Bearer ' + token).send({});
+  assert.equal(shippingOnlyPosted.status, 201, shippingOnlyPosted.text);
+  const [[shippingOnlyEntry]] = await pool.query(
+    "SELECT id FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?",
+    [userId, shippingOnlyInvoice.body.facture.id]
+  );
+  const [shippingOnlyLines] = await pool.query(
+    'SELECT c.code, l.debit, l.credit FROM pro_compta_lignes l JOIN pro_compta_comptes c ON c.id = l.compte_id AND c.user_id = l.user_id WHERE l.user_id = ? AND l.ecriture_id = ? ORDER BY c.code',
+    [userId, shippingOnlyEntry.id]
+  );
+  assert.deepEqual(shippingOnlyLines.map(row => ({ code: row.code, debit: Number(row.debit), credit: Number(row.credit) })), [
+    { code: '411', debit: 250, credit: 0 },
+    { code: '707', debit: 0, credit: 250 }
+  ]);
+
   const unclassified = await request(app).post('/api/produits').set('Authorization', 'Bearer ' + token)
     .send({ nom: 'Ancienne fiche non classée', type_catalogue: 'non_classe', stock: 2, prix_ht: 100, tva: 0 });
   assert.equal(unclassified.status, 201, unclassified.text);
