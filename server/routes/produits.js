@@ -305,8 +305,10 @@ router.delete('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Produit introuvable.' });
     }
 
-    const [[warehouseStock]] = await conn.query(
-      'SELECT COALESCE(SUM(quantite), 0) AS total FROM pro_stocks_entrepots WHERE produit_id = ?',
+    // Ne pas agréger : des soldes entrepôts opposés (données historiques/anormales)
+    // pourraient s'annuler et masquer un stock non nul. Verrouiller la ligne détectée.
+    const [warehouseStockRows] = await conn.query(
+      'SELECT id FROM pro_stocks_entrepots WHERE produit_id = ? AND quantite <> 0 LIMIT 1 FOR UPDATE',
       [existing.id]
     );
     const [invoiceLines] = await conn.query(
@@ -323,7 +325,7 @@ router.delete('/:id', async (req, res, next) => {
       'SELECT id FROM pro_commandes_fournisseurs_lignes WHERE produit_id = ? LIMIT 1 FOR UPDATE',
       [existing.id]
     );
-    if (Number(existing.stock) !== 0 || Number(warehouseStock.total) !== 0 ||
+    if (Number(existing.stock) !== 0 || warehouseStockRows.length ||
         invoiceLines.length || movements.length || purchaseLines.length) {
       await conn.rollback();
       return res.status(409).json({
