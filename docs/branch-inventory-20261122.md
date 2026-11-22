@@ -2,9 +2,9 @@
 
 Dépôt : `morn53426-ui/-samafacture-pro`  
 Référence : `main`  
-Branches : **146** (noms confirmés run 7) ; **145 SHA enregistrés / 143 uniques**, HEADs actualisés pour toutes les refs (la branche d’audit est auto-référente et n’a pas de SHA dans le tableau).  
-PR ouvertes : **23** (têtes et comparaisons rafraîchies run 7). Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
-CI main : aucune status/run fraîche retournée run 7; le run 6 rapportait #1296 réussi (non revalidé). Ruleset `protect main` actif selon run 6 (non revalidé run 7).
+Branches : **147** (noms confirmés run 8 follow-up) ; **146 SHA enregistrés / 144 uniques**, HEADs actualisés pour toutes les refs (la branche d’audit est auto-référente et n’a pas de SHA dans le tableau).  
+PR ouvertes : **24** (têtes et comparaisons run 8). Main : `8453ee6d8e633f151523236eecff1bc0e0cf877b`.  
+CI main : aucune status/run fraîche retournée run 8; ruleset `protect main` attesté run 6 mais non revalidé run 8.
 
 
 > Run 7 (09:23 UTC): noms de branches vérifiés (100+46, aucun changement). HEADs mis à jour pour les 22 branches des PR ouvertes (hors branche auto-référente #132) et les 122 branches sans PR ouverte. Ahead/behind frais pour les 23 PR et les 122 branches non-PR. Les dates de dernier commit ne sont pas disponibles via la collecte; CI non-PR non vérifiée. Couverture des noms et SHA: 146 branches, aucun nom manquant.
@@ -60,11 +60,12 @@ CI main : aucune status/run fraîche retournée run 7; le run 6 rapportait #1296
 |---|---|
 | `chore/emil-design-skills-20261117` | `70f8ea19` |
 
-### ci (3)
+### ci (4)
 
 | Branche | HEAD |
 |---|---|
 | `ci/lint-history-protection-backend-20261122` | `d16c4c54` |
+| `ci/workspace-ui-structure-tests-20261122` | `f16f127b` |
 | `ci/package-main-after-pr39-pr40` | `8c725a00` |
 | `ci/real-restore-smoke-20261117` | `8864ab94` |
 
@@ -297,3 +298,13 @@ Les 146 noms sont identiques au run 7 (pagination 100 + 46 + page terminale vide
 - #110: expense red amounts contrast 4.23:1, below 4.5:1.
 ### Main CI
 Current main SHA remains 8453ee6d8e633f151523236eecff1bc0e0cf877b. Combined statuses and PR-triggered workflow-run query returned no entries this run; no main CI result is claimed.
+
+
+### Run 8 follow-up — branche/PR #141
+- Branches: **147** (page 1=100, page 2=47, page 3=0); aucun nom extra/manquant par rapport à la liste API. L'inventaire contient 146 refs hors branche audit auto-référente, dont la nouvelle ci/workspace-ui-structure-tests-20261122.
+- PR ouvertes: **24**.
+- #141: head f16f127b, base feat/workspace-settings-navigation-20261121 (PR #129), 1 ahead/0 behind, 1 fichier (.github/workflows/workspace-ui-structure.yml), Draft. Workflow-run/status query vide au contrôle; CI non confirmée.
+- #129: head 868027e1, 9 ahead/0 behind main, Draft; workflow-runs/status query vide.
+- #132 après mise à jour des documents: head 30329590 (auto-refreshed), 69 ahead/0 behind, deux fichiers docs; Tests automatisés en cours, ZIP success. SHA précis du run #132 à confirmer dans PR.
+- Les HEAD des 122 branches sans PR ne sont pas rafraîchis dans ce follow-up; leurs SHA restent run7. Le head de la branche audit #132 est auto-référentiel.
+- main reste 8453ee6d; CI main non visible par les endpoints interrogés.
