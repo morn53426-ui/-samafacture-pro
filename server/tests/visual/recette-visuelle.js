@@ -4083,6 +4083,33 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
         );
         const titleElement = titleCandidates[0] || null;
         const titleRect = titleElement?.getBoundingClientRect();
+        const titleTextRects = titleElement
+          ? (() => {
+            const range = document.createRange();
+            range.selectNodeContents(titleElement);
+            return Array.from(range.getClientRects()).map(rect => ({
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom
+            }));
+          })()
+          : [];
+        const titleTextOverflowsElement = Boolean(titleRect && titleTextRects.some(rect =>
+          rect.left < titleRect.left - 0.5 ||
+          rect.right > titleRect.right + 0.5 ||
+          rect.top < titleRect.top - 0.5 ||
+          rect.bottom > titleRect.bottom + 0.5
+        ));
+        const firstBannerRect = banners.length
+          ? documentNode.querySelector(selector)?.getBoundingClientRect()
+          : null;
+        const titleTextOverflowsBanner = Boolean(firstBannerRect && titleTextRects.some(rect =>
+          rect.left < firstBannerRect.left - 0.5 ||
+          rect.right > firstBannerRect.right + 0.5 ||
+          rect.top < firstBannerRect.top - 0.5 ||
+          rect.bottom > firstBannerRect.bottom + 0.5
+        ));
         return {
           documentFound: true,
           documentWidth: Number(bounds.width.toFixed(2)),
@@ -4101,7 +4128,9 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
           titleBounds: titleRect ? {
             leftOverflow: Number((bounds.left - titleRect.left).toFixed(2)),
             rightOverflow: Number((titleRect.right - bounds.right).toFixed(2)),
-            topOverflow: Number((bounds.top - titleRect.top).toFixed(2))
+            topOverflow: Number((bounds.top - titleRect.top).toFixed(2)),
+            textOverflowElement: titleTextOverflowsElement,
+            textOverflowBanner: titleTextOverflowsBanner
           } : null,
           banners
         };
@@ -4115,6 +4144,12 @@ async function verifyInvoiceAndQuoteFlows(browser, baseUrl, fixtures) {
       if (geometry.titleBounds) {
         assert.ok(geometry.titleBounds.leftOverflow <= 0.5 && geometry.titleBounds.rightOverflow <= 0.5 && geometry.titleBounds.topOverflow <= 0.5,
           type + '/' + template + ' : titre principal hors de la zone du document : ' + JSON.stringify({ bounds: geometry.titleBounds, candidates: geometry.titleCandidates }));
+        assert.equal(geometry.titleBounds.textOverflowElement, false,
+          type + '/' + template + ' : le texte du titre doit rester dans son propre bloc, sans rognage : ' + JSON.stringify(geometry.titleBounds));
+        if (geometry.banners.length) {
+          assert.equal(geometry.titleBounds.textOverflowBanner, false,
+            type + '/' + template + ' : le texte du titre doit rester dans le bandeau : ' + JSON.stringify(geometry.titleBounds));
+        }
       }
       for (const banner of geometry.banners) {
         assert.ok(Math.abs(banner.marginTop) <= 0.5 && Math.abs(banner.marginLeft) <= 0.5 && Math.abs(banner.marginRight) <= 0.5,
