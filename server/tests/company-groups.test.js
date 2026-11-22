@@ -101,8 +101,8 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v21 sans perdre les données existantes', async () => {
-  // Simule strictement une base v8 : schéma v8 sans les migrations v9-v21
+test('une base v8 reçoit les migrations v9 à v22 sans perdre les données existantes', async () => {
+  // Simule strictement une base v8 : schéma v8 sans les migrations v9-v22
   // (échéances récurrentes, multi-sociétés, outbox, preuves email, abonnements, catalogue, entrepôts, comptabilité et essai).
   const [[trialRows]] = await pool.query("SELECT COUNT(*) AS total FROM users WHERE trial_status = 'trialing' OR trial_started_at IS NOT NULL OR trial_ends_at IS NOT NULL");
   assert.equal(Number(trialRows.total), 0, 'Ne pas supprimer d’essais existants pendant la simulation v8.');
@@ -172,10 +172,10 @@ test('une base v8 reçoit les migrations v9 à v21 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v21 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v22 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 21, 'la version doit inclure les migrations v19 à v21 après le socle v18.');
+  assert.equal(Number(meta.version), 22, 'la version doit inclure les migrations v19 à v22 après le socle v18.');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',

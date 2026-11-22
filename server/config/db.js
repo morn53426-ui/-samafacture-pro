@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 21;
+const CURRENT_SCHEMA_VERSION = 22;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -175,6 +175,7 @@ async function runMigrations(conn) {
   // v19 : historique des contrepassations et réactivations comptables des factures.
   // v20 : mode de règlement des dépenses (caisse 571 / banque 521).
   // v21 : état et dates UTC de l'essai gratuit de 15 jours, sans attribution rétroactive.
+  // v22 : les événements comptables de facture ne doivent pas être supprimés en cascade par une suppression de facture.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -389,6 +390,19 @@ async function runMigrations(conn) {
     .filter(Boolean);
   for (const statement of invoiceAccountingEventsStatements) {
     await conn.query(statement);
+  }
+
+  // v22 : conserver l'identifiant de facture comme référence d'audit, sans FK
+  // vers factures. Une facture supprimée par une voie exceptionnelle ne doit pas
+  // effacer ses événements ; la FK user_id → users conserve la suppression complète
+  // et volontaire du tenant via ON DELETE CASCADE.
+  const [invoiceEventForeignKeys] = await conn.query(
+    `SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS
+     WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'
+       AND CONSTRAINT_NAME = 'fk_pro_compta_facture_events_invoice'`
+  );
+  if (invoiceEventForeignKeys.length) {
+    await conn.query('ALTER TABLE pro_compta_facture_events DROP FOREIGN KEY fk_pro_compta_facture_events_invoice');
   }
 
   // v18 : 004 vient de créer pro_entrepots sur les nouvelles bases ; cet ajout conditionnel
