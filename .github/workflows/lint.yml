@@ -26,6 +26,10 @@ on:
       - 'server/tests/paiements.test.js'
       - 'server/tests/backup.test.js'
       - 'server/routes/factures.js'
+      - 'server/routes/dashboard.js'
+      - 'server/routes/rapports.js'
+      - 'server/routes/public-api.js'
+      - 'server/routes/factures-recurrentes.js'
       - 'server/tests/professional-tenant.test.js'
       - '.github/workflows/lint.yml'
   push:
@@ -87,4 +91,8 @@ jobs:
           server/tests/paiements.test.js
           server/tests/backup.test.js
           server/routes/factures.js
+          server/routes/dashboard.js
+          server/routes/rapports.js
+          server/routes/public-api.js
+          server/routes/factures-recurrentes.js
           server/tests/professional-tenant.test.js
