@@ -26,14 +26,16 @@ describe('Navigation mobile — clavier et restauration du focus', () => {
     assert.match(handler, /sidebar\?\.classList\.contains\('open'\)/);
     assert.match(handler, /event\.preventDefault\(\)/);
     assert.match(handler, /closeSidebar\(\)/);
+    assert.match(handler, /const toggles = \[/);
     assert.ok(handler.includes("document.querySelector('.enterprise-console-menu-toggle')"));
     assert.ok(handler.includes("document.getElementById('mobile-toggle-btn')"));
-    assert.ok(handler.includes('toggle?.isConnected && toggle.getClientRects().length'));
-    assert.ok(handler.includes('toggle.focus({ preventScroll: true })'));
+    assert.match(handler, /const toggle = toggles\.find\(candidate =>/);
+    assert.match(handler, /candidate\?\.isConnected && candidate\.getClientRects\(\)\.length/);
+    assert.match(handler, /if \(toggle\) toggle\.focus\(\{ preventScroll: true \}\)/);
     assert.ok(
       handler.indexOf("document.querySelector('.enterprise-console-menu-toggle')") <
       handler.indexOf("document.getElementById('mobile-toggle-btn')"),
-      'Le déclencheur du centre Groupe doit être prioritaire lorsqu’il est présent.'
+      'Le déclencheur du centre Groupe reste prioritaire uniquement s’il est visible.'
     );
   });
 
