@@ -231,6 +231,7 @@ test('les espaces entreprise isolent les clients, les factures et les permission
   const forbiddenApiKeyCreation = await request(app)
     .post('/api/pro/integrations/api-keys')
     .set('Authorization', 'Bearer ' + memberToken)
+    .set('X-SF-Company-Owner', String(ownerId))
     .send({ nom: 'Clé API tenant B', scopes: ['invoices:read'] });
   assert.equal(forbiddenApiKeyCreation.status, 403,
     'un membre lecture seule ne doit pas obtenir integrations.manage');
