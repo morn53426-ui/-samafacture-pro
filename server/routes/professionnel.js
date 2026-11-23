@@ -363,7 +363,7 @@ router.get('/clients/:id/statement', async (req, res, next) => {
       [uid, uid, clientId]
     );
     const [remboursements] = await pool.query(
-      "SELECT r.id, r.paiement_id, r.montant, r.motif, r.reference_prestataire, r.traite_le, f.numero FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id JOIN factures f ON f.id = p.facture_id WHERE r.user_id = ? AND f.user_id = ? AND r.statut = 'rembourse' AND f.client_id = ? AND f.type = 'facture' ORDER BY r.traite_le DESC",
+      "SELECT r.id, r.paiement_id, r.montant, r.motif, r.reference_prestataire, r.traite_le, f.numero FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id AND p.user_id = r.user_id JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id WHERE r.user_id = ? AND f.user_id = ? AND r.statut = 'rembourse' AND f.client_id = ? AND f.type = 'facture' ORDER BY r.traite_le DESC",
       [uid, uid, clientId]
     );
     const totalFacture = factures.filter(f => f.type === 'facture' && f.statut !== 'annulee').reduce((s, f) => s + Number(f.total), 0);
