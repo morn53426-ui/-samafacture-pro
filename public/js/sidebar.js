@@ -435,19 +435,37 @@ function bindWorkspaceNotificationDismiss() {
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape') return;
 
-    const panel = document.getElementById('workspace-notification-panel');
-    if (!panel || panel.hidden) return;
-
-    // Un dialogue actif (aperçu A4, confirmation, etc.) doit traiter Échap en priorité.
-    // Ne pas déplacer le focus vers la cloche lorsque les notifications sont déjà fermées.
+    // Un dialogue actif doit traiter Échap en priorité : ne pas fermer un menu
+    // situé derrière une confirmation ou un aperçu encore ouvert.
     const anotherDialogIsOpen = Array.from(
       document.querySelectorAll('[role="dialog"], [id$="modal"]')
     ).some(dialog =>
-      dialog !== panel &&
       !dialog.hidden &&
       getComputedStyle(dialog).display !== 'none'
     );
     if (anotherDialogIsOpen) return;
+
+    // Le menu mobile est une navigation déployable, pas une modale : Échap le
+    // referme et rend le focus au bouton qui l'a ouvert (y compris le centre Groupe).
+    const sidebar = document.getElementById('app-sidebar');
+    if (sidebar?.classList.contains('open')) {
+      event.preventDefault();
+      closeSidebar();
+      const toggles = [
+        document.querySelector('.enterprise-console-menu-toggle'),
+        document.getElementById('mobile-toggle-btn')
+      ];
+      // Le déclencheur Groupe peut exister dans le DOM hors de sa page et être
+      // masqué. Choisir le premier bouton réellement visible évite de perdre le focus.
+      const toggle = toggles.find(candidate =>
+        candidate?.isConnected && candidate.getClientRects().length
+      );
+      if (toggle) toggle.focus({ preventScroll: true });
+      return;
+    }
+
+    const panel = document.getElementById('workspace-notification-panel');
+    if (!panel || panel.hidden) return;
 
     closeWorkspaceNotifications();
     const toggle = document.getElementById('workspace-notification-toggle');
