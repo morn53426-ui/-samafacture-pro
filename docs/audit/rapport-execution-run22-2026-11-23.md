@@ -293,3 +293,47 @@ La dernière étape de recette visuelle responsive était en cours; le workflow 
 - PR #194 intégrée sur main par le propriétaire; CI post-fusion #45221526816 green sur le SHA exact.
 - PR #210 et #206 restent en brouillon/non fusionnées en attente de leurs résultats CI exacts.
 - Aucun paiement réel, déploiement production, migration destructive, altération de donnée, volume ou sauvegarde; aucun historique comptable modifié.
+
+
+## Addendum — PR #211, CI P1 et vérification de l’essai gratuit (23 novembre 2026)
+
+### PR #210 — devise des commandes
+- Head exact : `fa92faeccf886fa3d67f4c8003fbc7b2f0ccf5ad`; base main `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`.
+- ESLint #45224583453 : **success**.
+- Archive ZIP #45224583450 : **success**.
+- Tests automatisés Node.js/MySQL #45224583486 : **success**, y compris restauration chiffrée, smoke MySQL/Redis et recette visuelle responsive.
+- PR reste Draft/non fusionnée en attente de validation produit/comptabilité/OHADA de la règle « devise unique de base tant que les conversions ne sont pas disponibles ». Aucun ancien document modifié.
+
+### PR #211 — grille responsive des paramètres
+- PR : https://github.com/morn53426-ui/-samafacture-pro/pull/211
+- Branche : `ux/settings-company-fields-grid-main-20261123-run23`; head `4518451df4e887ed584219d282530e3acf4734df`; base main `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`.
+- Diff contrôlé contre main : **3 fichiers uniquement** — `.github/workflows/lint.yml`, `public/parametres.html`, `server/tests/parametres-accessibility.test.js`; 3 commits ahead / 0 behind.
+- Grille : 2 colonnes desktop, 1 colonne à 700 px et moins, RIB pleine largeur desktop; les neuf champs, leurs labels/IDs et le formulaire unique restent présents.
+- Contrôle CI exact du head `4518451...` : ESLint #45225973707 **success**; ZIP #45225973680 **success**; Tests Node/MySQL #45225973762 **in_progress** (étape exécution tests au dernier relevé).
+- Une lacune de couverture ESLint a été corrigée dans la PR elle-même : le test `parametres-accessibility.test.js` est maintenant ajouté aux filtres pull_request/push et à la commande ESLint. Le workflow ESLint sur le head exact confirme **success**.
+- PR reste Draft; aucun merge avant test complet et revue du rendu responsive.
+
+### Audit de l’essai gratuit — état main `c32ed40...`
+- `server/utils/free-trial.js` centralise 15 jours, normalise « Standard » vers le plan technique historique `starter`, et conserve `pro` / `entreprise`.
+- `public/register.html` propose Standard, Pro et Entreprise, chacun avec 15 jours offerts, sans carte bancaire ni prélèvement automatique indiqué. `public/js/google-auth.js` transmet aussi le choix au endpoint Google.
+- `POST /api/auth/register` et la création d'un nouveau compte par Google insèrent `trial_started_at` en UTC, `trial_ends_at = UTC_TIMESTAMP() + 15 DAY`, `trial_status='trialing'`, `plan` et `trial_plan` avec la formule choisie.
+- La période sélectionnée est unique à la première création : un compte déjà existant ne reçoit pas de nouvel essai; un utilisateur avec invitation d'équipe/groupe en attente n'obtient pas d'essai individuel concurrent.
+- `PUT /api/auth/plan` autorise le changement de formule uniquement pendant l'essai actif et garde strictement les dates initiales. Après expiration, `requireAuth` rabat le compte sur Gratuit avant l'accès aux routes; les données existantes ne sont pas supprimées.
+- Le test dédié `server/tests/free-trial.test.js` est découvert par le script `node --test "tests/*.test.js"`.
+- Journal réel CI de la PR #210 sur son head exact `fa92faecc...`, run #45224583486 : les cinq tests dédiés ont été exécutés et ont passé : normalisation des trois plans; inscription avec exactement 15 jours; changement de formule sans reset; expiration avec données conservées; exclusion des invitations d'équipe.
+- **Compatibilité API documentée** : si l'ancien client d'inscription omet `plan`, le compte est créé sur Gratuit sans essai. L'inscription web actuelle impose le choix de formule; le flux Google du même formulaire transmet aussi ce plan.
+- Le code consulté ne déclenche aucun paiement à la création de l'essai. Aucune activation de paiement réel ni de prélèvement n'a été effectuée pendant cet audit.
+
+### PR #206 — rapport Run 22
+- Head au moment de ce snapshot : `ee5bf10b535a66255812e5627a732dfafd9624d9`; diff contre main actuel limité au seul fichier Markdown du rapport (8 commits ahead / 0 behind).
+- ZIP exact #45225346613 : **success**.
+- Tests #45225346649 : **in_progress**, étape de recette visuelle responsive en cours au dernier relevé. Le commit de cet addendum déclenchera un nouveau run complet.
+- PR #206 reste Draft et non fusionnée.
+
+### Décision
+- Main reste `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`; aucune modification directe de main.
+- PR #210 : validation technique complète, validation métier attendue.
+- PR #211 : ESLint/ZIP verts, tests complets en cours.
+- PR #206 : tests du head précédent en cours, nouveau head attendu après cet addendum.
+- PR #194 déjà fusionnée par le propriétaire; CI post-fusion #45221526816 green. La liste des revues reste des COMMENTED de l'auteur, sans approbation indépendante consultée.
+- Aucune branche supprimée; aucun volume, backup, donnée ou historique comptable modifié; aucun paiement réel ou déploiement production.
