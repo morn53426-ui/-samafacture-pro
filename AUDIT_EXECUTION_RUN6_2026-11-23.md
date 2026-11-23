@@ -925,3 +925,60 @@ ux/settings-company-fields-grid-20261122
 - 0 push direct ou force push sur main; 0 branche supprimée.
 - 0 migration, écriture comptable historique ou opération destructive.
 - 0 modification de données, volumes ou sauvegardes; 0 paiement réel; 0 déploiement.
+
+
+---
+
+## Addendum Run 10 — 23 novembre 2026
+
+### État GitHub au snapshot Run 10
+- `main` : `b43a94fc2937b0108077501a0260358c8569e11f` (inchangé).
+- Branches recensées : **185** (pages API: 100 + 85).
+- PR ouvertes : **49**.
+- PR fermées : **125** (pages API: 100 + 25), réparties en **106 fusionnées** et **19 fermées sans fusion**.
+- CI post-fusion de main : run **#45080802243**, `success` sur le SHA exact de main.
+
+### PR #178 — stabilisation des tests de concurrence devise
+- Branche : `fix/tenant-currency-atomic-lock-20261123`; base empilée : `fix/pro-orders-tenant-currency-20261123` (head de la base #171 : `953489e79a9a6779b03e9c436559b925904f5635`).
+- Head courant Run 10 : `fc4a1b0e3fddc6da7409566942fcda1bc7d6a621`.
+- Parent précédent : `e657bb8201f8dc323c084acc3c6f0a5a898002e9`; compare exact : **2 commits ahead, 0 behind**, un seul fichier modifié `server/tests/currency-lock-concurrency.test.js` (+98/-24 dans le diff cumulé du correctif de tests).
+- La correction précédente `e657bb8` a CI 3/3 green sur SHA exact : Tests #45121938072 success (y compris sauvegarde chiffrée, smoke MySQL/Redis, recette visuelle 147 captures/7 largeurs), ESLint #45121938074 success, ZIP #45121938066 success.
+- Cause du test fragile : quatre pauses fixes (200/60/200/120 ms) utilisées pour supposer qu'une requête concurrente avait atteint le verrou.
+- Correctif Run 10 : remplacer les pauses par un observateur instrumentant `pool.getConnection().query`; il signale la tentative après l'émission de `SELECT ... FROM users WHERE id = ? FOR UPDATE`. Les tests vérifient que les deux requêtes restent bloquées tant que la transaction de contrôle conserve le verrou. Le timeout 5 secondes ne sert qu'à faire échouer le test si la requête de verrouillage n'est jamais observée.
+- 10 cas de concurrence restent présents; aucune pause fixe ne subsiste.
+- CI du head `fc4a1b0` au dernier snapshot : ESLint #45123066689 **success**; Tests #45123066688 **in_progress**; ZIP #45123066651 **in_progress**. Aucun succès n'est revendiqué pour les deux derniers checks.
+- Revue COMMENT soumise par l'auteur sur `fc4a1b0` (review #6017303518), pas d'approbation indépendante.
+- GitHub marque la PR #178 `mergeable_state=unstable` au dernier relevé; elle reste empilée sur #171/#168 et ne doit pas être fusionnée séparément.
+
+### PR #177 et #174
+- #177 head `f68ab94eb1d4c2c01d08331321cda293ab0a264f`: Tests #45118980192, ESLint #45118980187 et ZIP #45118980228 success sur le head exact; draft; validation humaine indépendante sécurité encore requise.
+- #174 head `27fa8c2ec2e2e87b5f6b58a98b07052f5a5bce75`: Tests #45109124536, ESLint #45109124614 et ZIP #45109124542 success sur le head exact; draft; domaine DNS/TLS réel et test appareil non réalisés; chevauchement à réconcilier avec #173.
+
+### PR #176 — état du rapport
+- Le présent addendum est ajouté de façon append-only au fichier `AUDIT_EXECUTION_RUN6_2026-11-23.md` de la branche `audit/execution-report-20261123-run6`; aucun contenu historique n'est supprimé.
+- Le commit d'ajout Run 9 était `bf311f88ed9f1f381120787ef369d77d080e8012`; le head de branche est avancé par le nouvel ajout Run 10. La CI sur ce nouveau head doit être vérifiée séparément.
+- PR #176 demeure documentaire et draft.
+
+### Inventaire migrations, workflows et protections
+- `server/config/db.js`: `CURRENT_SCHEMA_VERSION = 23`.
+- Migrations numérotées 003–012 dans `server/database/migrations/`; migration 012 existante `012_comptabilite_correspondances.sql`.
+- Cinq scripts SQL additionnels sont présents à la racine (stabilité, token_version, personnalisation facture, index reset token, scalabilité); leur ordre d'exécution exact reste à confirmer.
+- Workflows main : `.github/workflows/test.yml`, `.github/workflows/lint.yml`, `.github/workflows/package-source-zip.yml`.
+- Ruleset #27410527 actif; checks requis Tests Node.js/MySQL et Build complete source archive; résolution des conversations requise; deletion/non-fast-forward interdits; bypass never; seuil d'approbation configuré à 0. Endpoint branch protection classique reste inaccessible (403).
+
+### Planning P0–P3
+- **P0** : attendre les tests/ZIP du head exact `fc4a1b0`; examiner les logs de tout échec et ne pas réutiliser les succès du parent comme preuve pour le nouveau head.
+- **P0** : obtenir une revue indépendante et validation humaine sécurité de #177 avant toute fusion.
+- **P0** : #174 demande vérification DNS/TLS et appareil avec un domaine réel; choisir une seule PR parmi #173/#174 après comparaison finale.
+- **P0** : réconcilier la chaîne #168 → #171 → #178; revérifier l'ensemble des checks sur un head cohérent avant toute décision de fusion.
+- **P1** : #149 reste bloquée sur la collision de migration 012/schema v23; migration 013/v24, tests upgrade/replay, FK tenant et validation humaine OHADA.
+- **P1** : rebase contrôlé puis CI exacte et revue humaine pour #159/#164.
+- **P2** : PDF/impression, accessibilité et UX en petits lots indépendants.
+- **P3** : branding, vidéo, documentation après clôture des risques P0/P1.
+
+### Bilan de sécurité Run 10
+- **0 fusion**; main inchangé.
+- 0 push direct/force push sur main; 0 branche supprimée.
+- 0 migration exécutée; 0 modification d'écriture comptable historique.
+- 0 opération destructive; 0 modification des données, volumes ou sauvegardes.
+- 0 paiement réel; 0 déploiement production.
