@@ -26,6 +26,8 @@ on:
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
       - 'server/routes/auth.js'
+      - 'server/routes/factures.js'
+      - 'server/routes/public-api.js'
       - 'server/routes/produits.js'
       - 'server/routes/depenses.js'
       - 'server/routes/factures-recurrentes.js'
@@ -97,6 +99,8 @@ jobs:
           server/email-outbox.js
           server/routes/professionnel.js
           server/routes/auth.js
+          server/routes/factures.js
+          server/routes/public-api.js
           server/routes/produits.js
           server/routes/depenses.js
           server/routes/factures-recurrentes.js
