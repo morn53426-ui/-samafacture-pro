@@ -1,6 +1,7 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+const crypto = require('node:crypto');
 const {
   app,
   pool,
@@ -224,17 +225,30 @@ test('les espaces entreprise isolent les clients, les factures et les permission
   assert.equal(invoiceList.body.factures.some(row => Number(row.id) === Number(foreignInvoiceId)), false,
     'la liste B ne doit pas inclure une facture dont le client appartient à A');
 
-  const apiKey = await request(app)
+  // Un membre lecture seule ne possède pas integrations.manage : la création
+  // d'une clé via l'interface doit rester interdite. On insère une clé de fixture
+  // pour tester l'isolation API publique sans élargir les permissions du membre.
+  const forbiddenApiKeyCreation = await request(app)
     .post('/api/pro/integrations/api-keys')
     .set('Authorization', 'Bearer ' + memberToken)
     .send({ nom: 'Clé API tenant B', scopes: ['invoices:read'] });
-  assert.equal(apiKey.status, 201, apiKey.text);
+  assert.equal(forbiddenApiKeyCreation.status, 403,
+    'un membre lecture seule ne doit pas obtenir integrations.manage');
+
+  const apiKeyToken = 'sf_live_' + 'd'.repeat(64);
+  const apiKeyHash = crypto.createHash('sha256').update(apiKeyToken).digest('hex');
+  await pool.query(
+    'INSERT INTO pro_api_keys (user_id, nom, token_hash, scopes_json) VALUES (?, ?, ?, ?)',
+    [memberId, 'Clé API fixture tenant B', apiKeyHash, JSON.stringify(['invoices:read'])]
+  );
   const publicInvoiceList = await request(app)
     .get('/api/v1/invoices')
-    .set('X-SamaFacture-Key', apiKey.body.token);
+    .set('X-SamaFacture-Key', apiKeyToken);
   assert.equal(publicInvoiceList.status, 200, publicInvoiceList.text);
   assert.equal(publicInvoiceList.body.data.some(row => Number(row.id) === Number(foreignInvoiceId)), false,
     'la liste API publique B ne doit pas inclure une facture dont le client appartient à A');
+  assert.ok(publicInvoiceList.body.data.some(row => Number(row.id) === Number(memberInvoiceId)),
+    'la clé API B doit toujours lire ses propres factures');
 
   // Les paiements doivent eux aussi être filtrés par tenant, même si une ligne anormale
   // d'une autre entreprise référence l'identifiant de la facture B.
