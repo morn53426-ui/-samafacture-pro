@@ -509,6 +509,6 @@ Head/base SHAs courts et état draft. CI revalidée pour #167/#168/#149/#159/#16
 - PR [#171](https://github.com/morn53426-ui/-samafacture-pro/pull/171) draft, 8 commits ahead/0 behind de la base, 6 fichiers modifiés; mergeable clean au dernier compare.
 - Correctifs : commandes pro par défaut sur devise tenant, validation devise; verrou de changement de devise compte aussi `pro_commandes` et `pro_bons_livraison`; test EUR, devise invalide et refus de changement après commande.
 - CI head exact `9b70c35fef2e12726274ae4b726ca50c5e54b8e3` : ZIP success (run 1387), ESLint success (run 663), Tests Node/MySQL en cours (run 1697, started 01:01:58Z). Aucun test local exécuté.
-- Revue COMMENT publiée (review ID 6015507944), sans approbation. PR dépend de #168 et ne doit pas être fusionnée indépendamment.
+- Revue COMMENT actualisée sur le head `9b70c35fef2e12726274ae4b726ca50c5e54b8e3` (review ID 6015515714), sans approbation; review 6015507944 est antérieure au dernier commit. PR dépend de #168 et ne doit pas être fusionnée indépendamment.
 - Finding #168 supplémentaire : les nouveaux tests devise/tenant ne sont pas couverts par le workflow ESLint path-list/commande. Commentaire #168 ID 7088811240; #171 ajoute les cinq fichiers tests aux deux listes et aux filtres de chemins.
 - Race du verrou de devise (COUNT/UPDATE séparés et créations concurrentes) toujours non corrigée; lot distinct nécessaire.
