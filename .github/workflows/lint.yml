@@ -17,6 +17,8 @@ on:
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
+      - 'server/routes/factures.js'
+      - 'server/tests/factures.test.js'
       - 'server/tests/company-group-ui.test.js'
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
@@ -76,6 +78,8 @@ jobs:
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
+          server/routes/factures.js
+          server/tests/factures.test.js
           server/tests/company-group-ui.test.js
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
