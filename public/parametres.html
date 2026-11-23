@@ -1506,7 +1506,7 @@
       closeResetModal();
       document.getElementById('reset-msg').innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin:12px 0; font-size:0.85rem;">Le tableau de bord a été réinitialisé ✓</div>`;
     } catch (err) {
-      document.getElementById('reset-modal-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('reset-modal-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     }
   }
 </script>

@@ -10,6 +10,7 @@ const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydun
 const net = require('net');
 const { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, SUPPORTED_TIMEZONES } = require('../config/localization');
 const { localDateString } = require('../utils/local-date');
+const { formatAmountWithCurrency, normalizeCurrency } = require('../utils/money-format');
 const { isEnterprisePlan } = require('../utils/plans');
 const { encryptEmailPayload, decryptEmailPayload } = require('../utils/email-outbox-crypto');
 
@@ -377,12 +378,23 @@ router.post('/clients/:id/remind', async (req, res, next) => {
     const uid = owner(req), clientId = Number(req.params.id), canal = req.body.canal || 'email';
     const client = await clientOwned(uid, clientId);
     if (!client) return res.status(404).json({ error: 'Client introuvable.' });
-    const [rows] = await pool.query("SELECT numero, total, montant_paye, date_echeance FROM factures WHERE user_id = ? AND client_id = ? AND type = 'facture' AND statut IN ('en_attente','en_retard') ORDER BY date_echeance ASC", [uid, clientId]);
+    const [rows] = await pool.query("SELECT numero, total, montant_paye, date_echeance, devise FROM factures WHERE user_id = ? AND client_id = ? AND type = 'facture' AND statut IN ('en_attente','en_retard') ORDER BY date_echeance ASC", [uid, clientId]);
     const dues = rows.filter(f => Number(f.total) > Number(f.montant_paye));
     if (!dues.length) return res.status(400).json({ error: 'Aucune facture impayée pour ce client.' });
-    const total = dues.reduce((s, f) => s + Number(f.total) - Number(f.montant_paye), 0);
-    const list = dues.map(f => f.numero + ' : ' + (Number(f.total) - Number(f.montant_paye)).toLocaleString('fr-FR') + ' FCFA').join('\n');
-    const message = 'Bonjour ' + client.nom + ', petit rappel concernant vos factures en attente :\n' + list + '\nSolde total : ' + total.toLocaleString('fr-FR') + ' FCFA. Merci.';
+    const byCurrency = new Map();
+    for (const facture of dues) {
+      const devise = normalizeCurrency(facture.devise);
+      const groupe = byCurrency.get(devise) || { lignes: [], solde: 0 };
+      const reste = Number(facture.total) - Number(facture.montant_paye);
+      groupe.lignes.push(facture.numero + ' : ' + formatAmountWithCurrency(reste, devise));
+      groupe.solde += reste;
+      byCurrency.set(devise, groupe);
+    }
+    const details = Array.from(byCurrency.entries()).map(([devise, groupe]) =>
+      'Factures en ' + devise + ' :\n' + groupe.lignes.join('\n') +
+      '\nSolde total : ' + formatAmountWithCurrency(groupe.solde, devise)
+    ).join('\n\n');
+    const message = 'Bonjour ' + client.nom + ', petit rappel concernant vos factures en attente :\n' + details + '\n\nMerci.';
     if (canal === 'whatsapp') {
       const phone = String(client.whatsapp || client.telephone || '').replace(/[^0-9]/g, '');
       if (!phone) return res.status(400).json({ error: 'Aucun numéro WhatsApp disponible pour ce client.' });

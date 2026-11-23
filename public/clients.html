@@ -172,7 +172,7 @@
       closeModal();
       load().catch(err => alert(err.message));
     } catch (err) {
-      document.getElementById('modal-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('modal-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }

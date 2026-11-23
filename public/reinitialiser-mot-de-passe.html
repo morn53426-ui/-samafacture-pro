@@ -71,7 +71,7 @@
       Api.clearSession();
       location.href = 'login.html?reinitialise=1';
     } catch (err) {
-      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+      errorBox.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
       restore();
     }
   });
