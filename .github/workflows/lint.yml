@@ -15,6 +15,7 @@ on:
       - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
+      - 'server/tests/parametres-accessibility.test.js'
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
@@ -60,6 +61,7 @@ on:
       - 'server/tests/workspace-navigation.test.js'
       - 'server/tests/sidebar-mobile-keyboard.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
+      - 'server/tests/parametres-accessibility.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
 
@@ -96,6 +98,7 @@ jobs:
           server/tests/sidebar-mobile-keyboard.test.js
           server/tests/accounting-expense-mappings.test.js
           server/tests/workspace-modal-accessibility.test.js
+          server/tests/parametres-accessibility.test.js
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
