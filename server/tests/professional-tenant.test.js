@@ -139,7 +139,8 @@ test('les espaces entreprise isolent les clients, les factures et les permission
 
   // Une facture rattachée anormalement au client mais appartenant au membre ne doit pas
   // polluer les totaux affichés dans l’espace de l’entreprise propriétaire.
-  assert.equal(Number(sharedClient.total_facture), 0);
+  assert.equal(Number(sharedClient.total_facture), 700,
+    'le total du client A conserve sa propre facture et exclut la facture B mal rattachée');
 
   const detail = await request(app)
     .get('/api/clients/' + clientId)
