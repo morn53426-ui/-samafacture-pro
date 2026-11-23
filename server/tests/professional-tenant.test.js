@@ -17,6 +17,8 @@ let ownerToken;
 let memberToken;
 let clientId;
 let foreignInvoiceId;
+let foreignInvoiceVerificationCode;
+let foreignPaymentToken;
 let ownerInvoiceId;
 let foreignRecurringId;
 let memberInvoiceId;
@@ -81,6 +83,11 @@ before(async () => {
     [memberId, clientId, 'CROSS-TENANT-' + Date.now()]
   );
   foreignInvoiceId = invoiceResult.insertId;
+  foreignInvoiceVerificationCode = 'a1b2c3d4e5';
+  await pool.query(
+    "UPDATE factures SET verification_code = ?, date_echeance = DATE_SUB(CURDATE(), INTERVAL 5 DAY), statut = 'en_retard' WHERE id = ? AND user_id = ?",
+    [foreignInvoiceVerificationCode, foreignInvoiceId, memberId]
+  );
   const [foreignRecurring] = await pool.query(
     `INSERT INTO factures_recurrentes
       (user_id, client_id, libelle, frequence, prochaine_date, lignes_json)
@@ -116,6 +123,10 @@ before(async () => {
     [memberId, memberClient.insertId, 'TENANT-DETAIL-' + Date.now()]
   );
   memberInvoiceId = memberInvoice.insertId;
+  await pool.query(
+    "UPDATE factures SET date_echeance = DATE_SUB(CURDATE(), INTERVAL 3 DAY), statut = 'en_retard' WHERE id = ? AND user_id = ?",
+    [memberInvoiceId, memberId]
+  );
   const [foreignPayment] = await pool.query(
     'INSERT INTO paiements (user_id, facture_id, montant, methode) VALUES (?, ?, ?, ?)',
     [ownerId, memberInvoiceId, 123, 'Espèces']
@@ -290,9 +301,11 @@ test('les espaces entreprise isolent les clients, les factures et les permission
     'INSERT INTO pro_acomptes (user_id, facture_id, numero, date_emission, montant) VALUES (?, ?, ?, CURDATE(), ?)',
     [memberId, ownerInvoiceId, 'TENANT-AC-' + Date.now(), 100]
   );
+  foreignPaymentToken = 'b'.repeat(64);
+  const foreignPaymentTokenHash = crypto.createHash('sha256').update(foreignPaymentToken).digest('hex');
   const [foreignPaymentLink] = await pool.query(
     'INSERT INTO pro_payment_links (user_id, facture_id, token_hash, montant, devise) VALUES (?, ?, ?, ?, ?)',
-    [memberId, ownerInvoiceId, 'b'.repeat(64), 100, 'FCFA']
+    [memberId, ownerInvoiceId, foreignPaymentTokenHash, 100, 'FCFA']
   );
   const checkoutReference = 'c'.repeat(64);
   const [foreignCheckout] = await pool.query(
@@ -377,6 +390,26 @@ test('les espaces entreprise isolent les clients, les factures et les permission
     [foreignInvoiceId, memberId]
   );
   assert.ok(remainingInvoice, 'la facture de l’autre compte doit être conservée');
+});
+
+test('les routes publiques et l’assistant excluent les relations inter-entreprises', async () => {
+  const publicInvoice = await request(app)
+    .get('/api/public/consulter/' + foreignInvoiceId + '/' + foreignInvoiceVerificationCode);
+  assert.equal(publicInvoice.status, 404,
+    'la consultation publique ne doit pas révéler le client rattaché à une autre entreprise');
+
+  const publicPaymentLink = await request(app)
+    .get('/api/public/paiement/' + foreignPaymentToken);
+  assert.equal(publicPaymentLink.status, 404,
+    'un lien de paiement B ne doit pas afficher les montants ou références d’une facture A');
+
+  const assistant = require('../routes/assistant');
+  const overdue = await assistant.executerOutil('factures_en_retard', {}, memberId);
+  assert.deepEqual(overdue.map(row => row.client), ['Client entreprise B'],
+    'les factures en retard de B ne doivent pas nommer le client A');
+  const topClients = await assistant.executerOutil('top_clients', {}, memberId);
+  assert.deepEqual(topClients.map(row => row.client), ['Client entreprise B'],
+    'le classement des clients de B ne doit pas inclure le client A');
 });
 
 test('le relevé client exclut les remboursements liés à un paiement d’un autre tenant', async () => {
