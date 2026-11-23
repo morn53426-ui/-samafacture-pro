@@ -73,7 +73,7 @@ La dernière vérification de protection (Run 25) documentait le ruleset `protec
 
 ## 5. Revue indépendante et décision du Run 26
 
-Revue statique indépendante des diffs #208/#209/#211/#210 : aucun défaut bloquant identifié dans la lecture ciblée; ceci ne remplace pas une approbation GitHub indépendante ni une recette visuelle sur appareil. Les PR #209 et #211 sont duplicatives; la candidate #211 est préférable pour son test d'unicité de formulaire et sa couverture de chemins lint. Les candidats #208, #209, #211, #210 restent Draft et non approuvés.
+Revue statique ciblée effectuée par l’assistant sur les diffs #208/#209/#211/#210 : aucun défaut bloquant identifié dans le périmètre limité; cette lecture ne constitue pas une approbation GitHub indépendante ni une recette visuelle manuelle. Les PR #209 et #211 sont duplicatives; la candidate #211 est préférable pour son test d'unicité de formulaire et sa couverture de chemins lint. Les candidats #208, #209, #211, #210 restent Draft et non approuvés.
 
 **Merges Run 26 : 0.** Les critères de fusion ne sont pas tous satisfaits (draft, approbation indépendante absente, visual check manuelle manquante ou validation métier/DDL). Aucun merge, push main, force push, suppression, paiement réel ou déploiement.
 
