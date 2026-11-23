@@ -181,9 +181,12 @@ test('les espaces entreprise isolent les clients, les factures et les permission
     'SELECT COUNT(*) AS total FROM factures WHERE user_id = ?',
     [memberId]
   );
-  assert.equal(recurringAfter.factures_generees, recurringBefore.factures_generees,
+  assert.equal(Number(recurringAfter.factures_generees), Number(recurringBefore.factures_generees),
     'le modèle mal rattaché ne doit pas incrémenter son compteur');
-  assert.equal(String(recurringAfter.prochaine_date).slice(0, 10), String(recurringBefore.prochaine_date).slice(0, 10),
+  const dateOnly = value => value instanceof Date
+    ? value.toISOString().slice(0, 10)
+    : String(value).slice(0, 10);
+  assert.equal(dateOnly(recurringAfter.prochaine_date), dateOnly(recurringBefore.prochaine_date),
     'le modèle mal rattaché ne doit pas avancer son échéance');
   assert.equal(Number(invoiceCountAfter.total), Number(invoiceCountBefore.total),
     'aucune facture ne doit être générée depuis un modèle lié au client d’une autre entreprise');
