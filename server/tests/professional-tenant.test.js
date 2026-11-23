@@ -16,6 +16,7 @@ let ownerToken;
 let memberToken;
 let clientId;
 let foreignInvoiceId;
+let ownerInvoiceId;
 let foreignRecurringId;
 let memberInvoiceId;
 let memberInvoicePaymentId;
@@ -85,10 +86,11 @@ before(async () => {
 
   // Une facture valide de A permet de détecter si son tableau de bord agrège à tort
   // la facture B anormalement rattachée au client A.
-  await pool.query(
+  const [ownerInvoice] = await pool.query(
     "INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison, sous_total, total_tva, total, montant_paye) VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', 0, 0, 700, 0, 700, 0)",
     [ownerId, clientId, 'OWNER-TENANT-' + Date.now()]
   );
+  ownerInvoiceId = ownerInvoice.insertId;
 
   // Facture saine de B : une ligne de paiement propre à B et une ligne anormale de A
   // référencent volontairement cette même facture pour vérifier le filtrage par tenant.
@@ -146,7 +148,11 @@ test('les espaces entreprise isolent les clients, les factures et les permission
     .get('/api/clients/' + clientId)
     .set('Authorization', 'Bearer ' + ownerToken);
   assert.equal(detail.status, 200);
-  assert.deepEqual(detail.body.factures, [], 'la fiche client ne doit pas exposer les factures d’un autre compte');
+  assert.deepEqual(
+    detail.body.factures.map(row => Number(row.id)),
+    [Number(ownerInvoiceId)],
+    'la fiche client doit conserver la facture A sans exposer la facture B mal rattachée'
+  );
 
   // Le membre ne doit pas lire une facture qui référence le client d'une autre entreprise.
   const foreignInvoiceDetail = await request(app)
