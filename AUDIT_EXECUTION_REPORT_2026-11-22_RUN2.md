@@ -317,3 +317,11 @@ ui/modern-responsive-polish
 ux/dashboard-mobile-module-rail-20261122
 ux/pro-workspace-mobile-domain-rail-20261122
 ux/settings-company-fields-grid-20261122
+
+
+## Inventaire des PR fermées (numéros exacts, sans gaps)
+
+- #1–#15 : 15 PR fermées avant le 14 novembre.
+- #16–#57, #59–#60, #62–#65, #67–#69, #71–#89 : 70 PR fermées créées entre le 14 et le 17 novembre.
+- #90–#98, #100–#101, #103–#109, #111–#113, #116–#117, #119–#125, #148, #150–#152, #158, #160–#163, #165 : 40 PR fermées créées entre le 18 et le 22 novembre.
+- Les gaps #58, #61, #66 et #70 n'apparaissent pas dans la recherche PR; les 125 PR fermées et 38 ouvertes donnent 163 PR existantes au total.
