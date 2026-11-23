@@ -584,3 +584,30 @@ test('une nouvelle caisse reprend la devise de base et refuse les devises inconn
   assert.equal(Number(counts.total), 2,
     'une caisse avec une devise non prise en charge ne doit pas être créée');
 });
+
+test('une caisse créée en concurrence avec un changement de devise reprend la devise verrouillée', async () => {
+  const company = await createCompanyAndClient('cash-register-currency-race');
+  const updateRequest = request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  const createRequest = request(app)
+    .post('/api/pro/cash/registers')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Caisse concurrente sans devise' });
+
+  const response = await runCurrencyChangeBeforeCreation(
+    company,
+    updateRequest,
+    createRequest,
+    async (createResponse, currentCompany) => {
+      const [[stored]] = await pool.query(
+        'SELECT devise FROM pro_caisses WHERE id = ? AND user_id = ?',
+        [createResponse.body.id, currentCompany.userId]
+      );
+      return stored;
+    }
+  );
+  assert.equal(response.status, 201, response.text);
+  assert.equal(response.body.devise, 'EUR');
+});
