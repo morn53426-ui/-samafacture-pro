@@ -561,3 +561,22 @@ PR #206 Run 22 doc-only, head `662f5ee56a104510a60b0123d2e1302011ad6020`, base `
 - PR #154 mobile workspace : portage ciblé sur branche `fix/mobile-workspace-domain-rail-main-20261123`, PR #208 Draft, head courant `21a3e371eec79eb52ef6962458a1d3ef34aebb0d`, base c32. Diff 4 fichiers (CSS rail, région HTML accessible, recette visuelle et test structurel), 59 additions/6 suppressions. Revue statique : rail <=560px, scroll-snap, role=region, tabindex=0, aria-label. Une assertion regex trop échappée a été repérée et remplacée par des assertions `includes` avant finalisation. Checks du head exact : ESLint #45223260450 et ZIP #45223260488 in_progress; run tests sur le head final encore absent au dernier relevé (run #45223179384 est sur l'ancien head `f4b126e8...`). Ne pas merger avant CI complète sur `21a3e371...` et revue.
 - PR #155 paramètres : compare vers c32 ne conserve que 3 fichiers (lint workflow, `public/parametres.html`, test accessibilité). Branche stale 9 ahead/62 behind. Revue ciblée à poursuivre; ne pas synchroniser/merger avant CI et diff exact.
 - PR #154/#155/#127 restent en branches d'origine préservées; #208 est un portage dédié, aucun merge effectué.
+
+
+## Addendum — PR responsive/settings préparées (17:03 UTC)
+
+### PR #208 — rail mobile professionnel
+- Draft, base c32, head exact `21a3e371eec79eb52ef6962458a1d3ef34aebb0d`, 4 fichiers, 59 additions/6 suppressions.
+- ESLint #45223260450 success; ZIP #45223260488 success; Tests #45223260494 in_progress (exact head), étapes install dependencies en cours, tests et recette visuelle pas encore exécutés. Aucun merge.
+- Revue statique : CSS rail 84vw/300px, scroll-snap et overflow auto; région focusable/nommée; recette visuelle vérifie scrollWidth/clientWidth et clavier. Assertion regex initiale overescaped corrigée avant ce head.
+
+### PR #209 — grille coordonnées entreprise
+- Draft, base c32, head exact `9888f76fcee4a631a6bd33473c6d7fa4a8800b1f`, 3 fichiers, 39 additions/1 suppression.
+- Portage ciblé de la grille responsive de #155 : 2 colonnes desktop, 1 mobile, RIB pleine largeur, conditions et mentions légales hors grille. Test structurel ajouté; ESLint workflow couvre path et commande.
+- Revue statique : préserver `escapeHtml(err.message)` du main. Le head stale #155 contient `innerHTML = ... ${err.message}` sans escaping (risque XSS si message contrôlé); cette ligne n'a pas été portée. ESLint #45223608516 success; Tests #45223608140 et ZIP #45223608500 in_progress sur head exact. Aucun merge.
+
+### P2 candidats / décision
+- #127 : la pagination Executive 28 lignes et ses classes sont déjà sur main; duplicate, pas de portage.
+- #155 : stale (9 ahead/62 behind); uniquement grille settings à portage ciblé, autre code du branch stale non réutilisé. La régression d'escaping est à corriger/éviter.
+- #154 : stale (8 ahead/62 behind); portage #208 séparé.
+- #208 et #209 sont indépendantes et Draft; les fusionner une par une après CI exacte, revue et vérification des protections. Main c32 reste green.
