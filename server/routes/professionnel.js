@@ -739,21 +739,62 @@ router.get('/cash/registers', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 router.post('/cash/registers', async (req, res, next) => {
+  let conn;
   try {
+    const uid = owner(req);
     const nom = String(req.body.nom || '').trim().slice(0, 120);
     if (!nom) return res.status(400).json({ error: 'Le nom de la caisse est obligatoire.' });
-    let establishmentId = null;
-    if (req.body.etablissement_id) {
-      const [e] = await pool.query('SELECT id FROM pro_etablissements WHERE id = ? AND user_id = ?', [req.body.etablissement_id, owner(req)]);
-      if (!e.length) return res.status(400).json({ error: 'Établissement invalide.' });
-      establishmentId = e[0].id;
-    }
     const initial = Number(req.body.solde_initial || 0);
     if (!Number.isFinite(initial) || initial < 0) return res.status(400).json({ error: 'Solde initial invalide.' });
-    const [result] = await pool.query('INSERT INTO pro_caisses (user_id, etablissement_id, nom, devise, solde_initial) VALUES (?, ?, ?, ?, ?)', [owner(req), establishmentId, nom, String(req.body.devise || 'FCFA').slice(0, 10), initial]);
-    await audit(req, 'caisse.creee', 'caisse', result.insertId, { nom });
-    res.status(201).json({ id: result.insertId, nom });
-  } catch (err) { next(err); }
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    // Le formulaire ne demande pas de devise : utiliser celle du compte verrouillé
+    // évite de créer silencieusement une caisse FCFA pour une entreprise en EUR.
+    const [[company]] = await conn.query(
+      'SELECT devise FROM users WHERE id = ? FOR UPDATE',
+      [uid]
+    );
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+
+    const baseCurrency = String(company.devise || 'FCFA').trim().toUpperCase();
+    const currency = req.body.devise === undefined || req.body.devise === null || String(req.body.devise).trim() === ''
+      ? baseCurrency
+      : String(req.body.devise).trim().toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(currency)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise de caisse non prise en charge.' });
+    }
+
+    let establishmentId = null;
+    if (req.body.etablissement_id) {
+      const [establishments] = await conn.query(
+        'SELECT id FROM pro_etablissements WHERE id = ? AND user_id = ?',
+        [req.body.etablissement_id, uid]
+      );
+      if (!establishments.length) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Établissement invalide.' });
+      }
+      establishmentId = establishments[0].id;
+    }
+
+    const [result] = await conn.query(
+      'INSERT INTO pro_caisses (user_id, etablissement_id, nom, devise, solde_initial) VALUES (?, ?, ?, ?, ?)',
+      [uid, establishmentId, nom, currency, initial]
+    );
+    await conn.commit();
+    await audit(req, 'caisse.creee', 'caisse', result.insertId, { nom, devise: currency });
+    res.status(201).json({ id: result.insertId, nom, devise: currency });
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 router.post('/cash/registers/:id/operations', async (req, res, next) => {
   let conn;
