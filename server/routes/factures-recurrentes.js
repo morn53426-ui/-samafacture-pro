@@ -115,6 +115,7 @@ router.get('/', async (req, res, next) => {
  *       400: { description: "Champs manquants ou client invalide.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/', async (req, res, next) => {
+  let conn;
   try {
     const { client_id, libelle, frequence, prochaine_date, remise, frais_livraison, mode_paiement, commentaires, lignes, envoi_auto_email } = req.body;
 
@@ -185,7 +186,16 @@ router.post('/', async (req, res, next) => {
       };
     });
 
-    const [result] = await pool.query(
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    // Un modèle récurrent fait partie de l'historique qui fige la devise du compte.
+    // Son insertion doit donc partager le même verrou que les réglages de localisation.
+    const [[account]] = await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    if (!account) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+    const [result] = await conn.query(
       `INSERT INTO factures_recurrentes (user_id, client_id, libelle, frequence, prochaine_date, jour_ancre, remise, frais_livraison, mode_paiement, commentaires, lignes_json, envoi_auto_email)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -194,10 +204,15 @@ router.post('/', async (req, res, next) => {
         JSON.stringify(lignesClean), envoiAutoEmail ? 1 : 0
       ]
     );
-
-    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
+    const [rows] = await conn.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
+    await conn.commit();
     res.status(201).json({ recurrente: { ...rows[0], lignes: lignesClean } });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 /**

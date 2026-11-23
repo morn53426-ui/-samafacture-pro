@@ -18,6 +18,23 @@ on:
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
+      - 'server/tests/factures.test.js'
+      - 'server/routes/clients.js'
+      - 'server/tests/client-history-protection.test.js'
+      - 'server/routes/public.js'
+      - 'server/routes/assistant.js'
+      - 'server/routes/dashboard.js'
+      - 'server/routes/rapports.js'
+      - 'server/tests/professional-tenant.test.js'
+      - 'server/routes/auth.js'
+      - 'server/routes/depenses.js'
+      - 'server/routes/factures-recurrentes.js'
+      - 'server/routes/factures.js'
+      - 'server/routes/produits.js'
+      - 'server/routes/public-api.js'
+      - 'server/tests/auth-currency.test.js'
+      - 'server/tests/currency-lock-concurrency.test.js'
+      - 'server/tests/setup.js'
       - 'server/tests/company-group-ui.test.js'
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
@@ -27,17 +44,6 @@ on:
       - 'server/tests/auth.test.js'
       - 'server/tests/paiements.test.js'
       - 'server/tests/backup.test.js'
-      - 'server/tests/factures.test.js'
-      - 'server/routes/clients.js'
-      - 'server/tests/client-history-protection.test.js'
-      - 'server/routes/factures.js'
-      - 'server/routes/public.js'
-      - 'server/routes/public-api.js'
-      - 'server/routes/assistant.js'
-      - 'server/routes/dashboard.js'
-      - 'server/routes/rapports.js'
-      - 'server/routes/factures-recurrentes.js'
-      - 'server/tests/professional-tenant.test.js'
       - 'server/tests/mobile-config.test.js'
       - 'mobile/scripts/check-capacitor-config.js'
       - '.github/workflows/lint.yml'
@@ -86,13 +92,30 @@ jobs:
           server/tests/visual/recette-visuelle.js
           server/tests/local-date-format.test.js
           server/tests/workspace-navigation.test.js
-          server/tests/sidebar-mobile-keyboard.test.js
           server/tests/dashboard-ui.test.js
+          server/tests/sidebar-mobile-keyboard.test.js
           server/tests/accounting-expense-mappings.test.js
           server/tests/workspace-modal-accessibility.test.js
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
+          server/tests/factures.test.js
+          server/routes/clients.js
+          server/tests/client-history-protection.test.js
+          server/routes/public.js
+          server/routes/assistant.js
+          server/routes/dashboard.js
+          server/routes/rapports.js
+          server/tests/professional-tenant.test.js
+          server/routes/auth.js
+          server/routes/depenses.js
+          server/routes/factures-recurrentes.js
+          server/routes/factures.js
+          server/routes/produits.js
+          server/routes/public-api.js
+          server/tests/auth-currency.test.js
+          server/tests/currency-lock-concurrency.test.js
+          server/tests/setup.js
           server/tests/company-group-ui.test.js
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
@@ -102,16 +125,5 @@ jobs:
           server/tests/auth.test.js
           server/tests/paiements.test.js
           server/tests/backup.test.js
-          server/tests/factures.test.js
-          server/routes/clients.js
-          server/tests/client-history-protection.test.js
-          server/routes/factures.js
-          server/routes/public.js
-          server/routes/public-api.js
-          server/routes/assistant.js
-          server/routes/dashboard.js
-          server/routes/rapports.js
-          server/routes/factures-recurrentes.js
-          server/tests/professional-tenant.test.js
           server/tests/mobile-config.test.js
           mobile/scripts/check-capacitor-config.js
