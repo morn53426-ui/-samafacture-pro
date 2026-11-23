@@ -772,3 +772,15 @@
 - PR #201 report branch est elle-même 1 commit behind main; son run tests #45190634576 in_progress au snapshot, ZIP #45190634696 success. Ne pas fusionner ce rapport tant que main stable et head resynchronisé.
 
 Aucune fusion supplémentaire, aucun push direct/force push, aucune branche ou PR supprimée, aucune donnée/migration/volume/backup/historique comptable modifié; aucun paiement réel ou déploiement production.
+---
+
+## Run 19 — post-fusion main confirmé GREEN (23 novembre 2026, 14:11 UTC)
+
+- PR #197 fusion squash : f8a61187e8b8df7dc319d611dd58fb02dd0aa336.
+- Run push #45190172560 : success sur le SHA exact f8a61187e8b8df7dc319d611dd58fb02dd0aa336.
+- Steps success : tests Node/MySQL, audit dépendances, restauration chiffrée, smoke MySQL/Redis, recette visuelle responsive, publication captures et teardown.
+- Compare main vs merge commit = identical; main stable à ce checkpoint.
+- Après confirmation main green, synchronisation PR #202, #203 et #201 via commits merge à deux parents; update refs fast-forward uniquement (force=false, expected_sha), sans écrire sur main.
+- PR #202 nouveaux checks à attendre sur nouveau head; ancienne CI #45189484145/#45189484248/#45189484153 ne vaut que pour l'ancien head.
+- PR #203 nouveaux checks à attendre sur nouveau head; ancienne CI #45189953127/#45189952933/#45189953049 ne vaut que pour l'ancien head. Validation humaine de sécurité reste obligatoire avant merge.
+- Rapport #201 synchronisé à main pour conserver sa ligne historique et ce checkpoint.
