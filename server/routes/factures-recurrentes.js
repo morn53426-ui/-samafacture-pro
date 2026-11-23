@@ -78,7 +78,7 @@ router.get('/', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       `SELECT r.*, c.nom as client_nom FROM factures_recurrentes r
-       JOIN clients c ON c.id = r.client_id
+       JOIN clients c ON c.id = r.client_id AND c.user_id = r.user_id
        WHERE r.user_id = ? ORDER BY r.prochaine_date ASC`,
       [req.tenantId]
     );
