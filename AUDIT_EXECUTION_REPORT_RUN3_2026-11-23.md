@@ -2,6 +2,9 @@
 
 ## Résumé exécutif
 
+
+> **Note de snapshot :** l'inventaire (176 branches / 40 PR ouvertes) a été collecté juste avant la création de cette branche de rapport et de la PR #170. Elles sont exclues de l'inventaire; après création, l'état vivant est donc 177 branches et 41 PR ouvertes (si aucune autre modification concurrente).
+
 - Dépôt public : `morn53426-ui/-samafacture-pro`.
 - Main inchangé : `b43a94fc2937b0108077501a0260358c8569e11f`.
 - Inventaire actualisé : **176 branches**, **40 PR ouvertes**, **125 PR fermées** (dont 106 merged et 19 fermées sans merge). Les numéros #58, #61, #66 et #70 sont absents de la collection PR.
