@@ -321,3 +321,11 @@ Repository: https://github.com/morn53426-ui/-samafacture-pro
 
 ## Addendum de création du rapport
 Ce snapshot contient 186 branches et 43 PR ouvertes, avant création de la branche/PR Run 11. Après création du rapport, compter +1 branche et +1 PR; le SHA main reste inchangé.
+
+
+## Addendum — 23 novembre 2026, ~07:03 UTC
+
+- PR #179 head a avancé de `24e8c0d745789fc08634f3d241c691c4b808f465` à `2d6a67a6d9be58f21fd72a6cfaac58f5586d2998` (4 commits supplémentaires). Le lot ajoute un garde-fou tenant-aware sur les factures récurrentes et un test qui vérifie 409 sans progression du compteur, échéance ni facture. Revue statique : correction route cohérente.
+- CI #179 exacte sur `2d6a67a6d9be58f21fd72a6cfaac58f5586d2998`: Tests #1754 **in progress**; ESLint #706 **success**; ZIP #1444 **success**.
+- Les deux défauts test de la revue restent visibles : `sharedClient.total_facture` attend 0 malgré la facture A de 700 insérée; le POST de clé API attend 201 avec un membre read-only, alors que `requirePermission` impose `integrations.manage`. Revue COMMENT #6017639254 déposée sur ce head, sans approbation.
+- Le snapshot Run 11 et son rapport restent non destructifs; main n'a pas changé.
