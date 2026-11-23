@@ -19,7 +19,6 @@ let foreignInvoiceId;
 let memberInvoiceId;
 let memberInvoicePaymentId;
 let foreignClientPaymentId;
-let ownerInvoiceId;
 
 before(async () => {
   await setupTestDatabase();
@@ -75,11 +74,10 @@ before(async () => {
 
   // Une facture valide de A permet de détecter si son tableau de bord agrège à tort
   // la facture B anormalement rattachée au client A.
-  const [ownerInvoice] = await pool.query(
+  await pool.query(
     "INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison, sous_total, total_tva, total, montant_paye) VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', 0, 0, 700, 0, 700, 0)",
     [ownerId, clientId, 'OWNER-TENANT-' + Date.now()]
   );
-  ownerInvoiceId = ownerInvoice.insertId;
 
   // Facture saine de B : une ligne de paiement propre à B et une ligne anormale de A
   // référencent volontairement cette même facture pour vérifier le filtrage par tenant.
