@@ -72,36 +72,86 @@ function entrepriseProfile(devise) {
   };
 }
 
-function pause(milliseconds) {
-  return new Promise(resolve => setTimeout(resolve, milliseconds));
+function observeAccountLockAttempts() {
+  const originalGetConnection = pool.getConnection;
+  const waiters = [];
+  let active = true;
+
+  pool.getConnection = async (...args) => {
+    const conn = await originalGetConnection.apply(pool, args);
+    const originalQuery = conn.query.bind(conn);
+    conn.query = (sql, ...queryArgs) => {
+      const isAccountLock = typeof sql === 'string' &&
+        /\\bFROM\\s+users\\s+WHERE\\s+id\\s*=\\s*\\?\\s+FOR\\s+UPDATE\\b/i.test(sql);
+      if (active && isAccountLock) {
+        const waiter = waiters.shift();
+        if (waiter) {
+          clearTimeout(waiter.timer);
+          waiter.resolve();
+        }
+      }
+      return originalQuery(sql, ...queryArgs);
+    };
+    return conn;
+  };
+
+  return {
+    waitForNextAccountLock(timeoutMs = 5000) {
+      return new Promise((resolve, reject) => {
+        const waiter = {
+          resolve,
+          timer: setTimeout(() => {
+            const index = waiters.indexOf(waiter);
+            if (index !== -1) waiters.splice(index, 1);
+            reject(new Error('La requête n’a pas tenté de verrouiller la ligne users dans le délai imparti.'));
+          }, timeoutMs)
+        };
+        waiters.push(waiter);
+      });
+    },
+    restore() {
+      active = false;
+      pool.getConnection = originalGetConnection;
+      for (const waiter of waiters.splice(0)) {
+        clearTimeout(waiter.timer);
+        waiter.reject(new Error('Observation des verrous interrompue avant le signal attendu.'));
+      }
+    }
+  };
 }
 
 async function runCreationBeforeCurrencyChange(company, createRequest, updateRequest) {
   const lock = await pool.getConnection();
   let lockHeld = false;
   let createSettled = false;
+  let createPromise;
+  let updatePromise;
+  let lockObserver;
   try {
     await lock.beginTransaction();
     await lock.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [company.userId]);
     lockHeld = true;
 
-    // Démarrer la création en premier pendant qu'un autre transaction détient le verrou.
-    // Elle ne doit pas pouvoir écrire en contournant le verrou users.
-    const createPromise = createRequest.then(
+    lockObserver = observeAccountLockAttempts();
+
+    // La création est démarrée avant le changement. On attend la tentative SQL
+    // réelle sur users ... FOR UPDATE plutôt qu'une temporisation arbitraire.
+    const createLockAttempt = lockObserver.waitForNextAccountLock();
+    createPromise = createRequest.then(
       response => { createSettled = true; return { response }; },
       error => { createSettled = true; return { error }; }
     );
-    await pause(200);
+    await createLockAttempt;
     assert.equal(createSettled, false,
-      'la création doit attendre le verrou du compte avant de créer le premier historique');
+      'la création doit rester en attente tant que la transaction détient le verrou du compte');
 
-    // Le changement est lancé après la création : il ne doit pas vérifier l'historique
-    // avant d'avoir obtenu le même verrou.
-    const updatePromise = updateRequest.then(
+    // Le changement de devise doit tenter d'acquérir le même verrou après la création.
+    const updateLockAttempt = lockObserver.waitForNextAccountLock();
+    updatePromise = updateRequest.then(
       response => ({ response }),
       error => ({ error })
     );
-    await pause(60);
+    await updateLockAttempt;
 
     await lock.commit();
     lockHeld = false;
@@ -123,8 +173,12 @@ async function runCreationBeforeCurrencyChange(company, createRequest, updateReq
 
     return { createResponse, updateResponse };
   } finally {
+    // La connexion test est libérée avant de rétablir le pool; si un test échoue,
+    // les requêtes déjà démarrées peuvent alors terminer sans garder le verrou.
     if (lockHeld) await lock.rollback().catch(() => {});
+    if (lockObserver) lockObserver.restore();
     lock.release();
+    await Promise.allSettled([createPromise, updatePromise].filter(Boolean));
   }
 }
 
@@ -165,23 +219,31 @@ async function assertHistoryCreationRace(company, updateRequest, createRequest, 
 async function runCurrencyChangeBeforeCreation(company, updateRequest, createRequest, getStoredDocument) {
   const lock = await pool.getConnection();
   let lockHeld = false;
+  let updatePromise;
+  let createPromise;
+  let lockObserver;
   try {
     await lock.beginTransaction();
     await lock.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [company.userId]);
     lockHeld = true;
+    lockObserver = observeAccountLockAttempts();
 
-    // Le changement de devise est lancé en premier et doit réserver le verrou avant
-    // que la création ne lise sa devise effective.
-    const updatePromise = updateRequest.then(
+    // Le changement est lancé en premier. Attendre sa véritable tentative de verrou
+    // garantit l'ordre sans dépendre de la vitesse du runner CI.
+    const updateLockAttempt = lockObserver.waitForNextAccountLock();
+    updatePromise = updateRequest.then(
       response => ({ response }),
       error => ({ error })
     );
-    await pause(200);
-    const createPromise = createRequest.then(
+    await updateLockAttempt;
+
+    // La création ne démarre qu'après que le changement a demandé le même verrou.
+    const createLockAttempt = lockObserver.waitForNextAccountLock();
+    createPromise = createRequest.then(
       response => ({ response }),
       error => ({ error })
     );
-    await pause(120);
+    await createLockAttempt;
 
     await lock.commit();
     lockHeld = false;
@@ -199,7 +261,9 @@ async function runCurrencyChangeBeforeCreation(company, updateRequest, createReq
     return createResult.response;
   } finally {
     if (lockHeld) await lock.rollback().catch(() => {});
+    if (lockObserver) lockObserver.restore();
     lock.release();
+    await Promise.allSettled([updatePromise, createPromise].filter(Boolean));
   }
 }
 
