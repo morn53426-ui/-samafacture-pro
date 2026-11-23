@@ -16,6 +16,7 @@ let ownerToken;
 let memberToken;
 let clientId;
 let foreignInvoiceId;
+let foreignRecurringId;
 let memberInvoiceId;
 let memberInvoicePaymentId;
 let foreignClientPaymentId;
@@ -66,6 +67,16 @@ before(async () => {
     [memberId, clientId, 'CROSS-TENANT-' + Date.now()]
   );
   foreignInvoiceId = invoiceResult.insertId;
+  const [foreignRecurring] = await pool.query(
+    `INSERT INTO factures_recurrentes
+      (user_id, client_id, libelle, frequence, prochaine_date, lignes_json)
+     VALUES (?, ?, ?, 'mensuelle', CURDATE(), ?)`,
+    [memberId, clientId, 'Modèle récurrent mal rattaché', JSON.stringify([
+      { designation: 'Prestation test', quantite: 1, prix_unitaire: 100, tva: 0 }
+    ])]
+  );
+  foreignRecurringId = foreignRecurring.insertId;
+
   const [foreignClientPayment] = await pool.query(
     'INSERT INTO paiements (user_id, facture_id, montant, methode) VALUES (?, ?, ?, ?)',
     [memberId, foreignInvoiceId, 250, 'Espèces']
@@ -148,6 +159,34 @@ test('les espaces entreprise isolent les clients, les factures et les permission
     .set('Authorization', 'Bearer ' + memberToken);
   assert.equal(foreignInvoiceReminder.status, 404,
     'une relance ne doit jamais utiliser les coordonnées d’un client appartenant à une autre entreprise');
+
+  const [[recurringBefore]] = await pool.query(
+    'SELECT prochaine_date, factures_generees FROM factures_recurrentes WHERE id = ? AND user_id = ?',
+    [foreignRecurringId, memberId]
+  );
+  const [[invoiceCountBefore]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM factures WHERE user_id = ?',
+    [memberId]
+  );
+  const foreignRecurringGeneration = await request(app)
+    .post('/api/factures-recurrentes/' + foreignRecurringId + '/generer')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(foreignRecurringGeneration.status, 409, foreignRecurringGeneration.text);
+  assert.equal(foreignRecurringGeneration.body.code, 'CLIENT_TENANT_MISMATCH');
+  const [[recurringAfter]] = await pool.query(
+    'SELECT prochaine_date, factures_generees FROM factures_recurrentes WHERE id = ? AND user_id = ?',
+    [foreignRecurringId, memberId]
+  );
+  const [[invoiceCountAfter]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM factures WHERE user_id = ?',
+    [memberId]
+  );
+  assert.equal(recurringAfter.factures_generees, recurringBefore.factures_generees,
+    'le modèle mal rattaché ne doit pas incrémenter son compteur');
+  assert.equal(String(recurringAfter.prochaine_date).slice(0, 10), String(recurringBefore.prochaine_date).slice(0, 10),
+    'le modèle mal rattaché ne doit pas avancer son échéance');
+  assert.equal(Number(invoiceCountAfter.total), Number(invoiceCountBefore.total),
+    'aucune facture ne doit être générée depuis un modèle lié au client d’une autre entreprise');
 
   const { envoyerFactureParEmail } = require('../routes/factures');
   await assert.rejects(
