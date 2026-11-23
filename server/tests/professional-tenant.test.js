@@ -50,7 +50,7 @@ before(async () => {
   assert.equal(clientResponse.status, 201, clientResponse.text);
   clientId = clientResponse.body.client.id;
 
-  await pool.query("UPDATE users SET devise = 'EUR' WHERE id = ?", [ownerId]);
+  await pool.query("UPDATE users SET devise = 'EUR', fuseau_horaire = 'Europe/Paris' WHERE id = ?", [ownerId]);
 
   // Simule une invitation acceptée avec un rôle strictement en lecture seule.
   await pool.query(
@@ -99,6 +99,7 @@ test('les espaces entreprise isolent les clients, les factures et les permission
     .set('X-SF-Company-Owner', String(ownerId));
   assert.equal(companyContext.status, 200, companyContext.text);
   assert.equal(companyContext.body.devise, 'EUR');
+  assert.equal(companyContext.body.fuseau_horaire, 'Europe/Paris');
 
   // Une facture rattachée anormalement au client mais appartenant au membre ne doit pas
   // polluer les totaux affichés dans l’espace de l’entreprise propriétaire.
