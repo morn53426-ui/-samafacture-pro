@@ -9,6 +9,15 @@ const sidebar = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'sidebar.js'), 'utf8
 const styles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'style.css'), 'utf8');
 
 describe('Dashboard Sunupilot — structure de référence', () => {
+  test('un lien d’évitement clavier atteint le contenu principal et devient visible au focus', () => {
+    assert.match(dashboard, /<a class="workspace-skip-link" href="#dashboard-content">Aller au contenu principal<\/a>/);
+    assert.match(dashboard, /<main class="main-content workspace-page page-dashboard" id="main-content">/);
+    assert.match(dashboard, /<div id="topbar-root"><\/div>\s*<section class="dashboard-welcome" id="dashboard-content" tabindex="-1">/);
+    assert.match(styles, /\.workspace-skip-link\s*\{[^}]*transform:\s*translateY\(-160%\)/);
+    assert.match(styles, /\.workspace-skip-link:focus\s*\{[^}]*transform:\s*translateY\(0\)/);
+    assert.match(styles, /\.workspace-skip-link\s*\{[^}]*z-index:\s*1200/);
+  });
+
   test('le tableau de bord accueille le prénom sans injecter de HTML utilisateur', () => {
     assert.match(dashboard, /const greetingName = String\(user\.prenom \|\| user\.nom \|\| ''\)/);
     assert.match(dashboard, /dashboard-greeting'\)\.textContent = greetingName/);
