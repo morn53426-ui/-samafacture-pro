@@ -451,11 +451,16 @@ function bindWorkspaceNotificationDismiss() {
     if (sidebar?.classList.contains('open')) {
       event.preventDefault();
       closeSidebar();
-      const toggle = document.querySelector('.enterprise-console-menu-toggle') ||
-        document.getElementById('mobile-toggle-btn');
-      if (toggle?.isConnected && toggle.getClientRects().length) {
-        toggle.focus({ preventScroll: true });
-      }
+      const toggles = [
+        document.querySelector('.enterprise-console-menu-toggle'),
+        document.getElementById('mobile-toggle-btn')
+      ];
+      // Le déclencheur Groupe peut exister dans le DOM hors de sa page et être
+      // masqué. Choisir le premier bouton réellement visible évite de perdre le focus.
+      const toggle = toggles.find(candidate =>
+        candidate?.isConnected && candidate.getClientRects().length
+      );
+      if (toggle) toggle.focus({ preventScroll: true });
       return;
     }
 
