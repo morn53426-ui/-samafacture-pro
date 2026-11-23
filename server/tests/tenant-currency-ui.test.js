@@ -26,5 +26,9 @@ for (const page of ['produits.html', 'nouvelle-facture.html']) {
     const html = fs.readFileSync(path.join(publicDir, page), 'utf8');
     assert.match(html, /Api\.get\(['"]\/pro\/company-context['"]\)/);
     assert.match(html, /context\?\.devise/);
+    if (page === 'nouvelle-facture.html') {
+      assert.match(html, /context\?\.fuseau_horaire/);
+      assert.match(html, /dateCivileAujourdhui\(context\.fuseau_horaire\)/);
+    }
   });
 }
