@@ -304,8 +304,21 @@
     background: var(--gold-light); color: var(--gold-text);
   }
   .invoice-template-tier.tier-enterprise {
-    border-color: color-mix(in srgb, var(--emerald) 30%, var(--line));
-    background: var(--emerald-light); color: var(--emerald);
+    border-color: #A7DCC5;
+    background: #D1FAE5;
+    color: #066144;
+  }
+  :root[data-theme="dark"] .invoice-template-tier.tier-enterprise {
+    border-color: #316A4B;
+    background: #173D2B;
+    color: #9DE7BC;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .invoice-template-tier.tier-enterprise {
+      border-color: #316A4B;
+      background: #173D2B;
+      color: #9DE7BC;
+    }
   }
   .invoice-template-preview-window {
     position: relative; width: 100%; min-height: 300px; overflow: hidden;
