@@ -9,7 +9,7 @@ const publicDir = path.join(__dirname, '..', '..', 'public');
 for (const page of ['produits.html', 'nouvelle-facture.html']) {
   test(page + ' : le JavaScript intégré est syntaxiquement valide', () => {
     const html = fs.readFileSync(path.join(publicDir, page), 'utf8');
-    const inlineScripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)]
+    const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
       .map(match => match[1])
       .filter(source => source.trim().length > 0);
 
@@ -24,7 +24,7 @@ for (const page of ['produits.html', 'nouvelle-facture.html']) {
 
   test(page + ' : la devise vient du contexte entreprise actif', () => {
     const html = fs.readFileSync(path.join(publicDir, page), 'utf8');
-    assert.match(html, /Api\\.get\\(['"]\\/pro\\/company-context['"]\\)/);
-    assert.match(html, /context\\?\\.devise/);
+    assert.match(html, /Api\.get\(['"]\/pro\/company-context['"]\)/);
+    assert.match(html, /context\?\.devise/);
   });
 }
