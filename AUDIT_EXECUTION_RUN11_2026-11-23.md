@@ -329,3 +329,10 @@ Ce snapshot contient 186 branches et 43 PR ouvertes, avant création de la branc
 - CI #179 exacte sur `2d6a67a6d9be58f21fd72a6cfaac58f5586d2998`: Tests #1754 **in progress**; ESLint #706 **success**; ZIP #1444 **success**.
 - Les deux défauts test de la revue restent visibles : `sharedClient.total_facture` attend 0 malgré la facture A de 700 insérée; le POST de clé API attend 201 avec un membre read-only, alors que `requirePermission` impose `integrations.manage`. Revue COMMENT #6017639254 déposée sur ce head, sans approbation.
 - Le snapshot Run 11 et son rapport restent non destructifs; main n'a pas changé.
+
+
+## Addendum — 23 novembre 2026, ~07:04 UTC
+
+- PR #179 latest head `212cdb9de793690303cad47ceb24756ea718d789` ajoute la correction attendue : total du client A à 700 (facture A valide, facture B de 5 000 exclue). La garde facture récurrente et son test 409 sans mutation ont aussi été portés sur le head précédent `2d6a67a`.
+- **Blocage encore présent** : le test API-key attend 201 pour le membre `clients.read` uniquement, alors que le middleware impose `integrations.manage` au POST. Revue COMMENT #6017643104 sur le head `212cdb9`; aucune approbation.
+- CI #1754 (head précédent `2d6a67a`) : Tests encore in progress, ESLint #706 success, ZIP #1444 success. **Aucun run CI visible sur le head courant `212cdb9`** au snapshot.
