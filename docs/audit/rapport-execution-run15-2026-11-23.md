@@ -689,3 +689,37 @@
 - Fusion 0; push direct main 0; force push 0; branche supprimée 0.
 - DDL/migration exécuté 0; données, volumes, sauvegardes et historique comptable modifiés 0.
 - Paiement réel 0; déploiement production 0.
+
+
+---
+
+## Addendum Run 19 — fusion #197 et nouveaux lots P0/P2 (23 novembre 2026, 14:04 UTC)
+
+### PR #197 — fusion contrôlée
+- Head revu et testé : `c2ba2ffb156d1aac7a418cba9e6cce73b362a86a`; base exacte `c0a3b569e3e685183376be8428c4696d8c767ccd`; compare 6 ahead / 0 behind; 3 fichiers.
+- Finding initial corrigé : le lien d'évitement pointait sur `#main-content`, positionné avant `#topbar-root`; la barre utilitaire demeurait donc dans le parcours. Le lien cible maintenant `#dashboard-content`, après topbar, avec `tabindex=-1`; landmark `main#main-content` conservé.
+- CI sur le head exact : Tests Node/MySQL #45188654715 success (tous les steps, y compris tests, restauration chiffrée, MySQL/Redis et recette responsive); ESLint #45188654724 success; ZIP #45188654730 success.
+- Revue statique du diff final documentée (review COMMENT id 6022891410; pas une approbation). Aucun test lecteur d'écran/AT manuel exécuté.
+- PR #197 marquée Ready puis fusion squash via l'API standard, avec expected head SHA, sans bypass : commit de merge `f8a61187e8b8df7dc319d611dd58fb02dd0aa336`, 23 novembre 2026 14:03:47 UTC.
+- `compare(main, f8a61187...)` retournait `identical`: ce commit est bien le HEAD de main.
+- **CI post-fusion en attente** au snapshot 14:04 UTC : `fetch_commit_workflow_runs(f8a61187...)` retourne `[]`; combined status retourne `statuses=[]`. Ne pas confondre avec les checks PR pré-fusion. Aucune autre fusion tant qu'un run push exact et vert n'est pas confirmé.
+
+### PR #202 — contraste badge Entreprise
+- Cause confirmée sur main avant fusion #197 : palette héritée `--emerald` / `--emerald-light` utilisée pour un badge petit; aucune assertion de contraste Enterprise dans la recette de thème.
+- PR #134 historique était fortement divergente : 3 ahead / 100 behind, merge-base `8453ee6d...`; conservée ouverte en Draft, body annoté comme remplacée par un portage propre. Aucune branche supprimée.
+- Nouvelle branche `fix/enterprise-badge-contrast-current-main-run19-20261123` créée depuis main `c0a3b569...`; PR #202 Draft, base `c0a3b569...`, head `1b546cbf92e5c9953b4bf3cfff5a32986ea59ecb`, compare 3 ahead / 0 behind, 2 fichiers.
+- Commits : `4a3be5c05c5deded23ce3262aeea1af15ee9a45e` (palette claire/sombre/sombre système) et `65a4d8aca640d0d50389702006b84880fe5ea59f` (test contraste et reporting); dernier commit `1b546cbf...` corrige l'assertion browser-context pour lancer une erreur native dans `page.evaluate` plutôt que d'utiliser Node `assert`.
+- Ratios mathématiques des valeurs proposées : clair `#066144` sur `#D1FAE5` = 6,61:1; sombre `#9DE7BC` sur `#173D2B` = 8,39:1. Le rendu réel dépend encore de la recette CI.
+- CI exacte : Tests #45189484145 in_progress; ESLint #45189484248 success; ZIP #45189484153 success. Revue statique COMMENT id 6022966681; non approbation. Aucun changement de données/DDL/comptabilité.
+
+### PR #203 — redaction du verification_code (P0 sécurité)
+- Cause racine confirmée sur main `c0a3b569...` : `GET /api/factures` renvoie `f.*`; `GET /api/clients/:id` renvoie `SELECT * FROM factures`. Dans les deux réponses, le champ `verification_code` peut être exposé alors qu'il n'est pas requis par les listes.
+- L'ancienne PR #193 était 5 ahead / 1 behind main; head ancien gardé ouvert Draft et annoté comme historique. Reprise fraîche sur `security/redact-verification-codes-current-main-run19-20261123`.
+- PR #203 Draft, base `c0a3b569...`, head `7c3e5144a9a5f3cff69e4033a399fe93becfa420`, compare 5 ahead / 0 behind, 5 fichiers.
+- Modifications : retire le code des listes factures et historique client; garde le code dans le détail authentifié pour le QR; tests list/detail/public consult; étend les triggers/cibles ESLint aux deux routes et deux tests. Aucun changement financier, fiscal, DDL ou écriture comptable.
+- CI sur head exact : Tests #45189953127 in_progress; ESLint #45189952933 in_progress; ZIP #45189953049 success. Revue statique COMMENT id 6022995746; non approbation. **Validation humaine spécifique sécurité obligatoire avant fusion** (vérifier tous consommateurs de listes, accès public et nécessité du code dans le détail authentifié).
+
+### Autres décisions
+- Impression : #151 (bandeaux A4) et #125 (pagination PDF consolidée) déjà fusionnées; #127 contient le correctif Executive également porté dans #125 et reste doublon, ne pas fusionner.
+- P0 #194/#199 isolation multi-tenant/remboursements et P1 #192 devise restent en attente de revue de sécurité/métier humaine; P1 #142/#145 (v21/v22) en attente de validation spécifique DDL/comptable.
+- #197 est la seule fusion de ce run. Aucun push direct main, force push, branche supprimée, migration exécutée, donnée/volume/sauvegarde/historique comptable modifié, paiement réel ou déploiement production.
