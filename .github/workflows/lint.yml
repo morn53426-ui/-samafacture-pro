@@ -11,13 +11,22 @@ on:
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/local-date-format.test.js'
       - 'server/tests/workspace-navigation.test.js'
-      - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/sidebar-mobile-keyboard.test.js'
+      - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
+      - 'server/routes/auth.js'
+      - 'server/routes/depenses.js'
+      - 'server/routes/factures-recurrentes.js'
+      - 'server/routes/factures.js'
+      - 'server/routes/produits.js'
+      - 'server/routes/public-api.js'
+      - 'server/tests/auth-currency.test.js'
+      - 'server/tests/currency-lock-concurrency.test.js'
+      - 'server/tests/setup.js'
       - 'server/tests/company-group-ui.test.js'
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
@@ -82,6 +91,15 @@ jobs:
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
+          server/routes/auth.js
+          server/routes/depenses.js
+          server/routes/factures-recurrentes.js
+          server/routes/factures.js
+          server/routes/produits.js
+          server/routes/public-api.js
+          server/tests/auth-currency.test.js
+          server/tests/currency-lock-concurrency.test.js
+          server/tests/setup.js
           server/tests/company-group-ui.test.js
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
