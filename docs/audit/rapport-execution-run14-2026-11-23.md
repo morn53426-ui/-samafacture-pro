@@ -475,3 +475,14 @@ Requête récente paginée/triée par date commit. Liste observée :
 - `5f1c09d655b340eac687d983e322e740798b7817` — security proxy/CORS documentation (#158)
 - `db790c1d25cdedabf19d33cffd5bf489bc77d1ef` — refactor backup redundant mkdir
 - `620b919b8f317d2fd5116728ff5aa292aa3357b0` — merge main and MySQL backup permissions
+
+
+## Addendum — follow-up P0 sécurité #199 (client statement refund)
+Audit statique complémentaire de `server/routes/professionnel.js` sur main : une requête de relevé client joignait `pro_refund_requests → paiements → factures` par identifiants seulement. Les filtres tenant sur refund et facture ne vérifiaient pas l'appartenance du paiement; une référence historique incohérente pouvait inclure l'ID/les attributs du remboursement dans le relevé d'une autre société.
+
+Candidate dédiée : [PR #199](https://github.com/morn53426-ui/-samafacture-pro/pull/199), branch `security/refund-statement-tenant-join-20261123-run14`, head `b212dbc0bac111c77023c1ad42c58514786aeaca`.
+- Correctif : joindre `paiements.user_id = refund.user_id` puis `factures.user_id = paiements.user_id`.
+- Test : créer refund A via route, fixture uniquement change le payment tenant en B, vérifier exclusion du relevé A, restaurer le payment tenant dans `finally`.
+- Lint workflow étendu à `server/tests/professional-tenant.test.js`.
+- Revue statique COMMENT #6019994024, non-approbatrice. CI n'était pas encore visible au relevé initial; ne pas considérer le test exécuté/green avant run sur ce SHA.
+- Aucun schema/migration, calcul financier ou paiement provider modifié. PR en Draft.
