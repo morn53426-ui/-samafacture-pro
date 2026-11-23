@@ -31,7 +31,7 @@ function isPrivateAddress(hostname) {
 
 const NON_PUBLIC_HOST_SUFFIXES = [
   'localhost', 'local', 'internal', 'intranet', 'lan', 'home', 'home.arpa',
-  'corp', 'private', 'test', 'example', 'invalid', 'alt', 'onion'
+  'corp', 'private', 'test', 'example', 'invalid', 'alt', 'onion', 'arpa', 'localdomain'
 ];
 
 function isNonPublicHostname(hostname) {

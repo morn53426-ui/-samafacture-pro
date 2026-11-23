@@ -46,7 +46,9 @@ test('les URL HTTP, locales, privées et suffixes DNS non publics sont refusés'
     'https://service.corp',
     'https://host.private',
     'https://app.onion',
-    'https://alt-network.alt'
+    'https://alt-network.alt',
+    'https://resolver.arpa',
+    'https://host.localdomain'
   ];
 
   for (const url of urls) {
