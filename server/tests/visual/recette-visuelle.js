@@ -1273,9 +1273,30 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.ok(nav.left >= -1 && nav.right <= metrics.viewport + 1,
       'La navigation professionnelle ne doit pas sortir de l’écran : ' + JSON.stringify(nav));
     if (viewport.width <= 560) {
-      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
-      assert.equal(gridColumns.split(' ').length, 1,
-        'Les rubriques professionnelles doivent s’empiler sur téléphone : ' + gridColumns);
+      const mobileRail = await page.$eval('.pro-workspace-guide-grid', element => {
+        const style = getComputedStyle(element);
+        return {
+          gridAutoFlow: style.gridAutoFlow,
+          overflowX: style.overflowX,
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+          role: element.getAttribute('role'),
+          tabIndex: element.tabIndex,
+          label: element.getAttribute('aria-label')
+        };
+      });
+      assert.equal(mobileRail.gridAutoFlow, 'column',
+        'Les domaines professionnels doivent former un rail horizontal sur téléphone : ' + JSON.stringify(mobileRail));
+      assert.equal(mobileRail.overflowX, 'auto',
+        'Le rail mobile doit pouvoir défiler horizontalement : ' + JSON.stringify(mobileRail));
+      assert.ok(mobileRail.scrollWidth > mobileRail.clientWidth,
+        'Le rail mobile doit contenir plusieurs domaines au-delà de la largeur visible : ' + JSON.stringify(mobileRail));
+      assert.equal(mobileRail.role, 'region',
+        'Le rail mobile doit être identifié comme une région accessible.');
+      assert.equal(mobileRail.tabIndex, 0,
+        'Le rail mobile doit être accessible au clavier.');
+      assert.ok(mobileRail.label,
+        'Le rail mobile doit avoir un libellé pour les technologies d’assistance.');
     }
     if (viewport.width > 1100) {
       const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
