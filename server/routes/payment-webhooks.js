@@ -8,6 +8,7 @@ const {
 const { decryptSecret } = require('../utils/pro-webhooks');
 const { notifierUtilisateur } = require('../realtime');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
+const { localDateString } = require('../utils/local-date');
 
 const router = express.Router();
 
@@ -69,7 +70,15 @@ async function applySuccessfulCheckout(checkoutId, providerRef, amount, method, 
     // checkouts concurrents ; affectedRows=0 signifie que cette référence était déjà payée.
     const totalPaid = Math.round((Number(invoice.montant_paye) + (insertPayment.affectedRows ? paidAmount : 0)) * 100) / 100;
     const isFullyPaid = totalPaid + 0.001 >= Number(invoice.total);
-    const isOverdue = invoice.date_echeance && String(invoice.date_echeance).slice(0, 10) < new Date().toISOString().slice(0, 10);
+    let isOverdue = false;
+    if (invoice.date_echeance) {
+      const [[account]] = await conn.query(
+        'SELECT fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+        [checkout.user_id]
+      );
+      const companyLocalDate = localDateString(account?.fuseau_horaire || 'Africa/Dakar');
+      isOverdue = String(invoice.date_echeance).slice(0, 10) < companyLocalDate;
+    }
     const newStatus = isFullyPaid ? 'payee' : (isOverdue ? 'en_retard' : 'en_attente');
     await conn.query(
       'UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ? AND user_id = ?',

@@ -4,6 +4,7 @@ const { pool } = require('../config/db');
 const { computeTotals, insererLignesFacture, ajusterStockFacture } = require('./factures');
 const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
+const { localDateString } = require('../utils/local-date');
 
 const router = express.Router();
 
@@ -17,12 +18,30 @@ async function authenticateApiKey(req, res, next) {
       [hash]
     );
     if (!rows.length) return res.status(401).json({ error: 'Clé API inconnue, expirée ou révoquée.' });
+    let scopes;
+    try {
+      scopes = Array.isArray(rows[0].scopes_json)
+        ? rows[0].scopes_json
+        : JSON.parse(rows[0].scopes_json || '[]');
+    } catch (_) {
+      return res.status(401).json({ error: 'Clé API invalide : permissions illisibles.' });
+    }
+    if (!Array.isArray(scopes) || !scopes.every(scope => typeof scope === 'string')) {
+      return res.status(401).json({ error: 'Clé API invalide : permissions mal formées.' });
+    }
     req.apiKeyId = Number(rows[0].id);
     req.apiUserId = Number(rows[0].user_id);
-    req.apiScopes = Array.isArray(rows[0].scopes_json) ? rows[0].scopes_json : JSON.parse(rows[0].scopes_json || '[]');
+    req.apiScopes = scopes;
     await pool.query('UPDATE pro_api_keys SET derniere_utilisation = NOW() WHERE id = ?', [req.apiKeyId]);
     next();
   } catch (err) { next(err); }
+}
+
+function parseIsoDateOnly(value) {
+  const text = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+  const parsed = new Date(text + 'T00:00:00.000Z');
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== text ? null : text;
 }
 
 function requireScope(scope) {
@@ -54,7 +73,7 @@ router.get('/invoices', requireScope('invoices:read'), async (req, res, next) =>
   try {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
     const [rows] = await pool.query(
-      'SELECT f.id, f.numero, f.type, f.date_emission, f.date_echeance, f.statut, f.total, f.montant_paye, u.devise, c.nom AS client_nom FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id WHERE f.user_id = ? ORDER BY f.date_emission DESC, f.id DESC LIMIT ?',
+      'SELECT f.id, f.numero, f.type, f.date_emission, f.date_echeance, f.statut, f.total, f.montant_paye, f.devise, c.nom AS client_nom FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id WHERE f.user_id = ? ORDER BY f.date_emission DESC, f.id DESC LIMIT ?',
       [req.apiUserId, limit]
     );
     res.json({ data: rows });
@@ -65,17 +84,32 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
   let conn;
   try {
     const uid = req.apiUserId;
+    const [[company]] = await pool.query('SELECT devise, fuseau_horaire FROM users WHERE id = ? LIMIT 1', [uid]);
+    if (!company) return res.status(401).json({ error: 'Compte associé à la clé API introuvable.' });
+    const companyCurrency = String(company.devise || 'FCFA').toUpperCase();
+    const dateEmission = req.body.date_emission === undefined || req.body.date_emission === null || req.body.date_emission === ''
+      ? localDateString(company.fuseau_horaire || 'Africa/Dakar')
+      : parseIsoDateOnly(req.body.date_emission);
+    const dateEcheance = req.body.date_echeance === undefined || req.body.date_echeance === null || req.body.date_echeance === ''
+      ? null
+      : parseIsoDateOnly(req.body.date_echeance);
+    if (!dateEmission || (req.body.date_echeance && !dateEcheance)) {
+      return res.status(400).json({ error: 'Date d’émission ou date d’échéance invalide (format attendu : AAAA-MM-JJ).' });
+    }
     const clientId = Number(req.body.client_id);
     const [clients] = await pool.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [clientId, uid]);
     if (!clients.length) return res.status(400).json({ error: 'Client invalide pour cette clé API.' });
     const idempotencyKey = String(req.get('Idempotency-Key') || '').trim() || null;
     if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 100)) return res.status(400).json({ error: 'Idempotency-Key invalide (8 à 100 caractères).' });
     if (idempotencyKey) {
-      const [existing] = await pool.query('SELECT id, numero, total, statut FROM factures WHERE user_id = ? AND idempotency_key = ? LIMIT 1', [uid, idempotencyKey]);
+      const [existing] = await pool.query('SELECT id, numero, total, statut, devise FROM factures WHERE user_id = ? AND idempotency_key = ? LIMIT 1', [uid, idempotencyKey]);
       if (existing.length) return res.status(200).json({ facture: existing[0], idempotent_replay: true });
     }
     const inputLines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
     if (!inputLines.length || inputLines.length > 100) return res.status(400).json({ error: 'Une facture doit contenir entre 1 et 100 lignes.' });
+    if (inputLines.some(line => !line || typeof line !== 'object' || Array.isArray(line))) {
+      return res.status(400).json({ error: 'Chaque ligne de facture doit être un objet valide.' });
+    }
     const productIds = [...new Set(inputLines.map(l => Number(l.produit_id)).filter(n => Number.isInteger(n) && n > 0))];
     let validProducts = new Set();
     if (productIds.length) {
@@ -96,21 +130,20 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
         code: 'QUOTA_DEPASSE'
       });
     }
-    const numero = 'API-' + new Date().getFullYear() + '-' + crypto.randomBytes(5).toString('hex').toUpperCase();
-    const dateEmission = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.date_emission || '')) ? req.body.date_emission : new Date().toISOString().slice(0, 10);
+    const numero = 'API-' + dateEmission.slice(0, 4) + '-' + crypto.randomBytes(5).toString('hex').toUpperCase();
     const [result] = await conn.query(
-      'INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, statut, remise, frais_livraison, commentaires, sous_total, total_tva, total, verification_code, idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, clientId, numero, 'facture', dateEmission, req.body.date_echeance || null, 'en_attente', totals.remise, Number(req.body.frais_livraison) || 0, String(req.body.commentaires || '').slice(0, 2000) || null, totals.sous_total, totals.total_tva, totals.total, crypto.randomBytes(4).toString('hex').toUpperCase(), idempotencyKey]
+      'INSERT INTO factures (user_id, client_id, numero, type, date_emission, date_echeance, devise, statut, remise, frais_livraison, commentaires, sous_total, total_tva, total, verification_code, idempotency_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [uid, clientId, numero, 'facture', dateEmission, dateEcheance, companyCurrency, 'en_attente', totals.remise, Number(req.body.frais_livraison) || 0, String(req.body.commentaires || '').slice(0, 2000) || null, totals.sous_total, totals.total_tva, totals.total, crypto.randomBytes(4).toString('hex').toUpperCase(), idempotencyKey]
     );
     await insererLignesFacture(conn, result.insertId, totals.computedLignes);
     await ajusterStockFacture(conn, result.insertId, uid, -1);
     await conn.commit();
     await queueWebhookEvent(uid, 'invoice.created', { invoice_id: result.insertId, numero, total: totals.total }).catch(e => console.warn('Webhook queue failed:', e.message));
-    res.status(201).json({ facture: { id: result.insertId, numero, total: totals.total, statut: 'en_attente' } });
+    res.status(201).json({ facture: { id: result.insertId, numero, total: totals.total, devise: companyCurrency, statut: 'en_attente' } });
   } catch (err) {
     if (conn) { try { await conn.rollback(); } catch (_) {} }
     if (err.code === 'ER_DUP_ENTRY' && req.get('Idempotency-Key')) {
-      const [existing] = await pool.query('SELECT id, numero, total, statut FROM factures WHERE user_id = ? AND idempotency_key = ? LIMIT 1', [req.apiUserId, req.get('Idempotency-Key').trim()]);
+      const [existing] = await pool.query('SELECT id, numero, total, statut, devise FROM factures WHERE user_id = ? AND idempotency_key = ? LIMIT 1', [req.apiUserId, req.get('Idempotency-Key').trim()]);
       if (existing.length) return res.status(200).json({ facture: existing[0], idempotent_replay: true });
     }
     next(err);

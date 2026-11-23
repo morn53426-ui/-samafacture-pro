@@ -141,7 +141,7 @@ async function assertEnterpriseGroupOwner(req, res) {
 router.get('/orders', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT o.*, c.nom AS client_nom FROM pro_commandes o JOIN clients c ON c.id = o.client_id WHERE o.user_id = ? ORDER BY o.date_commande DESC, o.id DESC LIMIT 250',
+      'SELECT o.*, c.nom AS client_nom FROM pro_commandes o JOIN clients c ON c.id = o.client_id AND c.user_id = o.user_id WHERE o.user_id = ? ORDER BY o.date_commande DESC, o.id DESC LIMIT 250',
       [owner(req)]
     );
     res.json({ commandes: rows.map(r => ({ ...r, lignes: parseJson(r.lignes_json, []) })) });
@@ -211,14 +211,14 @@ router.post('/orders/:id/delivery-note', async (req, res, next) => {
 
 router.get('/delivery-notes', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT b.*, c.nom AS client_nom FROM pro_bons_livraison b LEFT JOIN pro_commandes o ON o.id = b.commande_id LEFT JOIN clients c ON c.id = o.client_id WHERE b.user_id = ? ORDER BY b.date_livraison DESC, b.id DESC LIMIT 250', [owner(req)]);
+    const [rows] = await pool.query('SELECT b.*, c.nom AS client_nom FROM pro_bons_livraison b LEFT JOIN pro_commandes o ON o.id = b.commande_id AND o.user_id = b.user_id LEFT JOIN clients c ON c.id = o.client_id AND c.user_id = o.user_id WHERE b.user_id = ? ORDER BY b.date_livraison DESC, b.id DESC LIMIT 250', [owner(req)]);
     res.json({ bons_livraison: rows.map(r => ({ ...r, lignes: parseJson(r.lignes_json, []) })) });
   } catch (err) { next(err); }
 });
 
 router.get('/credit-notes', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT a.*, f.numero AS facture_numero FROM pro_avoirs a JOIN factures f ON f.id = a.facture_id WHERE a.user_id = ? ORDER BY a.date_emission DESC, a.id DESC LIMIT 250', [owner(req)]);
+    const [rows] = await pool.query('SELECT a.*, f.numero AS facture_numero FROM pro_avoirs a JOIN factures f ON f.id = a.facture_id AND f.user_id = a.user_id WHERE a.user_id = ? ORDER BY a.date_emission DESC, a.id DESC LIMIT 250', [owner(req)]);
     res.json({ avoirs: rows });
   } catch (err) { next(err); }
 });
@@ -268,7 +268,7 @@ router.put('/credit-notes/:id/status', async (req, res, next) => {
 router.get('/deposits', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT a.*, f.numero AS facture_numero, c.nom AS client_nom FROM pro_acomptes a JOIN factures f ON f.id = a.facture_id JOIN clients c ON c.id = f.client_id WHERE a.user_id = ? ORDER BY a.date_emission DESC, a.id DESC LIMIT 250',
+      'SELECT a.*, f.numero AS facture_numero, c.nom AS client_nom FROM pro_acomptes a JOIN factures f ON f.id = a.facture_id AND f.user_id = a.user_id JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id WHERE a.user_id = ? ORDER BY a.date_emission DESC, a.id DESC LIMIT 250',
       [owner(req)]
     );
     res.json({ acomptes: rows });
@@ -413,7 +413,7 @@ router.post('/clients/:id/remind', async (req, res, next) => {
 /* -------------------------- PAIEMENTS ---------------------------------- */
 router.get('/payments', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT p.id, p.facture_id, p.montant, p.methode, p.reference, p.date_paiement, f.numero, c.nom AS client_nom FROM paiements p JOIN factures f ON f.id = p.facture_id JOIN clients c ON c.id = f.client_id WHERE p.user_id = ? ORDER BY p.date_paiement DESC LIMIT 300', [owner(req)]);
+    const [rows] = await pool.query('SELECT p.id, p.facture_id, p.montant, p.methode, p.reference, p.date_paiement, f.numero, c.nom AS client_nom FROM paiements p JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id WHERE p.user_id = ? ORDER BY p.date_paiement DESC LIMIT 300', [owner(req)]);
     const [refunds] = await pool.query('SELECT id, paiement_id, montant, motif, statut, created_at FROM pro_refund_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 100', [owner(req)]);
     res.json({ paiements: rows, remboursements: refunds });
   } catch (err) { next(err); }
@@ -642,7 +642,7 @@ router.put('/refunds/:id/status', async (req, res, next) => {
 
 router.get('/payment-links', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT l.id, l.facture_id, l.montant, l.devise, l.statut, l.expire_at, l.created_at, f.numero FROM pro_payment_links l JOIN factures f ON f.id = l.facture_id WHERE l.user_id = ? ORDER BY l.created_at DESC LIMIT 100', [owner(req)]);
+    const [rows] = await pool.query('SELECT l.id, l.facture_id, l.montant, l.devise, l.statut, l.expire_at, l.created_at, f.numero FROM pro_payment_links l JOIN factures f ON f.id = l.facture_id AND f.user_id = l.user_id WHERE l.user_id = ? ORDER BY l.created_at DESC LIMIT 100', [owner(req)]);
     res.json({ liens: rows });
   } catch (err) { next(err); }
 });
@@ -704,7 +704,7 @@ router.post('/establishments', async (req, res, next) => {
 router.get('/cash/registers', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT c.*, e.nom AS etablissement_nom, c.solde_initial + COALESCE(SUM(CASE WHEN o.type = ? THEN o.montant WHEN o.type = ? THEN -o.montant ELSE 0 END),0) AS solde_actuel FROM pro_caisses c LEFT JOIN pro_etablissements e ON e.id = c.etablissement_id LEFT JOIN pro_caisse_operations o ON o.caisse_id = c.id AND o.user_id = c.user_id WHERE c.user_id = ? GROUP BY c.id ORDER BY c.nom',
+      'SELECT c.*, e.nom AS etablissement_nom, c.solde_initial + COALESCE(SUM(CASE WHEN o.type = ? THEN o.montant WHEN o.type = ? THEN -o.montant ELSE 0 END),0) AS solde_actuel FROM pro_caisses c LEFT JOIN pro_etablissements e ON e.id = c.etablissement_id AND e.user_id = c.user_id LEFT JOIN pro_caisse_operations o ON o.caisse_id = c.id AND o.user_id = c.user_id WHERE c.user_id = ? GROUP BY c.id ORDER BY c.nom',
       ['entree', 'sortie', owner(req)]
     );
     res.json({ caisses: rows });
@@ -758,7 +758,7 @@ router.post('/cash/registers/:id/operations', async (req, res, next) => {
 });
 router.get('/cash/operations', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT o.*, c.nom AS caisse_nom FROM pro_caisse_operations o JOIN pro_caisses c ON c.id = o.caisse_id WHERE o.user_id = ? ORDER BY o.operation_date DESC LIMIT 300', [owner(req)]);
+    const [rows] = await pool.query('SELECT o.*, c.nom AS caisse_nom FROM pro_caisse_operations o JOIN pro_caisses c ON c.id = o.caisse_id AND c.user_id = o.user_id WHERE o.user_id = ? ORDER BY o.operation_date DESC LIMIT 300', [owner(req)]);
     res.json({ operations: rows });
   } catch (err) { next(err); }
 });
@@ -1045,8 +1045,8 @@ router.post('/team/invitations/accept/verify', async (req, res, next) => {
       [invite.user_id, actor(req), invite.role, permissionsJson]
     );
     const [accepted] = await conn.query(
-      "UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ? AND statut = 'envoyee'",
-      [actor(req), invite.id]
+      "UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ? AND user_id = ? AND statut = 'envoyee'",
+      [actor(req), invite.id, invite.user_id]
     );
     if (accepted.affectedRows !== 1) {
       await conn.rollback();
@@ -1054,8 +1054,8 @@ router.post('/team/invitations/accept/verify', async (req, res, next) => {
     }
     await conn.query(
       "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_accepted', updated_at = NOW() " +
-      "WHERE ((entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
-      [invite.id, proof.id]
+      "WHERE owner_user_id = ? AND ((entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
+      [invite.user_id, invite.id, proof.id]
     );
     await conn.query(
       'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -1454,8 +1454,8 @@ router.post('/company-group/invitations/:invitationId/retry-email', async (req, 
        SET statut = 'queued', tentatives = 0, prochaine_tentative = NOW(),
            verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = NULL,
            updated_at = NOW()
-       WHERE id = ? AND statut = 'failed'`,
-      [invitation.email_id]
+       WHERE id = ? AND owner_user_id = ? AND statut = 'failed'`,
+      [invitation.email_id, actor(req)]
     );
     if (updated.affectedRows !== 1) {
       await conn.rollback();
@@ -1696,16 +1696,16 @@ router.post('/company-group/invitations/accept/verify', async (req, res, next) =
       [invite.group_id, actor(req)]
     );
     await conn.query(
-      "UPDATE pro_company_group_invitations SET statut = 'acceptee', accepted_company_owner_id = ?, accepted_at = NOW() WHERE id = ? AND statut = 'envoyee'",
-      [actor(req), invite.id]
+      "UPDATE pro_company_group_invitations SET statut = 'acceptee', accepted_company_owner_id = ?, accepted_at = NOW() WHERE id = ? AND group_id = ? AND statut = 'envoyee'",
+      [actor(req), invite.id, invite.group_id]
     );
     await conn.query(
       "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, " +
       "dernier_code_erreur = 'invitation_accepted', updated_at = NOW() " +
-      "WHERE entity_type IN ('company_group_invitation', 'company_group_invitation_verification') " +
+      "WHERE owner_user_id = ? AND entity_type IN ('company_group_invitation', 'company_group_invitation_verification') " +
       "AND ((entity_type = 'company_group_invitation' AND entity_id = ?) " +
       "OR (entity_type = 'company_group_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
-      [invite.id, proof.id]
+      [invite.owner_user_id, invite.id, proof.id]
     );
     await conn.query(
       'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -1818,8 +1818,8 @@ router.delete('/company-group/invitations/:invitationId', async (req, res, next)
     // Annule seulement les messages qui n'ont pas encore été réclamés.
     // Un message déjà en cours de remise SMTP peut être impossible à rappeler.
     const [cancelled] = await conn.query(
-      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_revoked', updated_at = NOW() WHERE entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry')",
-      [invitation.id]
+      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_revoked', updated_at = NOW() WHERE owner_user_id = ? AND entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry')",
+      [actor(req), invitation.id]
     );
     const [[emailState]] = await conn.query(
       "SELECT statut FROM email_outbox WHERE entity_type = 'company_group_invitation' AND entity_id = ? LIMIT 1",
@@ -2192,7 +2192,7 @@ router.get('/reports/custom', async (req, res, next) => {
     if (req.query.from && /^\d{4}-\d{2}-\d{2}$/.test(req.query.from)) { where += ' AND f.date_emission >= ?'; params.push(req.query.from); }
     if (req.query.to && /^\d{4}-\d{2}-\d{2}$/.test(req.query.to)) { where += ' AND f.date_emission <= ?'; params.push(req.query.to); }
     if (idOk(req.query.client_id)) { where += ' AND f.client_id = ?'; params.push(Number(req.query.client_id)); }
-    const [rows] = await pool.query('SELECT ' + dateExpr + ' AS label, COUNT(*) AS nb_factures, SUM(f.total) AS total, SUM(f.montant_paye) AS encaisse FROM factures f JOIN clients c ON c.id = f.client_id WHERE f.user_id = ? AND f.type = ? AND f.statut != ?' + where + ' GROUP BY label ORDER BY label', [params[0], params[1], 'annulee', ...params.slice(2)]);
+    const [rows] = await pool.query('SELECT ' + dateExpr + ' AS label, COUNT(*) AS nb_factures, SUM(f.total) AS total, SUM(f.montant_paye) AS encaisse FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id WHERE f.user_id = ? AND f.type = ? AND f.statut != ?' + where + ' GROUP BY label ORDER BY label', [params[0], params[1], 'annulee', ...params.slice(2)]);
     res.json({ groupe: group, rows });
   } catch (err) { next(err); }
 });
@@ -2638,7 +2638,7 @@ router.post('/warehouses', async (req, res, next) => {
 router.get('/purchase-orders', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id WHERE o.user_id = ? ORDER BY o.date_commande DESC, o.id DESC LIMIT 250',
+      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id AND s.user_id = o.user_id WHERE o.user_id = ? ORDER BY o.date_commande DESC, o.id DESC LIMIT 250',
       [owner(req)]
     );
     res.json({ commandes: rows });
@@ -2648,7 +2648,7 @@ router.get('/purchase-orders', async (req, res, next) => {
 router.get('/purchase-orders/:id', async (req, res, next) => {
   try {
     const [orders] = await pool.query(
-      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id WHERE o.id = ? AND o.user_id = ?',
+      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id AND s.user_id = o.user_id WHERE o.id = ? AND o.user_id = ?',
       [req.params.id, owner(req)]
     );
     if (!orders.length) return res.status(404).json({ error: 'Commande fournisseur introuvable.' });
@@ -4009,6 +4009,19 @@ router.put('/crm/activities/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* ---------------------- CONTEXTE ENTREPRISE ---------------------------- */
+router.get('/company-context', async (req, res, next) => {
+  try {
+    const [[company]] = await pool.query(
+      'SELECT devise, fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+      [owner(req)]
+    );
+    if (!company) return res.status(404).json({ error: 'Entreprise introuvable.' });
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ devise: String(company.devise || 'FCFA').toUpperCase(), fuseau_horaire: company.fuseau_horaire || 'Africa/Dakar' });
+  } catch (err) { next(err); }
+});
+
 /* ---------------------- PARAMÈTRES INTERNATIONAUX ---------------------- */
 router.get('/localization', async (req, res, next) => {
   try {
@@ -4026,9 +4039,14 @@ router.get('/localization', async (req, res, next) => {
 
 router.put('/localization', async (req, res, next) => {
   try {
+    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
+    if (!company) return res.status(404).json({ error: 'Entreprise introuvable.' });
+    const currentCurrency = String(company.devise || 'FCFA').toUpperCase();
     const country = String(req.body.pays_code || 'SN').toUpperCase();
     const language = String(req.body.langue || 'fr').toLowerCase();
-    const currency = String(req.body.devise || 'FCFA').toUpperCase();
+    const currency = req.body.devise === undefined || req.body.devise === null || String(req.body.devise).trim() === ''
+      ? currentCurrency
+      : String(req.body.devise).trim().toUpperCase();
     const timezone = String(req.body.fuseau_horaire || 'Africa/Dakar');
     const dateFormat = String(req.body.format_date || 'dd/MM/yyyy');
     const taxRegime = String(req.body.regime_fiscal || 'standard');
@@ -4039,8 +4057,6 @@ router.put('/localization', async (req, res, next) => {
       return res.status(400).json({ error: 'Un paramètre pays, langue, devise, fuseau horaire ou fiscalité est invalide.' });
     }
     const locale = language + '-' + country;
-    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
-    const currentCurrency = String(company?.devise || 'FCFA').toUpperCase();
     if (currency !== currentCurrency) {
       const [[history]] = await pool.query(
         'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
