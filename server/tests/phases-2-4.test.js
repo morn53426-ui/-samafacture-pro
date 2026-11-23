@@ -32,6 +32,9 @@ before(async () => {
   assert.equal(registration.status, 201, registration.text);
   userId = registration.body.user.id;
   token = registration.body.token;
+  // Cette suite couvre plusieurs scénarios comptables, pas le quota Gratuit.
+  // Un plan Pro évite qu'une facture ajoutée à la suite ne fasse échouer un test voisin.
+  await pool.query("UPDATE users SET plan = 'pro' WHERE id = ?", [userId]);
 
   const client = await request(app).post('/api/clients').set('Authorization', 'Bearer ' + token).send({ nom: 'Client recette phases 2-4' });
   assert.equal(client.status, 201, client.text);
