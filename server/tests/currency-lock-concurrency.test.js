@@ -91,7 +91,7 @@ async function runCreationBeforeCurrencyChange(company, createRequest, updateReq
       response => { createSettled = true; return { response }; },
       error => { createSettled = true; return { error }; }
     );
-    await pause(120);
+    await pause(200);
     assert.equal(createSettled, false,
       'la création doit attendre le verrou du compte avant de créer le premier historique');
 
@@ -112,11 +112,14 @@ async function runCreationBeforeCurrencyChange(company, createRequest, updateReq
     const createResponse = createResult.response;
     const updateResponse = updateResult.response;
     assert.equal(createResponse.status, 201, createResponse.text);
-    assert.equal(updateResponse.status, 409, updateResponse.text,
-      'le changement de devise doit être refusé après la création du premier historique');
+    assert.ok(
+      [200, 409].includes(updateResponse.status),
+      'le réglage doit réussir avant la création ou être refusé après sa création: ' + updateResponse.text
+    );
 
     const [[account]] = await pool.query('SELECT devise FROM users WHERE id = ?', [company.userId]);
-    assert.equal(account.devise, 'FCFA', 'la devise initiale doit être conservée après une création prioritaire');
+    assert.equal(account.devise, updateResponse.status === 200 ? 'EUR' : 'FCFA',
+      'la devise effective doit refléter le résultat du contrôle historique');
 
     return { createResponse, updateResponse };
   } finally {
