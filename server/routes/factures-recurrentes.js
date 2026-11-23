@@ -379,7 +379,6 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
       [modele.client_id, userId]
     );
     if (!clientRows.length) {
-      await conn.rollback();
       const error = new Error('Le client associé au modèle récurrent n’appartient plus à cette entreprise.');
       error.code = 'CLIENT_TENANT_MISMATCH';
       throw error;
