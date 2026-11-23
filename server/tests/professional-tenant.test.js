@@ -56,7 +56,7 @@ before(async () => {
   // Simule une invitation acceptée avec un rôle strictement en lecture seule.
   await pool.query(
     'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json, active) VALUES (?, ?, ?, ?, 1)',
-    [ownerId, memberId, 'lecture_seule', JSON.stringify(['clients.read', 'invoices.read', 'dashboard.read', 'reports.read', 'payments.read'])]
+    [ownerId, memberId, 'lecture_seule', JSON.stringify(['clients.read', 'invoices.read', 'dashboard.read', 'reports.read', 'payments.read', 'integrations.manage'])]
   );
 
   // Défense en profondeur : une référence inter-entreprises anormale ne doit ni
@@ -162,6 +162,18 @@ test('les espaces entreprise isolent les clients, les factures et les permission
   assert.equal(invoiceList.status, 200, invoiceList.text);
   assert.equal(invoiceList.body.factures.some(row => Number(row.id) === Number(foreignInvoiceId)), false,
     'la liste B ne doit pas inclure une facture dont le client appartient à A');
+
+  const apiKey = await request(app)
+    .post('/api/pro/integrations/api-keys')
+    .set('Authorization', 'Bearer ' + memberToken)
+    .send({ nom: 'Clé API tenant B', scopes: ['invoices:read'] });
+  assert.equal(apiKey.status, 201, apiKey.text);
+  const publicInvoiceList = await request(app)
+    .get('/api/v1/invoices')
+    .set('X-SamaFacture-Key', apiKey.body.token);
+  assert.equal(publicInvoiceList.status, 200, publicInvoiceList.text);
+  assert.equal(publicInvoiceList.body.data.some(row => Number(row.id) === Number(foreignInvoiceId)), false,
+    'la liste API publique B ne doit pas inclure une facture dont le client appartient à A');
 
   // Les paiements doivent eux aussi être filtrés par tenant, même si une ligne anormale
   // d'une autre entreprise référence l'identifiant de la facture B.
