@@ -4039,9 +4039,14 @@ router.get('/localization', async (req, res, next) => {
 
 router.put('/localization', async (req, res, next) => {
   try {
+    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
+    if (!company) return res.status(404).json({ error: 'Entreprise introuvable.' });
+    const currentCurrency = String(company.devise || 'FCFA').toUpperCase();
     const country = String(req.body.pays_code || 'SN').toUpperCase();
     const language = String(req.body.langue || 'fr').toLowerCase();
-    const currency = String(req.body.devise || 'FCFA').toUpperCase();
+    const currency = req.body.devise === undefined || req.body.devise === null || String(req.body.devise).trim() === ''
+      ? currentCurrency
+      : String(req.body.devise).trim().toUpperCase();
     const timezone = String(req.body.fuseau_horaire || 'Africa/Dakar');
     const dateFormat = String(req.body.format_date || 'dd/MM/yyyy');
     const taxRegime = String(req.body.regime_fiscal || 'standard');
@@ -4052,8 +4057,6 @@ router.put('/localization', async (req, res, next) => {
       return res.status(400).json({ error: 'Un paramètre pays, langue, devise, fuseau horaire ou fiscalité est invalide.' });
     }
     const locale = language + '-' + country;
-    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
-    const currentCurrency = String(company?.devise || 'FCFA').toUpperCase();
     if (currency !== currentCurrency) {
       const [[history]] = await pool.query(
         'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
