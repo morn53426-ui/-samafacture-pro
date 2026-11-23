@@ -29,6 +29,17 @@ function isPrivateAddress(hostname) {
   return false;
 }
 
+const NON_PUBLIC_HOST_SUFFIXES = [
+  'localhost', 'local', 'internal', 'intranet', 'lan', 'home', 'home.arpa',
+  'corp', 'private', 'test', 'example', 'invalid', 'alt', 'onion'
+];
+
+function isNonPublicHostname(hostname) {
+  return NON_PUBLIC_HOST_SUFFIXES.some(suffix =>
+    hostname === suffix || hostname.endsWith('.' + suffix)
+  );
+}
+
 function validateCapacitorConfig(config, options = {}) {
   const errors = [];
   const mobileDir = options.mobileDir || MOBILE_DIR;
@@ -74,8 +85,7 @@ function validateCapacitorConfig(config, options = {}) {
     const hostname = serverUrl.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
     const ipVersion = net.isIP(hostname);
     const placeholder = /(^|\.)(votredomaine\.com|example\.com|example\.org|example\.net|example\.invalid|invalid|test)$/i.test(hostname);
-    const localHost = hostname === 'localhost' || hostname.endsWith('.localhost') ||
-      hostname.endsWith('.local') || hostname.endsWith('.internal');
+    const localHost = isNonPublicHostname(hostname);
     if (!hostname.includes('.') || hostname.startsWith('.')) {
       errors.push('server.url doit utiliser un nom de domaine public complet.');
     }
@@ -95,7 +105,7 @@ function validateCapacitorConfig(config, options = {}) {
       errors.push('server.url utilise encore un domaine d’exemple. Configurez le véritable domaine public avant de générer l’application.');
     }
     if (localHost || isPrivateAddress(hostname)) {
-      errors.push('server.url ne peut pas cibler localhost, une adresse privée ou un réseau local.');
+      errors.push('server.url ne peut pas cibler localhost, une adresse privée ou un suffixe DNS non public.');
     }
   }
 
