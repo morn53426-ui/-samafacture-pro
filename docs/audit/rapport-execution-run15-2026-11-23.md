@@ -745,3 +745,30 @@
 ### Resynchronisation à prévoir
 - Après fusion #197, les branches #202 (badge contraste), #203 (redaction verification_code) et #201 (rapport) sont chacune 1 commit behind main `f8a61187...`; elles conservent leur historique et devront être resynchronisées proprement avant un éventuel merge.
 - CI des heads non synchronisés reste informative uniquement, pas une preuve finale après sync.
+
+---
+
+## Addendum Run 19 — inventaire branches/PR/workflows/migrations (23 novembre 2026, 14:10 UTC)
+
+### Inventaire via API GitHub (snapshot)
+- Branches : 212 (pagination 100 + 100 + 12); main marqué protected, HEAD f8a61187e8b8df7dc319d611dd58fb02dd0aa336.
+- Pull Requests : 55 ouvertes et 144 fermées sur les pages parcourues. Les 55 ouvertes sont retournées sur une page; les fermées couvrent deux pages (100 + 44).
+- Derniers commits main : f8a61187... (skip-link dashboard), c0a3b569... (fermeture sidebar mobile avec Échap), b0b52e66... (validation HTTPS Capacitor), b276eba5... (redaction hash token reset), 262707e1... (lint token reset).
+- Workflows actifs dans .github/workflows : test.yml, lint.yml, package-source-zip.yml. Le workflow test déclenche sur pull_request et push vers main. Le package ZIP est PR-only (opened/synchronize/reopened), donc le ZIP est un required check du merge PR mais ne génère pas de run push main.
+- Le listing des workflows via l'endpoint collection Actions n'est pas exposé par le connecteur; les 3 fichiers ont été inventoriés directement dans .github/workflows.
+
+### Migrations / schéma — lecture seule
+- server/config/db.js : CURRENT_SCHEMA_VERSION = 23; verrou MySQL GET_LOCK('samafacture_schema_init', 60); schema.sql est appliqué sur nouvelle base, puis runMigrations(); sur base existante, migrations rejouées sous verrou si version stockée <23. Le marqueur est avancé après les migrations.
+- 10 scripts numérotés sous server/database/migrations : 003_professional_modules.sql, 004_paiements_comptabilite_achats.sql, 005_portail_crm_international_ia.sql, 006_company_groups.sql, 007_email_outbox.sql, 008_company_group_email_proof.sql, 009_team_invitation_email_proof.sql, 010_saas_subscriptions_simulation.sql, 011_comptabilite_contrepas_factures.sql, 012_comptabilite_correspondances.sql.
+- 5 fichiers SQL historiques à la racine : migration_2026_08_30_stabilite.sql, migration_2026_11_15_token_version.sql, migration_facture_personnalisation.sql, migration_index_reset_token.sql, migration_scalabilite_30_41.sql.
+- DDL observé : migrations 003–010 et 011–012 créent des tables (généralement CREATE TABLE IF NOT EXISTS); le runner ajoute aussi colonnes/index idempotents, modifie le type stock, adapte des FK client et renseigne des backfills. Migration 011 crée le journal pro_compta_facture_events; la logique v22 supprime ensuite la FK invoice pour conserver les événements même si une facture disparaît. Migration 012 ajoute correspondances comptables par tenant et clé composée compte+user.
+- Les migrations historiques à la racine comprennent des ALTER TABLE et la migration stabilité contient un UPDATE abonnement_paiements; vérifier procédure et sauvegarde avant toute application manuelle. Aucun script migratoire n'a été exécuté dans Run19; aucun volume ou historique comptable touché.
+
+### CI actuelle et décisions
+- Main post-merge #45190172560, event push, SHA exact f8a61187... : toujours in_progress au snapshot 14:10 UTC. Tests, restauration sauvegarde et smoke MySQL/Redis success; recette visuelle responsive encore in_progress. Aucune autre fusion tant que le run n'est pas completed/success.
+- PR #202 et #203 ont chacune 3/3 workflows verts sur leur head d'origine, mais sont 1 commit behind main depuis #197; leur CI est non réutilisable après resynchronisation.
+- PR #203 tests sur ancien head 7c3e5144... : Tests #45189953127 success, ESLint #45189952933 success, ZIP #45189953049 success; reste Draft et exige validation humaine spécifique sécurité avant fusion.
+- PR #202 tests sur ancien head 1b546cbf... : Tests #45189484145 success, ESLint #45189484248 success, ZIP #45189484153 success; la recette Chromium doit être rejouée après synchronisation pour confirmer les couleurs calculées.
+- PR #201 report branch est elle-même 1 commit behind main; son run tests #45190634576 in_progress au snapshot, ZIP #45190634696 success. Ne pas fusionner ce rapport tant que main stable et head resynchronisé.
+
+Aucune fusion supplémentaire, aucun push direct/force push, aucune branche ou PR supprimée, aucune donnée/migration/volume/backup/historique comptable modifié; aucun paiement réel ou déploiement production.
