@@ -3,7 +3,7 @@
 ## Résumé exécutif
 
 
-> **Note de snapshot :** l'inventaire (176 branches / 40 PR ouvertes) a été collecté juste avant la création de cette branche de rapport et de la PR #170. Elles sont exclues de l'inventaire; après création, l'état vivant est donc 177 branches et 41 PR ouvertes (si aucune autre modification concurrente).
+> **Note de snapshot :** l'inventaire (176 branches / 40 PR ouvertes) a été collecté avant la création de la branche de rapport et de la PR #170, puis du correctif et de la PR #171. Ces deux branches/PR sont exclues de l'inventaire initial; l'état vivant après création est donc 178 branches et 42 PR ouvertes (si aucune autre modification concurrente).
 
 - Dépôt public : `morn53426-ui/-samafacture-pro`.
 - Main inchangé : `b43a94fc2937b0108077501a0260358c8569e11f`.
@@ -501,3 +501,14 @@ Head/base SHAs courts et état draft. CI revalidée pour #167/#168/#149/#159/#16
 6. Les PRs non prioritaires ne sont pas CI/diff revalidées individuellement run 3.
 7. Branch protection endpoint classique 403; seules les règles du ruleset sont confirmées.
 
+
+
+## Suivi complémentaire après snapshot — PR #171
+
+- Nouvelle branche : `fix/pro-orders-tenant-currency-20261123`, head `a56f305c7547adcab0bf6e6b49bd02731ecf3a6d`, base PR #168 head `b07000daa7663196de68a42bc0ba011f4f4cf7f9`.
+- PR [#171](https://github.com/morn53426-ui/-samafacture-pro/pull/171) draft, 7 commits ahead/0 behind de la base, 6 fichiers modifiés; mergeable clean au dernier compare.
+- Correctifs : commandes pro par défaut sur devise tenant, validation devise; verrou de changement de devise compte aussi `pro_commandes` et `pro_bons_livraison`; test EUR, devise invalide et refus de changement après commande.
+- CI head exact : ZIP success, ESLint success, Tests Node/MySQL en cours au moment de cette mise à jour. Aucun test local exécuté.
+- Revue COMMENT publiée (review ID 6015507944), sans approbation. PR dépend de #168 et ne doit pas être fusionnée indépendamment.
+- Finding #168 supplémentaire : les nouveaux tests devise/tenant ne sont pas couverts par le workflow ESLint path-list/commande. Commentaire #168 ID 7088811240; #171 ajoute les cinq fichiers tests aux deux listes et aux filtres de chemins.
+- Race du verrou de devise (COUNT/UPDATE séparés et créations concurrentes) toujours non corrigée; lot distinct nécessaire.
