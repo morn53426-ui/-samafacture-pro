@@ -151,6 +151,12 @@ router.get('/orders', async (req, res, next) => {
 router.post('/orders', async (req, res, next) => {
   try {
     const uid = owner(req);
+    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [uid]);
+    if (!company) return res.status(404).json({ error: 'Entreprise introuvable.' });
+    const currency = String(req.body.devise || company.devise || 'FCFA').trim().toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(currency)) {
+      return res.status(400).json({ error: 'Devise de commande non prise en charge.' });
+    }
     const clientId = Number(req.body.client_id);
     const client = await clientOwned(uid, clientId);
     if (!client) return res.status(400).json({ error: 'Client invalide pour cette entreprise.' });
@@ -173,10 +179,10 @@ router.post('/orders', async (req, res, next) => {
     const orderNumber = randomRef('CMD');
     const [result] = await pool.query(
       'INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, date_livraison_prevue, devise, total, lignes_json, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, clientId, orderNumber, 'confirmee', await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, String(req.body.devise || 'FCFA').slice(0, 10), total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
+      [uid, clientId, orderNumber, 'confirmee', await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, currency, total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
     );
     await audit(req, 'commande.creee', 'commande', result.insertId, { numero: orderNumber });
-    res.status(201).json({ id: result.insertId, total, lignes: normalized });
+    res.status(201).json({ id: result.insertId, total, devise: currency, lignes: normalized });
   } catch (err) { next(err); }
 });
 
