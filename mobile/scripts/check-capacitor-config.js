@@ -71,10 +71,17 @@ function validateCapacitorConfig(config, options = {}) {
   }
 
   if (serverUrl) {
-    const hostname = serverUrl.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    const hostname = serverUrl.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+    const ipVersion = net.isIP(hostname);
     const placeholder = /(^|\.)(votredomaine\.com|example\.com|example\.org|example\.net|example\.invalid|invalid|test)$/i.test(hostname);
     const localHost = hostname === 'localhost' || hostname.endsWith('.localhost') ||
       hostname.endsWith('.local') || hostname.endsWith('.internal');
+    if (!hostname.includes('.') || hostname.startsWith('.')) {
+      errors.push('server.url doit utiliser un nom de domaine public complet.');
+    }
+    if (ipVersion !== 0 && !isPrivateAddress(hostname)) {
+      errors.push('server.url doit utiliser un nom de domaine DNS public, pas une adresse IP.');
+    }
     if (serverUrl.protocol !== 'https:') {
       errors.push('server.url doit utiliser HTTPS.');
     }
