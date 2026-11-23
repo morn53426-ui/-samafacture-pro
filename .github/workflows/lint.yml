@@ -2,7 +2,7 @@ name: ESLint — JavaScript modifié
 
 on:
   pull_request:
-    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'fix/webhook-local-timezone-dynamic-currency-20261123']
+    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'fix/webhook-local-timezone-dynamic-currency-20261123', 'fix/pro-orders-tenant-currency-20261123']
     paths:
       - 'eslint.config.mjs'
       - '.github/workflows/lint.yml'
@@ -16,6 +16,7 @@ on:
       - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/auth-currency.test.js'
+      - 'server/tests/currency-lock-concurrency.test.js'
       - 'server/tests/money-format.test.js'
       - 'server/tests/professional-tenant.test.js'
       - 'server/tests/public-api-currency.test.js'
@@ -24,6 +25,7 @@ on:
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
+      - 'server/routes/auth.js'
       - 'server/tests/company-group-ui.test.js'
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
@@ -82,6 +84,7 @@ jobs:
           server/tests/dashboard-ui.test.js
           server/tests/accounting-expense-mappings.test.js
           server/tests/auth-currency.test.js
+          server/tests/currency-lock-concurrency.test.js
           server/tests/money-format.test.js
           server/tests/professional-tenant.test.js
           server/tests/public-api-currency.test.js
@@ -90,6 +93,7 @@ jobs:
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
+          server/routes/auth.js
           server/tests/company-group-ui.test.js
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
