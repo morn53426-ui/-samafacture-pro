@@ -56,7 +56,7 @@ before(async () => {
   // Simule une invitation acceptée avec un rôle strictement en lecture seule.
   await pool.query(
     'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json, active) VALUES (?, ?, ?, ?, 1)',
-    [ownerId, memberId, 'lecture_seule', JSON.stringify(['clients.read', 'invoices.read', 'dashboard.read', 'reports.read', 'payments.read', 'integrations.manage'])]
+    [ownerId, memberId, 'lecture_seule', JSON.stringify(['clients.read'])]
   );
 
   // Défense en profondeur : une référence inter-entreprises anormale ne doit ni
