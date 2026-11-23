@@ -1186,7 +1186,7 @@ router.post('/:id/relancer', async (req, res, next) => {
 
     if (!facture.verification_code) {
       facture.verification_code = crypto.randomBytes(5).toString('hex');
-      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ? AND user_id = ?', [facture.verification_code, facture.id, req.tenantId]);
     }
 
     const baseUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
