@@ -46,6 +46,7 @@ réel en HTTPS, `npm run preflight` doit afficher une validation réussie. Les c
 La pré-vérification ne contacte pas le serveur et ne valide donc pas son certificat,
 sa disponibilité ou l'authentification : ces points doivent être testés sur un appareil
 ou un simulateur après le déploiement.
+La pré-vérification rejette aussi les suffixes DNS réservés ou non publics (par exemple `.test`, `.example`, `.invalid`, `.local`, `.lan`, `.home.arpa`, `.corp`, `.private` et `.onion`). Elle ne résout pas le DNS : un nom DNS public peut malgré tout pointer vers une adresse privée. Vérifiez la résolution, le certificat TLS et l'accès réel sur appareil/simulateur avant toute publication.
 
 ## Étape 3 — Icônes et écran de démarrage
 
