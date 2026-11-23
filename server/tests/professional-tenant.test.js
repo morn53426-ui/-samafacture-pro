@@ -369,6 +369,10 @@ after(async () => {
     // Les lignes professionnelles B insérées dans les tests peuvent référencer des
     // factures/commandes A (FK RESTRICT) : nettoyer B avant le propriétaire A.
     await nettoyerUtilisateur(memberId);
+    // Une commande A a été créée dans la fixture puis référencée par un bon B.
+    // Après suppression des dépendances B, supprimer explicitement la commande A
+    // avant que la cascade du compte A ne tente d'effacer son client.
+    if (ownerId) await pool.query('DELETE FROM pro_commandes WHERE user_id = ?', [ownerId]);
     await nettoyerUtilisateur(ownerId);
   } finally {
     await teardownTestEnvironment();
