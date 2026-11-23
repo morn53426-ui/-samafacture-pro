@@ -539,3 +539,62 @@ test('une facture créée par API lit la devise après le verrou du compte', asy
     return stored;
   });
 });
+
+
+test('une commande accepte la devise de base explicite et refuse une devise étrangère supportée', async () => {
+  const company = await createCompanyAndClient('currency-order-mismatch-fcfa');
+
+  const matchingResponse = await request(app)
+    .post('/api/pro/orders')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      client_id: company.clientId,
+      devise: 'FCFA',
+      lignes: [{ designation: 'Commande dans la devise de base', quantite: 1, prix_unitaire: 2500 }]
+    });
+  assert.equal(matchingResponse.status, 201, matchingResponse.text);
+  assert.equal(matchingResponse.body.devise, 'FCFA');
+
+  const mismatchResponse = await request(app)
+    .post('/api/pro/orders')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      client_id: company.clientId,
+      devise: 'EUR',
+      lignes: [{ designation: 'Commande devise incohérente', quantite: 1, prix_unitaire: 100 }]
+    });
+  assert.equal(mismatchResponse.status, 409, mismatchResponse.text);
+  assert.match(mismatchResponse.body.error, /conversions multi-devises ne sont pas encore activées/i);
+
+  const [[count]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_commandes WHERE user_id = ?',
+    [company.userId]
+  );
+  assert.equal(Number(count.total), 1, 'la commande rejetée ne doit pas être enregistrée');
+});
+
+test('une commande EUR refuse un override FCFA lorsque la devise de base est EUR', async () => {
+  const company = await createCompanyAndClient('currency-order-mismatch-eur');
+  const profileResponse = await request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  assert.equal(profileResponse.status, 200, profileResponse.text);
+
+  const mismatchResponse = await request(app)
+    .post('/api/pro/orders')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      client_id: company.clientId,
+      devise: 'FCFA',
+      lignes: [{ designation: 'Commande devise incohérente', quantite: 1, prix_unitaire: 100 }]
+    });
+  assert.equal(mismatchResponse.status, 409, mismatchResponse.text);
+  assert.match(mismatchResponse.body.error, /conversions multi-devises ne sont pas encore activées/i);
+
+  const [[count]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_commandes WHERE user_id = ?',
+    [company.userId]
+  );
+  assert.equal(Number(count.total), 0, 'aucune commande incohérente ne doit être enregistrée');
+});
