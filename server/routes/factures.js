@@ -572,14 +572,6 @@ router.post('/', async (req, res, next) => {
       }
     }
 
-    const [companyRows] = await pool.query('SELECT devise, fuseau_horaire FROM users WHERE id = ?', [req.tenantId]);
-    const companyCurrency = String(companyRows[0]?.devise || 'FCFA').toUpperCase();
-    const companyLocalDate = localDateString(companyRows[0]?.fuseau_horaire || 'Africa/Dakar');
-    const documentCurrency = String(devise || companyCurrency).toUpperCase();
-    if (!SUPPORTED_CURRENCIES.includes(documentCurrency)) return res.status(400).json({ error: 'Devise de document non prise en charge.' });
-    if (documentCurrency !== companyCurrency) {
-      return res.status(409).json({ error: 'La devise du document doit correspondre à la devise de base de l’entreprise. Les conversions multi-devises ne sont pas encore activées.' });
-    }
     const docType = type === 'devis' ? 'devis' : 'facture';
     const dateValidite = docType === 'devis' ? optionalIsoDate(date_validite) : null;
     if (dateValidite === undefined) {
@@ -605,6 +597,29 @@ router.post('/', async (req, res, next) => {
 
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    // Factures et devis doivent tous deux figer la devise au premier document.
+    // Le quota facture utilise déjà ce verrou ; le prendre ici aussi pour les devis
+    // et relire la devise après le verrou évite toute valeur devenue obsolète.
+    const [[company]] = await conn.query(
+      'SELECT devise, fuseau_horaire FROM users WHERE id = ? FOR UPDATE',
+      [req.tenantId]
+    );
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+    const companyCurrency = String(company.devise || 'FCFA').toUpperCase();
+    const companyLocalDate = localDateString(company.fuseau_horaire || 'Africa/Dakar');
+    const documentCurrency = String(devise || companyCurrency).toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(documentCurrency)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise de document non prise en charge.' });
+    }
+    if (documentCurrency !== companyCurrency) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'La devise du document doit correspondre à la devise de base de l’entreprise. Les conversions multi-devises ne sont pas encore activées.' });
+    }
+
     let invoiceWarehouseId = null;
     if (docType === 'facture') {
       // Toutes les créations verrouillent d'abord le compte via le registre de quota.
