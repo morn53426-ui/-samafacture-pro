@@ -70,6 +70,26 @@ test("l'ancienne route entreprise ne peut pas contourner la protection de devise
   assert.equal(omittedCurrency.status, 200, omittedCurrency.text);
   assert.equal(omittedCurrency.body.user.devise, 'EUR', 'une devise omise ne doit pas réinitialiser le compte en FCFA');
 
+  const localizationOmitted = await request(app)
+    .put('/api/pro/localization')
+    .set('Authorization', 'Bearer ' + token)
+    .send({
+      pays_code: 'SN',
+      langue: 'fr',
+      fuseau_horaire: 'Africa/Dakar',
+      format_date: 'dd/MM/yyyy',
+      regime_fiscal: 'standard'
+    });
+  assert.equal(localizationOmitted.status, 200, localizationOmitted.text);
+  assert.equal(localizationOmitted.body.parametres.devise, 'EUR',
+    'la route internationale doit également préserver la devise omise');
+
+  const localizationChange = await request(app)
+    .put('/api/pro/localization')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ pays_code: 'SN', langue: 'fr', devise: 'USD', fuseau_horaire: 'Africa/Dakar', format_date: 'dd/MM/yyyy', regime_fiscal: 'standard' });
+  assert.equal(localizationChange.status, 409, localizationChange.text);
+
   const changeCurrency = await request(app)
     .put('/api/auth/entreprise')
     .set('Authorization', 'Bearer ' + token)
