@@ -2689,14 +2689,7 @@ router.post('/purchase-orders', async (req, res, next) => {
   let conn;
   try {
     const uid = owner(req), supplierId = Number(req.body.fournisseur_id), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
-    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [uid]);
-    const companyCurrency = String(company?.devise || 'FCFA').toUpperCase();
-    const orderCurrency = String(req.body.devise || companyCurrency).toUpperCase();
-    if (!SUPPORTED_CURRENCIES.includes(orderCurrency)) return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
-    if (orderCurrency !== companyCurrency) return res.status(409).json({ error: 'La devise de la commande doit correspondre à la devise de base de l’entreprise. Les conversions ne sont pas encore activées.' });
     if (!idOk(supplierId) || !lines.length || lines.length > 100) return res.status(400).json({ error: 'Fournisseur et 1 à 100 lignes obligatoires.' });
-    const [[supplier]] = await pool.query('SELECT id FROM pro_fournisseurs WHERE id = ? AND user_id = ? AND actif = 1', [supplierId, uid]);
-    if (!supplier) return res.status(400).json({ error: 'Fournisseur inconnu ou inactif.' });
     let totalHt = 0, totalTax = 0;
     const normalized = [];
     const productIds = [];
@@ -2723,6 +2716,28 @@ router.post('/purchase-orders', async (req, res, next) => {
     const numero = randomRef('ACH');
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    // Verrou partagé avec les paramètres de devise : un changement de devise ne
+    // peut pas passer entre la lecture du compte et l'insertion de l'achat.
+    const [[company]] = await conn.query('SELECT devise FROM users WHERE id = ? FOR UPDATE', [uid]);
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+    const companyCurrency = String(company.devise || 'FCFA').toUpperCase();
+    const orderCurrency = String(req.body.devise || companyCurrency).toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(orderCurrency)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
+    }
+    if (orderCurrency !== companyCurrency) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'La devise de la commande doit correspondre à la devise de base de l’entreprise. Les conversions ne sont pas encore activées.' });
+    }
+    const [[supplier]] = await conn.query('SELECT id FROM pro_fournisseurs WHERE id = ? AND user_id = ? AND actif = 1', [supplierId, uid]);
+    if (!supplier) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Fournisseur inconnu ou inactif.' });
+    }
     if (uniqueProductIds.length) {
       const [owned] = await conn.query(
         `SELECT id, type_catalogue FROM produits
