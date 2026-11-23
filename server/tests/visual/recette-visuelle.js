@@ -2445,7 +2445,7 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     const pro = proBadge ? getComputedStyle(proBadge) : null;
     const enterpriseBadge = document.querySelector('.invoice-template-tier.tier-enterprise');
     const enterprise = enterpriseBadge ? getComputedStyle(enterpriseBadge) : null;
-    assert.ok(enterprise, 'Le badge Entreprise doit être présent dans la galerie des modèles.');
+    if (!enterprise) throw new Error('Le badge Entreprise doit être présent dans la galerie des modèles.');
     const result = {
       soonText: soon.color,
       soonBackground: soon.backgroundColor,
