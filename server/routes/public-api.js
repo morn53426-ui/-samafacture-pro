@@ -86,10 +86,11 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
     const uid = req.apiUserId;
     const [[company]] = await pool.query('SELECT devise, fuseau_horaire FROM users WHERE id = ? LIMIT 1', [uid]);
     if (!company) return res.status(401).json({ error: 'Compte associé à la clé API introuvable.' });
-    const companyCurrency = String(company.devise || 'FCFA').toUpperCase();
-    const dateEmission = req.body.date_emission === undefined || req.body.date_emission === null || req.body.date_emission === ''
-      ? localDateString(company.fuseau_horaire || 'Africa/Dakar')
-      : parseIsoDateOnly(req.body.date_emission);
+    let companyCurrency = String(company.devise || 'FCFA').toUpperCase();
+    const hasExplicitEmissionDate = req.body.date_emission !== undefined && req.body.date_emission !== null && req.body.date_emission !== '';
+    let dateEmission = hasExplicitEmissionDate
+      ? parseIsoDateOnly(req.body.date_emission)
+      : localDateString(company.fuseau_horaire || 'Africa/Dakar');
     const dateEcheance = req.body.date_echeance === undefined || req.body.date_echeance === null || req.body.date_echeance === ''
       ? null
       : parseIsoDateOnly(req.body.date_echeance);
@@ -129,6 +130,20 @@ router.post('/invoices', requireScope('invoices:write'), async (req, res, next) 
         error: `Le quota mensuel de ${quota.limit} factures gratuites est atteint.`,
         code: 'QUOTA_DEPASSE'
       });
+    }
+    // reserveMonthlyInvoiceQuota verrouille déjà users ; relire la devise et le
+    // fuseau depuis cette transaction pour ne pas écrire avec une valeur pré-verrou.
+    const [[lockedCompany]] = await conn.query(
+      'SELECT devise, fuseau_horaire FROM users WHERE id = ? FOR UPDATE',
+      [uid]
+    );
+    if (!lockedCompany) {
+      await conn.rollback();
+      return res.status(401).json({ error: 'Compte associé à la clé API introuvable.' });
+    }
+    companyCurrency = String(lockedCompany.devise || 'FCFA').toUpperCase();
+    if (!hasExplicitEmissionDate) {
+      dateEmission = localDateString(lockedCompany.fuseau_horaire || 'Africa/Dakar');
     }
     const numero = 'API-' + dateEmission.slice(0, 4) + '-' + crypto.randomBytes(5).toString('hex').toUpperCase();
     const [result] = await conn.query(
