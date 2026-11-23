@@ -185,3 +185,42 @@ Le snapshot de l'inventaire principal ci-dessus a été pris immédiatement apr�
 - Main : `60fc886aee3d15993b255a8d4a1ce35a287e9939`; CI #45217959532 encore en cours; stabilité post-#192 non certifiée.
 - #194 non fusionnée; #192 fusionnée sur GitHub; aucune autre fusion effectuée par cette étape.
 - Aucun push direct/force push sur main, aucune branche supprimée, aucun volume/donnée/sauvegarde/historique comptable modifié, aucun paiement réel ni déploiement production.
+
+
+## Addendum — synchronisation confirmée de #194 (23 novembre, 16:42 UTC)
+
+### Main après PR #192
+- Main confirmé : `60fc886aee3d15993b255a8d4a1ce35a287e9939`.
+- CI post-fusion #192 : run #45217959532 **success** sur ce SHA exact, y compris tests Node/MySQL, restauration chiffrée, smoke MySQL/Redis, recette responsive et publication des captures.
+- Main est stable après #192 au regard de ce workflow complet. Aucun push direct sur main effectué.
+
+### PR #194 — branche synchronisée
+- [PR #194](https://github.com/morn53426-ui/-samafacture-pro/pull/194).
+- Branche : `security/tenant-relations-main-current-20261123-run12`.
+- Commit de synchronisation observé : `970832f4bb45bb348dae99967183e917beeeb7e3`, message `Merge branch 'main' into security/tenant-relations-main-current-20261123-run12`.
+- Base main : `60fc886aee3d15993b255a8d4a1ce35a287e9939`.
+- Compare GitHub : **22 commits ahead / 0 behind**, merge-base égal au main courant. Les correctifs #194 sont maintenant synchronisés sans rebase et sans réécriture de l'historique.
+- La tentative concurrente de synchronisation effectuée depuis cet audit a détecté que le head de branche avait changé et s'est arrêtée avant toute écriture. Le commit de synchronisation ci-dessus était déjà présent sur GitHub; il n'a pas été créé par cette tentative.
+- 12 fichiers applicatifs/tests et lint restent le diff de la PR contre main. Aucun DDL ni changement d'historique comptable.
+
+### CI exacte sur le head synchronisé
+| Contrôle | Run | Head | État |
+|---|---:|---|---|
+| ESLint | #45218710123 | `970832f4...` | success |
+| Archive source ZIP | #45218710373 | `970832f4...` | success |
+| Tests Node.js/MySQL, restore, smoke et recette visuelle | #45218709676 | `970832f4...` | in_progress au relevé |
+
+La dernière étape de recette visuelle responsive était en cours; le workflow Tests doit terminer avec conclusion success avant fusion.
+
+### Revue de sécurité indépendante — blocage restant
+- Les revues GitHub retournées pour #194 sont des états `COMMENTED`, toutes rédigées par `morn53426-ui`, auteur de la PR.
+- Aucun état `APPROVED` par un reviewer distinct n'est présent dans les revues retournées.
+- Aucun thread inline non résolu n'est retourné.
+- La PR indique qu'aucun reviewer externe indépendant n'est désigné actuellement.
+- Une seconde passe statique a été effectuée, mais elle ne remplace pas la revue humaine indépendante demandée par la PR.
+- **Décision : ne pas fusionner #194 tant qu'un reviewer distinct n'a pas enregistré une approbation de sécurité sur le head exact, et tant que les tests complets de ce head ne sont pas success.** La demande de fusion exprimée par le propriétaire ne remplace pas l'approbation indépendante.
+
+### Rapport Run 22 — propre CI
+- Branche du rapport : `audit/execution-report-20261123-run22`.
+- Head après addendum précédent : `409007958fae037c3e780f260e8014e784c774a3`; CI ZIP #45219320766 success, Tests #45219320400 in_progress au relevé.
+- Le présent addendum est ajouté sans écraser le texte ni les rapports Runs 1–21. PR #206 reste Draft et non fusionnée.
