@@ -37,7 +37,9 @@ test('les URL HTTP, locales et privées sont refusées', () => {
     'https://localhost',
     'https://127.0.0.1',
     'https://192.168.1.20',
-    'https://service.local'
+    'https://8.8.8.8',
+    'https://service.local',
+    'https://votredomaine.com.'
   ];
 
   for (const url of urls) {
