@@ -82,7 +82,8 @@ function observeAccountLockAttempts() {
     const originalQuery = conn.query.bind(conn);
     conn.query = (sql, ...queryArgs) => {
       const isAccountLock = typeof sql === 'string' &&
-        /\\bFROM\\s+users\\s+WHERE\\s+id\\s*=\\s*\\?\\s+FOR\\s+UPDATE\\b/i.test(sql);
+        /\bFROM\s+users\s+WHERE\s+id\s*=\s*\?\s+FOR\s+UPDATE\b/i.test(sql);
+      const result = originalQuery(sql, ...queryArgs);
       if (active && isAccountLock) {
         const waiter = waiters.shift();
         if (waiter) {
@@ -90,7 +91,7 @@ function observeAccountLockAttempts() {
           waiter.resolve();
         }
       }
-      return originalQuery(sql, ...queryArgs);
+      return result;
     };
     return conn;
   };
@@ -124,6 +125,7 @@ async function runCreationBeforeCurrencyChange(company, createRequest, updateReq
   const lock = await pool.getConnection();
   let lockHeld = false;
   let createSettled = false;
+  let updateSettled = false;
   let createPromise;
   let updatePromise;
   let lockObserver;
@@ -148,10 +150,12 @@ async function runCreationBeforeCurrencyChange(company, createRequest, updateReq
     // Le changement de devise doit tenter d'acquérir le même verrou après la création.
     const updateLockAttempt = lockObserver.waitForNextAccountLock();
     updatePromise = updateRequest.then(
-      response => ({ response }),
-      error => ({ error })
+      response => { updateSettled = true; return { response }; },
+      error => { updateSettled = true; return { error }; }
     );
     await updateLockAttempt;
+    assert.equal(updateSettled, false,
+      'le changement de devise doit attendre le verrou détenu par la transaction de test');
 
     await lock.commit();
     lockHeld = false;
@@ -219,6 +223,8 @@ async function assertHistoryCreationRace(company, updateRequest, createRequest, 
 async function runCurrencyChangeBeforeCreation(company, updateRequest, createRequest, getStoredDocument) {
   const lock = await pool.getConnection();
   let lockHeld = false;
+  let updateSettled = false;
+  let createSettled = false;
   let updatePromise;
   let createPromise;
   let lockObserver;
@@ -232,18 +238,22 @@ async function runCurrencyChangeBeforeCreation(company, updateRequest, createReq
     // garantit l'ordre sans dépendre de la vitesse du runner CI.
     const updateLockAttempt = lockObserver.waitForNextAccountLock();
     updatePromise = updateRequest.then(
-      response => ({ response }),
-      error => ({ error })
+      response => { updateSettled = true; return { response }; },
+      error => { updateSettled = true; return { error }; }
     );
     await updateLockAttempt;
+    assert.equal(updateSettled, false,
+      'le changement de devise doit rester bloqué tant que le compte est verrouillé');
 
     // La création ne démarre qu'après que le changement a demandé le même verrou.
     const createLockAttempt = lockObserver.waitForNextAccountLock();
     createPromise = createRequest.then(
-      response => ({ response }),
-      error => ({ error })
+      response => { createSettled = true; return { response }; },
+      error => { createSettled = true; return { error }; }
     );
     await createLockAttempt;
+    assert.equal(createSettled, false,
+      'la création doit attendre le changement de devise qui détient le verrou du compte');
 
     await lock.commit();
     lockHeld = false;
