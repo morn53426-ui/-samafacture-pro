@@ -669,8 +669,8 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
     }
     if (requestedCurrency !== currentCurrency) {
       const [[history]] = await pool.query(
-        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
-        [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id]
+        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_commandes WHERE user_id = ?) AS commandes, (SELECT COUNT(*) FROM pro_bons_livraison WHERE user_id = ?) AS livraisons, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
+        [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id]
       );
       const hasBusinessHistory = Object.values(history || {}).some(value => Number(value) > 0);
       if (hasBusinessHistory) {
