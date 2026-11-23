@@ -94,7 +94,6 @@ router.get('/', async (req, res, next) => {
  */
 router.post('/', async (req, res, next) => {
   let conn;
-  let productId;
   try {
     const { nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
     if (!nom) return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
@@ -124,26 +123,20 @@ router.post('/', async (req, res, next) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.tenantId, nom, catalogueType, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), quantity, minimumQuantity, categorie || null, description || null, image || null]
     );
-    productId = result.insertId;
-    await conn.commit();
-  } catch (err) {
-    if (conn) await conn.rollback().catch(() => {});
-    return next(err);
-  } finally {
-    if (conn) conn.release();
-  }
 
-  // Le produit est désormais un historique durable avant de libérer le verrou.
-  // L'initialisation du stock reste inchangée et n'affecte pas les services.
-  try {
-    const { type_catalogue, stock } = req.body;
-    if (isStockManagedType(normalizeCatalogueType(type_catalogue))) {
-      await initialiserStockEntrepotPrincipal(pool, req.tenantId, productId, nonNegativeQuantity(stock));
+    // Créer produit et stock initial dans la même transaction : un échec du
+    // stockage physique ne doit pas laisser un produit partiellement initialisé.
+    if (stockManaged) {
+      await initialiserStockEntrepotPrincipal(conn, req.tenantId, result.insertId, quantity);
     }
-    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [productId, req.tenantId]);
+    const [rows] = await conn.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
+    await conn.commit();
     res.status(201).json({ produit: rows[0] });
   } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
     next(err);
+  } finally {
+    if (conn) conn.release();
   }
 });
 
