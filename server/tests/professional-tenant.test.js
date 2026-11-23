@@ -18,6 +18,8 @@ let clientId;
 let foreignInvoiceId;
 let memberInvoiceId;
 let memberInvoicePaymentId;
+let foreignClientPaymentId;
+let ownerInvoiceId;
 
 before(async () => {
   await setupTestDatabase();
@@ -55,7 +57,7 @@ before(async () => {
   // Simule une invitation acceptée avec un rôle strictement en lecture seule.
   await pool.query(
     'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json, active) VALUES (?, ?, ?, ?, 1)',
-    [ownerId, memberId, 'lecture_seule', JSON.stringify(['clients.read', 'invoices.read'])]
+    [ownerId, memberId, 'lecture_seule', JSON.stringify(['clients.read', 'invoices.read', 'dashboard.read', 'reports.read', 'payments.read'])]
   );
 
   // Défense en profondeur : une référence inter-entreprises anormale ne doit ni
@@ -65,6 +67,19 @@ before(async () => {
     [memberId, clientId, 'CROSS-TENANT-' + Date.now()]
   );
   foreignInvoiceId = invoiceResult.insertId;
+  const [foreignClientPayment] = await pool.query(
+    'INSERT INTO paiements (user_id, facture_id, montant, methode) VALUES (?, ?, ?, ?)',
+    [memberId, foreignInvoiceId, 250, 'Espèces']
+  );
+  foreignClientPaymentId = foreignClientPayment.insertId;
+
+  // Une facture valide de A permet de détecter si son tableau de bord agrège à tort
+  // la facture B anormalement rattachée au client A.
+  const [ownerInvoice] = await pool.query(
+    "INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison, sous_total, total_tva, total, montant_paye) VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', 0, 0, 700, 0, 700, 0)",
+    [ownerId, clientId, 'OWNER-TENANT-' + Date.now()]
+  );
+  ownerInvoiceId = ownerInvoice.insertId;
 
   // Facture saine de B : une ligne de paiement propre à B et une ligne anormale de A
   // référencent volontairement cette même facture pour vérifier le filtrage par tenant.
@@ -161,6 +176,38 @@ test('les espaces entreprise isolent les clients, les factures et les permission
     [Number(memberInvoicePaymentId)],
     'le détail B ne doit retourner que les paiements appartenant à B'
   );
+
+  assert.ok(foreignClientPaymentId, 'le paiement mal lié doit bien exister dans la fixture de régression');
+
+  const memberPayments = await request(app)
+    .get('/api/pro/payments')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(memberPayments.status, 200, memberPayments.text);
+  assert.equal(memberPayments.body.paiements.some(payment => payment.client_nom === 'Client entreprise A'), false,
+    'la liste des paiements B ne doit pas divulguer le nom du client A');
+
+  const memberDashboard = await request(app)
+    .get('/api/dashboard')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(memberDashboard.status, 200, memberDashboard.text);
+  assert.equal(memberDashboard.body.derniers_paiements.some(payment => payment.client_nom === 'Client entreprise A'), false,
+    'le tableau de bord B ne doit pas afficher les coordonnées du client A');
+
+  const memberSalesReport = await request(app)
+    .get('/api/rapports/ventes?group_by=client')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(memberSalesReport.status, 200, memberSalesReport.text);
+  assert.equal(memberSalesReport.body.rows.some(row => row.label === 'Client entreprise A'), false,
+    'les rapports de B ne doivent pas exposer le nom du client A');
+
+  const ownerDashboard = await request(app)
+    .get('/api/dashboard')
+    .set('Authorization', 'Bearer ' + ownerToken);
+  assert.equal(ownerDashboard.status, 200, ownerDashboard.text);
+  const ownerTopClient = ownerDashboard.body.top_clients.find(row => Number(row.id) === Number(clientId));
+  assert.ok(ownerTopClient, 'le client A doit rester présent dans son propre tableau de bord');
+  assert.equal(Number(ownerTopClient.nb_factures), 1,
+    'le tableau de bord A ne doit pas compter la facture B anormalement liée à son client');
 
   // Le rôle lecture seule possède clients.read et invoices.read, mais pas clients.write.
   const forbiddenWrite = await request(app)
