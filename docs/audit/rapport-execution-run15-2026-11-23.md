@@ -784,3 +784,24 @@ Aucune fusion supplémentaire, aucun push direct/force push, aucune branche ou P
 - PR #202 nouveaux checks à attendre sur nouveau head; ancienne CI #45189484145/#45189484248/#45189484153 ne vaut que pour l'ancien head.
 - PR #203 nouveaux checks à attendre sur nouveau head; ancienne CI #45189953127/#45189952933/#45189953049 ne vaut que pour l'ancien head. Validation humaine de sécurité reste obligatoire avant merge.
 - Rapport #201 synchronisé à main pour conserver sa ligne historique et ce checkpoint.
+---
+## Run 19 — contrôles synchronisés et consolidation des lots P0 (23 novembre 2026, 14:17 UTC)
+
+### Heads synchronisés sur main
+- PR #202 : base f8a61187e8b8df7dc319d611dd58fb02dd0aa336; head 268ccf303e4332f47e73910043f601e4083b97e0; compare 4 ahead / 0 behind; 2 fichiers. Tests #45191709097 in_progress au snapshot; ESLint #45191708824 success; ZIP #45191708650 success.
+- PR #203 : base f8a61187e8b8df7dc319d611dd58fb02dd0aa336; head 2059e3744ce88eface5c00e52c459c7e6edc5235; compare 6 ahead / 0 behind; 5 fichiers. Tests #45191717740 in_progress (step tests en cours); ESLint #45191717706 success; ZIP #45191717720 success. Revue COMMENT head exact id 6023159795; non approbation.
+- PR #201 rapport : base f8a61187e8b8df7dc319d611dd58fb02dd0aa336; head a49f89c67d84e526df7c5592c155f8121adf9e77; compare 10 ahead / 0 behind; 1 seul fichier documentaire. Tests #45191735536 in_progress; ZIP #45191735596 success.
+- Ces branches ont été synchronisées en commits à deux parents (head historique + main), puis refs mises à jour avec force=false et expected_sha. Aucun push sur main.
+
+### Audit des doublons de sécurité P0
+- PR #194 (head historique 900163220356db9c443e11e5f6208760d49a62f2) couvre déjà la redaction de verification_code dans les listes facture et historique client, ainsi que les tests dans factures.test.js et client-history-protection.test.js.
+- La même PR #194 contient aussi la correction de jointure remboursement vers paiement vers facture (p.user_id = r.user_id, f.user_id = p.user_id) et le test de régression du relevé client dans professional-tenant.test.js, avec restauration de la fixture en finally.
+- #194 est un lot plus large d'isolation tenant (12 fichiers), compare actuel 20 ahead / 1 behind main f8a61187...; son CI de l'ancien head était Tests #45188705205 success, ESLint #45188705209 success, ZIP #45188705073 success. Les résultats doivent être relancés après synchronisation.
+- #203 et #199 sont des sous-ensembles des corrections présentes dans #194. Leurs branches/PR sont conservées en Draft pour historique/fallback; ne pas fusionner séparément si #194 est retenue.
+- #194 revue statique COMMENT sur exact head id 6023216062, pas approbation. Validation humaine spécifique sécurité obligatoire; aucune approbation par l'auteur n'est comptée comme review indépendante.
+
+### Prochain jalon
+- Achever la CI #202/#203/#201 sur leurs nouveaux SHA. Si #202 est entièrement green, réévaluer la fusion de ce seul lot UI non critique et vérifier le push CI de main ensuite.
+- Après éventuelle fusion #202 et CI main confirmée, synchroniser la candidate sécurité consolidée #194 une seule fois sur le main le plus récent; relancer ses trois checks et préparer une validation humaine détaillée. Aucun merge P0 sans cette validation.
+
+À ce snapshot, main reste f8a61187...; run post-merge #45190172560 est success. Aucune autre fusion depuis #197. Données, volumes, sauvegardes, historique comptable et schéma non modifiés.
