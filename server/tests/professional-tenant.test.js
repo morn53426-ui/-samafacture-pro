@@ -245,6 +245,70 @@ test('les espaces entreprise isolent les clients, les factures et les permission
   assert.equal(memberPayments.body.paiements.some(payment => payment.client_nom === 'Client entreprise A'), false,
     'la liste des paiements B ne doit pas divulguer le nom du client A');
 
+  // Vérifier les modules professionnels qui relient eux aussi des factures,
+  // commandes et paiements : une FK SQL seule ne garantit pas le même user_id.
+  const [foreignOrder] = await pool.query(
+    'INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, devise, total, lignes_json) VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?)',
+    [ownerId, clientId, 'TENANT-ORDER-' + Date.now(), 'confirmee', 'FCFA', 1000, JSON.stringify([{ designation: 'Commande A', quantite: 1, prix_unitaire: 1000 }])]
+  );
+  const [foreignDelivery] = await pool.query(
+    'INSERT INTO pro_bons_livraison (user_id, commande_id, numero, date_livraison, lignes_json) VALUES (?, ?, ?, CURDATE(), ?)',
+    [memberId, foreignOrder.insertId, 'TENANT-BL-' + Date.now(), JSON.stringify([{ designation: 'Livraison A', quantite: 1 }])]
+  );
+  const [foreignCredit] = await pool.query(
+    'INSERT INTO pro_avoirs (user_id, facture_id, numero, date_emission, montant, motif) VALUES (?, ?, ?, CURDATE(), ?, ?)',
+    [memberId, ownerInvoiceId, 'TENANT-AV-' + Date.now(), 100, 'Référence inter-entreprises de test']
+  );
+  const [foreignDeposit] = await pool.query(
+    'INSERT INTO pro_acomptes (user_id, facture_id, numero, date_emission, montant) VALUES (?, ?, ?, CURDATE(), ?)',
+    [memberId, ownerInvoiceId, 'TENANT-AC-' + Date.now(), 100]
+  );
+  const [foreignPaymentLink] = await pool.query(
+    'INSERT INTO pro_payment_links (user_id, facture_id, token_hash, montant, devise) VALUES (?, ?, ?, ?, ?)',
+    [memberId, ownerInvoiceId, 'b'.repeat(64), 100, 'FCFA']
+  );
+  const checkoutReference = 'c'.repeat(64);
+  const [foreignCheckout] = await pool.query(
+    'INSERT INTO pro_invoice_checkouts (user_id, facture_id, fournisseur, reference_interne, montant, devise, statut) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [memberId, ownerInvoiceId, 'wave', checkoutReference, 100, 'XOF', 'en_attente']
+  );
+
+  const deliveryList = await request(app)
+    .get('/api/pro/delivery-notes')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(deliveryList.status, 200, deliveryList.text);
+  const crossTenantDelivery = deliveryList.body.bons_livraison.find(row => Number(row.id) === Number(foreignDelivery.insertId));
+  assert.ok(crossTenantDelivery, 'le bon B peut rester visible dans son historique');
+  assert.equal(crossTenantDelivery.client_nom, null,
+    'un bon B lié à une commande A ne doit pas révéler le nom du client A');
+
+  const creditList = await request(app)
+    .get('/api/pro/credit-notes')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(creditList.status, 200, creditList.text);
+  assert.equal(creditList.body.avoirs.some(row => Number(row.id) === Number(foreignCredit.insertId)), false,
+    'la liste des avoirs B doit exclure un avoir référant une facture A');
+
+  const depositList = await request(app)
+    .get('/api/pro/deposits')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(depositList.status, 200, depositList.text);
+  assert.equal(depositList.body.acomptes.some(row => Number(row.id) === Number(foreignDeposit.insertId)), false,
+    'la liste des acomptes B doit exclure un acompte référant une facture A');
+
+  const paymentLinkList = await request(app)
+    .get('/api/pro/payment-links')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(paymentLinkList.status, 200, paymentLinkList.text);
+  assert.equal(paymentLinkList.body.liens.some(row => Number(row.id) === Number(foreignPaymentLink.insertId)), false,
+    'la liste des liens de paiement B doit exclure un lien référant une facture A');
+
+  const foreignCheckoutStatus = await request(app)
+    .get('/api/pro/checkouts/' + checkoutReference + '/status')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(foreignCheckoutStatus.status, 404,
+    'une session de paiement B référant une facture A doit rester introuvable');
+
   const memberDashboard = await request(app)
     .get('/api/dashboard')
     .set('Authorization', 'Bearer ' + memberToken);
@@ -290,8 +354,10 @@ test('les espaces entreprise isolent les clients, les factures et les permission
 
 after(async () => {
   try {
-    await nettoyerUtilisateur(ownerId);
+    // Les lignes professionnelles B insérées dans les tests peuvent référencer des
+    // factures/commandes A (FK RESTRICT) : nettoyer B avant le propriétaire A.
     await nettoyerUtilisateur(memberId);
+    await nettoyerUtilisateur(ownerId);
   } finally {
     await teardownTestEnvironment();
   }
