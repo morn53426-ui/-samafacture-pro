@@ -528,3 +528,52 @@ Les workflows pertinents sont Tests Node/MySQL, ESLint ciblé et archive source.
 ### Bilan de sécurité Run 7
 - 0 merge, 0 push direct main, 0 force push, 0 branche supprimée, 0 migration, 0 écriture comptable historique, 0 paiement réel, 0 déploiement.
 - Les tests locaux n'ont pas été exécutés (clone local précédemment bloqué par DNS). CI GitHub exactes #174/#176 sont, elles, vérifiées completed/success.
+
+
+## Addendum Run 7 — PR sécurité #177 et inventaire final (05:08 UTC)
+
+### Inventaire actualisé après création de #177
+- Branches: **184** (183 au début du Run 7 + branche dédiée #177). Branches préservées; aucune suppression.
+- PR ouvertes: **48** (47 au snapshot précédent + #177).
+- PR fermées: **125**, comptage revalidé par plages de création : 16 (≤14 nov), 86 (15–19 nov), 13 (20–21 nov), 10 (22–23 nov). Total 125; 106 fusionnées et 19 non fusionnées selon l'inventaire précédent.
+- Main SHA inchangé: `b43a94fc2937b0108077501a0260358c8569e11f`. Pas de merge/push direct.
+
+### Comparaison des branches prioritaires avec main
+| PR | Ahead | Behind | État/risque |
+|---|---:|---:|---|
+| #167 | 26 | 0 | CI green, candidate parent, review humaine requise |
+| #168 | 53 | 0 | CI green; inclut #167, race devise non résolue |
+| #171 | 63 | 0 | CI green; branch stack sur #168 (diff propre de 7 fichiers relative à sa base), ne pas fusionner seule |
+| #149 | 4 | 42 | Diverged, non mergeable; migration v23/012 conflit |
+| #159 | 12 | 15 | Diverged, non mergeable; sécurité code vérification, stale |
+| #164 | 3 | 16 | Diverged; CI green mais synchronisation et review requises |
+| #173 | 7 | 0 | CI green, chevauchement avec #174 |
+| #174 | 11 | 0 | CI green, draft; préflight initial + hardening DNS |
+| #176 | 3 | 0 (rapport) | CI Run 6 green sur head initial; addendum Run 7 ajouté sur branche |
+
+### Nouveau lot de sécurité porté sur main — PR #177
+- Branche `security/invoice-verification-code-redaction-main-20261123-run7`, créée depuis SHA main exact `b43a94fc2937b0108077501a0260358c8569e11f`.
+- Head après 2 commits : `b27099a408c150547e5d4aac69f71ade4bb16ce9`; diff `ahead 2 / behind 0`, 2 fichiers, +48/-1.
+- Cause: `GET /api/factures` fait `SELECT f.*`, puis renvoie les lignes, ce qui exposait `verification_code` dans la liste paginée.
+- Correctif: copie de chaque row et retrait du seul `verification_code` dans la réponse list; aucun changement DB. Test vérifie la liste sans code, le détail authentifié et URL QR conservent le code, la réponse de consultation publique ne le reflète pas.
+- Revue statique de second passage publiée sur le SHA exact en COMMENT (pas approval). PR #177 draft; GitHub indiquait `mergeable=false` au snapshot. CI n'a pas encore été retournée par l'API pour ce SHA; tests locaux non exécutés. **Validation humaine sécurité obligatoire avant fusion.**
+- PR #159 conservée inchangée; #177 est le portage propre, pas une fermeture/remplacement automatique de #159.
+
+### CI exacte — états au snapshot
+- Main #45080802243: job Node/MySQL success, SHA main exact (dernier post-merge run confirmé; main n'a pas changé depuis).
+- #174 head `27fa8c2ec2e2e87b5f6b58a98b07052f5a5bce75`: Tests #45109124536 success (589 tests, 588 pass, 0 fail, 1 skipped), npm audit 0 vulnérabilité; restauration chiffrée 1/1; cluster MySQL/Redis success; recette visuelle 147 captures/7 largeurs; ESLint #45109124614 success; ZIP #45109124542 success.
+- #175 head `f9f95b734deb3fe9ecacfbb257686085b3fa53a6`: Tests #45103510033 success; ZIP #45103509982 success.
+- #176 head initial `639fd3e4ef0a49b265a426710e8285d28be7e0e5`: tests #45109394856 success (584, 583 pass, 0 fail, 1 skipped), restore 1/1, cluster/visuel success; ZIP #45109394857 success. Après ajout du Run 7, head `2a6e79b09e953938d5171176842e9063b70604e0`: Tests #45115640434 in_progress, ZIP #45115640427 success. Ce head n'est pas green complet.
+- #177 head `b27099a408c150547e5d4aac69f71ade4bb16ce9`: aucun run CI retourné, aucun check success à revendiquer.
+- #167/#168/#171/#149/#159/#164/#173: leurs trois workflows observés completed/success sur les SHA exacts listés au tableau précédent; ces résultats ne valident pas rebases.
+
+### Décision merge / risques restants
+- **0 merge Run 7.** #177 et #174 restent drafts sans approval indépendante; #176 CI après addendum incomplète au snapshot.
+- #174: domaine placeholder, DNS/TLS et device validation non faits; #173 overlap.
+- #168/#171: race devise requiert verrou/transaction et tests concurrents.
+- #167: tests XSS hostiles, scheduler multi-devises/idempotence et review humaine.
+- #149: migration 013/schema v24, upgrade v23→24, replay/idempotence, FK tenant composée et validation OHADA.
+- #159/#164: stale; rebase, CI exacte et review humaine.
+- Ruleset #27410527 actif selon Run 6; 0 approbation exigée par GitHub, bypass never; protection classique 403/non vérifiée.
+- Aucun test local; DNS GitHub clone précédemment bloqué. Les CI exactes green sont distinguées de celles pending/absentes.
+- 0 migration, 0 suppression, 0 modification de données/volumes/backups/écritures historiques, 0 paiement réel, 0 déploiement.
