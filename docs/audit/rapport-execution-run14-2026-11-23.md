@@ -451,3 +451,27 @@ Le connecteur de recherche renvoie au maximum 100 PR fermées dans cette requêt
 - [#45 — Sécuriser la sauvegarde, la rétention et la restauration de la base](https://github.com/morn53426-ui/-samafacture-pro/pull/45)
 - [#43 — Améliorer le mobile, les aperçus A4 et l’espace professionnel](https://github.com/morn53426-ui/-samafacture-pro/pull/43)
 - [#44 — Sécurité : rendre la révocation des sessions immédiate entre workers](https://github.com/morn53426-ui/-samafacture-pro/pull/44)
+
+
+## Addendum — commits récents de main (20 résultats, 23 novembre)
+Requête récente paginée/triée par date commit. Liste observée :
+- `b0b52e660af61fa781dc9a761165dd72977f969a` — fix(mobile): validate Capacitor public HTTPS before native builds
+- `b276eba52b5179f351efe68d18cf540a170c70fd` — test(security): cover reset token hash redaction
+- `262707e11d6f362820bf07018647df4312791444` — ci(lint): include auth reset token redaction tests
+- `aa4bf4f64c4be58c4ad69064f4ef58f8411450a2` — test(security): cover reset token hash redaction on current main
+- `13111355a0d2bc71ee0f3a01b504179b2d136926` — fix: fuseau local, devise du tenant et isolation
+- `19fcafb0be02c261ea799236fed046bdce80a291` — fix: devises, relances et échappement HTML
+- `b43a94fc2937b0108077501a0260358c8569e11f` — docs(backup): sécuriser le transfert hors serveur rclone
+- `e6a2caf04f0648d30419042c97cb63b6a14a05f8` — merge PR #163 backup-directory permissions
+- `1c3a12bacd9c6a761247756562ea77ebe50ef41d` — merge latest main invitation-security test into backup hardening
+- `596b3311f12c41946906b236274d9c8a615393d6` — test invitations expiration/change-email (#162)
+- `b8df6bfac18e4eb2776a35887e178af6d8d42bfd` — merge dashboard update and backup lint target
+- `cc728a65336a5ad154136c668f3be06256e66ede` — merge dashboard module rail into backup permissions fix
+- `8d0f287f46a96cb0697d7a0be9f6fe055b6e5a51` — UX dashboard module rail mobile (#161)
+- `f3844b627efcdf6472ef57bffe3d69283a36bb37` — keep server/.env.example current
+- `1d42ba738607a1f648e3391c051a618061654f69` — keep .env template current
+- `d6a054483a11a3ebd7020fa8850d59f07dafdc22` — merge main into backup permissions hardening
+- `06c3589daf5f49405e9a7ead70ee5cc9aece2a12` — merge latest main preserving backup directory permissions
+- `5f1c09d655b340eac687d983e322e740798b7817` — security proxy/CORS documentation (#158)
+- `db790c1d25cdedabf19d33cffd5bf489bc77d1ef` — refactor backup redundant mkdir
+- `620b919b8f317d2fd5116728ff5aa292aa3357b0` — merge main and MySQL backup permissions
