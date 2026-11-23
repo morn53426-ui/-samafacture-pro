@@ -499,3 +499,11 @@
 - #202 applicative et #204 documentaire seulement; aucun DDL.
 - CI post-merge #45206892048 encore in_progress au snapshot; main n'est pas certifié stable après #204.
 - Rapport Run 20 : https://github.com/morn53426-ui/-samafacture-pro/blob/main/docs/audit/rapport-execution-run20-2026-11-23.md
+
+
+## Addendum — revue complémentaire devise / commandes
+
+- Revue statique du diff PR #192 sur le head `8a11e00bb976979403e9d3fcfa8e767a074b5423` : verrou de compte cohérent partagé entre profil/localisation et créations métier; tests de concurrence couvrent plusieurs courses et la préservation des champs optionnels; aucun DDL.
+- **Point bloquant métier non tranché** : `POST /api/pro/orders` accepte une devise explicite valide différente de la devise de base, alors que factures et achats fournisseurs imposent la devise de base et qu'aucune conversion n'est activée. Le test vérifie seulement le rejet d'une devise inconnue, pas le cas d'une devise supportée différente. Décider explicitement du support multidevise et de son impact rapports/comptabilité, ou appliquer la contrainte devise de base avec test de régression.
+- COMMENT statique #6024556793 sur #192 (pas une approbation). #192 reste Draft; synchronisation sur main `8df0651951884623d4f5d4cd7ebc48b9c26f79e0`, CI exacte fraîche et validation humaine OHADA/devise obligatoires.
+- Snapshot inventaire initial du rapport (213 branches, 54 ouvertes, 146 fermées) est pris avant la création de la branche/PR Run21; ces éléments de rapport ne sont pas inclus dans les comptes du snapshot.
