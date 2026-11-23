@@ -117,6 +117,32 @@ async function assertCurrencyChangeAndOrderAreSerialized(company, updateRequest)
   }
 }
 
+async function assertHistoryCreationRace(company, updateRequest, createRequest, tableName, idField) {
+  const [updateResponse, createResponse] = await Promise.all([
+    updateRequest,
+    createRequest
+  ]);
+
+  assert.equal(createResponse.status, 201, createResponse.text);
+  assert.ok(
+    [200, 409].includes(updateResponse.status),
+    'le réglage doit passer avant la création ou être refusé après sa création: ' + updateResponse.text
+  );
+
+  const [[account]] = await pool.query('SELECT devise FROM users WHERE id = ?', [company.userId]);
+  if (updateResponse.status === 200) assert.equal(account.devise, 'EUR');
+  else assert.equal(account.devise, 'FCFA');
+
+  const recordId = createResponse.body[idField];
+  assert.ok(recordId, 'la réponse doit contenir l’identifiant du nouvel enregistrement');
+  const [[stored]] = await pool.query(
+    'SELECT id FROM ' + tableName + ' WHERE id = ? AND user_id = ?',
+    [recordId, company.userId]
+  );
+  assert.ok(stored, 'le nouvel enregistrement doit rester présent après la course concurrente');
+}
+
+
 test('le profil entreprise sérialise le changement de devise avec la création de commande', async () => {
   const company = await createCompanyAndClient('currency-race-profile');
   const updateRequest = request(app)
@@ -142,4 +168,79 @@ test('la localisation sérialise le changement de devise avec la création de co
     });
 
   await assertCurrencyChangeAndOrderAreSerialized(company, updateRequest);
+});
+
+test('le changement de devise est sérialisé avec la création d’un produit', async () => {
+  const company = await createCompanyAndClient('currency-race-product');
+  const updateRequest = request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  const createRequest = request(app)
+    .post('/api/produits')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Service concurrent', type_catalogue: 'service', prix_ht: 1500 });
+  await assertHistoryCreationRace(company, updateRequest, createRequest, 'produits', 'produit.id');
+});
+
+test('le changement de devise est sérialisé avec la création d’une dépense', async () => {
+  const company = await createCompanyAndClient('currency-race-expense');
+  const updateRequest = request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  const createRequest = request(app)
+    .post('/api/depenses')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ libelle: 'Dépense concurrente', montant: 1250, mode_reglement: 'caisse' });
+  await assertHistoryCreationRace(company, updateRequest, createRequest, 'depenses', 'depense.id');
+});
+
+test('le changement de devise est sérialisé avec la création d’un modèle récurrent', async () => {
+  const company = await createCompanyAndClient('currency-race-recurring');
+  const updateRequest = request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  const createRequest = request(app)
+    .post('/api/factures-recurrentes')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      client_id: company.clientId,
+      libelle: 'Entretien mensuel',
+      frequence: 'mensuelle',
+      prochaine_date: '2026-12-01',
+      lignes: [{ designation: 'Entretien', quantite: 1, prix_unitaire: 3000, tva: 0 }]
+    });
+  await assertHistoryCreationRace(company, updateRequest, createRequest, 'factures_recurrentes', 'recurrente.id');
+});
+
+test('le changement de devise est sérialisé avec une écriture comptable manuelle', async () => {
+  const company = await createCompanyAndClient('currency-race-accounting');
+  const config = await request(app)
+    .get('/api/pro/accounting/config')
+    .set('Authorization', 'Bearer ' + company.token);
+  assert.equal(config.status, 200, config.text);
+  const debitAccount = config.body.comptes.find(account => account.code === '411');
+  const creditAccount = config.body.comptes.find(account => account.code === '571');
+  assert.ok(debitAccount && creditAccount, 'les comptes de démarrage 411 et 571 doivent être disponibles');
+  assert.ok(config.body.journaux.length > 0, 'un journal de comptabilité doit être disponible');
+
+  const updateRequest = request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  const createRequest = request(app)
+    .post('/api/pro/accounting/entries')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      journal_id: config.body.journaux[0].id,
+      date_ecriture: '2026-11-23',
+      libelle: 'Écriture concurrente de test',
+      lignes: [
+        { compte_id: debitAccount.id, libelle: 'Débit test', debit: 2500, credit: 0 },
+        { compte_id: creditAccount.id, libelle: 'Crédit test', debit: 0, credit: 2500 }
+      ]
+    });
+  await assertHistoryCreationRace(company, updateRequest, createRequest, 'pro_compta_ecritures', 'id');
 });
