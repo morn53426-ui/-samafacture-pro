@@ -26,6 +26,9 @@ on:
       - 'server/tests/auth.test.js'
       - 'server/tests/paiements.test.js'
       - 'server/tests/backup.test.js'
+      - 'server/tests/factures.test.js'
+      - 'server/routes/clients.js'
+      - 'server/tests/client-history-protection.test.js'
       - 'server/routes/factures.js'
       - 'server/routes/dashboard.js'
       - 'server/routes/rapports.js'
@@ -93,6 +96,9 @@ jobs:
           server/tests/auth.test.js
           server/tests/paiements.test.js
           server/tests/backup.test.js
+          server/tests/factures.test.js
+          server/routes/clients.js
+          server/tests/client-history-protection.test.js
           server/routes/factures.js
           server/routes/dashboard.js
           server/routes/rapports.js
