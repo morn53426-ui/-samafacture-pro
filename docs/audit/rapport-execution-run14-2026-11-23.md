@@ -492,3 +492,7 @@ Candidate dédiée : [PR #199](https://github.com/morn53426-ui/-samafacture-pro/
 - **PR #199 head** `b212dbc0bac111c77023c1ad42c58514786aeaca`: Tests #45156601143 / run 1786 **in_progress**; ESLint #45156601267 / 726 **success**; ZIP #45156601096 / 1472 **success**. No test result is claimed yet.
 - **PR #198 latest report head** `761a97296a2b13177cdb875a567df8b774e29827`: Tests #45156666396 / run 1787 **in_progress**; ZIP #45156666492 / 1473 **success**. Documentation PR remains Draft; no test result claimed.
 - PR #198 compare main: 3 commits ahead, 0 behind; one added report file, 488 lines. PR #199 compare main: 3 commits ahead, 0 behind; 3 files changed (route, regression test, lint workflow), 41 additions/1 deletion.
+
+
+## Addendum — dernière révision du rapport
+Le rapport a été amendé après le snapshot CI ci-dessus; la dernière révision est un commit documentation-only. Les runs reportés #1787/#1473 étaient attachés à la révision précédente `761a97296a2b13177cdb875a567df8b774e29827`; le fetch de runs sur la révision suivante `d97c17920af292291e0ab666c37fddcb4380c884` a retourné aucun run. Ne pas les présenter comme des checks sur le head le plus récent du rapport. Le run CI code de #199 demeure in_progress sur son head code exact.
