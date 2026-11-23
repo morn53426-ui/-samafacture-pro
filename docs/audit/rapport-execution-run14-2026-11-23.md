@@ -486,3 +486,9 @@ Candidate dédiée : [PR #199](https://github.com/morn53426-ui/-samafacture-pro/
 - Lint workflow étendu à `server/tests/professional-tenant.test.js`.
 - Revue statique COMMENT #6019994024, non-approbatrice. CI n'était pas encore visible au relevé initial; ne pas considérer le test exécuté/green avant run sur ce SHA.
 - Aucun schema/migration, calcul financier ou paiement provider modifié. PR en Draft.
+
+
+## Addendum — CI/PR report snapshot after follow-up creation
+- **PR #199 head** `b212dbc0bac111c77023c1ad42c58514786aeaca`: Tests #45156601143 / run 1786 **in_progress**; ESLint #45156601267 / 726 **success**; ZIP #45156601096 / 1472 **success**. No test result is claimed yet.
+- **PR #198 latest report head** `761a97296a2b13177cdb875a567df8b774e29827`: Tests #45156666396 / run 1787 **in_progress**; ZIP #45156666492 / 1473 **success**. Documentation PR remains Draft; no test result claimed.
+- PR #198 compare main: 3 commits ahead, 0 behind; one added report file, 488 lines. PR #199 compare main: 3 commits ahead, 0 behind; 3 files changed (route, regression test, lint workflow), 41 additions/1 deletion.
