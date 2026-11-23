@@ -262,3 +262,34 @@ La dernière étape de recette visuelle responsive était en cours; le workflow 
 ### Préservation
 - Main n'a pas été modifié directement.
 - Pas de branche supprimée, pas de migration exécutée, pas de volume/donnée/sauvegarde/historique comptable altéré, pas de paiement réel ni de déploiement production.
+
+
+## Addendum — PR #210 et triage des PR UX/impression (23 novembre 2026)
+
+### P1 — suivi de devise des commandes : PR #210
+- PR : https://github.com/morn53426-ui/-samafacture-pro/pull/210
+- Branche dédiée : `fix/pro-orders-base-currency-main-20261123-run23`.
+- Base : main `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`; head : `fa92faeccf886fa3d67f4c8003fbc7b2f0ccf5ad`.
+- État : Draft, ouverte, non fusionnée; deux fichiers modifiés (`server/routes/professionnel.js`, `server/tests/currency-lock-concurrency.test.js`).
+- Correction : l'API conserve la devise de base par défaut et rejette avec HTTP 409 un override explicite reconnu mais différent de la devise de base, avant toute insertion.
+- Tests ajoutés : compte FCFA — FCFA accepté et EUR rejeté; compte EUR — FCFA rejeté; vérification qu'aucune commande incohérente n'est insérée.
+- CI connue sur le head exact au relevé : ESLint #45224583453 **success**; ZIP #45224583450 **success**; Tests Node/MySQL #45224583486 **in_progress** (étape tests). Aucun succès global n'est revendiqué tant que le workflow complet n'est pas terminé.
+- Validation métier requise avant fusion : confirmer qu'aucun contrat d'API externe ne dépend d'une devise par commande. Sans moteur de conversion, la règle proposée est alignée sur les routes de facture; elle ne modifie ni les commandes historiques, ni les montants, ni les écritures OHADA. Aucun merge sans CI complète verte et revue humaine comptable/produit.
+
+### Rapport Run 22 — branche synchronisée et validation en cours
+- Branche : `audit/execution-report-20261123-run22`; head au moment de cet addendum : `69fda5270a50945b6cd8f36d29124277943fe206`.
+- Compare direct contre main `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c` : **7 commits ahead / 0 behind**; le seul fichier du diff est le présent rapport Markdown. Aucun changement de code applicatif ne se trouve dans le diff final.
+- ZIP sur le head exact `69fda527...` : #45224175928 **success**.
+- Tests Node/MySQL/recette responsive sur le même head : #45224176108 **in_progress**, étape recette responsive en cours au relevé. Le commit suivant qui ajoute ce présent addendum déclenchera une nouvelle CI exacte.
+
+### Triage des PR historiques P2
+- **PR #151 — bandeau d'impression A4 pleine largeur : fusionnée** le 22 novembre 2026 à 17:02:54 UTC; merge SHA `00d52ca8acdced3d81d39bf592a916d6729c4e98`. Le merge SHA est ancêtre du main actuel `c32ed40...`; le workflow post-fusion courant #45221526816 sur ce main est success.
+- **PR #127 — devis Executive, pagination A4 28 lignes : ne pas re-porter à l'identique.** Les classes `sf-executive-*`, les règles `@media print` ciblées et le test PDF « devis Executive de 28 lignes » sont déjà présents dans les fichiers de main (`public/css/style.css`, `public/js/facture-templates.js`, `server/tests/facture-pdf.test.js`). La branche #127 est ancienne (6 commits ahead / 68 behind au compare direct) et ne doit pas être fusionnée depuis son historique.
+- **PR #156 — skip-link clavier du dashboard :** le raccourci `workspace-skip-link` et son test de structure sont présents dans main. Ne pas fusionner la branche historique.
+- **PR #155 — grille responsive des coordonnées entreprise :** le wrapper `settings-company-fields-grid` et son CSS deux colonnes / une colonne sous 700 px sont absents du `public/parametres.html` actuel. Candidat P2 utile à porter proprement depuis main, mais aucun changement n'est entrepris dans ce lot afin de garder le P1 multidevise isolé jusqu'à sa CI et sa décision métier.
+- Les branches historiques #127/#155/#156 restent ouvertes; aucune PR n'a été fermée ni branche supprimée.
+
+### Préservation et décisions
+- PR #194 intégrée sur main par le propriétaire; CI post-fusion #45221526816 green sur le SHA exact.
+- PR #210 et #206 restent en brouillon/non fusionnées en attente de leurs résultats CI exacts.
+- Aucun paiement réel, déploiement production, migration destructive, altération de donnée, volume ou sauvegarde; aucun historique comptable modifié.
