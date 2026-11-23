@@ -2490,7 +2490,7 @@ router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
 router.get('/checkouts/:reference/status', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT c.statut, c.montant, c.devise, c.fournisseur, c.created_at, c.paid_at, f.numero AS facture_numero FROM pro_invoice_checkouts c JOIN factures f ON f.id = c.facture_id WHERE c.reference_interne = ? AND c.user_id = ? LIMIT 1',
+      'SELECT c.statut, c.montant, c.devise, c.fournisseur, c.created_at, c.paid_at, f.numero AS facture_numero FROM pro_invoice_checkouts c JOIN factures f ON f.id = c.facture_id AND f.user_id = c.user_id WHERE c.reference_interne = ? AND c.user_id = ? LIMIT 1',
       [req.params.reference, owner(req)]
     );
     if (!rows.length) return res.status(404).json({ error: 'Session de paiement introuvable.' });
