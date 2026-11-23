@@ -54,7 +54,7 @@ router.get('/invoices', requireScope('invoices:read'), async (req, res, next) =>
   try {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
     const [rows] = await pool.query(
-      'SELECT f.id, f.numero, f.type, f.date_emission, f.date_echeance, f.statut, f.total, f.montant_paye, u.devise, c.nom AS client_nom FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id WHERE f.user_id = ? ORDER BY f.date_emission DESC, f.id DESC LIMIT ?',
+      'SELECT f.id, f.numero, f.type, f.date_emission, f.date_echeance, f.statut, f.total, f.montant_paye, u.devise, c.nom AS client_nom FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id JOIN users u ON u.id = f.user_id WHERE f.user_id = ? ORDER BY f.date_emission DESC, f.id DESC LIMIT ?',
       [req.apiUserId, limit]
     );
     res.json({ data: rows });
