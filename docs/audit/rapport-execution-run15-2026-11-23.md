@@ -657,3 +657,35 @@
 - Fusion Run 18 : 0; push direct main : 0; force push : 0; branche supprimée : 0.
 - Migration/DDL : 0; données, volumes, sauvegardes et historique comptable touchés : 0; paiement réel : 0; production : 0.
 - **Décision :** main post-merge #200 est confirmé green sur son run push exact. Les fusions restent séquentielles; #197 attend ses checks exacts, les lots P0/P1 attendent les validations humaines spécifiques.
+
+
+---
+
+## Addendum Run 19 — revue indépendante et correction du skip-link (23 novembre 2026, 13:56 UTC)
+
+### État du dépôt
+- `main` confirmé au SHA `c0a3b569e3e685183376be8428c4696d8c767ccd`; aucun nouveau commit ni fusion depuis le Run 18.
+- CI post-fusion #200 toujours établie par run push exact #45170046061 sur `c0a3b569e3e685183376be8428c4696d8c767ccd`: job Tests Node.js/MySQL terminé success.
+- Règles de merge : dernière observation documentée au Run 16, ruleset #27410527 actif, checks requis Tests Node.js/MySQL + Build complete source archive, conversations résolues, approbations requises=0, bypass actors=0. Endpoint de ruleset non exposé dans les outils de ce run; règles non re-vérifiées à 13:56 UTC.
+- Branches, PR ouvertes/fermées et migrations n'ont pas été ré-inventoriées exhaustivement dans ce run; conserver les derniers totaux du Run 18 comme snapshot, pas comme nouveau comptage.
+
+### PR #197 — finding et correction
+- PR #197 reste ouverte et Draft; base SHA `c0a3b569e3e685183376be8428c4696d8c767ccd`.
+- Head exact après corrections : `c2ba2ffb156d1aac7a418cba9e6cce73b362a86a`; branche `a11y/dashboard-skip-link-main-current-run13`.
+- Compare main...branche : 6 commits ahead, 0 behind; 3 fichiers modifiés; aucune divergence avec main.
+- Commits du Run 19 : `a19372203fb1041534aa885ce5d63c045dec2f61` (skip-link HTML vers la section de contenu) et `c2ba2ffb156d1aac7a418cba9e6cce73b362a86a` (assertions structurelles renforcées).
+- Finding de revue : la cible antérieure `#main-content` se trouvait avant `#topbar-root` dans le landmark main; la barre supérieure (notifications, actions rapides, déconnexion) restait donc dans le parcours après activation du lien. Correction : le lien cible désormais `#dashboard-content`, section d'accueil focalisable située après `#topbar-root`; `main#main-content` conserve son landmark sémantique.
+- Tokens `--emerald`, `--paper`, `--ink`, `--shadow-md` vérifiés présents dans `:root`; les variantes du thème sombre redéfinissent `--paper`, `--ink` et `--shadow-md`.
+- Test structurel vérifie le lien, le landmark main, et l'ordre topbar → section cible. Limite : aucune simulation DOM/navigateur, parcours clavier réel ou lecteur d'écran exécuté.
+- Diff indépendant relu : changement ciblé et limité aux CSS, dashboard HTML et test; pas de changement métier, financier, comptable, sécurité sensible ou DDL. Review GitHub COMMENT attachée au head exact (review id 6022891410); elle n'est pas une approbation humaine.
+- CI sur le head exact `c2ba2ffb...` : Tests Node/MySQL #45188654715 in_progress au snapshot; ESLint #45188654724 in_progress; Source ZIP #45188654730 success. Le status API combiné retourne statuses=[]; seuls les workflow runs donnent les résultats en cours. Aucun succès des anciens heads n'est réutilisé.
+
+### Décision
+- Garder #197 en Draft jusqu'à fin des tests et de ESLint sur le head exact, résolution de tout finding et relecture de l'état mergeable/protections.
+- Aucune fusion effectuée dans ce run. Ne pas convertir en Ready ni appeler l'API merge tant que les checks exacts ne sont pas success et les protections applicables revalidées.
+- P0 sécurité #193/#194/#199, P1 devise #192 et P1 migrations/comptabilité #142/#145 restent bloqués selon les validations de leurs addenda précédents; ne pas les mélanger avec le lot accessibilité.
+
+### Préservation
+- Fusion 0; push direct main 0; force push 0; branche supprimée 0.
+- DDL/migration exécuté 0; données, volumes, sauvegardes et historique comptable modifiés 0.
+- Paiement réel 0; déploiement production 0.
