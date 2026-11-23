@@ -59,7 +59,7 @@ Fusion après validation des tests automatisés, ESLint et package source ZIP. (
 ## 3. Findings P0
 ### P0-A — codes publics divulgués par les listes
 Main actuel renvoie `verification_code` via `SELECT *` dans la liste factures et l'historique client. Ce secret protège la consultation publique; il ne doit pas être distribué par les listes.
-- Candidate actuelle : [PR #193](https://github.com/morn53426-ui/-samafacture-pro/pull/193), branche `security/execution-report-20261123-run12` (head `fb6324d`).
+- Candidate actuelle : [PR #193](https://github.com/morn53426-ui/-samafacture-pro/pull/193), branche `security/redact-verification-codes-main-current-20261123-run12` (head `fb6324d`).
 - Correctif : retirer le code des deux réponses liste; conserver le détail authentifié pour le QR; test de la consultation publique; lint ciblé.
 - CI : tests en cours, lint et ZIP green sur head exact. **Aucune approbation humaine ni fusion.**
 
