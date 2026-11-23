@@ -3601,6 +3601,9 @@ router.post('/accounting/entries', async (req, res, next) => {
     if (Math.abs(debit - credit) > 0.01) return res.status(400).json({ error: 'Écriture déséquilibrée : total débit et crédit doivent être identiques.' });
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    // Les écritures manuelles sont elles aussi un historique qui fige la devise.
+    const [[account]] = await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [uid]);
+    if (!account) { await conn.rollback(); return res.status(404).json({ error: 'Entreprise introuvable.' }); }
     const [journalRows] = await conn.query('SELECT id FROM pro_compta_journaux WHERE id = ? AND user_id = ? AND actif = 1', [req.body.journal_id, uid]);
     if (!journalRows.length) { await conn.rollback(); return res.status(400).json({ error: 'Journal invalide.' }); }
     const ids = [...new Set(clean.map(line => line.account))];
