@@ -131,3 +131,14 @@ Ruleset précédemment inspecté : #27410527 (`protect main`), PR obligatoire, n
 - Main post-#204 CI run #45206892048 : https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45206892048
 - PR #194 : https://github.com/morn53426-ui/-samafacture-pro/pull/194
 - PR #192 : https://github.com/morn53426-ui/-samafacture-pro/pull/192
+
+
+## Addendum — snapshot après ouverture de PR #206
+
+Le snapshot de l'inventaire principal ci-dessus a été pris immédiatement après la fusion #205, avant l'ouverture de la PR de ce rapport. Après création de la branche/PR Run 22 :
+
+- Branches : 215 (100 + 100 + 15; page suivante vide).
+- PR ouvertes : 55, incluant #206 Draft.
+- PR #206 head : `e3725b217b2b453d75e3ddcc073a080346e78060`; base main `f10d89694e264bc710f1ce534a6418dd792e603a`.
+- CI PR #206 au snapshot : Package ZIP run #45212244169 queued; Tests Node/MySQL non encore visible.
+- Aucun changement applicatif. PR #206 non fusionnée.
