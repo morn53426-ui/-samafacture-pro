@@ -693,7 +693,20 @@ router.post('/payment-links', async (req, res, next) => {
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expires = req.body.expire_jours ? new Date(Date.now() + Math.min(90, Math.max(1, Number(req.body.expire_jours))) * 86400000) : null;
-    const devise = String(req.body.devise || 'FCFA').slice(0, 10);
+    const rawCurrency = req.body.devise;
+    const devise = normalizeCurrency(
+      rawCurrency === undefined || rawCurrency === null || String(rawCurrency).trim() === ''
+        ? invoice.devise
+        : rawCurrency
+    );
+    if (!SUPPORTED_CURRENCIES.includes(devise)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise non prise en charge.' });
+    }
+    if (devise !== normalizeCurrency(invoice.devise)) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'La devise du lien doit correspondre à celle de la facture.' });
+    }
     const [result] = await conn.query('INSERT INTO pro_payment_links (user_id, facture_id, token_hash, montant, devise, expire_at) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, tokenHash, amount, devise, expires]);
     await conn.commit();
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
