@@ -26,6 +26,8 @@ describe('Authentification', () => {
     assert.ok(res.body.token, 'un jeton JWT doit être renvoyé');
     assert.equal(res.body.user.email, email);
     assert.equal(res.body.user.password_hash, undefined, 'le mot de passe ne doit jamais être renvoyé');
+    assert.equal(res.body.user.reset_token_hash, undefined, 'le hash de réinitialisation ne doit jamais être renvoyé');
+    assert.equal(res.body.user.reset_token_expires, undefined, 'la date d’expiration interne ne doit jamais être renvoyée');
     userId = res.body.user.id;
   });
 
@@ -141,6 +143,39 @@ describe('Authentification', () => {
     const res = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${login.body.token}`);
     assert.equal(res.status, 200);
     assert.equal(res.body.user.email, email);
+  });
+
+  test('les réponses login et auth/me masquent les secrets de réinitialisation sans les effacer de la base', async () => {
+    const markerHash = 'a'.repeat(64);
+    const { pool } = require('../config/db');
+    await pool.query(
+      'UPDATE users SET reset_token_hash = ?, reset_token_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = ?',
+      [markerHash, userId]
+    );
+
+    const connexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
+    assert.equal(connexion.status, 200, connexion.text);
+    const profil = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', 'Bearer ' + connexion.body.token);
+    assert.equal(profil.status, 200, profil.text);
+
+    for (const [route, user] of [
+      ['/api/auth/login', connexion.body.user],
+      ['/api/auth/me', profil.body.user]
+    ]) {
+      assert.ok(user, route + ' doit renvoyer le profil utilisateur.');
+      assert.equal(user.password_hash, undefined, route + ' ne doit pas exposer password_hash.');
+      assert.equal(user.reset_token_hash, undefined, route + ' ne doit pas exposer reset_token_hash.');
+      assert.equal(user.reset_token_expires, undefined, route + ' ne doit pas exposer reset_token_expires.');
+    }
+
+    const [[stored]] = await pool.query(
+      'SELECT reset_token_hash FROM users WHERE id = ?',
+      [userId]
+    );
+    assert.equal(stored.reset_token_hash, markerHash,
+      'la lecture du profil ne doit pas invalider ni supprimer le hash stocké.');
   });
 
   test('les informations légales et bancaires de l’entreprise sont enregistrées et conservées', async () => {
