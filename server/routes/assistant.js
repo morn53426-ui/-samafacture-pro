@@ -73,7 +73,7 @@ async function execFacturesEnRetard(userId) {
   const [rows] = await pool.query(
     `SELECT f.numero, f.date_echeance, f.total, (f.total - f.montant_paye) AS solde_restant, c.nom as client,
             DATEDIFF(CURDATE(), f.date_echeance) as jours_retard
-     FROM factures f JOIN clients c ON c.id = f.client_id
+     FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id
      WHERE f.user_id = ? AND f.type = 'facture' AND f.statut IN ('en_attente', 'en_retard')
        AND f.date_echeance IS NOT NULL AND f.date_echeance < CURDATE() AND f.total > f.montant_paye
      ORDER BY f.date_echeance ASC
@@ -119,7 +119,7 @@ async function execTopClients(userId, { limite }) {
   const n = Math.min(Math.max(Number(limite) || 5, 1), 20);
   const [rows] = await pool.query(
     `SELECT c.nom as client, COUNT(*) as nb_factures, COALESCE(SUM(f.total), 0) as total
-     FROM factures f JOIN clients c ON c.id = f.client_id
+     FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id
      WHERE f.user_id = ? AND f.type = 'facture' AND f.statut <> 'annulee'
      GROUP BY c.id, c.nom ORDER BY total DESC LIMIT ?`,
     [userId, n]
@@ -431,5 +431,8 @@ router.post('/message', assistantLimiter, async (req, res, next) => {
     res.status(502).json({ error: "L'assistant est momentanément indisponible. Réessayez dans un instant." });
   }
 });
+
+// Expose the query dispatcher for direct tenant-isolation regression tests.
+router.executerOutil = executerOutil;
 
 module.exports = router;
