@@ -4013,12 +4013,12 @@ router.put('/crm/activities/:id', async (req, res, next) => {
 router.get('/company-context', async (req, res, next) => {
   try {
     const [[company]] = await pool.query(
-      'SELECT devise FROM users WHERE id = ? LIMIT 1',
+      'SELECT devise, fuseau_horaire FROM users WHERE id = ? LIMIT 1',
       [owner(req)]
     );
     if (!company) return res.status(404).json({ error: 'Entreprise introuvable.' });
     res.set('Cache-Control', 'private, no-store');
-    res.json({ devise: String(company.devise || 'FCFA').toUpperCase() });
+    res.json({ devise: String(company.devise || 'FCFA').toUpperCase(), fuseau_horaire: company.fuseau_horaire || 'Africa/Dakar' });
   } catch (err) { next(err); }
 });
 
