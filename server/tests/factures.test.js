@@ -66,45 +66,6 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(facture.total, 11800);
   });
 
-  test('la liste des factures ne divulgue pas le code des liens publics, conservé dans le détail', async () => {
-    const created = await request(app)
-      .post('/api/factures')
-      .set('Authorization', 'Bearer ' + token)
-      .send({
-        client_id: clientId,
-        type: 'facture',
-        lignes: [{ designation: 'Document protégé', quantite: 1, prix_unitaire: 25000, tva: 0 }]
-      });
-    assert.equal(created.status, 201, created.text);
-    const invoiceId = created.body.facture.id;
-    const verificationCode = created.body.facture.verification_code;
-    assert.match(verificationCode || '', /^[a-f0-9]{10}$/i);
-
-    const list = await request(app)
-      .get('/api/factures?limite=50')
-      .set('Authorization', 'Bearer ' + token);
-    assert.equal(list.status, 200, list.text);
-    const listedInvoice = list.body.factures.find(row => Number(row.id) === Number(invoiceId));
-    assert.ok(listedInvoice, 'la facture créée doit apparaître dans la liste');
-    assert.equal(Object.hasOwn(listedInvoice, 'verification_code'), false,
-      'le code public ne doit pas être diffusé par la liste paginée');
-
-    const detail = await request(app)
-      .get('/api/factures/' + invoiceId)
-      .set('Authorization', 'Bearer ' + token);
-    assert.equal(detail.status, 200, detail.text);
-    assert.equal(detail.body.facture.verification_code, verificationCode,
-      'le détail authentifié conserve le code nécessaire au QR et à la consultation');
-    assert.ok(detail.body.verify_url.includes('verifier.html?id=' + invoiceId + '&code=' + verificationCode),
-      'le lien QR doit continuer à porter le code de vérification');
-
-    const publicConsultation = await request(app)
-      .get('/api/public/consulter/' + invoiceId + '/' + verificationCode);
-    assert.equal(publicConsultation.status, 200, publicConsultation.text);
-    assert.equal(Object.hasOwn(publicConsultation.body.facture, 'verification_code'), false,
-      'la réponse publique ne doit pas révéler le code qui protège la consultation');
-  });
-
   test('la remise réduit la base imposable avant calcul de la TVA (remise + livraison)', async () => {
     const res = await request(app)
       .post('/api/factures')

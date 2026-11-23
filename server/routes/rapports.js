@@ -21,7 +21,7 @@ async function fetchVentes(userId, { from, to, group_by = 'month', exclude_cance
   if (group_by === 'client') {
     const [rows] = await pool.query(
       `SELECT c.nom as label, COUNT(*) as nb_factures, COALESCE(SUM(f.total),0) as total
-       FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id
+       FROM factures f JOIN clients c ON c.id = f.client_id
        WHERE f.user_id = ? AND f.type = 'facture' ${whereExtra}
        GROUP BY c.id, c.nom ORDER BY total DESC`,
       params

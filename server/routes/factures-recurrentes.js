@@ -78,7 +78,7 @@ router.get('/', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       `SELECT r.*, c.nom as client_nom FROM factures_recurrentes r
-       JOIN clients c ON c.id = r.client_id AND c.user_id = r.user_id
+       JOIN clients c ON c.id = r.client_id
        WHERE r.user_id = ? ORDER BY r.prochaine_date ASC`,
       [req.tenantId]
     );
@@ -115,7 +115,6 @@ router.get('/', async (req, res, next) => {
  *       400: { description: "Champs manquants ou client invalide.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/', async (req, res, next) => {
-  let conn;
   try {
     const { client_id, libelle, frequence, prochaine_date, remise, frais_livraison, mode_paiement, commentaires, lignes, envoi_auto_email } = req.body;
 
@@ -186,16 +185,7 @@ router.post('/', async (req, res, next) => {
       };
     });
 
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
-    // Un modèle récurrent fait partie de l'historique qui fige la devise du compte.
-    // Son insertion doit donc partager le même verrou que les réglages de localisation.
-    const [[account]] = await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
-    if (!account) {
-      await conn.rollback();
-      return res.status(404).json({ error: 'Entreprise introuvable.' });
-    }
-    const [result] = await conn.query(
+    const [result] = await pool.query(
       `INSERT INTO factures_recurrentes (user_id, client_id, libelle, frequence, prochaine_date, jour_ancre, remise, frais_livraison, mode_paiement, commentaires, lignes_json, envoi_auto_email)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -204,15 +194,10 @@ router.post('/', async (req, res, next) => {
         JSON.stringify(lignesClean), envoiAutoEmail ? 1 : 0
       ]
     );
-    const [rows] = await conn.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
-    await conn.commit();
+
+    const [rows] = await pool.query('SELECT * FROM factures_recurrentes WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ recurrente: { ...rows[0], lignes: lignesClean } });
-  } catch (err) {
-    if (conn) await conn.rollback().catch(() => {});
-    next(err);
-  } finally {
-    if (conn) conn.release();
-  }
+  } catch (err) { next(err); }
 });
 
 /**
@@ -357,9 +342,6 @@ router.post('/:id/generer', async (req, res, next) => {
     res.status(201).json({ facture });
   } catch (err) {
     if (err?.code === 'QUOTA_DEPASSE') return res.status(403).json({ error: err.message, code: 'QUOTA_DEPASSE' });
-    if (err?.code === 'CLIENT_TENANT_MISMATCH') {
-      return res.status(409).json({ error: err.message, code: 'CLIENT_TENANT_MISMATCH' });
-    }
     next(err);
   }
 });
@@ -385,18 +367,6 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
     if (!modele) {
       await conn.rollback();
       return null;
-    }
-
-    // Défense en profondeur : un modèle historique mal rattaché ne doit jamais
-    // générer de facture pour le client d'une autre entreprise.
-    const [clientRows] = await conn.query(
-      'SELECT id FROM clients WHERE id = ? AND user_id = ? FOR UPDATE',
-      [modele.client_id, userId]
-    );
-    if (!clientRows.length) {
-      const error = new Error('Le client associé au modèle récurrent n’appartient plus à cette entreprise.');
-      error.code = 'CLIENT_TENANT_MISMATCH';
-      throw error;
     }
     if (onlyIfDue && Number(modele.actif) !== 1) {
       await conn.rollback();

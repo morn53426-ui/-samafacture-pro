@@ -92,9 +92,7 @@ router.get('/:id', async (req, res, next) => {
     const client = rows[0];
     if (!client) return res.status(404).json({ error: 'Client introuvable.' });
     const [factures] = await pool.query('SELECT * FROM factures WHERE client_id = ? AND user_id = ? ORDER BY date_emission DESC', [client.id, req.tenantId]);
-    // Le code protège les liens publics et n'est pas requis pour l'historique client.
-    const facturesSansCode = factures.map(({ verification_code, ...facture }) => facture);
-    res.json({ client, factures: facturesSansCode });
+    res.json({ client, factures });
   } catch (err) { next(err); }
 });
 

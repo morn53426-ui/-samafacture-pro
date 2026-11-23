@@ -89,7 +89,6 @@ router.get('/', async (req, res, next) => {
  *       400: { description: Libellé ou montant manquant., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/', async (req, res, next) => {
-  let conn;
   try {
     const { libelle, montant, categorie, date_depense, notes } = req.body;
     const modeReglement = req.body.mode_reglement === undefined ? 'caisse' : req.body.mode_reglement;
@@ -97,27 +96,14 @@ router.post('/', async (req, res, next) => {
     if (!['caisse', 'banque'].includes(modeReglement)) {
       return res.status(400).json({ error: 'Le mode de règlement doit être caisse ou banque.', code: 'MODE_REGLEMENT_INVALIDE' });
     }
-
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
-    const [[account]] = await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
-    if (!account) {
-      await conn.rollback();
-      return res.status(404).json({ error: 'Entreprise introuvable.' });
-    }
-    const [result] = await conn.query(
+    const [result] = await pool.query(
       `INSERT INTO depenses (user_id, libelle, montant, categorie, mode_reglement, date_depense, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [req.tenantId, libelle, positiveNumber(montant, 0), categorie || null, modeReglement, date_depense || new Date().toISOString().slice(0, 10), notes || null]
     );
-    const [rows] = await conn.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
-    await conn.commit();
+
+    const [rows] = await pool.query('SELECT * FROM depenses WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ depense: rows[0] });
-  } catch (err) {
-    if (conn) await conn.rollback().catch(() => {});
-    next(err);
-  } finally {
-    if (conn) conn.release();
-  }
+  } catch (err) { next(err); }
 });
 
 /**

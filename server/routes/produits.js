@@ -93,7 +93,6 @@ router.get('/', async (req, res, next) => {
  *       400: { description: Nom manquant., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/', async (req, res, next) => {
-  let conn;
   try {
     const { nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
     if (!nom) return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
@@ -111,33 +110,19 @@ router.post('/', async (req, res, next) => {
     const quantity = stockManaged ? nonNegativeQuantity(stock) : 0;
     const minimumQuantity = stockManaged ? nonNegativeQuantity(stock_minimum) : 0;
 
-    conn = await pool.getConnection();
-    await conn.beginTransaction();
-    const [[account]] = await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
-    if (!account) {
-      await conn.rollback();
-      return res.status(404).json({ error: 'Entreprise introuvable.' });
-    }
-    const [result] = await conn.query(
+    const [result] = await pool.query(
       `INSERT INTO produits (user_id, nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.tenantId, nom, catalogueType, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), quantity, minimumQuantity, categorie || null, description || null, image || null]
     );
 
-    // Créer produit et stock initial dans la même transaction : un échec du
-    // stockage physique ne doit pas laisser un produit partiellement initialisé.
+    // Un service n'entre pas dans les stocks physiques ni dans les entrepôts.
     if (stockManaged) {
-      await initialiserStockEntrepotPrincipal(conn, req.tenantId, result.insertId, quantity);
+      await initialiserStockEntrepotPrincipal(pool, req.tenantId, result.insertId, quantity);
     }
-    const [rows] = await conn.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
-    await conn.commit();
+    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     res.status(201).json({ produit: rows[0] });
-  } catch (err) {
-    if (conn) await conn.rollback().catch(() => {});
-    next(err);
-  } finally {
-    if (conn) conn.release();
-  }
+  } catch (err) { next(err); }
 });
 
 /**
