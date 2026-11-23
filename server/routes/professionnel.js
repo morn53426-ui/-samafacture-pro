@@ -1045,8 +1045,8 @@ router.post('/team/invitations/accept/verify', async (req, res, next) => {
       [invite.user_id, actor(req), invite.role, permissionsJson]
     );
     const [accepted] = await conn.query(
-      "UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ? AND statut = 'envoyee'",
-      [actor(req), invite.id]
+      "UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ? AND user_id = ? AND statut = 'envoyee'",
+      [actor(req), invite.id, invite.user_id]
     );
     if (accepted.affectedRows !== 1) {
       await conn.rollback();
@@ -1054,8 +1054,8 @@ router.post('/team/invitations/accept/verify', async (req, res, next) => {
     }
     await conn.query(
       "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_accepted', updated_at = NOW() " +
-      "WHERE ((entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
-      [invite.id, proof.id]
+      "WHERE owner_user_id = ? AND ((entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
+      [invite.user_id, invite.id, proof.id]
     );
     await conn.query(
       'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -1454,8 +1454,8 @@ router.post('/company-group/invitations/:invitationId/retry-email', async (req, 
        SET statut = 'queued', tentatives = 0, prochaine_tentative = NOW(),
            verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = NULL,
            updated_at = NOW()
-       WHERE id = ? AND statut = 'failed'`,
-      [invitation.email_id]
+       WHERE id = ? AND owner_user_id = ? AND statut = 'failed'`,
+      [invitation.email_id, actor(req)]
     );
     if (updated.affectedRows !== 1) {
       await conn.rollback();
@@ -1696,16 +1696,16 @@ router.post('/company-group/invitations/accept/verify', async (req, res, next) =
       [invite.group_id, actor(req)]
     );
     await conn.query(
-      "UPDATE pro_company_group_invitations SET statut = 'acceptee', accepted_company_owner_id = ?, accepted_at = NOW() WHERE id = ? AND statut = 'envoyee'",
-      [actor(req), invite.id]
+      "UPDATE pro_company_group_invitations SET statut = 'acceptee', accepted_company_owner_id = ?, accepted_at = NOW() WHERE id = ? AND group_id = ? AND statut = 'envoyee'",
+      [actor(req), invite.id, invite.group_id]
     );
     await conn.query(
       "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, " +
       "dernier_code_erreur = 'invitation_accepted', updated_at = NOW() " +
-      "WHERE entity_type IN ('company_group_invitation', 'company_group_invitation_verification') " +
+      "WHERE owner_user_id = ? AND entity_type IN ('company_group_invitation', 'company_group_invitation_verification') " +
       "AND ((entity_type = 'company_group_invitation' AND entity_id = ?) " +
       "OR (entity_type = 'company_group_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
-      [invite.id, proof.id]
+      [invite.owner_user_id, invite.id, proof.id]
     );
     await conn.query(
       'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -1818,8 +1818,8 @@ router.delete('/company-group/invitations/:invitationId', async (req, res, next)
     // Annule seulement les messages qui n'ont pas encore été réclamés.
     // Un message déjà en cours de remise SMTP peut être impossible à rappeler.
     const [cancelled] = await conn.query(
-      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_revoked', updated_at = NOW() WHERE entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry')",
-      [invitation.id]
+      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_revoked', updated_at = NOW() WHERE owner_user_id = ? AND entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry')",
+      [actor(req), invitation.id]
     );
     const [[emailState]] = await conn.query(
       "SELECT statut FROM email_outbox WHERE entity_type = 'company_group_invitation' AND entity_id = ? LIMIT 1",
