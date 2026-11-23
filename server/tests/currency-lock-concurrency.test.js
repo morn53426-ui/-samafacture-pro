@@ -264,3 +264,26 @@ test('le changement de devise est sérialisé avec une écriture comptable manue
     });
   await assertHistoryCreationRace(company, updateRequest, createRequest, 'pro_compta_ecritures', 'id');
 });
+
+
+test('le changement de devise est sérialisé avec la création d’un achat fournisseur', async () => {
+  const company = await createCompanyAndClient('currency-race-purchase');
+  const supplier = await request(app)
+    .post('/api/pro/suppliers')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Fournisseur concurrent' });
+  assert.equal(supplier.status, 201, supplier.text);
+
+  const updateRequest = request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  const createRequest = request(app)
+    .post('/api/pro/purchase-orders')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      fournisseur_id: supplier.body.id,
+      lignes: [{ designation: 'Matière première test', quantite: 1, prix_unitaire: 1000, tva: 0 }]
+    });
+  await assertHistoryCreationRace(company, updateRequest, createRequest, 'pro_commandes_fournisseurs', 'id');
+});
