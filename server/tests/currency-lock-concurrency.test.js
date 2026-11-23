@@ -289,6 +289,70 @@ test('le profil entreprise sérialise le changement de devise avec la création 
   await assertCurrencyChangeAndOrderAreSerialized(company, updateRequest);
 });
 
+test('les mises à jour concurrentes du profil préservent les champs optionnels non fournis', async () => {
+  const company = await createCompanyAndClient('currency-profile-field-race');
+  const sharedProfile = entrepriseProfile('FCFA');
+  for (const field of [
+    'entreprise_rccm',
+    'entreprise_site_web',
+    'entreprise_banque',
+    'entreprise_rib',
+    'entreprise_conditions_reglement',
+    'entreprise_mentions_legales'
+  ]) {
+    delete sharedProfile[field];
+  }
+
+  const firstProfile = { ...sharedProfile, entreprise_banque: 'Banque A' };
+  const secondProfile = { ...sharedProfile, entreprise_rccm: 'RCCM B' };
+  const lock = await pool.getConnection();
+  let lockHeld = false;
+  let lockObserver;
+  let firstPromise;
+  let secondPromise;
+
+  try {
+    await lock.beginTransaction();
+    await lock.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [company.userId]);
+    lockHeld = true;
+    lockObserver = observeAccountLockAttempts();
+
+    const firstLockAttempt = lockObserver.waitForNextAccountLock();
+    firstPromise = request(app)
+      .put('/api/auth/entreprise')
+      .set('Authorization', 'Bearer ' + company.token)
+      .send(firstProfile)
+      .then(response => response);
+    await firstLockAttempt;
+
+    const secondLockAttempt = lockObserver.waitForNextAccountLock();
+    secondPromise = request(app)
+      .put('/api/auth/entreprise')
+      .set('Authorization', 'Bearer ' + company.token)
+      .send(secondProfile)
+      .then(response => response);
+    await secondLockAttempt;
+
+    await lock.commit();
+    lockHeld = false;
+    const [firstResponse, secondResponse] = await Promise.all([firstPromise, secondPromise]);
+    assert.equal(firstResponse.status, 200, firstResponse.text);
+    assert.equal(secondResponse.status, 200, secondResponse.text);
+
+    const [[storedProfile]] = await pool.query(
+      'SELECT entreprise_banque, entreprise_rccm FROM users WHERE id = ?',
+      [company.userId]
+    );
+    assert.equal(storedProfile.entreprise_banque, 'Banque A');
+    assert.equal(storedProfile.entreprise_rccm, 'RCCM B');
+  } finally {
+    if (lockHeld) await lock.rollback().catch(() => {});
+    if (lockObserver) lockObserver.restore();
+    lock.release();
+    await Promise.allSettled([firstPromise, secondPromise].filter(Boolean));
+  }
+});
+
 test('la localisation sérialise le changement de devise avec la création de commande', async () => {
   const company = await createCompanyAndClient('currency-race-localization');
   const updateRequest = request(app)
