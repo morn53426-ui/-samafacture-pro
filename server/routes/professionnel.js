@@ -181,10 +181,17 @@ router.post('/orders', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Entreprise introuvable.' });
     }
-    const currency = String(req.body.devise || company.devise || 'FCFA').trim().toUpperCase();
+    const baseCurrency = String(company.devise || 'FCFA').trim().toUpperCase();
+    const currency = String(req.body.devise || baseCurrency).trim().toUpperCase();
     if (!SUPPORTED_CURRENCIES.includes(currency)) {
       await conn.rollback();
       return res.status(400).json({ error: 'Devise de commande non prise en charge.' });
+    }
+    if (currency !== baseCurrency) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'La devise du document doit correspondre à la devise de base de l’entreprise. Les conversions multi-devises ne sont pas encore activées.'
+      });
     }
     const [clientRows] = await conn.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [clientId, uid]);
     if (!clientRows.length) {
