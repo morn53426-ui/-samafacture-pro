@@ -410,3 +410,25 @@ Head `3160e225053caaaa7491c9106129f2a776e30f54`, branche `fix/payment-link-invoi
 ## 9. Décision de ce run
 
 Main est stable selon le run de tests post-fusion exact, mais **les merges restent suspendus** tant qu'une revue humaine requise par la politique de projet n'est pas obtenue et que les règles de protection ne rendent pas l'approbation obligatoire. Les lots sûrs continuent sur branches/PR dédiées.
+
+
+## Addendum — réconciliation après ouverture de PR #217 (23 novembre, 21:05 UTC)
+
+### Inventaire corrigé incluant cette PR
+- Branches : **227**, dont `audit/execution-report-20261123-run28` et `fix/payment-link-invoice-currency-20261123-run28`.
+- PR : **213** — **64 ouvertes**, **117 merged**, **32 closed sans merge**.
+- PR #217 (rapport Run 28) : ouverte en Draft, head initial `f6c1350128e1635deec5f4d2a39fa69a5b3f11db`; cet addendum est un commit de suivi sur la même branche.
+- Numéros ouverts corrigés : 99, 102, 110, 114, 115, 118, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 145, 153, 154, 155, 156, 157, 166, 169, 170, 171, 172, 175, 176, 177, 178, 179, 180, 182, 183, 185, 188, 190, 193, 195, 196, 198, 199, 201, 203, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217.
+
+### Revue indépendante des PR sécurité stale — redondance constatée
+Relecture des diffs #188, #199, #193 et #203 contre le code de `main` confirme que leurs corrections principales sont déjà présentes sur `main` :
+- #188 : joins tenant dans dashboard, factures, factures récurrentes, rapports, route checkout; garde du client lors de génération récurrente; filtres paiements; chemins lint et tests de tenant. Les équivalents ont été vérifiés dans les fichiers actuels.
+- #199 : jointures de remboursement par `user_id` entre remboursement, paiement et facture déjà présentes dans `server/routes/professionnel.js`; test de régression cross-tenant déjà dans `server/tests/professional-tenant.test.js`.
+- #193/#203 : codes `verification_code` retirés des listes de factures et fiche client sur main; tests couvrent liste, détail authentifié et consultation publique; lint paths déjà inclus.
+
+**Décision :** ne pas porter de doublons et ne pas merger ces branches stale. Les PR restent ouvertes (aucune fermeture autorisée). Si des différences supplémentaires sont proposées ultérieurement, les comparer à main avant toute action.
+
+### CI au moment de cet addendum
+- PR #216, head `3160e225053caaaa7491c9106129f2a776e30f54`: Tests Node/MySQL run **45264699456 en cours**; ESLint **45264698495 success**; ZIP **45264698546 success**.
+- PR #217 (head initial ci-dessus) : Tests run **45265040281 en cours**; ZIP **45265039871 success**. Après cet addendum, les checks doivent être revalidés sur le nouveau head.
+- Main push test run exact : **45221526816 success**, 620 tests, 619 pass, 0 fail, 1 skipped; restore sauvegarde chiffrée dédié 1 pass.
