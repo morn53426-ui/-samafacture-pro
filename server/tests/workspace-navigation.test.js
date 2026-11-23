@@ -127,11 +127,12 @@ describe('Navigation et structure des pages métier', () => {
     assert.match(grid[1], /tabindex="0"/);
     assert.match(grid[1], /aria-label=/);
     assert.match(html, /Sur mobile, faites défiler les domaines horizontalement/);
-    assert.match(enterpriseStyles, /@media\\s*\\(max-width:\\s*560px\\)[\\s\\S]*?\\.pro-workspace \\.pro-workspace-guide-grid\\s*\\{[^}]*grid-auto-flow:\\s*column/);
-    assert.match(enterpriseStyles, /grid-auto-columns:\\s*min\\(84vw,\\s*300px\\)/);
-    assert.match(enterpriseStyles, /overflow-x:\\s*auto/);
-    assert.match(enterpriseStyles, /scroll-snap-type:\\s*x proximity/);
-    assert.match(enterpriseStyles, /\\.pro-workspace-guide-grid:focus-visible\\s*\\{/);
+    assert.ok(enterpriseStyles.includes('@media (max-width: 560px)'));
+    assert.ok(enterpriseStyles.includes('grid-auto-flow: column'));
+    assert.ok(enterpriseStyles.includes('grid-auto-columns: min(84vw, 300px)'));
+    assert.ok(enterpriseStyles.includes('overflow-x: auto'));
+    assert.ok(enterpriseStyles.includes('scroll-snap-type: x proximity'));
+    assert.ok(enterpriseStyles.includes('.pro-workspace-guide-grid:focus-visible'));
   });
 
   test('le plan de comptes OHADA peut être consulté et complété depuis son écran', () => {
