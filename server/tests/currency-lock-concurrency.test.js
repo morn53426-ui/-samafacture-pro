@@ -133,7 +133,7 @@ async function assertHistoryCreationRace(company, updateRequest, createRequest, 
   if (updateResponse.status === 200) assert.equal(account.devise, 'EUR');
   else assert.equal(account.devise, 'FCFA');
 
-  const recordId = createResponse.body[idField];
+  const recordId = idField.split('.').reduce((value, key) => value && value[key], createResponse.body);
   assert.ok(recordId, 'la réponse doit contenir l’identifiant du nouvel enregistrement');
   const [[stored]] = await pool.query(
     'SELECT id FROM ' + tableName + ' WHERE id = ? AND user_id = ?',
