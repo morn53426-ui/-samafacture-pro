@@ -5,6 +5,8 @@ on:
     branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'fix/webhook-local-timezone-dynamic-currency-20261123']
     paths:
       - 'eslint.config.mjs'
+      - '.github/workflows/lint.yml'
+      - 'server/tests/setup.js'
       - 'public/js/sidebar.js'
       - 'public/js/api.js'
       - 'public/js/workspace-modals.js'
@@ -69,6 +71,8 @@ jobs:
         run: >-
           npx --yes --package=eslint@10.15.0 eslint
           eslint.config.mjs
+          .github/workflows/lint.yml
+          server/tests/setup.js
           public/js/sidebar.js
           public/js/api.js
           public/js/workspace-modals.js
