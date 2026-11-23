@@ -723,3 +723,25 @@
 - Impression : #151 (bandeaux A4) et #125 (pagination PDF consolidée) déjà fusionnées; #127 contient le correctif Executive également porté dans #125 et reste doublon, ne pas fusionner.
 - P0 #194/#199 isolation multi-tenant/remboursements et P1 #192 devise restent en attente de revue de sécurité/métier humaine; P1 #142/#145 (v21/v22) en attente de validation spécifique DDL/comptable.
 - #197 est la seule fusion de ce run. Aucun push direct main, force push, branche supprimée, migration exécutée, donnée/volume/sauvegarde/historique comptable modifié, paiement réel ou déploiement production.
+
+
+---
+
+## Addendum Run 19 — protections et run push exact observés (23 novembre 2026, 14:05 UTC)
+
+### Règles GitHub relues directement
+- Ruleset repository #27410527 `protect main`: `enforcement=active`, cible `refs/heads/main`.
+- Règles : protection contre suppression; protection non-fast-forward; PR obligatoire; 0 approbation requise; conversations de revue à résoudre; aucun bypass actor; `current_user_can_bypass=never`.
+- Méthodes de fusion autorisées : merge, squash, rebase.
+- Checks obligatoires : `Tests Node.js et MySQL` et `Build complete source archive`; politique stricte d'actualisation des checks.
+- Endpoint de branch-protection classique retourne 403 (non accessible à l'intégration); règleset repository lu avec succès. Le ruleset est donc la source de protection vérifiée.
+
+### CI post-fusion #197
+- Actions API `actions/runs?branch=main` retourne le run push #45190172560, workflow Tests automatisés, head_branch `main`, head SHA exact `f8a61187e8b8df7dc319d611dd58fb02dd0aa336`, créé 14:03:49 UTC.
+- Statut au snapshot 14:05 UTC : `in_progress`; étapes jusqu'à la détection Chromium, audit dépendances et préflight staging success; étape Tests en cours; restauration chiffrée, smoke MySQL/Redis et recette responsive non commencés.
+- Compare `main` avec le commit de fusion : `identical`.
+- Aucun nouveau lot ne peut être fusionné tant que #45190172560 n'est pas terminé en success sur ce SHA.
+
+### Resynchronisation à prévoir
+- Après fusion #197, les branches #202 (badge contraste), #203 (redaction verification_code) et #201 (rapport) sont chacune 1 commit behind main `f8a61187...`; elles conservent leur historique et devront être resynchronisées proprement avant un éventuel merge.
+- CI des heads non synchronisés reste informative uniquement, pas une preuve finale après sync.
