@@ -2,7 +2,7 @@ name: ESLint — JavaScript modifié
 
 on:
   pull_request:
-    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'fix/webhook-local-timezone-dynamic-currency-20261123', 'fix/pro-orders-tenant-currency-20261123']
+    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'fix/webhook-local-timezone-dynamic-currency-20261123', 'fix/pro-orders-tenant-currency-20261123', 'fix/pro-orders-tenant-currency-main-20261123']
     paths:
       - 'eslint.config.mjs'
       - '.github/workflows/lint.yml'
