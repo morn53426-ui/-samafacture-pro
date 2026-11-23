@@ -93,6 +93,8 @@ router.get('/', async (req, res, next) => {
  *       400: { description: Nom manquant., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/', async (req, res, next) => {
+  let conn;
+  let productId;
   try {
     const { nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
     if (!nom) return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
@@ -110,19 +112,39 @@ router.post('/', async (req, res, next) => {
     const quantity = stockManaged ? nonNegativeQuantity(stock) : 0;
     const minimumQuantity = stockManaged ? nonNegativeQuantity(stock_minimum) : 0;
 
-    const [result] = await pool.query(
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [[account]] = await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    if (!account) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+    const [result] = await conn.query(
       `INSERT INTO produits (user_id, nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.tenantId, nom, catalogueType, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), quantity, minimumQuantity, categorie || null, description || null, image || null]
     );
+    productId = result.insertId;
+    await conn.commit();
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    return next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 
-    // Un service n'entre pas dans les stocks physiques ni dans les entrepôts.
-    if (stockManaged) {
-      await initialiserStockEntrepotPrincipal(pool, req.tenantId, result.insertId, quantity);
+  // Le produit est désormais un historique durable avant de libérer le verrou.
+  // L'initialisation du stock reste inchangée et n'affecte pas les services.
+  try {
+    const { type_catalogue, stock } = req.body;
+    if (isStockManagedType(normalizeCatalogueType(type_catalogue))) {
+      await initialiserStockEntrepotPrincipal(pool, req.tenantId, productId, nonNegativeQuantity(stock));
     }
-    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
+    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [productId, req.tenantId]);
     res.status(201).json({ produit: rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 /**
