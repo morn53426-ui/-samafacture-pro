@@ -404,7 +404,13 @@ router.get('/', async (req, res, next) => {
        ORDER BY f.date_emission DESC, f.id DESC LIMIT ? OFFSET ?`,
       [...params, limite, offset]
     );
-    res.json({ factures: rows, pagination: buildPaginationMeta(page, limite, total) });
+    // Le code protège les liens publics; la liste n'en a pas besoin, contrairement au détail.
+    const factures = rows.map((row) => {
+      const safeRow = { ...row };
+      delete safeRow.verification_code;
+      return safeRow;
+    });
+    res.json({ factures, pagination: buildPaginationMeta(page, limite, total) });
   } catch (err) { next(err); }
 });
 
