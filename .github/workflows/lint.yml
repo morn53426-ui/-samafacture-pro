@@ -30,6 +30,8 @@ on:
       - 'server/routes/clients.js'
       - 'server/tests/client-history-protection.test.js'
       - 'server/routes/factures.js'
+      - 'server/routes/public.js'
+      - 'server/routes/assistant.js'
       - 'server/routes/dashboard.js'
       - 'server/routes/rapports.js'
       - 'server/routes/factures-recurrentes.js'
@@ -100,6 +102,8 @@ jobs:
           server/routes/clients.js
           server/tests/client-history-protection.test.js
           server/routes/factures.js
+          server/routes/public.js
+          server/routes/assistant.js
           server/routes/dashboard.js
           server/routes/rapports.js
           server/routes/factures-recurrentes.js
