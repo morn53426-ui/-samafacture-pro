@@ -485,3 +485,46 @@ Les workflows pertinents sont Tests Node/MySQL, ESLint ciblé et archive source.
 - **0 migration ou opération destructive exécutée.**
 - Aucun paiement réel, déploiement production ou modification de données comptables.
 - Aucun test local sur ce run; CI GitHub exacte #174 est partiellement en cours. Ne pas présenter les contrôles en cours comme green.
+
+## Addendum Run 7 — 23 novembre 2026, 05:03 UTC
+
+### Inventaire actualisé
+- `main` inchangé : `b43a94fc2937b0108077501a0260358c8569e11f`.
+- Branches : **183** (100 sur la première page, 83 sur la seconde; la page de continuation suivante est vide). Après le rapport Run 6, aucune branche de code nouvelle n'a été créée pendant ce snapshot.
+- PR ouvertes : **47** (recherche repo-scoped actuelle).
+- PR fermées : **125**, re-vérifiées par quatre plages de création (16 + 86 + 13 + 10). Numéros manquants/non créés identifiés dans l'inventaire précédent.
+- Aucun merge ou changement de main pendant cette exécution.
+
+### CI post-merge main
+- SHA main reste le même. Le run post-merge précédemment vérifié `45080802243` a son job `Tests Node.js et MySQL` completed/success. Aucun nouveau merge n'a déclenché une CI post-merge; je n'invente pas un run plus récent.
+
+### PR #174 — état exact après fin de CI
+- Head : `27fa8c2ec2e2e87b5f6b58a98b07052f5a5bce75`; branche `fix/mobile-nonpublic-hostnames-20261123`; base `main`; draft; mergeable; 11 commits; 5 fichiers.
+- Runs exacts : Tests #45109124536 **success**; ESLint #45109124614 **success**; ZIP #45109124542 **success**.
+- Tests Node/MySQL : **589 tests, 588 pass, 0 fail, 1 skipped**; audit npm: **0 vulnérabilité**. Restauration réelle backup chiffrée : **1/1 pass**. Smoke cluster MySQL/Redis : success. Recette visuelle : 147 captures/7 largeurs, artifact publié.
+- Revue enregistrée : COMMENT de `morn53426-ui`, pas une approbation; aucune approbation indépendante. La PR reste draft.
+- Revue statique du diff : suffixes DNS réservés `.arpa` et `.localdomain` ajoutés et testés. Limite restante : le préflight ne résout pas le DNS; un hostname public peut pointer vers une IP privée. TLS, disponibilité et test appareil ne sont pas vérifiés. Configuration actuelle reste placeholder `https://votredomaine.com`, donc le préflight bloque volontairement la génération native.
+- PR #173 est toujours ouverte et chevauche #174; ne pas fusionner les deux séparément. #174 contient le préflight initial et son hardening, retargeté main.
+
+### PR #176 — rapport Run 6
+- Head `639fd3e4ef0a49b265a426710e8285d28be7e0e5`; draft, mergeable, 2 commits, 1 fichier, aucune review.
+- Tests #45109394856 **success** : 584 tests, 583 pass, 0 fail, 1 skipped; restore chiffré 1/1; smoke cluster et recette visuelle 147/7 success.
+- ZIP #45109394857 **success**.
+- PR #175 (Run 5) vérifiée : Tests #45103510033 success et ZIP #45103509982 success.
+
+### Migrations/workflows confirmés
+- `CURRENT_SCHEMA_VERSION = 23` dans `server/config/db.js`.
+- Migrations présentes 003–012; migration 011 `comptabilite_contrepas_factures`, 012 `comptabilite_correspondances` (SHA blob 012 `bb3ec6e6b35dcb0a3975417d92aef39cd5629f4a`). Aucun SQL exécuté.
+- Workflows main : tests Node/MySQL (`.github/workflows/test.yml`), ESLint ciblé (`lint.yml`), archive source (`package-source-zip.yml`). Les workflows déclenchent sur PR ciblant main; PR #174 est retargetée main.
+
+### Décisions / gates
+- #174 : CI complète green mais **pas mergeable par notre processus** (draft + revue indépendante manquante + domaine réel/DNS/TLS/appareil non vérifiés). Aucun merge.
+- #168/#171 : race de changement de devise/création document non résolue; transaction/verrou et tests concurrents requis.
+- #167 : tests XSS hostile, multi-devise scheduler/idempotence et review indépendante requis.
+- #159/#164 : rebase, CI sur SHA rebasé et review indépendante.
+- #149 : migration 013/version 24, tests v23→v24/replay et validation OHADA requises.
+- Ruleset #27410527 actif selon snapshot Run 6, bypass never, 0 approbation exigée par GitHub; l'endpoint branch protection classique reste 403.
+
+### Bilan de sécurité Run 7
+- 0 merge, 0 push direct main, 0 force push, 0 branche supprimée, 0 migration, 0 écriture comptable historique, 0 paiement réel, 0 déploiement.
+- Les tests locaux n'ont pas été exécutés (clone local précédemment bloqué par DNS). CI GitHub exactes #174/#176 sont, elles, vérifiées completed/success.
