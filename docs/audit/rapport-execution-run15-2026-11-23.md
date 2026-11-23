@@ -529,3 +529,61 @@
 - Merge 0; push main 0; force push 0; branche supprimée 0.
 - Migration 0; données/volumes/sauvegardes/historique comptable modifiés 0.
 - Paiement réel 0; déploiement production 0.
+
+
+---
+
+## Addendum Run 16 — suivi CI et correction clavier (23 novembre 2026)
+
+### État réel du dépôt au snapshot
+- `main` : `b0b52e660af61fa781dc9a761165dd72977f969a`.
+- Branches : **210** (pagination API : 100 + 100 + 10).
+- PR ouvertes : **55**.
+- PR fermées : **142** (pagination 100 + 42), dont **110 fusionnées** et **32 fermées sans fusion**.
+- Workflows présents sur main : `.github/workflows/test.yml`, `.github/workflows/lint.yml`, `.github/workflows/package-source-zip.yml`.
+- Le dernier run post-fusion connu sur main est #45138061597, success sur le SHA `b0b52e660af61fa781dc9a761165dd72977f969a`. Le wrapper par SHA utilisé pour les PR ne retourne que les runs pull_request et n'a pas renvoyé ce run main; il n'est donc pas présenté comme un nouveau run.
+- Ruleset #27410527 reconsulté : enforcement active; checks requis `Tests Node.js et MySQL` et `Build complete source archive`; résolution des conversations requise; approbations requises = **0**; bypass actors = **0**. L'endpoint de protection classique `branches/main/protection` retourne 403.
+
+### PR de sécurité — vérification des runs exacts et reviews
+- **#193** head `fb6324d34b024072f98d7c1347a0da330922aba4`: Tests #45140914890 success; ESLint #45140914986 success; ZIP #45140914942 success.
+- **#194** head `5cd2604b395e7d994c051f4b7d19f7800bccaaf6`: Tests #45141155965 success; ESLint #45141155971 success; ZIP #45141155951 success.
+- **#199** head `b212dbc0bac111c77023c1ad42c58514786aeaca`: Tests #45156601143 success; ESLint #45156601267 success; ZIP #45156601096 success.
+- Les revues enregistrées sur #193/#194/#199/#200 proviennent uniquement du compte auteur `morn53426-ui` et sont de type COMMENTED; aucune approbation indépendante n'est enregistrée. CI verte ne vaut donc pas autorisation de fusion pour ces changements sécurité.
+- #193 masque `verification_code` dans les réponses de liste facture et historique client, tout en le conservant dans le détail authentifié/QR.
+- #194 ajoute les clauses tenant concordantes aux relations factures/clients/paiements, dashboard/rapports, checkout et récurrences.
+- #199 ajoute `p.user_id = r.user_id` et `f.user_id = p.user_id` à la chaîne remboursement→paiement→facture du relevé client.
+
+### PR #200 — correctif de focus découvert pendant la revue
+- Base : `main` SHA `b0b52e660af61fa781dc9a761165dd72977f969a`.
+- Head initial : `e010e563e568e89dcc86f8d735a60f6236986258`; les trois checks initiaux étaient green sur ce SHA.
+- Finding : le sélecteur `querySelector('.enterprise-console-menu-toggle') || getElementById('mobile-toggle-btn')` choisissait un bouton Groupe même lorsqu'il était présent mais masqué, ce qui pouvait empêcher la restauration du focus vers le bouton mobile visible.
+- Correctif commit `cd6793fd256f57d9a2159f673f97fb8e1e3f1500`: collecte des deux déclencheurs puis sélection du premier élément connecté et réellement visible via `getClientRects().length`.
+- Test commit `69180203cc2c694c3de029873b360d43d0b487ca`: test structural étendu pour vérifier la recherche du premier déclencheur visible.
+- Head actuel au snapshot : `69180203cc2c694c3de029873b360d43d0b487ca`; PR draft, base main.
+- CI sur ce head exact : ZIP #45166873404 **success**; ESLint #45166873510 **success**; Tests #45166873559 **in_progress**. Ne pas réutiliser les succès du head initial `e010e5` comme preuve pour le head actuel.
+- Revue statique du diff faite par l'auteur; pas d'approbation/revue indépendante externe. Aucun changement métier ou DDL.
+
+### PR #201 — rapport Run 15
+- Head avant cet addendum : `05df11e280dcf1f17a4986721a909e6330893dc7`; Tests #45160980773 success et ZIP #45160980866 success sur ce head.
+- Le présent addendum Run 16 est ajouté en append-only au fichier `docs/audit/rapport-execution-run15-2026-11-23.md`; les sections Runs antérieurs sont conservées. Les contrôles du nouveau head après cet ajout doivent être vérifiés séparément.
+
+### Migrations et schéma
+- `server/config/db.js`: `CURRENT_SCHEMA_VERSION = 23`.
+- Migrations versionnées `003` à `012` dans `server/database/migrations/`; migration 012 existante : `012_comptabilite_correspondances.sql`.
+- Cinq scripts SQL supplémentaires à la racine : stabilite 2026-08-30, token_version 2026-11-15, facture_personnalisation, index_reset_token, scalabilite_30_41. Leur ordre exact d'application doit être confirmé par les procédures d'installation/upgrade avant un changement de schéma.
+- Aucun DDL/migration exécuté pendant Run 16.
+
+### Planning P0–P3
+- **P0** : terminer Tests Node/MySQL sur le head exact #200 `69180203...`; si échec, examiner le log de ce run uniquement. Garder #200 draft jusqu'à revue indépendante.
+- **P0** : obtenir une approbation sécurité humaine indépendante pour #193/#194/#199; les reviews actuelles sont des COMMENT de l'auteur seulement.
+- **P0** : compléter le scan des relations tenant-aware restantes; aucune fusion #194/#199 avant revue du périmètre combiné et résolution des chevauchements.
+- **P1** : #192 devise : confirmer métier multi-devise avant changer ou fusionner; CI historique green sur son head, pas de décision métier enregistrée.
+- **P1** : #142 schema v21 / essai 15 jours et #145 schema v22 / conservation événements : rebase/reconstruction, CI exacte, validation humaine comptable/DDL.
+- **P2** : autres correctifs accessibilité et impressions A4/PDF en lots indépendants.
+- **P3** : branding, vidéo et documentation après stabilisation P0/P1.
+
+### Bilan sécurité Run 16
+- 0 fusion; main inchangé au SHA relevé.
+- 0 push direct/force push sur main; 0 branche supprimée.
+- 0 migration; 0 écriture comptable historique modifiée.
+- 0 modification de données, volumes ou sauvegardes; 0 paiement réel; 0 déploiement production.
