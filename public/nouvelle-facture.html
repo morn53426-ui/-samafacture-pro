@@ -175,6 +175,9 @@
     try {
       const context = await Api.get('/pro/company-context');
       companyCurrency = context?.devise || user?.devise || companyCurrency;
+      if (context?.fuseau_horaire) {
+        document.getElementById('date_emission').value = dateCivileAujourdhui(context.fuseau_horaire);
+      }
     } catch (_) {
       companyCurrency = user?.devise || companyCurrency;
     }
