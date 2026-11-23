@@ -158,6 +158,55 @@ test('un checkout Wave est confirmé par serveur-à-serveur, idempotent et inscr
   }
 });
 
+test('les liens de paiement héritent de la devise facture et rejettent les incohérences', async () => {
+  const invoice = await creerFacture({ amount: 2000, tax: 0 });
+  await pool.query('UPDATE factures SET devise = ? WHERE id = ? AND user_id = ?', ['EUR', invoice.id, userId]);
+
+  const link = await request(app)
+    .post('/api/pro/payment-links')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ facture_id: invoice.id, montant: 1200 });
+  assert.equal(link.status, 201, link.text);
+  assert.equal(link.body.devise, 'EUR', 'la devise absente doit hériter de celle de la facture');
+
+  const tokenFromUrl = new URL(link.body.url).searchParams.get('token');
+  assert.match(tokenFromUrl || '', /^[a-f0-9]{64}$/);
+  const publicLink = await request(app).get('/api/public/paiement/' + tokenFromUrl);
+  assert.equal(publicLink.status, 200, publicLink.text);
+  assert.equal(publicLink.body.devise, 'EUR');
+  assert.equal(Number(publicLink.body.montant), 1200);
+  assert.equal(Number(publicLink.body.solde_facture), 2000);
+
+  const [[beforeInvalid]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_payment_links WHERE user_id = ? AND facture_id = ?',
+    [userId, invoice.id]
+  );
+  const mismatch = await request(app)
+    .post('/api/pro/payment-links')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ facture_id: invoice.id, montant: 500, devise: 'USD' });
+  assert.equal(mismatch.status, 409, mismatch.text);
+  const unsupported = await request(app)
+    .post('/api/pro/payment-links')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ facture_id: invoice.id, montant: 500, devise: 'ZZZ' });
+  assert.equal(unsupported.status, 400, unsupported.text);
+
+  const [[afterInvalid]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_payment_links WHERE user_id = ? AND facture_id = ?',
+    [userId, invoice.id]
+  );
+  assert.equal(Number(afterInvalid.total), Number(beforeInvalid.total),
+    'aucun lien ne doit être créé pour une devise incohérente ou non prise en charge');
+
+  const sameCurrency = await request(app)
+    .post('/api/pro/payment-links')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ facture_id: invoice.id, montant: 500, devise: 'EUR' });
+  assert.equal(sameCurrency.status, 201, sameCurrency.text);
+  assert.equal(sameCurrency.body.devise, 'EUR');
+});
+
 test('les achats et réceptions partielles mettent à jour le stock global et le stock par entrepôt', async () => {
   const saleInvoice = await creerFacture({ amount: 1000, quantity: 2, product: true });
   const [[afterSale]] = await pool.query('SELECT stock FROM produits WHERE id = ? AND user_id = ?', [productId, userId]);
