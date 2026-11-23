@@ -654,37 +654,13 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
       }
     }
 
-    const [[userRow]] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
-    if (!userRow) return res.status(404).json({ error: 'Utilisateur introuvable.' });
-
-    // La devise de base est définie une seule fois avant les premiers mouvements métier.
-    // Cet endpoint historique coexiste avec /pro/localization : il doit donc appliquer
-    // la même règle et ne jamais réinitialiser silencieusement une devise omise.
-    const currentCurrency = String(userRow.devise || 'FCFA').toUpperCase();
-    const requestedCurrency = devise === undefined || devise === null || String(devise).trim() === ''
-      ? currentCurrency
-      : String(devise).trim().toUpperCase();
-    if (!SUPPORTED_CURRENCIES.includes(requestedCurrency)) {
+    // Valider la valeur explicite tôt ; la devise effective sera relue sous verrou
+    // juste avant l'écriture afin de ne pas utiliser un état devenu obsolète.
+    if (devise !== undefined && devise !== null && String(devise).trim() !== '' &&
+        !SUPPORTED_CURRENCIES.includes(String(devise).trim().toUpperCase())) {
       return res.status(400).json({ error: 'Devise de base non prise en charge.' });
     }
-    if (requestedCurrency !== currentCurrency) {
-      const [[history]] = await pool.query(
-        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_commandes WHERE user_id = ?) AS commandes, (SELECT COUNT(*) FROM pro_bons_livraison WHERE user_id = ?) AS livraisons, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
-        [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id]
-      );
-      const hasBusinessHistory = Object.values(history || {}).some(value => Number(value) > 0);
-      if (hasBusinessHistory) {
-        return res.status(409).json({
-          error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents, produits tarifés, modèles récurrents ou mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
-        });
-      }
-    }
-    const proActif = isProPlan(userRow.plan);
-
     if (signature_default) {
-      if (!proActif) {
-        return res.status(403).json({ error: 'La signature électronique est réservée au plan Pro. Passez à un plan payant dans Paramètres.', code: 'FONCTIONNALITE_PRO' });
-      }
       if (signature_default.length > 2 * 1024 * 1024) {
         return res.status(400).json({ error: 'Signature trop volumineuse.' });
       }
@@ -704,39 +680,93 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
       'eclipse', 'saphir', 'conseil', 'imperial', 'panorama', 'groupe', 'majeste'
     ];
     let template = templatesValides.includes(facture_template) ? facture_template : 'classique';
-    if (PRO_TEMPLATES.includes(template) && !proActif) {
-      return res.status(403).json({ error: 'Ce modèle de facture est réservé au plan Pro. Passez à un plan payant dans Paramètres.', code: 'FONCTIONNALITE_PRO' });
-    }
-    if (ENTERPRISE_TEMPLATES.includes(template) && !isEnterprisePlan(userRow?.plan)) {
-      return res.status(403).json({ error: 'Ce modèle de facture est réservé au plan Entreprise. Passez au plan Entreprise dans Paramètres.', code: 'FONCTIONNALITE_ENTREPRISE' });
-    }
-
     const texteOptionnel = (value, fallback, max) => {
       if (value === undefined) return fallback ?? null;
       if (value === null) return null;
       return String(value).trim().slice(0, max) || null;
     };
-    await pool.query(
-      `UPDATE users SET
-        entreprise_nom = ?, entreprise_logo = ?, entreprise_adresse = ?, entreprise_telephone = ?,
-        entreprise_email = ?, entreprise_ninea = ?, entreprise_rccm = ?, entreprise_site_web = ?,
-        entreprise_banque = ?, entreprise_rib = ?, entreprise_conditions_reglement = ?,
-        entreprise_mentions_legales = ?, devise = ?, facture_template = ?, signature_default = ?,
-        facture_personnalisation = ?
-       WHERE id = ?`,
-      [
-        entreprise_nom, entreprise_logo || null, entreprise_adresse, entreprise_telephone, entreprise_email,
-        entreprise_ninea,
-        texteOptionnel(entreprise_rccm, userRow.entreprise_rccm, 80),
-        texteOptionnel(entreprise_site_web, userRow.entreprise_site_web, 190),
-        texteOptionnel(entreprise_banque, userRow.entreprise_banque, 120),
-        texteOptionnel(entreprise_rib, userRow.entreprise_rib, 100),
-        texteOptionnel(entreprise_conditions_reglement, userRow.entreprise_conditions_reglement, 5000),
-        texteOptionnel(entreprise_mentions_legales, userRow.entreprise_mentions_legales, 2000),
-        requestedCurrency, template, signature_default || null,
-        personnalisationValidee ? JSON.stringify(personnalisationValidee) : null, req.user.id
-      ]
-    );
+    let conn;
+    try {
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+      // Le même verrou de ligne users est pris par les écritures métier qui
+      // initialisent l'historique (factures, commandes et achats).
+      const [[lockedUser]] = await conn.query(
+        'SELECT * FROM users WHERE id = ? FOR UPDATE',
+        [req.user.id]
+      );
+      if (!lockedUser) {
+        await conn.rollback();
+        return res.status(404).json({ error: 'Utilisateur introuvable.' });
+      }
+
+      // Le plan et les champs de repli doivent provenir de la même lecture verrouillée :
+      // une mise à jour concurrente du compte ne peut ni contourner les droits, ni être écrasée.
+      const proActif = isProPlan(lockedUser.plan);
+      if (signature_default && !proActif) {
+        await conn.rollback();
+        return res.status(403).json({ error: 'La signature électronique est réservée au plan Pro. Passez à un plan payant dans Paramètres.', code: 'FONCTIONNALITE_PRO' });
+      }
+      if (PRO_TEMPLATES.includes(template) && !proActif) {
+        await conn.rollback();
+        return res.status(403).json({ error: 'Ce modèle de facture est réservé au plan Pro. Passez à un plan payant dans Paramètres.', code: 'FONCTIONNALITE_PRO' });
+      }
+      if (ENTERPRISE_TEMPLATES.includes(template) && !isEnterprisePlan(lockedUser.plan)) {
+        await conn.rollback();
+        return res.status(403).json({ error: 'Ce modèle de facture est réservé au plan Entreprise. Passez au plan Entreprise dans Paramètres.', code: 'FONCTIONNALITE_ENTREPRISE' });
+      }
+
+      const currentCurrency = String(lockedUser.devise || 'FCFA').toUpperCase();
+      const requestedCurrency = devise === undefined || devise === null || String(devise).trim() === ''
+        ? currentCurrency
+        : String(devise).trim().toUpperCase();
+      if (!SUPPORTED_CURRENCIES.includes(requestedCurrency)) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Devise de base non prise en charge.' });
+      }
+
+      if (requestedCurrency !== currentCurrency) {
+        const [[history]] = await conn.query(
+          'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_commandes WHERE user_id = ?) AS commandes, (SELECT COUNT(*) FROM pro_bons_livraison WHERE user_id = ?) AS livraisons, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
+          [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id]
+        );
+        const hasBusinessHistory = Object.values(history || {}).some(value => Number(value) > 0);
+        if (hasBusinessHistory) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents, produits tarifés, modèles récurrents ou mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
+          });
+        }
+      }
+
+      await conn.query(
+        `UPDATE users SET
+          entreprise_nom = ?, entreprise_logo = ?, entreprise_adresse = ?, entreprise_telephone = ?,
+          entreprise_email = ?, entreprise_ninea = ?, entreprise_rccm = ?, entreprise_site_web = ?,
+          entreprise_banque = ?, entreprise_rib = ?, entreprise_conditions_reglement = ?,
+          entreprise_mentions_legales = ?, devise = ?, facture_template = ?, signature_default = ?,
+          facture_personnalisation = ?
+         WHERE id = ?`,
+        [
+          entreprise_nom, entreprise_logo || null, entreprise_adresse, entreprise_telephone, entreprise_email,
+          entreprise_ninea,
+          texteOptionnel(entreprise_rccm, lockedUser.entreprise_rccm, 80),
+          texteOptionnel(entreprise_site_web, lockedUser.entreprise_site_web, 190),
+          texteOptionnel(entreprise_banque, lockedUser.entreprise_banque, 120),
+          texteOptionnel(entreprise_rib, lockedUser.entreprise_rib, 100),
+          texteOptionnel(entreprise_conditions_reglement, lockedUser.entreprise_conditions_reglement, 5000),
+          texteOptionnel(entreprise_mentions_legales, lockedUser.entreprise_mentions_legales, 2000),
+          requestedCurrency, template, signature_default || null,
+          personnalisationValidee ? JSON.stringify(personnalisationValidee) : null, req.user.id
+        ]
+      );
+      await conn.commit();
+    } catch (err) {
+      if (conn) await conn.rollback().catch(() => {});
+      throw err;
+    } finally {
+      if (conn) conn.release();
+    }
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
     res.json({ user: sanitizeUser(rows[0]) });
   } catch (err) { next(err); }
