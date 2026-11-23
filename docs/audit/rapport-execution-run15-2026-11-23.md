@@ -4,7 +4,7 @@
 
 ## Résumé
 - Main observé : `b0b52e660af61fa781dc9a761165dd72977f969a`, inchangé pendant ce run.
-- Snapshot avant publication du présent rapport : 209 branches, 54 PR ouvertes, 142 PR fermées réparties par plages de création (recherche paginée par dates pour éviter la limite de 100).
+- Snapshot avant publication du présent rapport : 209 branches, 54 PR ouvertes, 142 PR fermées vérifiées par 4 plages de création : 1–10 nov (3), 11–15 nov (40), 16–20 nov (60), 21–23 nov (39); chaque plage est sous la limite de 100.
 - Après création de la branche/PR du rapport : 210 branches et 55 PR ouvertes (ajout de la branche `audit/execution-report-20261123-run15` et PR #201).
 - Aucun merge. Aucun push direct ou force-push sur main. Aucune branche supprimée. Aucun DDL/migration exécuté. Aucun volume, backup, donnée ou historique comptable modifié. Aucun paiement réel ni déploiement.
 - Main status API combiné a retourné `statuses=[]`. Le run post-fusion connu #45138061597 a un job Tests Node/MySQL terminé success, mais le connecteur ne permet pas de vérifier à nouveau la relation run→SHA dans cette exécution; ne pas le présenter comme un nouveau run.
@@ -381,7 +381,7 @@
 - #102: test(accessibility): couvrir le thème sombre et le parcours clavier
 - #99: Adopt SunuPilot branding — indigo and baobab green
 
-## Inventaire PR fermées — 142 (plages de création, résultats complets de recherche)
+## Inventaire PR fermées — 142 (4 plages de création, vérifiées sans dépassement de la limite 100)
 - #3: Audit correctif : sauvegardes, sécurité des sessions, paiements et quotas
 - #2: Modèles de factures et devis — enrichissement des informations et du rendu
 - #1: SamaFacture Pro — modernisation UI et modules professionnels
