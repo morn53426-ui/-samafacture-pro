@@ -551,3 +551,13 @@ PR #206 Run 22 doc-only, head `662f5ee56a104510a60b0123d2e1302011ad6020`, base `
 - Aucun merge ou push main, aucun force push, paiement réel ou déploiement.
 - Aucune branche/PR supprimée/fermée.
 - Inventaire lecture seule et création de ce rapport Run 23 sur branche dédiée depuis c32; PR draft. CI du nouveau rapport à vérifier sur son head exact avant tout merge.
+
+
+## Addendum — main post-#194 green et lot responsive mobile (17:01 UTC)
+
+- Main post-merge #194, SHA exact `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`: run #45221526816 completed **success** à 17:00:44 UTC. Toutes les étapes green : tests, restauration chiffrée, smoke MySQL/Redis, recette responsive et publication captures. Main est stable pour la prochaine étape; cette exécution n'a pas fusionné de PR.
+- PR #207 (ce rapport) : head `2ffe6cee56cb10b02f08ab0ed8985b07324e237b`; ZIP #45222784006 success, Tests #45222784004 in_progress. La CI n'est pas encore concluante sur ce head.
+- PR #127 (pagination Executive 28 lignes) : correction déjà présente sur main c32; CSS/classes `sf-executive-*` et test « devis Executive de 28 lignes » sont présents. Pas de portage, éviter doublon.
+- PR #154 mobile workspace : portage ciblé sur branche `fix/mobile-workspace-domain-rail-main-20261123`, PR #208 Draft, head courant `21a3e371eec79eb52ef6962458a1d3ef34aebb0d`, base c32. Diff 4 fichiers (CSS rail, région HTML accessible, recette visuelle et test structurel), 59 additions/6 suppressions. Revue statique : rail <=560px, scroll-snap, role=region, tabindex=0, aria-label. Une assertion regex trop échappée a été repérée et remplacée par des assertions `includes` avant finalisation. Checks du head exact : ESLint #45223260450 et ZIP #45223260488 in_progress; run tests sur le head final encore absent au dernier relevé (run #45223179384 est sur l'ancien head `f4b126e8...`). Ne pas merger avant CI complète sur `21a3e371...` et revue.
+- PR #155 paramètres : compare vers c32 ne conserve que 3 fichiers (lint workflow, `public/parametres.html`, test accessibilité). Branche stale 9 ahead/62 behind. Revue ciblée à poursuivre; ne pas synchroniser/merger avant CI et diff exact.
+- PR #154/#155/#127 restent en branches d'origine préservées; #208 est un portage dédié, aucun merge effectué.
