@@ -625,3 +625,35 @@
 - Main CI post-merge : non vérifiable via outils disponibles; **main stabilité non confirmée**.
 - Merges suivants : 0; main push direct 0; force push 0; branches supprimées 0.
 - DDL/migrations : 0; données/volumes/backups/historique comptable touchés : 0; paiement réel : 0; production : 0.
+
+
+---
+
+## Addendum Run 18 — vérification CI post-fusion et synchronisation (23 novembre 2026, 12:54 UTC)
+
+### État confirmé
+- `main` reste au SHA **`c0a3b569e3e685183376be8428c4696d8c767ccd`**, fusion #200.
+- La CI post-fusion qui n'était pas accessible au Run 17 est désormais retrouvée via l'API Actions/check-runs : run **#45170046061**, événement `push`, head SHA exact `c0a3b569e3e685183376be8428c4696d8c767ccd`, conclusion **success**. Check « Tests Node.js et MySQL » completed success (11:59:14–12:05:08 UTC). Lien : https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45170046061
+- Le wrapper status classique reste vide; cela n'invalide pas le check-run exact. Aucun autre lot n'a été fusionné.
+- Inventaire branches paginé terminé : **210 branches** (100 + 100 + 10). **54 PR ouvertes**; les 20 PR fermées les plus récentes sont récupérées, mais l'API de recherche ne donne pas ici une pagination complète/total fermé fiable. Le total historique de 143 fermées est conservé du snapshot précédent, non recalculé.
+- Schéma runtime : **v23**; migrations versionnées 003–012 et scripts SQL racine préexistants. Aucun script/migration exécuté.
+
+### PR #197 — lien d'évitement clavier resynchronisé sans force push
+- Head avant resynchronisation : `d23afbe04e35db9cfbaaf70a7ee2d0f6de187b61`, base b0b52e6.
+- Compare avec le main actuel : 3 commits ahead, 1 behind; modifications limitées à CSS, dashboard HTML et test structurel. Le main n'a pas modifié ces fichiers dans #200.
+- Rebasage conservateur via commit de fusion sur la branche PR (pas de force) : **`77788aeba50b3626f6349f886bc18df0c2102be7`**, parents: ancien head et main `c0a3b569e3e685183376be8428c4696d8c767ccd`. Ref update fast-forward accepté.
+- Revue statique : lien focus-visible, cible main tabindex=-1, outline, test structurel. Pas de navigateur/DOM interactif exécuté ici.
+- CI du nouveau head exact déclenchée : Tests #45179061694 **in_progress**; ESLint #45179061588 **in_progress**; ZIP #45179061592 **success**. Ne pas confondre avec la CI green du head précédent.
+
+### Lots prioritaires
+- **P0 sécurité** : #193 (redaction codes), #194 (isolation tenant consolidée), #199 (remboursements tenant). Les trois heads exacts ont CI 3/3 success. Aucune revue indépendante/approbation sécurité humaine enregistrée; bases PR anciennes (b0b52e6). Validation humaine spécifique et revue de chevauchement exigées avant fusion.
+- **P1 devise** : #192, CI 3/3 success sur head `8a11e00...`; PR encore basée sur b0b52e6. Décision métier sur devise et synchronisation requises.
+- **P1 comptabilité/essai** : #142 (schema v21, trial 15 jours) et #145 (schema v22, conservation événements). CI 3/3 success sur heads `decb8da...` et `5b6ba8b...`, mais #145 est empilée sur #142; bases/divergence doivent être réconciliées. Validation humaine spécifique comptable et migration requise avant merge.
+- **P2 accessibilité** : #197 resynchronisée avec main, CI exacte en cours.
+- **P2 PDF/print** : #127 pagination A4 Executive (mergeability true au dernier relevé) et autres branches d'impression; vérifier exact base, CI et diff avant reprise.
+- **P3** : vidéo/branding/documentation non urgents.
+
+### Préservation et décision
+- Fusion Run 18 : 0; push direct main : 0; force push : 0; branche supprimée : 0.
+- Migration/DDL : 0; données, volumes, sauvegardes et historique comptable touchés : 0; paiement réel : 0; production : 0.
+- **Décision :** main post-merge #200 est confirmé green sur son run push exact. Les fusions restent séquentielles; #197 attend ses checks exacts, les lots P0/P1 attendent les validations humaines spécifiques.
