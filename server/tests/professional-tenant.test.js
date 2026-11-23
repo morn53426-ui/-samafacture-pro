@@ -379,6 +379,46 @@ test('les espaces entreprise isolent les clients, les factures et les permission
   assert.ok(remainingInvoice, 'la facture de l’autre compte doit être conservée');
 });
 
+test('le relevé client exclut les remboursements liés à un paiement d’un autre tenant', async () => {
+  const [invoiceResult] = await pool.query(
+    "INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison, sous_total, total_tva, total, montant_paye) VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', 0, 0, 1000, 0, 1000, 500)",
+    [ownerId, clientId, 'REFUND-TENANT-' + Date.now()]
+  );
+  const invoiceId = invoiceResult.insertId;
+  const [paymentResult] = await pool.query(
+    'INSERT INTO paiements (user_id, facture_id, montant, methode) VALUES (?, ?, ?, ?)',
+    [ownerId, invoiceId, 500, 'Espèces']
+  );
+  const paymentId = paymentResult.insertId;
+  const refundRequest = await request(app)
+    .post('/api/pro/payments/' + paymentId + '/refunds')
+    .set('Authorization', 'Bearer ' + ownerToken)
+    .send({ montant: 100, motif: 'fixture tenant isolation' });
+  assert.equal(refundRequest.status, 201, refundRequest.text);
+  const refundId = refundRequest.body.id;
+  await pool.query(
+    "UPDATE pro_refund_requests SET statut = 'rembourse', traite_le = NOW() WHERE id = ? AND user_id = ?",
+    [refundId, ownerId]
+  );
+
+  // Référence inter-tenant volontairement mal formée : le paiement est B mais
+  // l'événement de remboursement et la facture sont A. Le relevé A doit l'exclure.
+  await pool.query('UPDATE paiements SET user_id = ? WHERE id = ?', [memberId, paymentId]);
+  try {
+    const statement = await request(app)
+      .get('/api/pro/clients/' + clientId + '/statement')
+      .set('Authorization', 'Bearer ' + ownerToken);
+    assert.equal(statement.status, 200, statement.text);
+    assert.equal(statement.body.remboursements.some(row => Number(row.id) === Number(refundId)), false,
+      'un remboursement lié à un paiement d’un autre tenant ne doit pas apparaître dans le relevé A');
+  } finally {
+    // Restaurer la fixture pour que le teardown supprime les lignes du tenant prévu.
+    await pool.query('UPDATE paiements SET user_id = ? WHERE id = ?', [ownerId, paymentId]);
+  }
+});
+
+
+
 after(async () => {
   try {
     // Les lignes professionnelles B insérées dans les tests peuvent référencer des
