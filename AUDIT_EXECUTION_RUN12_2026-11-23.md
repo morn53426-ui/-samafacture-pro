@@ -368,3 +368,11 @@ Ruleset `27410527` `protect main` **active** :
 - Données, volumes, sauvegardes, historique comptable modifiés : **0**.
 - Paiement réel/déploiement : **0**.
 - Risques restants : tests #193/#194 en cours; #188/#179 duplicates non synchronisées; validations humaines sécurité #193/#194 et comptabilité #142/#145; décision devises #192.
+
+
+## Addendum — après publication du rapport (23 novembre, ~08:47 UTC)
+- La branche du rapport `audit/execution-report-20261123-run12` et la PR [#195](https://github.com/morn53426-ui/-samafacture-pro/pull/195) ont été ajoutées sans écraser l'historique. Le snapshot inventaire ci-dessus est antérieur à ce rapport : après création, le total observé est 204 branches et 49 PR ouvertes (si aucune activité concurrente).
+- #193 : Tests #45140914890 encore `in_progress`; ESLint #45140914986 success; ZIP #45140914942 success.
+- #194 : Tests #45141155965 encore `in_progress`; ESLint #45141155971 success; ZIP #45141155951 success.
+- Revue statique COMMENT, sans approbation, publiée sur les heads exacts #193 et #194. Les deux PR restent draft et exigent validation humaine sécurité.
+- Main n'a pas bougé du SHA `b0b52e660af61fa781dc9a761165dd72977f969a` au dernier snapshot; run main #45138061597 reste success.
