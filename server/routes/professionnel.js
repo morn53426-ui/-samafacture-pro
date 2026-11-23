@@ -149,19 +149,13 @@ router.get('/orders', async (req, res, next) => {
 });
 
 router.post('/orders', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req);
-    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [uid]);
-    if (!company) return res.status(404).json({ error: 'Entreprise introuvable.' });
-    const currency = String(req.body.devise || company.devise || 'FCFA').trim().toUpperCase();
-    if (!SUPPORTED_CURRENCIES.includes(currency)) {
-      return res.status(400).json({ error: 'Devise de commande non prise en charge.' });
-    }
     const clientId = Number(req.body.client_id);
-    const client = await clientOwned(uid, clientId);
-    if (!client) return res.status(400).json({ error: 'Client invalide pour cette entreprise.' });
     const lignes = Array.isArray(req.body.lignes) ? req.body.lignes : [];
     if (!lignes.length || lignes.length > 100) return res.status(400).json({ error: 'Une commande doit contenir entre 1 et 100 lignes.' });
+
     let total = 0;
     const normalized = [];
     for (const line of lignes) {
@@ -176,14 +170,42 @@ router.post('/orders', async (req, res, next) => {
       normalized.push({ designation, quantite, prix_unitaire: prix, total: ligneTotal, produit_id: idOk(line.produit_id) ? Number(line.produit_id) : null });
     }
     total = Math.round(total * 100) / 100;
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    // Même verrou de compte que les réglages de devise et le quota des factures.
+    // L'ordre est alors sérialisé avec un changement de devise : soit l'ordre est
+    // enregistré avant (et bloque le changement), soit il lit la nouvelle devise.
+    const [[company]] = await conn.query('SELECT devise FROM users WHERE id = ? FOR UPDATE', [uid]);
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+    const currency = String(req.body.devise || company.devise || 'FCFA').trim().toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(currency)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise de commande non prise en charge.' });
+    }
+    const [clientRows] = await conn.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [clientId, uid]);
+    if (!clientRows.length) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Client invalide pour cette entreprise.' });
+    }
+
     const orderNumber = randomRef('CMD');
-    const [result] = await pool.query(
+    const [result] = await conn.query(
       'INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, date_livraison_prevue, devise, total, lignes_json, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [uid, clientId, orderNumber, 'confirmee', await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, currency, total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
     );
+    await conn.commit();
     await audit(req, 'commande.creee', 'commande', result.insertId, { numero: orderNumber });
     res.status(201).json({ id: result.insertId, total, devise: currency, lignes: normalized });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.put('/orders/:id/status', async (req, res, next) => {
