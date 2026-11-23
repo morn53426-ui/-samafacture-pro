@@ -2,7 +2,7 @@ name: ESLint — JavaScript modifié
 
 on:
   pull_request:
-    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape']
+    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'fix/webhook-local-timezone-dynamic-currency-20261123']
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'
@@ -13,6 +13,11 @@ on:
       - 'server/tests/workspace-navigation.test.js'
       - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
+      - 'server/tests/auth-currency.test.js'
+      - 'server/tests/money-format.test.js'
+      - 'server/tests/professional-tenant.test.js'
+      - 'server/tests/public-api-currency.test.js'
+      - 'server/tests/tenant-currency-ui.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - 'server/config/db.js'
       - 'server/email-outbox.js'
@@ -72,6 +77,11 @@ jobs:
           server/tests/workspace-navigation.test.js
           server/tests/dashboard-ui.test.js
           server/tests/accounting-expense-mappings.test.js
+          server/tests/auth-currency.test.js
+          server/tests/money-format.test.js
+          server/tests/professional-tenant.test.js
+          server/tests/public-api-currency.test.js
+          server/tests/tenant-currency-ui.test.js
           server/tests/workspace-modal-accessibility.test.js
           server/config/db.js
           server/email-outbox.js
