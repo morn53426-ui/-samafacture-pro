@@ -224,3 +224,41 @@ La dernière étape de recette visuelle responsive était en cours; le workflow 
 - Branche du rapport : `audit/execution-report-20261123-run22`.
 - Head après addendum précédent : `409007958fae037c3e780f260e8014e784c774a3`; CI ZIP #45219320766 success, Tests #45219320400 in_progress au relevé.
 - Le présent addendum est ajouté sans écraser le texte ni les rapports Runs 1–21. PR #206 reste Draft et non fusionnée.
+
+
+## Addendum — fusion PR #194, CI post-fusion et risque multidevise (23 novembre 2026, après 16:53 UTC)
+
+### PR #194 — fusion constatée sur GitHub
+- La PR #194 a été fermée et fusionnée le 23 novembre 2026 à 16:53:15 UTC par le propriétaire du dépôt `morn53426-ui`.
+- Merge SHA et nouveau `main` observé : `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`.
+- Head fusionné : `970832f4bb45bb348dae99967183e917beeeb7e3`; base avant fusion : `60fc886aee3d15993b255a8d4a1ce35a287e9939`.
+- L'action de fusion est une opération GitHub du propriétaire; elle n'a pas été exécutée par cette étape d'audit.
+- Les six avis GitHub consultés restent des états `COMMENTED` attribués à `morn53426-ui`; la liste consultée ne contient pas d'avis `APPROVED` d'un reviewer distinct. Il faut donc distinguer la décision de fusion du propriétaire d'une approbation indépendante de sécurité. Aucun thread inline non résolu n'était retourné au dernier contrôle.
+- Diff final PR #194 contre sa base : 12 fichiers applicatifs/tests et workflow lint, avec relations/jointures tenant-aware et tests d'isolement. Aucun DDL/migration, changement de calcul TVA/montant ou réécriture d'historique comptable identifié.
+
+### CI post-fusion de main — commit exact
+- Workflow Tests automatisés push : [run #45221526816](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45221526816).
+- Head exact : `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`.
+- Résultat final : **success**.
+- Étapes principales réussies : installation et dépendances Node, build Docker, contrôle des secrets locaux, diagnostic des dépendances vulnérables, script staging, tests, restauration réelle d'une sauvegarde chiffrée, smoke test MySQL/Redis, recette visuelle responsive avec données extrêmes et publication des captures.
+- Le workflow ZIP PR #194 (#45218710373) était également **success** sur le head exact de PR `970832f4...`; ce n'est pas un run ZIP déclenché sur le merge SHA. Ne pas confondre ces deux validations.
+- Main confirmé au dernier relevé : `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`. Le statut combiné du connecteur n'exposait pas de status context supplémentaire; le résultat du workflow Actions push ci-dessus est la preuve CI consultée.
+
+### PR #206 — rapport Run 22
+- Tests Node/MySQL et recette responsive : [run #45219751725](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45219751725), **success** sur `662f5ee56a104510a60b0123d2e1302011ad6020`.
+- Archive complète : [run #45219751786](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45219751786), **success** sur le même head.
+- La PR #206 demeure Draft/non fusionnée au dernier relevé. Sa branche documentaire était basée sur l'ancien main `f10d896...`; une intégration non destructive du main courant est ajoutée au présent commit pour éviter un historique divergeant. Les résultats CI ci-dessus portent sur le head pré-synchronisation; les contrôles se relanceront sur le nouveau head.
+
+### P1 — devise de commande : constat précis sur le code de main après #194
+- Fichier : `server/routes/professionnel.js`, route `POST /api/pro/orders`.
+- La route commence une transaction et verrouille `users.id` avec `SELECT devise FROM users WHERE id = ? FOR UPDATE`, ce qui sérialise correctement l'écriture avec un changement concurrent de devise.
+- La devise effective est ensuite calculée à partir de `req.body.devise` si fournie, sinon de `company.devise`; le contrôle rejette uniquement une devise qui ne figure pas dans `SUPPORTED_CURRENCIES`.
+- Par conséquent, une devise explicitement fournie et supportée mais différente de la devise de base du compte peut encore être enregistrée sur une commande. Les conversions multi-devises ne sont pas activées dans le flux métier examiné.
+- Le test `server/tests/currency-lock-concurrency.test.js` vérifie la course réglage/commande sans override explicite et confirme que la commande reprend la devise active. Il ne couvre pas le scénario « compte FCFA + payload devise EUR/USD supportée ».
+- **Risque fonctionnel P1 confirmé par lecture du code, pas par un test d'exécution dédié** : divergence possible de devise entre commande, documents dérivés, rapports et comptabilité. Aucun montant historique n'est modifié.
+- Décision nécessaire avant correction : soit (A) imposer strictement la devise de base et renvoyer 409 sur tout override différent, soit (B) formaliser une vraie prise en charge multi-devises avec taux, date, devise de règlement, arrondis, documents dérivés, reports et écritures OHADA. Ne pas coder un mélange des deux comportements.
+- Prochaine action recommandée après validation métier : test de régression compte FCFA + devise valide EUR (et inverse), valeur par défaut, devise invalide, commande puis livraison/facture dérivée, totaux et reporting; ensuite patch ciblé sur branche fraîche, CI exacte et revue comptable/OHADA. Aucun changement applicatif effectué dans cet addendum.
+
+### Préservation
+- Main n'a pas été modifié directement.
+- Pas de branche supprimée, pas de migration exécutée, pas de volume/donnée/sauvegarde/historique comptable altéré, pas de paiement réel ni de déploiement production.
