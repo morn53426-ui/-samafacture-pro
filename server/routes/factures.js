@@ -393,15 +393,24 @@ router.get('/', async (req, res, next) => {
     if (statut) { whereSql += ' AND f.statut = ?'; params.push(statut); }
     if (client_id) { whereSql += ' AND f.client_id = ?'; params.push(client_id); }
 
-    const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM factures f${whereSql}`, params);
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) as total FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id${whereSql}`,
+      params
+    );
     const [rows] = await pool.query(
       `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone,
               c.whatsapp as client_whatsapp, NULL as client_pays_code
-       FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id${whereSql}
+       FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id JOIN users u ON u.id = f.user_id${whereSql}
        ORDER BY f.date_emission DESC, f.id DESC LIMIT ? OFFSET ?`,
       [...params, limite, offset]
     );
-    res.json({ factures: rows, pagination: buildPaginationMeta(page, limite, total) });
+    // Le code protège les liens publics; la liste n'en a pas besoin, contrairement au détail.
+    const factures = rows.map((row) => {
+      const safeRow = { ...row };
+      delete safeRow.verification_code;
+      return safeRow;
+    });
+    res.json({ factures, pagination: buildPaginationMeta(page, limite, total) });
   } catch (err) { next(err); }
 });
 
@@ -436,7 +445,7 @@ router.get('/:id', async (req, res, next) => {
     const [rows] = await pool.query(
       `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone,
               c.whatsapp as client_whatsapp, c.adresse as client_adresse, NULL as client_pays_code
-       FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
+       FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id JOIN users u ON u.id = f.user_id
        WHERE f.id = ? AND f.user_id = ?`,
       [req.params.id, req.tenantId]
     );
@@ -452,7 +461,7 @@ router.get('/:id', async (req, res, next) => {
 
     const [[lignes], [paiements]] = await Promise.all([
       pool.query('SELECT * FROM facture_lignes WHERE facture_id = ?', [facture.id]),
-      pool.query('SELECT * FROM paiements WHERE facture_id = ? ORDER BY date_paiement DESC', [facture.id])
+      pool.query('SELECT * FROM paiements WHERE facture_id = ? AND user_id = ? ORDER BY date_paiement DESC', [facture.id, req.tenantId])
     ]);
 
     const verifyUrl = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/verifier.html?id=${facture.id}&code=${facture.verification_code}`;
@@ -1084,7 +1093,7 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
   const [rows] = await pool.query(
     `SELECT f.*, c.nom as client_nom, c.email as client_email,
             u.entreprise_nom, u.nom as user_nom, u.email as user_email, u.role as user_role
-     FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
+     FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id JOIN users u ON u.id = f.user_id
      WHERE f.id = ? AND f.user_id = ?`,
     [factureId, userId]
   );
@@ -1187,7 +1196,7 @@ router.post('/:id/relancer', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       `SELECT f.*, c.nom as client_nom, c.email as client_email, u.entreprise_nom, u.nom as user_nom
-       FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
+       FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id JOIN users u ON u.id = f.user_id
        WHERE f.id = ? AND f.user_id = ? AND f.type = 'facture'`,
       [req.params.id, req.tenantId]
     );
@@ -1201,7 +1210,7 @@ router.post('/:id/relancer', async (req, res, next) => {
 
     if (!facture.verification_code) {
       facture.verification_code = crypto.randomBytes(5).toString('hex');
-      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ? AND user_id = ?', [facture.verification_code, facture.id, req.tenantId]);
     }
 
     const baseUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');

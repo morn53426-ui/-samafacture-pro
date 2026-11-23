@@ -18,6 +18,14 @@ on:
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
+      - 'server/tests/factures.test.js'
+      - 'server/routes/clients.js'
+      - 'server/tests/client-history-protection.test.js'
+      - 'server/routes/public.js'
+      - 'server/routes/assistant.js'
+      - 'server/routes/dashboard.js'
+      - 'server/routes/rapports.js'
+      - 'server/tests/professional-tenant.test.js'
       - 'server/routes/auth.js'
       - 'server/routes/depenses.js'
       - 'server/routes/factures-recurrentes.js'
@@ -91,6 +99,14 @@ jobs:
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
+          server/tests/factures.test.js
+          server/routes/clients.js
+          server/tests/client-history-protection.test.js
+          server/routes/public.js
+          server/routes/assistant.js
+          server/routes/dashboard.js
+          server/routes/rapports.js
+          server/tests/professional-tenant.test.js
           server/routes/auth.js
           server/routes/depenses.js
           server/routes/factures-recurrentes.js

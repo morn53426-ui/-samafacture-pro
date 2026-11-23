@@ -78,7 +78,7 @@ router.get('/', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       `SELECT r.*, c.nom as client_nom FROM factures_recurrentes r
-       JOIN clients c ON c.id = r.client_id
+       JOIN clients c ON c.id = r.client_id AND c.user_id = r.user_id
        WHERE r.user_id = ? ORDER BY r.prochaine_date ASC`,
       [req.tenantId]
     );
@@ -357,6 +357,9 @@ router.post('/:id/generer', async (req, res, next) => {
     res.status(201).json({ facture });
   } catch (err) {
     if (err?.code === 'QUOTA_DEPASSE') return res.status(403).json({ error: err.message, code: 'QUOTA_DEPASSE' });
+    if (err?.code === 'CLIENT_TENANT_MISMATCH') {
+      return res.status(409).json({ error: err.message, code: 'CLIENT_TENANT_MISMATCH' });
+    }
     next(err);
   }
 });
@@ -382,6 +385,18 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
     if (!modele) {
       await conn.rollback();
       return null;
+    }
+
+    // Défense en profondeur : un modèle historique mal rattaché ne doit jamais
+    // générer de facture pour le client d'une autre entreprise.
+    const [clientRows] = await conn.query(
+      'SELECT id FROM clients WHERE id = ? AND user_id = ? FOR UPDATE',
+      [modele.client_id, userId]
+    );
+    if (!clientRows.length) {
+      const error = new Error('Le client associé au modèle récurrent n’appartient plus à cette entreprise.');
+      error.code = 'CLIENT_TENANT_MISMATCH';
+      throw error;
     }
     if (onlyIfDue && Number(modele.actif) !== 1) {
       await conn.rollback();

@@ -56,6 +56,30 @@ describe('Protection de l’historique client', () => {
     return response.body.client;
   }
 
+  test('le détail client ne divulgue pas les codes de vérification des factures', async () => {
+    const client = await createClient('Client historique sans secret');
+    const createdInvoice = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: client.id,
+        type: 'facture',
+        lignes: [{ designation: 'Prestation protégée', quantite: 1, prix_unitaire: 1500, tva: 0 }]
+      });
+    assert.equal(createdInvoice.status, 201, createdInvoice.text);
+    assert.match(createdInvoice.body.facture.verification_code || '', /^[a-f0-9]{10}$/i);
+
+    const response = await request(app)
+      .get(`/api/clients/${client.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(response.status, 200, response.text);
+    const listedInvoice = response.body.factures.find(row => Number(row.id) === Number(createdInvoice.body.facture.id));
+    assert.ok(listedInvoice, 'la facture reste présente dans l’historique client');
+    assert.equal(listedInvoice.numero, createdInvoice.body.facture.numero);
+    assert.equal(Object.hasOwn(listedInvoice, 'verification_code'), false,
+      'l’historique client ne doit pas exposer le secret de consultation publique');
+  });
+
   test('un client avec facture et paiement ne peut être supprimé; historique conservé', async () => {
     const client = await createClient('Client avec historique financier');
     const facture = await request(app)
