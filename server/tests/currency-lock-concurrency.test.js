@@ -72,6 +72,59 @@ function entrepriseProfile(devise) {
   };
 }
 
+function pause(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+async function runCreationBeforeCurrencyChange(company, createRequest, updateRequest) {
+  const lock = await pool.getConnection();
+  let lockHeld = false;
+  let createSettled = false;
+  try {
+    await lock.beginTransaction();
+    await lock.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [company.userId]);
+    lockHeld = true;
+
+    // Démarrer la création en premier pendant qu'un autre transaction détient le verrou.
+    // Elle ne doit pas pouvoir écrire en contournant le verrou users.
+    const createPromise = createRequest.then(
+      response => { createSettled = true; return { response }; },
+      error => { createSettled = true; return { error }; }
+    );
+    await pause(120);
+    assert.equal(createSettled, false,
+      'la création doit attendre le verrou du compte avant de créer le premier historique');
+
+    // Le changement est lancé après la création : il ne doit pas vérifier l'historique
+    // avant d'avoir obtenu le même verrou.
+    const updatePromise = updateRequest.then(
+      response => ({ response }),
+      error => ({ error })
+    );
+    await pause(60);
+
+    await lock.commit();
+    lockHeld = false;
+    const [createResult, updateResult] = await Promise.all([createPromise, updatePromise]);
+    if (createResult.error) throw createResult.error;
+    if (updateResult.error) throw updateResult.error;
+
+    const createResponse = createResult.response;
+    const updateResponse = updateResult.response;
+    assert.equal(createResponse.status, 201, createResponse.text);
+    assert.equal(updateResponse.status, 409, updateResponse.text,
+      'le changement de devise doit être refusé après la création du premier historique');
+
+    const [[account]] = await pool.query('SELECT devise FROM users WHERE id = ?', [company.userId]);
+    assert.equal(account.devise, 'FCFA', 'la devise initiale doit être conservée après une création prioritaire');
+
+    return { createResponse, updateResponse };
+  } finally {
+    if (lockHeld) await lock.rollback().catch(() => {});
+    lock.release();
+  }
+}
+
 async function assertCurrencyChangeAndOrderAreSerialized(company, updateRequest) {
   const orderRequest = request(app)
     .post('/api/pro/orders')
@@ -81,57 +134,21 @@ async function assertCurrencyChangeAndOrderAreSerialized(company, updateRequest)
       lignes: [{ designation: 'Prestation test', quantite: 1, prix_unitaire: 2500 }]
     });
 
-  const [updateResponse, orderResponse] = await Promise.all([
-    updateRequest,
-    orderRequest
-  ]);
+  const { createResponse: orderResponse } =
+    await runCreationBeforeCurrencyChange(company, orderRequest, updateRequest);
 
-  assert.equal(orderResponse.status, 201, orderResponse.text);
-  assert.ok(
-    [200, 409].includes(updateResponse.status),
-    'le changement de devise doit réussir avant la commande ou être refusé après sa création: ' + updateResponse.text
-  );
-
-  const [[account]] = await pool.query(
-    'SELECT devise FROM users WHERE id = ?',
-    [company.userId]
-  );
   const [[storedOrder]] = await pool.query(
     'SELECT devise FROM pro_commandes WHERE id = ? AND user_id = ?',
     [orderResponse.body.id, company.userId]
   );
-
-  assert.ok(storedOrder, 'la commande concurrente doit être enregistrée');
-  assert.equal(
-    storedOrder.devise,
-    account.devise,
-    'la devise de la commande doit toujours correspondre à la devise finale du compte'
-  );
-
-  if (updateResponse.status === 200) {
-    assert.equal(account.devise, 'EUR');
-    assert.equal(orderResponse.body.devise, 'EUR');
-  } else {
-    assert.equal(account.devise, 'FCFA');
-    assert.equal(updateResponse.status, 409);
-  }
+  assert.ok(storedOrder, 'la commande doit être conservée');
+  assert.equal(storedOrder.devise, 'FCFA',
+    'la commande doit enregistrer la devise qui reste active sur le compte');
 }
 
 async function assertHistoryCreationRace(company, updateRequest, createRequest, tableName, idField) {
-  const [updateResponse, createResponse] = await Promise.all([
-    updateRequest,
-    createRequest
-  ]);
-
-  assert.equal(createResponse.status, 201, createResponse.text);
-  assert.ok(
-    [200, 409].includes(updateResponse.status),
-    'le réglage doit passer avant la création ou être refusé après sa création: ' + updateResponse.text
-  );
-
-  const [[account]] = await pool.query('SELECT devise FROM users WHERE id = ?', [company.userId]);
-  if (updateResponse.status === 200) assert.equal(account.devise, 'EUR');
-  else assert.equal(account.devise, 'FCFA');
+  const { createResponse } =
+    await runCreationBeforeCurrencyChange(company, createRequest, updateRequest);
 
   const recordId = idField.split('.').reduce((value, key) => value && value[key], createResponse.body);
   assert.ok(recordId, 'la réponse doit contenir l’identifiant du nouvel enregistrement');
