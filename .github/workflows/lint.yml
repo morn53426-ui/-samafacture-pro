@@ -17,6 +17,15 @@ on:
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
+      - 'server/routes/auth.js'
+      - 'server/routes/depenses.js'
+      - 'server/routes/factures-recurrentes.js'
+      - 'server/routes/factures.js'
+      - 'server/routes/produits.js'
+      - 'server/routes/public-api.js'
+      - 'server/tests/auth-currency.test.js'
+      - 'server/tests/currency-lock-concurrency.test.js'
+      - 'server/tests/setup.js'
       - 'server/tests/company-group-ui.test.js'
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
@@ -79,6 +88,15 @@ jobs:
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
+          server/routes/auth.js
+          server/routes/depenses.js
+          server/routes/factures-recurrentes.js
+          server/routes/factures.js
+          server/routes/produits.js
+          server/routes/public-api.js
+          server/tests/auth-currency.test.js
+          server/tests/currency-lock-concurrency.test.js
+          server/tests/setup.js
           server/tests/company-group-ui.test.js
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
