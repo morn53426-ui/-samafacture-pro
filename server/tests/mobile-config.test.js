@@ -31,7 +31,7 @@ test('une configuration publique HTTPS valide passe la pré-vérification', () =
   assert.deepEqual(validateCapacitorConfig(validConfig(), { mobileDir }), []);
 });
 
-test('les URL HTTP, locales et privées sont refusées', () => {
+test('les URL HTTP, locales, privées et suffixes DNS non publics sont refusés', () => {
   const urls = [
     'http://facturation.sama-cloud.sn',
     'https://localhost',
@@ -39,7 +39,14 @@ test('les URL HTTP, locales et privées sont refusées', () => {
     'https://192.168.1.20',
     'https://8.8.8.8',
     'https://service.local',
-    'https://votredomaine.com.'
+    'https://votredomaine.com.',
+    'https://api.example',
+    'https://printer.home.arpa',
+    'https://device.lan',
+    'https://service.corp',
+    'https://host.private',
+    'https://app.onion',
+    'https://alt-network.alt'
   ];
 
   for (const url of urls) {
