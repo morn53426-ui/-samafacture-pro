@@ -24,15 +24,28 @@ Avant toute commande, ouvrez `capacitor.config.json` dans ce dossier et modifiez
 - `"server.url"` : remplacez `https://votredomaine.com` par le vrai domaine où votre
   serveur est déployé (voir la Phase 10 de `RAPPORT_AUDIT.md` pour le déploiement Docker).
 
-## Étape 2 — Installer et générer les projets natifs
+## Étape 2 — Vérifier la configuration, puis générer les projets natifs
+
+La commande de pré-vérification est volontairement bloquante tant que `server.url`
+contient encore `https://votredomaine.com`, une URL HTTP, un domaine local/privé ou
+une URL mal formée. Cela évite de générer une application qui ne peut pas joindre votre
+serveur depuis un téléphone.
 
 ```bash
 cd mobile
 npm install
-npx cap add ios       # génère le dossier ios/ (nécessite un Mac)
-npx cap add android    # génère le dossier android/
-npx cap sync
+npm run preflight
+npm run add:ios       # génère ios/ (nécessite un Mac avec Xcode)
+npm run add:android   # génère android/
+npm run sync
 ```
+
+Après avoir remplacé `server.url` dans `capacitor.config.json` par le domaine public
+réel en HTTPS, `npm run preflight` doit afficher une validation réussie. Les commandes
+`add:ios`, `add:android` et `sync` relancent aussi ce contrôle automatiquement.
+La pré-vérification ne contacte pas le serveur et ne valide donc pas son certificat,
+sa disponibilité ou l'authentification : ces points doivent être testés sur un appareil
+ou un simulateur après le déploiement.
 
 ## Étape 3 — Icônes et écran de démarrage
 
