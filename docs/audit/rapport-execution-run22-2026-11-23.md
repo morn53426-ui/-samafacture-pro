@@ -142,3 +142,46 @@ Le snapshot de l'inventaire principal ci-dessus a été pris immédiatement apr�
 - PR #206 head : `e3725b217b2b453d75e3ddcc073a080346e78060`; base main `f10d89694e264bc710f1ce534a6418dd792e603a`.
 - CI PR #206 au snapshot : Package ZIP run #45212244169 queued; Tests Node/MySQL non encore visible.
 - Aucun changement applicatif. PR #206 non fusionnée.
+
+
+## Addendum — après fusion PR #192 et contrôle du main (23 novembre, 16:38 UTC)
+
+### Fusion PR #192 — verrouillage de devise
+- PR #192 a été fusionnée sur GitHub le 23 novembre 2026 à 16:34:04 UTC.
+- Merge SHA / nouveau main : `60fc886aee3d15993b255a8d4a1ce35a287e9939`.
+- Message observé : `Merge pull request #192 from morn53426-ui/fix/tenant-currency-final-main-20261123`.
+- Cette fusion est intervenue après le snapshot initial du présent rapport. Elle n'a pas été effectuée dans le cadre de cette étape d'audit.
+- Le diff de #192 n'ajoute pas de migration DDL; il introduit des verrous transactionnels `users FOR UPDATE` partagés entre réglages et premières écritures métier ainsi que des tests de concurrence.
+- **Risque post-fusion conservé** : l'audit précédent a relevé que `POST /api/pro/orders` accepte une devise supportée explicitement différente de la devise de base, sans conversion activée, contrairement aux factures et achats fournisseurs. La fusion ne résout pas cette incohérence métier. La traiter par une PR de suivi dédiée après analyse des impacts commandes, rapports, facturation et comptabilité OHADA; aucune correction spéculative ni écriture historique n'est effectuée ici.
+
+### CI post-fusion PR #192 — SHA exact
+- Workflow Tests automatisés : [run #45217959532](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45217959532).
+- Head SHA : `60fc886aee3d15993b255a8d4a1ce35a287e9939`.
+- État au relevé : **in_progress**.
+- Étapes exécutées avec succès : préparation du job, initialisation containers, récupération du dépôt, validation Docker Compose, installation Node, build image et contrôle secrets, dépendances, détection Chromium, contrôle dépendances, script staging, tests, restauration réelle sauvegarde chiffrée, diagnostics et smoke test MySQL/Redis.
+- Étape `Recette visuelle responsive avec données extrêmes` : **in_progress**.
+- Publication des captures : **pending**.
+- Le run ne peut pas être déclaré réussi avant sa conclusion finale. Aucune fusion supplémentaire pendant ce contrôle.
+
+### PR #194 — nouvel état après #192
+- [PR #194](https://github.com/morn53426-ui/-samafacture-pro/pull/194), branche `security/tenant-relations-main-current-20261123-run12`.
+- Head exact : `250141bd649cd773462813bd99b098c5f62a6374`.
+- Base au moment de sa synchronisation : `f10d89694e264bc710f1ce534a6418dd792e603a`.
+- Compare avec le main courant `60fc886aee3d15993b255a8d4a1ce35a287e9939` : **21 commits ahead / 13 behind**, état divergent. Les 13 commits correspondent au développement/fusion intervenu depuis l'ancienne base; la branche n'est plus à jour.
+- Les trois workflows sur le head `250141bd...` étaient green : ESLint #45213180825, archive ZIP #45213180911, Tests Node/MySQL #45213180959. Ces résultats ne valident pas la branche contre le nouveau main et ne remplacent pas de nouveaux checks après synchronisation.
+- Le diff porte sur 12 fichiers, routes tenant-aware et tests inter-entreprises; aucun changement DDL ni écriture comptable identifié dans le patch revu.
+- L'état GitHub observé est ouvert, non fusionné. Aucune synchronisation après la fusion #192 n'a été effectuée dans cette étape.
+- Les revues existantes de #194 sont toutes des soumissions `COMMENTED` du compte auteur `morn53426-ui`; aucun état `APPROVED` d'un reviewer distinct n'est présent dans les revues retournées. Aucun thread inline non résolu n'a été retourné.
+- **Blocage de fusion** : CI post-fusion du main courant terminée avec succès requise; synchronisation non destructive de #194 requise; trois checks relancés sur le nouveau head; revue de sécurité indépendante par une autre personne requise conformément au corps de la PR; validation humaine spécifique de sécurité requise. La demande de fusion exprimée dans la conversation n'est pas une approbation technique indépendante sur GitHub.
+
+### Candidats P2 relus en lecture seule
+- PR #127 (pagination A4 devis Executive) : 6 commits ahead / 45 behind, 3 fichiers.
+- PR #155 (grille responsive paramètres entreprise) : 9 ahead / 39 behind; compare ne montre que 3 fichiers modifiés sur main→head.
+- PR #156 (skip-link clavier dashboard) : 8 ahead / 39 behind; compare montre 4 fichiers.
+- PR #130 (contraste/focus) : 21 ahead / 45 behind, Draft.
+- Ces branches sont trop en retard pour être fusionnées ou validées sur leur CI historique. Les reprendre par portage ciblé sur une branche actuelle après stabilisation de main, sans fusion directe de leurs historiques.
+
+### Décision et préservation à 16:38 UTC
+- Main : `60fc886aee3d15993b255a8d4a1ce35a287e9939`; CI #45217959532 encore en cours; stabilité post-#192 non certifiée.
+- #194 non fusionnée; #192 fusionnée sur GitHub; aucune autre fusion effectuée par cette étape.
+- Aucun push direct/force push sur main, aucune branche supprimée, aucun volume/donnée/sauvegarde/historique comptable modifié, aucun paiement réel ni déploiement production.
