@@ -58,6 +58,34 @@ test("l'ancienne route entreprise ne peut pas contourner la protection de devise
   assert.equal(client.status, 201, client.text);
   clientId = client.body.client.id;
 
+  const orderPayload = {
+    client_id: clientId,
+    lignes: [{ designation: 'Prestation test', quantite: 1, prix_unitaire: 2500 }]
+  };
+  const invalidOrderCurrency = await request(app)
+    .post('/api/pro/orders')
+    .set('Authorization', 'Bearer ' + token)
+    .send({ ...orderPayload, devise: 'ZZZ' });
+  assert.equal(invalidOrderCurrency.status, 400, invalidOrderCurrency.text);
+
+  const order = await request(app)
+    .post('/api/pro/orders')
+    .set('Authorization', 'Bearer ' + token)
+    .send(orderPayload);
+  assert.equal(order.status, 201, order.text);
+  const [[storedOrder]] = await pool.query(
+    'SELECT devise FROM pro_commandes WHERE id = ? AND user_id = ?',
+    [order.body.id, userId]
+  );
+  assert.equal(storedOrder.devise, 'EUR', 'une commande sans devise explicite utilise la devise de l’entreprise');
+
+  const changeAfterOrder = await request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + token)
+    .send(profile('USD'));
+  assert.equal(changeAfterOrder.status, 409, changeAfterOrder.text,
+    'la présence d’une commande commerciale doit verrouiller la devise de base');
+
   await pool.query(
     "INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison, sous_total, total_tva, total, montant_paye, devise) VALUES (?, ?, ?, 'facture', '2026-11-16', 'en_attente', 0, 0, 5000, 0, 5000, 0, 'EUR')",
     [userId, clientId, 'CURRENCY-LOCK-' + Date.now()]
