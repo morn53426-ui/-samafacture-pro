@@ -342,6 +342,9 @@ router.post('/:id/generer', async (req, res, next) => {
     res.status(201).json({ facture });
   } catch (err) {
     if (err?.code === 'QUOTA_DEPASSE') return res.status(403).json({ error: err.message, code: 'QUOTA_DEPASSE' });
+    if (err?.code === 'CLIENT_TENANT_MISMATCH') {
+      return res.status(409).json({ error: err.message, code: 'CLIENT_TENANT_MISMATCH' });
+    }
     next(err);
   }
 });
@@ -368,6 +371,20 @@ async function genererFactureDepuisModele(id, userId, { onlyIfDue = false } = {}
       await conn.rollback();
       return null;
     }
+
+    // Défense en profondeur : un modèle historique ou modifié hors API ne doit jamais
+    // produire une facture associée au client d'un autre tenant.
+    const [clientRows] = await conn.query(
+      'SELECT id FROM clients WHERE id = ? AND user_id = ? FOR UPDATE',
+      [modele.client_id, userId]
+    );
+    if (!clientRows.length) {
+      await conn.rollback();
+      const error = new Error('Le client associé au modèle récurrent n’appartient plus à cette entreprise.');
+      error.code = 'CLIENT_TENANT_MISMATCH';
+      throw error;
+    }
+
     if (onlyIfDue && Number(modele.actif) !== 1) {
       await conn.rollback();
       return null;
