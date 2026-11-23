@@ -313,6 +313,30 @@
 
 ## 2. Main et post-merge CI
 
+### Workflows sur main
+
+| Workflow | SHA du fichier |
+|---|---|
+| `.github/workflows/lint.yml` | `a9a13d67937b3a9f8b79151e8780067f57528dc0` |
+| `.github/workflows/package-source-zip.yml` | `d69229d6d25f5d707fa6f018996c829c27013f5d` |
+| `.github/workflows/test.yml` | `9475c0e817663cc4d84702f98123013802b47b23` |
+
+### 10 commits récents de main
+
+| SHA | Date UTC | Message |
+|---|---|---|
+| `c32ed40a` | 2026-11-23 16:53:14 | Merge PR #194 — tenant relations |
+| `970832f4` | 2026-11-23 16:37:53 | Synchronisation main dans security branch |
+| `60fc886a` | 2026-11-23 16:34:03 | Merge PR #192 — tenant currency |
+| `0c046f9e` | 2026-11-23 16:14:16 | Synchronisation main dans currency branch |
+| `250141bd` | 2026-11-23 16:08:46 | Synchronisation main dans security branch |
+| `f10d8969` | 2026-11-23 16:01:06 | Rapport audit Run 21 |
+| `8df06519` | 2026-11-23 15:35:13 | Merge rapport Run 20 |
+| `047e7bad` | 2026-11-23 14:35:22 | Contraste badge Entreprise sombre |
+| `f8a61187` | 2026-11-23 14:03:46 | Skip link dashboard |
+| `90016322` | 2026-11-23 13:55:04 | Synchronisation branche isolation tenant |
+
+
 - SHA main exact: `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`.
 - Run push main: [45221526816](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45221526816), job `137856763971`, **completed/success**.
 - Log du commit exact: 620 tests, **619 pass, 0 fail, 1 skip** (suite principale); test dédié restauration chiffrée **1 pass, 0 fail**.
