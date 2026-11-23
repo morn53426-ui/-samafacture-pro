@@ -539,3 +539,48 @@ test('une facture créée par API lit la devise après le verrou du compte', asy
     return stored;
   });
 });
+
+test('une nouvelle caisse reprend la devise de base et refuse les devises inconnues', async () => {
+  const company = await createCompanyAndClient('cash-register-currency-default');
+  const profileResponse = await request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  assert.equal(profileResponse.status, 200, profileResponse.text);
+
+  const defaultRegister = await request(app)
+    .post('/api/pro/cash/registers')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Caisse principale EUR' });
+  assert.equal(defaultRegister.status, 201, defaultRegister.text);
+  assert.equal(defaultRegister.body.devise, 'EUR');
+
+  const [[storedDefault]] = await pool.query(
+    'SELECT devise FROM pro_caisses WHERE id = ? AND user_id = ?',
+    [defaultRegister.body.id, company.userId]
+  );
+  assert.equal(storedDefault.devise, 'EUR',
+    'une caisse sans devise explicite doit reprendre la devise de base de l’entreprise');
+
+  // Les caisses multi-devises explicites restent possibles et sont comptabilisées
+  // séparément par devise dans les rapports.
+  const foreignRegister = await request(app)
+    .post('/api/pro/cash/registers')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Caisse USD', devise: 'USD' });
+  assert.equal(foreignRegister.status, 201, foreignRegister.text);
+  assert.equal(foreignRegister.body.devise, 'USD');
+
+  const unsupportedRegister = await request(app)
+    .post('/api/pro/cash/registers')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Caisse devise invalide', devise: 'ZZZ' });
+  assert.equal(unsupportedRegister.status, 400, unsupportedRegister.text);
+
+  const [[counts]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_caisses WHERE user_id = ?',
+    [company.userId]
+  );
+  assert.equal(Number(counts.total), 2,
+    'une caisse avec une devise non prise en charge ne doit pas être créée');
+});
