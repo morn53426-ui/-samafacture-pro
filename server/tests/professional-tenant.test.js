@@ -130,6 +130,19 @@ test('les espaces entreprise isolent les clients, les factures et les permission
   assert.equal(foreignInvoiceDetail.status, 404,
     'une facture B avec un client A ne doit pas divulguer les coordonnées du client A');
 
+  const foreignInvoiceReminder = await request(app)
+    .post('/api/factures/' + foreignInvoiceId + '/relancer')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(foreignInvoiceReminder.status, 404,
+    'une relance ne doit jamais utiliser les coordonnées d’un client appartenant à une autre entreprise');
+
+  const { envoyerFactureParEmail } = require('../routes/factures');
+  await assert.rejects(
+    () => envoyerFactureParEmail(foreignInvoiceId, memberId, 'https://example.invalid'),
+    /Document introuvable/,
+    'l’envoi direct et les envois récurrents doivent refuser une facture mal rattachée'
+  );
+
   const invoiceList = await request(app)
     .get('/api/factures?limite=100')
     .set('Authorization', 'Bearer ' + memberToken);
