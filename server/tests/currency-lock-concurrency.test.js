@@ -162,6 +162,48 @@ async function assertHistoryCreationRace(company, updateRequest, createRequest, 
   assert.ok(stored, 'le nouvel enregistrement doit rester présent après la course concurrente');
 }
 
+async function runCurrencyChangeBeforeCreation(company, updateRequest, createRequest, getStoredDocument) {
+  const lock = await pool.getConnection();
+  let lockHeld = false;
+  try {
+    await lock.beginTransaction();
+    await lock.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [company.userId]);
+    lockHeld = true;
+
+    // Le changement de devise est lancé en premier et doit réserver le verrou avant
+    // que la création ne lise sa devise effective.
+    const updatePromise = updateRequest.then(
+      response => ({ response }),
+      error => ({ error })
+    );
+    await pause(200);
+    const createPromise = createRequest.then(
+      response => ({ response }),
+      error => ({ error })
+    );
+    await pause(120);
+
+    await lock.commit();
+    lockHeld = false;
+    const [updateResult, createResult] = await Promise.all([updatePromise, createPromise]);
+    if (updateResult.error) throw updateResult.error;
+    if (createResult.error) throw createResult.error;
+
+    assert.equal(updateResult.response.status, 200, updateResult.response.text);
+    assert.equal(createResult.response.status, 201, createResult.response.text);
+    const [[account]] = await pool.query('SELECT devise FROM users WHERE id = ?', [company.userId]);
+    assert.equal(account.devise, 'EUR');
+    const stored = await getStoredDocument(createResult.response, company);
+    assert.equal(stored.devise, 'EUR',
+      'le document créé après le changement doit reprendre la devise verrouillée du compte');
+    return createResult.response;
+  } finally {
+    if (lockHeld) await lock.rollback().catch(() => {});
+    lock.release();
+  }
+}
+
+
 
 test('le profil entreprise sérialise le changement de devise avec la création de commande', async () => {
   const company = await createCompanyAndClient('currency-race-profile');
@@ -286,4 +328,76 @@ test('le changement de devise est sérialisé avec la création d’un achat fou
       lignes: [{ designation: 'Matière première test', quantite: 1, prix_unitaire: 1000, tva: 0 }]
     });
   await assertHistoryCreationRace(company, updateRequest, createRequest, 'pro_commandes_fournisseurs', 'id');
+});
+
+test('un devis manuel lit la devise après le verrou du compte', async () => {
+  const company = await createCompanyAndClient('currency-change-before-quote');
+  const updateRequest = request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  const createRequest = request(app)
+    .post('/api/factures')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      client_id: company.clientId,
+      type: 'devis',
+      lignes: [{ designation: 'Devis en EUR', quantite: 1, prix_unitaire: 3500, tva: 0 }]
+    });
+  await runCurrencyChangeBeforeCreation(company, updateRequest, createRequest, async (response) => {
+    const [[stored]] = await pool.query('SELECT devise FROM factures WHERE id = ? AND user_id = ?', [response.body.facture.id, company.userId]);
+    return stored;
+  });
+});
+
+test('une facture manuelle lit la devise après le verrou du compte et le quota', async () => {
+  const company = await createCompanyAndClient('currency-change-before-invoice');
+  const updateRequest = request(app)
+    .put('/api/pro/localization')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      pays_code: 'SN',
+      langue: 'fr',
+      devise: 'EUR',
+      fuseau_horaire: 'Africa/Dakar',
+      format_date: 'dd/MM/yyyy',
+      regime_fiscal: 'standard'
+    });
+  const createRequest = request(app)
+    .post('/api/factures')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      client_id: company.clientId,
+      type: 'facture',
+      lignes: [{ designation: 'Facture en EUR', quantite: 1, prix_unitaire: 4500, tva: 0 }]
+    });
+  await runCurrencyChangeBeforeCreation(company, updateRequest, createRequest, async (response) => {
+    const [[stored]] = await pool.query('SELECT devise FROM factures WHERE id = ? AND user_id = ?', [response.body.facture.id, company.userId]);
+    return stored;
+  });
+});
+
+test('une facture créée par API lit la devise après le verrou du compte', async () => {
+  const company = await createCompanyAndClient('currency-change-before-api-invoice');
+  const key = await request(app)
+    .post('/api/pro/integrations/api-keys')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Clé API test concurrence', scopes: ['invoices:write'] });
+  assert.equal(key.status, 201, key.text);
+
+  const updateRequest = request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  const createRequest = request(app)
+    .post('/api/v1/invoices')
+    .set('X-SamaFacture-Key', key.body.token)
+    .send({
+      client_id: company.clientId,
+      lignes: [{ designation: 'Facture API en EUR', quantite: 1, prix_unitaire: 5500, tva: 0 }]
+    });
+  await runCurrencyChangeBeforeCreation(company, updateRequest, createRequest, async (response) => {
+    const [[stored]] = await pool.query('SELECT devise FROM factures WHERE id = ? AND user_id = ?', [response.body.facture.id, company.userId]);
+    return stored;
+  });
 });
