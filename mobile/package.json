@@ -4,9 +4,12 @@
   "description": "Enveloppe native iOS/Android (Capacitor) pour Sunupilot — charge le site web existant, ne réécrit rien.",
   "private": true,
   "scripts": {
-    "sync": "npx cap sync",
+    "sync": "npm run preflight && npx cap sync",
     "open:ios": "npx cap open ios",
-    "open:android": "npx cap open android"
+    "open:android": "npx cap open android",
+    "preflight": "node scripts/check-capacitor-config.js",
+    "add:ios": "npm run preflight && npx cap add ios",
+    "add:android": "npm run preflight && npx cap add android"
   },
   "dependencies": {
     "@capacitor/core": "^6.1.0"

@@ -26,6 +26,8 @@ on:
       - 'server/tests/auth.test.js'
       - 'server/tests/paiements.test.js'
       - 'server/tests/backup.test.js'
+      - 'server/tests/mobile-config.test.js'
+      - 'mobile/scripts/check-capacitor-config.js'
       - '.github/workflows/lint.yml'
   push:
     branches:
@@ -86,3 +88,5 @@ jobs:
           server/tests/auth.test.js
           server/tests/paiements.test.js
           server/tests/backup.test.js
+          server/tests/mobile-config.test.js
+          mobile/scripts/check-capacitor-config.js
