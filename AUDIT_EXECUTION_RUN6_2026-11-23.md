@@ -982,3 +982,10 @@ ux/settings-company-fields-grid-20261122
 - 0 migration exécutée; 0 modification d'écriture comptable historique.
 - 0 opération destructive; 0 modification des données, volumes ou sauvegardes.
 - 0 paiement réel; 0 déploiement production.
+
+
+### Addendum Run 10 — revue métier complémentaire #178
+- La PR #178 est repassée en **draft** pendant l'attente de la CI du nouveau head et de la décision métier sur la devise explicite des commandes.
+- Revue COMMENT #6017314009 sur le head `fc4a1b0e3fddc6da7409566942fcda1bc7d6a621`: `POST /api/pro/orders` accepte actuellement tout code devise supporté explicitement fourni, même s'il diffère de `company.devise`; factures et commandes fournisseurs refusent cette différence. Les tests actuels vérifient la devise implicite du tenant et le rejet d'un code invalide, pas un code supporté mais différent.
+- Décision requise avant fusion : confirmer si les commandes commerciales sont intentionnellement multi-devises. Si non, ajouter un rejet 409 et un test tenant EUR / commande USD. Aucun changement de politique devise n'a été fait dans Run 10.
+- La CI du head `fc4a1b0` reste : ESLint success; Tests Node/MySQL et ZIP in progress au dernier relevé. La validation ne peut pas être considérée complète.
