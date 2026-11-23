@@ -26,6 +26,11 @@ on:
       - 'server/tests/auth.test.js'
       - 'server/tests/paiements.test.js'
       - 'server/tests/backup.test.js'
+      - 'server/routes/factures.js'
+      - 'server/routes/dashboard.js'
+      - 'server/routes/rapports.js'
+      - 'server/routes/factures-recurrentes.js'
+      - 'server/tests/professional-tenant.test.js'
       - 'server/tests/mobile-config.test.js'
       - 'mobile/scripts/check-capacitor-config.js'
       - '.github/workflows/lint.yml'
@@ -88,5 +93,10 @@ jobs:
           server/tests/auth.test.js
           server/tests/paiements.test.js
           server/tests/backup.test.js
+          server/routes/factures.js
+          server/routes/dashboard.js
+          server/routes/rapports.js
+          server/routes/factures-recurrentes.js
+          server/tests/professional-tenant.test.js
           server/tests/mobile-config.test.js
           mobile/scripts/check-capacitor-config.js
