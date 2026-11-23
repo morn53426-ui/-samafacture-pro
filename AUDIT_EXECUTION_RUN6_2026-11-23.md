@@ -1,10 +1,11 @@
 # Audit & développement SamaFacture Pro — Run 6
-**Snapshot GitHub : 23 novembre 2026, 03:56 UTC**  
+**Snapshot GitHub : 23 novembre 2026, vers 04:00 UTC (avant création de la PR #176)**  
 Repository: https://github.com/morn53426-ui/-samafacture-pro
 
 ## Résumé de l'exécution
 - Main observé : `b43a94fc2937b0108077501a0260358c8569e11f` (aucun push/merge sur main).
 - Inventaire : **182 branches**, **46 PR ouvertes**, **125 PR fermées** (dont **106 fusionnées**, **19 fermées sans fusion**).
+- Après création de la branche et de la PR #176 du rapport Run 6, l'état vivant re-vérifié est **183 branches / 47 PR ouvertes**; le snapshot détaillé ci-dessous reste celui juste avant cette création.
 - Branches, données, volumes, sauvegardes et historique comptable préservés; aucune migration exécutée.
 - Main CI : run **45080802243**, « Tests automatisés », success sur SHA `b43a94fc2937b0108077501a0260358c8569e11f`; job Node/MySQL et toutes les étapes listées terminés avec succès.
 - Ruleset #27410527 actif sur main; aucun bypass. Protection classique non lisible (403).
