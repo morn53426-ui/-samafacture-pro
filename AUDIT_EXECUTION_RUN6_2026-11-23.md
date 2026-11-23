@@ -577,3 +577,288 @@ Les workflows pertinents sont Tests Node/MySQL, ESLint ciblé et archive source.
 - Ruleset #27410527 actif selon Run 6; 0 approbation exigée par GitHub, bypass never; protection classique 403/non vérifiée.
 - Aucun test local; DNS GitHub clone précédemment bloqué. Les CI exactes green sont distinguées de celles pending/absentes.
 - 0 migration, 0 suppression, 0 modification de données/volumes/backups/écritures historiques, 0 paiement réel, 0 déploiement.
+
+---
+
+# Addendum Run 8 — 23 novembre 2026, 06:00 UTC
+
+## Snapshot frais
+- Main: `b43a94fc2937b0108077501a0260358c8569e11f`, inchangé; dernier post-merge confirmé précédent #45080802243 green. Aucun nouveau run post-merge main récupéré ce tour.
+- **185 branches** (100 + 85; curseur final `MTg1`).
+- **49 PR ouvertes**, **125 PR fermées** re-comptées par segments de création (16, 86, 13, 10).
+- Split 106 merged/19 closed-no-merge repris de l'audit précédent, non recalculé sur les segments Run 8.
+
+## Toutes les branches (API, ordre alphabétique)
+```
+a11y/dashboard-skip-navigation-20261122
+a11y/mobile-sidebar-escape-focus-20261122
+audit/execution-report-20261122-run1
+audit/execution-report-20261122-run2
+audit/execution-report-20261123-run3
+audit/execution-report-20261123-run4
+audit/execution-report-20261123-run5
+audit/execution-report-20261123-run6
+audit/fix-backup-and-runtime-20261110
+audit/fix-enterprise-migration-invitation-20261116
+audit/fix-nginx-upstream-order-20261116
+audit/fix-realtime-company-groups-20261116-run1
+audit/fix-reset-email-docs-and-redaction-test-20261116
+audit/initial-review-20261122
+audit/invoice-pdf-typography-print-20261118
+audit/npm-audit-gate-2026-11-16
+audit/rapport-approfondi-2026-11-16-run2
+audit/securite-2026-11-15
+audit/security-multisocietes-review-20261116-run3
+audit/ui-runtime-pages-polish-20261113
+audit/visual-viewport-offset-regression-20261116
+automation/audit-fixes-20261116-0150
+automation/visual-viewport-notifications-20261116-0243
+brand/sunupilot-identity-foundation
+chore/emil-design-skills-20261117
+ci/lint-history-protection-backend-20261122
+ci/package-main-after-pr39-pr40
+ci/real-restore-smoke-20261117
+ci/workspace-ui-structure-tests-20261122
+docs/backup-offsite-pinned-rclone-20261122
+docs/business-plan-samafacture-pro
+docs/correct-one-time-plan-billing-2026-11-16
+docs/fix-staging-compose-runbook-20261116
+docs/improvement-plan-20261121
+docs/improvement-plan-main-20261122
+docs/local-docker-bootstrap-20261117
+docs/production-env-security-guidance-20261122
+docs/subscription-monthly-architecture-20261117
+docs/subscriptions-current-state-20261117
+docs/ui-polish-plans-20261117
+feat/abonnement-choix-moyen-paiement
+feat/accounting-expense-payment-mode-20261121
+feat/dashboard-reference-layout
+feat/dashboard-reference-modules-20261119
+feat/dashboard-reference-redesign-20261112
+feat/enterprise-command-center-20261117
+feat/enterprise-company-pagination-20261117
+feat/enterprise-multi-company-foundation-20261116
+feat/enterprise-page-structure-2026-11-13
+feat/enterprise-page-structure-v2-2026-11-13
+feat/enterprise-pages-v2-2026-11-13
+feat/enterprise-workspace-ux-20261117
+feat/invoice-stock-warehouse-20261119
+feat/invoice-template-gallery-2026-11-15-v2
+feat/invoice-template-gallery-2026-11-15
+feat/invoice-templates-pro-enterprise-20261117
+feat/invoice-warehouse-stock-20261119
+feat/invoice-warehouse-stock-main-20261119
+feat/mobile-config-preflight
+feat/monthly-invoice-quota-v8-2026-11-15
+feat/ohada-account-mappings-20261122
+feat/phases-2-4-paiements-compta-achats-20261112
+feat/phases-5-7-portal-international-automation-20261112
+feat/professional-subscription-page-2026-11-15
+feat/responsive-scaling-2026-11-15
+feat/sidebar-icon-label-navigation-20261117
+feat/sidebar-navigation-visual-refresh-20261117
+feat/subscription-engine-local-simulation-20261117
+feat/sunupilot-dashboard-reference
+feat/templates-factures-devis-complets
+feat/topbar-notifications-bell-20261112
+feat/ui-motion-visual-recette-20261112
+feat/workspace-settings-navigation-20261121
+feat/5-nouveaux-modeles-facture
+feat/15-day-trial-entitlements-20261121
+feature/ohada-expense-account-mappings-20261122
+feature/video-presentation-spark-sunupilot
+fix/a11y-settings-labels-20261116
+fix/accessibility-contrast-focus-main-20261121
+fix/accessibility-template-preview-contrast-20261122
+fix/accounting-event-audit-retention-v22-20261122
+fix/accounting-event-audit-retention-v22-run2-20261122
+fix/accounting-invoice-cancellation-reversal-20261121
+fix/accounting-refund-journal-reversal-20261121
+fix/atomic-backup-publish-2026-11-15
+fix/atomic-encrypted-backups-2026-11-15
+fix/audit-devise-relances-escape
+fix/backup-directory-permissions-20261122
+fix/backup-retention-guard-2026-11-16
+fix/ci-serial-tests-2026-11-15
+fix/client-delete-history-protection-20261122
+fix/dashboard-donut-count-20261118
+fix/docker-context-secrets-and-lockfile-2026-11-15
+fix/docker-local-startup-mysql-redis-swagger
+fix/enterprise-badge-contrast-main-20261122
+fix/enterprise-invitation-email-proof-20261116
+fix/expense-ledger-protection-20261122
+fix/invoice-delete-history-guard-20261122
+fix/invoice-footer-stamp-mobile-20261121
+fix/invoice-mobile-table-cards-20261121
+fix/invoice-pdf-continuation-identity-20261121
+fix/invoice-print-and-payment-stamp-2026-11-15
+fix/invoice-print-banner-geometry-20261121
+fix/invoice-print-banner-spacing-20261122
+fix/invoice-print-typography-20261118
+fix/invoice-settlement-integrity-2026-11-15
+fix/invoice-stock-principal-warehouse
+fix/light-dark-theme-consistency-20261118
+fix/mobile-invoice-line-columns
+fix/mobile-nonpublic-hostnames-20261123
+fix/monthly-invoice-quota-schema-v8-2026-11-15
+fix/mysql-backup-limited-privileges-20261122
+fix/navigation-compact-sidebar-2026-11-13
+fix/pdf-headless-user-formatting-20261121
+fix/pdf-pagination-extras-flow-20261117
+fix/pdf-print-pagination-20261117
+fix/pdf-stream-ack-payment-disclosures-20261116
+fix/pdf-worker-db-readiness-2026-11-16
+fix/pdf-worker-health-and-sidebar-icons-2026-11-15
+fix/pdf-worker-wait-for-api-health-2026-11-15
+fix/pro-orders-tenant-currency-20261123
+fix/pro-workspace-status-contrast-20261122
+fix/product-delete-stock-history-protection-20261122
+fix/purchase-receipt-warehouse-deadlock-20261119
+fix/quota-registry-initialization-robustness-2026-11-15
+fix/quote-executive-a4-pagination-20261121
+fix/quote-warehouse-resilience-20261120
+fix/refund-payment-method-mapping-20261122
+fix/refund-payment-method-mapping-rebased-20261122
+fix/revoke-jwt-on-logout-2026-11-15
+fix/session-revocation-and-payment-timeouts-2026-11-15
+fix/sidebar-aria-current-2026-11-15
+fix/subscription-disabled-state-tests-docs-20261117
+fix/subscription-icons-main-2026-11-15
+fix/sunupilot-pwa-lifecycle
+fix/team-invitation-email-proof-20261117
+fix/tenant-currency-atomic-lock-20261123
+fix/ui-icons-legibility-2026-11-15
+fix/ui-responsive-polish-20261117
+fix/visual-qr-fixture-20261121
+fix/webhook-local-timezone-dynamic-currency-20261123
+fix/whatsapp-country-guard-2026-11-16
+improve/pdf-page3-balance-20261121
+improve/pdf-page3-balance-main-20261121
+integration/main-company-invitation-email-proof-20261117
+integration/reconcile-main-v21-20261122
+integration/schema-v21-accounting-trial-20261122
+integration/schema-v22-main-reconciled-20261122
+integration/sunupilot-video-main-20261121
+main
+qa/test-pdf-24-modeles
+rebase/pr106-main-20261121-run1
+rebase/pr110-main-20261121-run1
+rebrand/optigest
+reconciliation/schema-v21-main-base-20261122
+security/docker-ignore-local-secrets-2026-11-15
+security/immediate-session-revocation-2026-11-16
+security/invoice-list-verification-code-redaction-20261122
+security/invoice-verification-code-redaction-main-20261123-run7
+security/redact-secret-urls-in-logs-2026-11-16
+test/accessibility-audit-business-pages-20261118
+test/accessibility-dark-keyboard-20261118
+test/accessibility-dark-keyboard-rebased-20261120
+test/backup-atomic-visibility-2026-11-15
+test/dark-theme-zoom-200-sweep-20261118
+test/expense-accounting-mappings-regression-20261122
+test/free-trial-expiry-session-guard-20261122
+test/invoice-long-pdf-pagination-20261121
+test/invoice-short-pdf-one-page-20261121
+test/invoice-short-pdf-one-page-main-20261121
+test/ohada-expense-ledger-integrity-20261121
+test/pdf-font-embedding-and-visual-print-20261118
+test/security-auth-reset-token-redaction-20261122
+test/team-invitation-expiry-email-change-20261122
+test/theme-dark-mobile-sweep-20261118
+test/theme-dark-sweep-20261118
+test/theme-light-desktop-sweep-20261118
+test/theme-light-mobile-sweep-20261118
+test/workspace-zoom-200-sweep-20261118
+tooling/local-docker-test-bundle-20261112
+ui/augmenter-logo-icones-sidebar
+ui/modern-responsive-polish
+ux/dashboard-mobile-module-rail-20261122
+ux/pro-workspace-mobile-domain-rail-20261122
+ux/settings-company-fields-grid-20261122
+```
+
+## PR ouvertes (49)
+- #178 — fix(currency): serialize tenant currency changes and orders
+- #177 — security(invoices): redact verification code from list API
+- #176 — docs(audit): rapports d'exécution runs 6–7 — 23 novembre
+- #159 — security(invoices): retirer le code public de la liste paginée
+- #174 — fix(mobile): reject reserved non-public hostnames
+- #168 — fix: fuseau local, devise du tenant et isolation des routes
+- #173 — feat(mobile): block native builds until HTTPS domain is configured
+- #175 — docs(audit): rapport d'exécution run 5 — 23 novembre
+- #172 — docs(audit): rapport d'exécution run 4 — 23 novembre
+- #171 — fix(pro): use tenant currency for orders and lock history
+- #170 — docs(audit): rapport d'exécution run 3 — 23 novembre
+- #167 — fix: devise des emails, relances impayés et échappement HTML
+- #169 — docs(audit): rapport d'exécution run 2 — 22 novembre
+- #149 — feat(accounting): configure expense category account mappings (schema v23)
+- #166 — docs(audit): rapport d'exécution initial du 22 novembre
+- #156 — a11y(dashboard): ajouter un accès clavier au contenu principal
+- #155 — ux(settings): grille responsive pour les coordonnées entreprise
+- #154 — ux(workspace): navigation mobile compacte par domaine
+- #153 — test(trial): vérifier l'expiration sur la première requête protégée
+- #157 — a11y(navigation): fermer le menu mobile avec Échap
+- #164 — test(security): empêcher la divulgation des hashes de réinitialisation
+- #127 — fix(pdf): pagination A4 du devis Executive (28 lignes)
+- #140 — ci(lint): couvrir les routes backend et tests de protection
+- #130 — fix(a11y): contraste WCAG AA et focus clavier sur les deux thèmes
+- #147 — integration: réconcilier comptabilité OHADA et essai gratuit v21 avec main actuel
+- #145 — fix(accounting): retain invoice reversal events (schema v22)
+- #142 — feat(accounting, trial): integrate invoice lifecycle and 15-day trial on schema v21
+- #146 — fix(integration): reconcile OHADA, 15-day trial and audit retention on current main
+- #132 — docs(audit): état initial et plan priorisé 22 novembre
+- #128 — feat(trial,workspace): essai 15 jours et organisation professionnelle
+- #144 — fix(accounting): retain invoice reversal events on invoice deletion (schema v22)
+- #143 — fix(accounting): map cheque payments to bank and reject unknown methods
+- #141 — ci: add workspace UI structure regression checks
+- #138 — fix(inventory): protect products with stock or history
+- #137 — fix(accounting): protect clients with linked history
+- #139 — fix(a11y): improve professional workspace status contrast
+- #135 — fix(accounting): preserve issued invoice history
+- #136 — fix(accounting): protect posted expenses from edits and deletion
+- #134 — fix(a11y): badge Entreprise lisible en thème sombre
+- #115 — test(accounting): cover expense posting and tenant isolation
+- #133 — fix(a11y): corriger le contraste des aperçus de modèles
+- #126 — feat(landing): présentation vidéo Sunupilot — portage sur main actuel
+- #131 — docs: actualiser la feuille de route sur le main courant
+- #118 — feat(landing): vidéo Sunupilot — capture locale automatisée des écrans
+- #99 — Adopt SunuPilot branding — indigo and baobab green
+- #114 — docs: centralize SamaFacture Pro improvement roadmap
+- #102 — test(accessibility): couvrir le thème sombre et le parcours clavier
+- #110 — test(accessibility): cover light/dark keyboard navigation and contrast
+- #129 — feat(workspace): navigation par domaines et paramètres structurés
+
+## PR fermées (125), segments et numéros
+- Jusqu'au 14 nov. (16): #3, #11, #16, #14, #15, #13, #12, #10, #9, #8, #7, #6, #4, #5, #2, #1
+- 15–19 nov. (86): #106, #107, #108, #105, #104, #103, #101, #100, #98, #97, #96, #95, #94, #93, #82, #83, #92, #85, #90, #91, #89, #88, #87, #86, #84, #81, #77, #78, #80, #79, #76, #75, #72, #73, #74, #71, #60, #63, #69, #64, #67, #59, #57, #65, #56, #68, #53, #62, #55, #54, #52, #51, #50, #49, #48, #46, #47, #45, #43, #44, #42, #41, #40, #39, #38, #36, #37, #27, #34, #35, #29, #33, #32, #30, #31, #28, #26, #25, #20, #23, #24, #22, #21, #19, #18, #17
+- 20–21 nov. (13): #125, #117, #119, #120, #123, #121, #116, #124, #122, #113, #112, #111, #109
+- 22–23 nov. (10): #165, #163, #162, #161, #158, #160, #152, #151, #150, #148
+
+## Main, commits et migrations
+- Main SHA confirmé par recherche commits récente: `b43a94fc2937b0108077501a0260358c8569e11f`.
+- 10 derniers SHAs: `b43a94fc2937b0108077501a0260358c8569e11f`, `e6a2caf04f0648d30419042c97cb63b6a14a05f8`, `1c3a12bacd9c6a761247756562ea77ebe50ef41d`, `596b3311f12c41946906b236274d9c8a615393d6`, `b8df6bfac18e4eb2776a35887e178af6d8d42bfd`, `cc728a65336a5ad154136c668f3be06256e66ede`, `8d0f287f46a96cb0697d7a0be9f6fe055b6e5a51`, `f3844b627efcdf6472ef57bffe3d69283a36bb37`, `1d42ba738607a1f648e3391c051a618061654f69`, `d6a054483a11a3ebd7020fa8850d59f07dafdc22`.
+- Schema v23; migrations 003–012, migration 012 `comptabilite_correspondances.sql`. Aucun SQL exécuté.
+
+## CI exacte
+- **#174** head `27fa8c2ec2e2e87b5f6b58a98b07052f5a5bce75`: tests #45109124536 success (589 tests, 588 pass, 1 skip), ESLint #45109124614 success, ZIP #45109124542 success; restore chiffrée 1/1, cluster smoke, visual 147 captures/7 widths, npm audit 0 vuln. Draft; DNS/TLS/device non testés; overlap #173.
+- **#177** head `f68ab94eb1d4c2c01d08331321cda293ab0a264f`: tests #45118980192 success (586 tests, 585 pass, 1 skip), ESLint #45118980187 success, ZIP #45118980228 success. Redaction `verification_code` dans la liste facture et historique client; détail auth conserve le QR/code. Draft; validation humaine sécurité.
+- **#178** base #171 `953489e79a9a6779b03e9c436559b925904f5635`; head initial `003ccada94e772ce1e6fdb971acaba9eb468b94d`: run #45120681619 failed (605 total, 603 pass, 1 fail, 1 skip). Échec unique: assertion statique catalogue-type attendait l'initialisation du stock dans `if(stockManaged)`.
+- Correctif sur #178: commit `e657bb8201f8dc323c084acc3c6f0a5a898002e9`, produit + stock initial + lecture dans la transaction, améliore atomicité. ZIP #45121938066 success; tests #45121938072 et ESLint #45121938074 in_progress au snapshot. COMMENT de revue #6017218096, pas d'approbation; tests concurrence utilisent pauses 200/60/120 ms et peuvent flaker, signal déterministe recommandé.
+- **#176** head `02abdb2607d7dbd24d3bc92a403ae51ae29904f3`: tests #45115823961 success et ZIP #45115823952 success. Rapport documentaire draft; addendum Run 8 ajouté à la suite.
+
+## Workflows et protections
+- `.github/workflows/test.yml`, `lint.yml`, `package-source-zip.yml`; tests Node/MySQL, Docker secret-exclusion, npm audit, backup restore, cluster, recette visuelle.
+- Ruleset #27410527 actif selon vérification précédente, bypass never; protection classique 403/non vérifiée. Pas de nouvelle lecture ruleset Run 8.
+- Checks #167/#168/#171/#149/#159/#164 précédemment rapportés green, non revalidés sur leurs heads pendant Run 8.
+
+## Findings et gates
+- **P0 #177**: code de vérification exposé par deux endpoints list; CI green exact mais approbation sécurité indépendante obligatoire.
+- **P0 #178**: race devise; correction atomicité stock faite, CI corrected head pending; tests timing-based à renforcer.
+- **P0 #174**: CI green, choisir entre #173/#174; domaine public DNS/TLS et device test requis.
+- **P1 #149**: 42 commits behind, mergeable false; migration 012 conflict/schema 23; migration 013/v24, upgrade/replay, FK tenant, validation OHADA.
+- **P1 #168/#171**: stack currency; tests exactes et revue de stack à revalider.
+- **P1 #159/#164**: stale, rebase/diff/checks exactes nécessaires.
+- **P2** PDF/impression/accessibilité/UX; **P3** branding/vidéo/docs après stabilisation.
+
+## Merge/safety
+- Run 8: 0 merge, main inchangé; 0 push direct/force push main; 0 branch deletion; 0 migration; 0 opération destructive; 0 modification données, volumes, backups ou historique comptable; 0 paiement réel; 0 déploiement.
