@@ -19,6 +19,8 @@ on:
       - 'server/routes/professionnel.js'
       - 'server/routes/factures.js'
       - 'server/tests/factures.test.js'
+      - 'server/routes/clients.js'
+      - 'server/tests/client-history-protection.test.js'
       - 'server/tests/company-group-ui.test.js'
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
@@ -80,6 +82,8 @@ jobs:
           server/routes/professionnel.js
           server/routes/factures.js
           server/tests/factures.test.js
+          server/routes/clients.js
+          server/tests/client-history-protection.test.js
           server/tests/company-group-ui.test.js
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
