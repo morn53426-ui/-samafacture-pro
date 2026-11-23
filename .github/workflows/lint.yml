@@ -24,6 +24,17 @@ on:
       - 'server/config/backup.js'
       - 'server/tests/restore-backup-roundtrip.test.js'
       - 'server/tests/auth.test.js'
+      - 'server/tests/setup.js'
+      - 'server/tests/auth-currency.test.js'
+      - 'server/tests/currency-lock-concurrency.test.js'
+      - 'server/tests/public-api-currency.test.js'
+      - 'server/tests/tenant-currency-ui.test.js'
+      - 'server/routes/auth.js'
+      - 'server/routes/factures.js'
+      - 'server/routes/public-api.js'
+      - 'server/routes/produits.js'
+      - 'server/routes/depenses.js'
+      - 'server/routes/factures-recurrentes.js'
       - 'server/tests/paiements.test.js'
       - 'server/tests/backup.test.js'
       - '.github/workflows/lint.yml'
@@ -84,5 +95,16 @@ jobs:
           server/config/backup.js
           server/tests/restore-backup-roundtrip.test.js
           server/tests/auth.test.js
+          server/tests/setup.js
+          server/tests/auth-currency.test.js
+          server/tests/currency-lock-concurrency.test.js
+          server/tests/public-api-currency.test.js
+          server/tests/tenant-currency-ui.test.js
+          server/routes/auth.js
+          server/routes/factures.js
+          server/routes/public-api.js
+          server/routes/produits.js
+          server/routes/depenses.js
+          server/routes/factures-recurrentes.js
           server/tests/paiements.test.js
           server/tests/backup.test.js
