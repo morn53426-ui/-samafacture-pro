@@ -862,3 +862,66 @@ ux/settings-company-fields-grid-20261122
 
 ## Merge/safety
 - Run 8: 0 merge, main inchangé; 0 push direct/force push main; 0 branch deletion; 0 migration; 0 opération destructive; 0 modification données, volumes, backups ou historique comptable; 0 paiement réel; 0 déploiement.
+
+
+---
+
+## Addendum Run 9 — 23 novembre 2026
+
+### Snapshot GitHub vérifié
+- `main` : `b43a94fc2937b0108077501a0260358c8569e11f`, inchangé pendant ce run.
+- Branches : **185** (pagination 100 + 85).
+- PR ouvertes : **49** (une page).
+- PR fermées : **125** (pagination 100 + 25), dont **106 fusionnées** et **19 fermées sans fusion**.
+- Derniers commits observés sur main : dernier commit `b43a94f` ("docs(backup): sécuriser le transfert hors serveur rclone"), précédé de la fusion #163.
+- CI post-fusion exacte de main : run **#45080802243**, conclusion `success` sur SHA `b43a94fc2937b0108077501a0260358c8569e11f`.
+
+### PR #178 — verrouillage transactionnel de la devise
+- PR ouverte, non draft; base `fix/pro-orders-tenant-currency-20261123` (SHA `953489e79a9a6779b03e9c436559b925904f5635`), head `fix/tenant-currency-atomic-lock-20261123`.
+- Head vérifié : `e657bb8201f8dc323c084acc3c6f0a5a898002e9`; 23 commits, 11 fichiers; GitHub retourne `mergeable_state=clean` vis-à-vis de sa base, mais la PR reste empilée et ne peut pas être traitée comme candidate indépendante.
+- Premier head `003ccada94e772ce1e6fdb971acaba9eb468b94d`: run Tests #45120681619 en échec (605 tests, 603 réussis, 1 échec, 1 ignoré). La cause rapportée est un test statique existant `server/tests/catalogue-type.test.js` qui exigeait l'initialisation du stock dans le bloc `if (stockManaged)`; l'ancien refactor avait déplacé l'initialisation après le commit.
+- Correctif `e657bb8`: insertion du produit, initialisation du stock principal et lecture du produit conservées dans la même transaction; rollback/release gérés dans le même bloc.
+- Résultats sur le head exact `e657bb8`: Tests Node/MySQL **#45121938072 success**; ESLint **#45121938074 success**; ZIP **#45121938066 success**. Les étapes restauration chiffrée, smoke test MySQL/Redis et recette visuelle ont terminé success; recette visuelle : 147 captures, 7 largeurs.
+- Le fichier `server/tests/currency-lock-concurrency.test.js` contient 10 scénarios. Les helpers de contention utilisent quatre pauses fixes (200, 60, 200 et 120 ms). Risque de flakiness conservé : remplacer ces attentes temporelles par une synchronisation déterministe avant approbation finale.
+- Revue soumise par l'auteur en état COMMENT, non APPROVE. Aucune approbation indépendante documentée.
+
+### PR #177 — retrait du code de vérification dans les listes
+- Head `f68ab94eb1d4c2c01d08331321cda293ab0a264f`.
+- Tests #45118980192, ESLint #45118980187, ZIP #45118980228 : tous `success` sur ce head.
+- Diff retire `verification_code` des listes facture et historique client; le détail authentifié conserve la valeur requise pour le QR. Revue COMMENT par l'auteur; validation sécurité humaine indépendante toujours requise. PR encore draft.
+
+### PR #174 — préflight mobile et suffixes DNS
+- Head `27fa8c2ec2e2e87b5f6b58a98b07052f5a5bce75`.
+- Tests #45109124536, ESLint #45109124614, ZIP #45109124542 : tous `success` sur ce head.
+- PR draft; domaine réel, DNS, TLS et vérification sur appareil non validés. Chevauchement fonctionnel avec #173 à réconcilier avant fusion d'une seule PR.
+
+### PR #176 — rapport documentaire
+- Head observé : `e4f7f719f3649e9bc23abb66242c906444de6c43).
+- ZIP #45122180998 : success; Tests #45122180997 : encore `in_progress` au dernier relevé (étape de recette visuelle en cours). Ne pas présenter ce head documentaire comme totalement vert.
+- Cet addendum est ajouté à la suite du rapport; aucun rapport précédent n'est remplacé.
+
+### Migrations : inventaire confirmé sur main
+- `server/config/db.js` : `CURRENT_SCHEMA_VERSION = 23`.
+- `server/database/migrations/` : migrations numérotées 003 à 012, y compris `012_comptabilite_correspondances.sql`.
+- Autres fichiers SQL présents à la racine : `migration_2026_08_30_stabilite.sql`, `migration_2026_11_15_token_version.sql`, `migration_facture_personnalisation.sql`, `migration_index_reset_token.sql`, `migration_scalabilite_30_41.sql`; leur chemin d'exécution et leur historique doivent être cartographiés séparément avant changement de schéma.
+- Aucun SQL de migration exécuté pendant Run 9.
+
+### Workflows et règles
+- Workflows présents sur main : `.github/workflows/test.yml`, `lint.yml`, `package-source-zip.yml`.
+- Ruleset **#27410527**: enforcement active sur `refs/heads/main`; règles deletion et non-fast-forward interdites; PR obligatoire; résolution des conversations requise; checks `Tests Node.js et MySQL` et `Build complete source archive`; bypass `never`; approbations requises configurées à 0.
+- Lecture de `/branches/main/protection` : 403, donc protection classique non vérifiée.
+
+### Planning et décisions
+- **P0** : remplacer les pauses fixes des tests concurrence #178 par une synchronisation déterministe; valider le head exact après nouveau run; obtenir une revue humaine indépendante; ne pas fusionner #178 tant que #171/#168 n'ont pas été réconciliées.
+- **P0** : #177 attend validation humaine sécurité malgré ses checks verts.
+- **P0** : #174 attend test domaine/DNS/TLS/appareil et résolution du doublon #173/#174.
+- **P1** : #149 reste bloquée par le conflit de migration 012/schema v23; préparer 013/v24, tests upgrade/replay et validation OHADA avant toute fusion.
+- **P1** : rebaser et revalider #159/#164; les anciens checks ne qualifient pas un SHA rebasé.
+- **P2** : PDF, impression, accessibilité et UX après clôture des risques P0/P1.
+- **P3** : branding, vidéo et documentation après stabilisation.
+
+### Bilan de sécurité Run 9
+- 0 fusion; `main` inchangé.
+- 0 push direct ou force push sur main; 0 branche supprimée.
+- 0 migration, écriture comptable historique ou opération destructive.
+- 0 modification de données, volumes ou sauvegardes; 0 paiement réel; 0 déploiement.
