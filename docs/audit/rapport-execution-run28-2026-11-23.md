@@ -432,3 +432,12 @@ Relecture des diffs #188, #199, #193 et #203 contre le code de `main` confirme q
 - PR #216, head `3160e225053caaaa7491c9106129f2a776e30f54`: Tests Node/MySQL run **45264699456 en cours**; ESLint **45264698495 success**; ZIP **45264698546 success**.
 - PR #217 (head initial ci-dessus) : Tests run **45265040281 en cours**; ZIP **45265039871 success**. Après cet addendum, les checks doivent être revalidés sur le nouveau head.
 - Main push test run exact : **45221526816 success**, 620 tests, 619 pass, 0 fail, 1 skipped; restore sauvegarde chiffrée dédié 1 pass.
+
+
+## Addendum — CI #216, échec et correction de fixture (23 novembre)
+
+- Head testé `3160e225053caaaa7491c9106129f2a776e30f54`: Tests Node/MySQL run **45264699456 failure**. Résultat: 621 tests, 619 pass, 1 fail, 1 skip. Le nouveau test « liens de paiement héritent de la devise facture » **a réussi**.
+- Échec isolé : test comptable existant de remboursement contre-passé, parce que la suite `phases-2-4` utilisait un compte Free et l'ajout d'une facture a fait dépasser le quota mensuel de 10. Réponse observée : HTTP 403 `QUOTA_DEPASSE`; pas une erreur du correctif paiement.
+- Correction test-only sur head `bceecd6b388178116ef78f1492633fa75586ab5f`: la fixture de la suite `phases-2-4` passe en plan Pro afin que cette suite teste les flux comptables et non le quota Free. Aucun code applicatif ni politique de quota ne change.
+- CI sur le nouveau head **pas encore observée** au moment de l'addendum; il faut rerun/attendre Tests, ESLint et ZIP sur le SHA exact. PR #216 reste Draft.
+- CI #217 report : les runs sur l'ancien head `f6c1350128e1635deec5f4d2a39fa69a5b3f11db` sont en cours; le head du rapport a changé depuis. Les checks exacts du nouveau head doivent être vérifiés après publication.
