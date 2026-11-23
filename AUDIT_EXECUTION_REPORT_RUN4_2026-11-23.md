@@ -488,3 +488,11 @@ Migrations présentes :
 - Aucun push direct/force push main; aucune suppression; aucun bypass.
 - Aucun paiement réel, déploiement production, migration ou opération destructive.
 - Les rapports run1 (#166), run2 (#169), run3 (#170) sont conservés; ce fichier run4 est un nouveau rapport, sans écrasement.
+
+
+## Mise à jour post-snapshot (23 novembre, 02:08 UTC)
+
+- PR #171 head précédent `e7a2bcd3818da6cf015c06855b62da7a2697d132` : CI **3/3 green**. Tests Node/MySQL, ESLint, ZIP; restauration chiffrée réelle, smoke cluster, recette responsive **147 captures sur 7 largeurs**. Le timeout précédent sur `9b70c35fef2e12726274ae4b726ca50c5e54b8e3` est corrigé par l’ordre de cleanup (suppression explicite commandes test avant utilisateur).
+- Revue complémentaire a trouvé `server/tests/setup.js` absent de la liste ESLint. Correction ajoutée à #171, commit `953489e79a9a6779b03e9c436559b925904f5635`, ajout du helper cleanup et du workflow lint lui-même dans les paths/commande. **CI du nouveau SHA en cours** (Tests Node/MySQL, ZIP, ESLint); ne pas utiliser les résultats de `e7a2bcd` comme validation du nouveau head.
+- PR #172 (ce rapport) : ZIP green sur `75c5e9917b89c7bb22ea7d24f3da941685538ec2`, Tests Node/MySQL en cours. Cette mise à jour documentaire déclenchera une nouvelle CI sur son head.
+- Aucun merge; approbation indépendante humaine toujours requise pour les PR applicatives et sécurité.
