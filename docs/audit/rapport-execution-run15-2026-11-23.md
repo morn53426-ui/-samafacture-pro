@@ -587,3 +587,41 @@
 - 0 push direct/force push sur main; 0 branche supprimée.
 - 0 migration; 0 écriture comptable historique modifiée.
 - 0 modification de données, volumes ou sauvegardes; 0 paiement réel; 0 déploiement production.
+
+
+---
+
+## Addendum Run 17 — fusion contrôlée #200 et arrêt après-merge (23 novembre 2026)
+
+### Snapshot
+- Main avant fusion : `b0b52e660af61fa781dc9a761165dd72977f969a`.
+- Inventaire revalidé : **210 branches** (100 + 100 + 10), **54 PR ouvertes**, **143 PR fermées**. Les PR fermées sont comptées par plages de création (1–10 nov: 3; 11–15: 40; 16–20: 60; 21–23: 40). Le champ « merged » n'est pas exposé dans les résultats de recherche fermées lors de ce run; le total fusionné/non-fusionné historique n'est donc pas recalculé.
+- PR #200 a été fusionnée en squash le 23 novembre à 11:59:09 UTC : commit main **`c0a3b569e3e685183376be8428c4696d8c767ccd`**. La branche source est conservée (aucune suppression).
+- Diff fusionné : `.github/workflows/lint.yml`, `public/js/sidebar.js`, `server/tests/sidebar-mobile-keyboard.test.js`. Aucun DDL/migration, modification métier, données, historique comptable, volume, backup, paiement réel ou déploiement.
+
+### #200 — revue indépendante et checks exacts pré-merge
+- Head exact : `69180203cc2c694c3de029873b360d43d0b487ca`; base exacte : `b0b52e660af61fa781dc9a761165dd72977f969a`.
+- Revue statique indépendante : le garde-dialogues reste prioritaire; Échap ferme la sidebar ouverte; focus restauré vers le premier déclencheur connecté et visible (toggle Groupe prioritaire, bouton mobile en fallback); fermeture des notifications conservée. Test structurel couvre les branches et états ARIA. Limite : pas de test DOM/browser interactif.
+- Avant fusion, mergeable=true, threads de revue non résolus=0, Draft converti en Ready, checks exacts 3/3 success :
+  - Tests Node/MySQL [45166873559](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45166873559) — success; steps incl. npm audit, suite, restore chiffrée, smoke MySQL/Redis, recette responsive.
+  - ESLint [45166873510](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45166873510) — success.
+  - ZIP [45166873404](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45166873404) — success.
+- Le ruleset actif précédemment observé (#27410527) exige Tests Node.js/MySQL + archive ZIP et résolution des conversations; approbations requises=0, bypass=0. Aucun contournement utilisé.
+
+### Vérification post-merge et blocage
+- Commit main confirmé par GitHub : `c0a3b569e3e685183376be8428c4696d8c767ccd`; fichiers du commit correspondent au diff #200.
+- Status API combiné sur le commit post-merge : `statuses=[]`; wrapper de workflow limité aux runs pull_request : `workflow_runs=[]`.
+- La page Actions/checks GitHub n'est pas accessible dans cette session (fetch désactivé); le run main post-merge exact n'a donc pas pu être confirmé. **Arrêt de toutes les fusions et du lot suivant** jusqu'à vérification manuelle/outil d'accès des checks de `c0a3b569...`. Aucun résultat CI post-merge n'est inventé.
+- Un run main antérieur #45138061597 avait ses étapes terminées success, mais il est antérieur à la fusion #200 et ne valide pas ce nouveau commit.
+
+### P0/P1 restant
+- #193, #194, #199 : CI complète success sur leurs heads exacts (voir Addendum Run 16), mais revue humaine sécurité distincte/approbation absente. #194 est le lot consolidé; les PR #193 et #199 ont des chevauchements. Ne pas fusionner avant revue sécurité humaine et comparaison des scopes.
+- #192 : CI complète success sur head exact; décision métier sur invariant de devise encore requise.
+- #142/#145 : integration/schema v21/v22, bases empilées; #142 mergeable=false et #145 cible la branche #142. Validation humaine spécifique trial/comptabilité/DDL requise. Aucune migration exécutée.
+- Schema runtime main reste v23. Les migrations 012 OHADA et v22 audit retention sont intactes.
+
+### Bilan Run 17
+- Fusion #200 : 1 (squash, checks pré-merge exacts green).
+- Main CI post-merge : non vérifiable via outils disponibles; **main stabilité non confirmée**.
+- Merges suivants : 0; main push direct 0; force push 0; branches supprimées 0.
+- DDL/migrations : 0; données/volumes/backups/historique comptable touchés : 0; paiement réel : 0; production : 0.
