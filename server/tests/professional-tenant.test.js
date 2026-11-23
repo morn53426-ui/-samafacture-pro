@@ -16,6 +16,8 @@ let ownerToken;
 let memberToken;
 let clientId;
 let foreignInvoiceId;
+let memberInvoiceId;
+let memberInvoicePaymentId;
 
 before(async () => {
   await setupTestDatabase();
@@ -53,7 +55,7 @@ before(async () => {
   // Simule une invitation acceptée avec un rôle strictement en lecture seule.
   await pool.query(
     'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json, active) VALUES (?, ?, ?, ?, 1)',
-    [ownerId, memberId, 'lecture_seule', JSON.stringify(['clients.read'])]
+    [ownerId, memberId, 'lecture_seule', JSON.stringify(['clients.read', 'invoices.read'])]
   );
 
   // Défense en profondeur : une référence inter-entreprises anormale ne doit ni
@@ -63,6 +65,28 @@ before(async () => {
     [memberId, clientId, 'CROSS-TENANT-' + Date.now()]
   );
   foreignInvoiceId = invoiceResult.insertId;
+
+  // Facture saine de B : une ligne de paiement propre à B et une ligne anormale de A
+  // référencent volontairement cette même facture pour vérifier le filtrage par tenant.
+  const [memberClient] = await pool.query(
+    'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+    [memberId, 'Client entreprise B']
+  );
+  const [memberInvoice] = await pool.query(
+    "INSERT INTO factures (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison, sous_total, total_tva, total, montant_paye) VALUES (?, ?, ?, 'facture', CURDATE(), 'en_attente', 0, 0, 1000, 0, 1000, 456)",
+    [memberId, memberClient.insertId, 'TENANT-DETAIL-' + Date.now()]
+  );
+  memberInvoiceId = memberInvoice.insertId;
+  const [foreignPayment] = await pool.query(
+    'INSERT INTO paiements (user_id, facture_id, montant, methode) VALUES (?, ?, ?, ?)',
+    [ownerId, memberInvoiceId, 123, 'Espèces']
+  );
+  const [memberPayment] = await pool.query(
+    'INSERT INTO paiements (user_id, facture_id, montant, methode) VALUES (?, ?, ?, ?)',
+    [memberId, memberInvoiceId, 456, 'Espèces']
+  );
+  memberInvoicePaymentId = memberPayment.insertId;
+  assert.ok(foreignPayment.insertId);
 });
 
 test('les espaces entreprise isolent les clients, les factures et les permissions', async () => {
@@ -99,7 +123,33 @@ test('les espaces entreprise isolent les clients, les factures et les permission
   assert.equal(detail.status, 200);
   assert.deepEqual(detail.body.factures, [], 'la fiche client ne doit pas exposer les factures d’un autre compte');
 
-  // Le rôle lecture seule possède clients.read mais pas clients.write.
+  // Le membre ne doit pas lire une facture qui référence le client d'une autre entreprise.
+  const foreignInvoiceDetail = await request(app)
+    .get('/api/factures/' + foreignInvoiceId)
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(foreignInvoiceDetail.status, 404,
+    'une facture B avec un client A ne doit pas divulguer les coordonnées du client A');
+
+  const invoiceList = await request(app)
+    .get('/api/factures?limite=100')
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(invoiceList.status, 200, invoiceList.text);
+  assert.equal(invoiceList.body.factures.some(row => Number(row.id) === Number(foreignInvoiceId)), false,
+    'la liste B ne doit pas inclure une facture dont le client appartient à A');
+
+  // Les paiements doivent eux aussi être filtrés par tenant, même si une ligne anormale
+  // d'une autre entreprise référence l'identifiant de la facture B.
+  const memberInvoiceDetail = await request(app)
+    .get('/api/factures/' + memberInvoiceId)
+    .set('Authorization', 'Bearer ' + memberToken);
+  assert.equal(memberInvoiceDetail.status, 200, memberInvoiceDetail.text);
+  assert.deepEqual(
+    memberInvoiceDetail.body.paiements.map(payment => Number(payment.id)),
+    [Number(memberInvoicePaymentId)],
+    'le détail B ne doit retourner que les paiements appartenant à B'
+  );
+
+  // Le rôle lecture seule possède clients.read et invoices.read, mais pas clients.write.
   const forbiddenWrite = await request(app)
     .post('/api/clients')
     .set('Authorization', 'Bearer ' + memberToken)
