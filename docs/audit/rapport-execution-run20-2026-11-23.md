@@ -400,3 +400,11 @@ Aucun paiement réel, mandat récurrent ou déploiement production n'est activé
 - Fusion #202 uniquement, non critique et sans migration.
 - Le CI post-merge main `047e7badf4fccd91644af74e0968089b23246c93` reste à compléter sur la recette visuelle au snapshot initial; aucune autre fusion avant succès.
 - Branch protection classique non accessible (403); ruleset actif lu et documenté.
+
+
+## Addendum — CI post-fusion complétée
+
+- Main exact `047e7badf4fccd91644af74e0968089b23246c93` : run Tests automatisés #45195824844 terminé **success** le 23 novembre 2026 à 14:42:41 UTC. [Run](https://github.com/morn53426-ui/-samafacture-pro/actions/runs/45195824844)
+- Tests Node.js/MySQL : success; restauration réelle de sauvegarde chiffrée : success; smoke cluster MySQL/Redis : success; recette visuelle responsive avec données extrêmes : success; publication des captures : success.
+- Main est stable après la fusion #202. Aucun autre lot applicatif n'a été fusionné dans ce run.
+- Les workflows ESLint et ZIP ne sont pas déclenchés sur push main; leur succès PR #202 reste associé au head exact `268ccf303e4332f47e73910043f601e4083b97e0`, non au SHA main post-fusion.
