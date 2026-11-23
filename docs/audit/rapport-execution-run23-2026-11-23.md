@@ -580,3 +580,42 @@ PR #206 Run 22 doc-only, head `662f5ee56a104510a60b0123d2e1302011ad6020`, base `
 - #155 : stale (9 ahead/62 behind); uniquement grille settings à portage ciblé, autre code du branch stale non réutilisé. La régression d'escaping est à corriger/éviter.
 - #154 : stale (8 ahead/62 behind); portage #208 séparé.
 - #208 et #209 sont indépendantes et Draft; les fusionner une par une après CI exacte, revue et vérification des protections. Main c32 reste green.
+
+
+## Addendum — Run 24 (snapshot 23 novembre 2026, 18:03 UTC)
+
+### Main et CI post-merge
+- Main actuel vérifié : `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c` (merge PR #194).
+- Tests automatisés run #45221526816 / workflow #1836 : **success**, SHA exact c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c. Main est stable pour poursuivre l'audit; aucun merge n'a été effectué par ce run.
+- Les 20 commits main récents ont été inventoriés; les 10 plus récents figurent dans l'addendum Run 23.
+- Ruleset `protect main` #27410527 lu et actif sur `refs/heads/main`: suppression et non-fast-forward interdits; PR requise; résolution des threads requise; **0 approbation obligatoire**; checks requis `Tests Node.js et MySQL` et `Build complete source archive`. Aucun acteur de bypass. L'endpoint branch protection reste 403 pour l'intégration, mais le ruleset est lisible.
+
+### Inventaire actualisé
+- Branches : **220** (pages API 100 + 100 + 20; page suivante vide), toutes conservées.
+- PR ouvertes : **58**; PR fermées : **149**, dont **117 merged** et **32 closed sans merge**. Toutes les PR/branches restent intactes.
+- Cinq nouvelles branches depuis Run 23 : `audit/execution-report-20261123-run23`, `fix/company-settings-responsive-grid-main-20261123`, `fix/mobile-workspace-domain-rail-main-20261123`, `fix/pro-orders-base-currency-main-20261123-run23`, `ux/settings-company-fields-grid-main-20261123-run23`.
+- Cinq nouvelles PR ouvertes depuis le snapshot Run 23 : #207 (rapport), #208 (rail mobile), #209 (grille paramètres), #210 (devise des commandes), #211 (grille paramètres). Le présent addendum est ajouté au rapport Run 23 sur sa branche existante; aucun rapport historique n'est écrasé.
+
+### Revue ciblée PR #211 — grille responsive paramètres
+- Draft, base `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`, head exact `4518451df4e887ed584219d282530e3acf4734df`, mergeable=true.
+- Diff statique : `.github/workflows/lint.yml`, `public/parametres.html`, `server/tests/parametres-accessibility.test.js`; grille 2 colonnes desktop `minmax(0,1fr)`, 1 colonne à 700 px, RIB pleine largeur desktop; conditions/mentions hors grille; identifiants/labels/formulaire conservés.
+- Checks sur le head exact : Tests Node.js/MySQL **success**, ESLint **success**, Build complete source archive **success**.
+- Limite : le test est structurel/CSS; aucune capture visuelle ni validation navigateur manuelle n'a été effectuée dans ce run. PR #209 est une autre candidate de grille (checks non vérifiés ici); #155 est stale (base `00d52ca8...`, 16 fichiers, mergeable=false). **Pas de merge** tant qu'une seule candidate n'est retenue, rendu responsive vérifié, review indépendante et CI exacte complète. PR #211 reste Draft.
+
+### Revue ciblée PR #177 — code de vérification factures
+- Head `f68ab94eb1d4c2c01d08331321cda293ab0a264f`: trois checks (Tests, ESLint, ZIP) **success** sur SHA exact.
+- Le code de `main` c32 a été relu sur blobs `server/routes/factures.js` (`e1fdb015fd37b0806c9b2552709c85b7575eecf3`) et `server/routes/clients.js` (`1f48127b1c2fe7e92d5b017de2e58ec75102a0bb`): `verification_code` est déjà supprimé des réponses de listes facture et historique client; le détail authentifié garde le code pour QR.
+- PR #177 est basée sur l'ancien SHA `b43a94fc2937b0108077501a0260358c8569e11f`, état `dirty` / mergeable=false, et redondante avec le code main (et candidates #203/#193). Les reviews précédentes sont COMMENTED par le propriétaire, pas d'approbation indépendante. **Aucune fusion**; sécurité critique et historique de code de consultation requièrent validation humaine spécifique. Aucun rebase/force-push.
+
+### Décisions / plan P0-P3
+- **P0 — sécurité tenant / secret de consultation :** main post-#194 CI green; garder l'audit d'accès cross-tenant et la revue humaine indépendante comme gates. Ne pas fusionner les PR redondantes #177/#203/#193.
+- **P1 — devise des commandes :** #210 est Draft; règle produit/comptable à clarifier (refuser la devise différente ou conversion explicite). Aucun changement ni merge de logique financière sans décision, tests de concurrence et approbation humaine.
+- **P1 — OHADA, migrations et écritures :** inspecter et tester migrations 011/012 et intégrations schema v21/v22/v23; toute migration destructive ou modification d'historique comptable reste bloquée par validation humaine spécifique.
+- **P1 — sauvegarde/restauration :** tests non destructifs seulement; ne restaurer aucun volume utilisateur ni toucher aux backups.
+- **P2 — responsive/PDF :** choisir entre #211/#209/#155 et #208; vérification visuelle, sync non destructive, CI et review exactes avant merge.
+- **P3 — documentation :** conserver ce rapport Run 23 append-only; le présent addendum Run 24 documente le snapshot sans remplacer les runs précédents.
+
+### Préservation et actions de ce run
+- Aucun merge, aucun push direct/force-push sur main, aucun déploiement ni paiement réel.
+- Aucun fichier migration exécuté; aucune donnée, volume, sauvegarde, branche ou PR supprimée/fermée; aucun historique comptable modifié.
+- Revue statique et checks GitHub consultés; aucun test local n'a été exécuté. Aucun contrôle n'est annoncé green sans SHA exact observé.
