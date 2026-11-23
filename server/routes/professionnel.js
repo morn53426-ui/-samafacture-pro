@@ -4081,43 +4081,69 @@ router.get('/localization', async (req, res, next) => {
 });
 
 router.put('/localization', async (req, res, next) => {
+  let conn;
   try {
-    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
-    if (!company) return res.status(404).json({ error: 'Entreprise introuvable.' });
+    const uid = owner(req);
+    const body = req.body || {};
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // Le changement de devise partage le verrou de compte utilisé par les
+    // créations de commandes, d'achats et de factures.
+    const [[company]] = await conn.query(
+      'SELECT devise FROM users WHERE id = ? FOR UPDATE',
+      [uid]
+    );
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+
     const currentCurrency = String(company.devise || 'FCFA').toUpperCase();
-    const country = String(req.body.pays_code || 'SN').toUpperCase();
-    const language = String(req.body.langue || 'fr').toLowerCase();
-    const currency = req.body.devise === undefined || req.body.devise === null || String(req.body.devise).trim() === ''
+    const country = String(body.pays_code || 'SN').toUpperCase();
+    const language = String(body.langue || 'fr').toLowerCase();
+    const currency = body.devise === undefined || body.devise === null || String(body.devise).trim() === ''
       ? currentCurrency
-      : String(req.body.devise).trim().toUpperCase();
-    const timezone = String(req.body.fuseau_horaire || 'Africa/Dakar');
-    const dateFormat = String(req.body.format_date || 'dd/MM/yyyy');
-    const taxRegime = String(req.body.regime_fiscal || 'standard');
+      : String(body.devise).trim().toUpperCase();
+    const timezone = String(body.fuseau_horaire || 'Africa/Dakar');
+    const dateFormat = String(body.format_date || 'dd/MM/yyyy');
+    const taxRegime = String(body.regime_fiscal || 'standard');
     if (!SUPPORTED_COUNTRIES.includes(country) || !['fr','en'].includes(language) ||
         !SUPPORTED_CURRENCIES.includes(currency) || !SUPPORTED_TIMEZONES.includes(timezone) ||
         !['dd/MM/yyyy','yyyy-MM-dd','MM/dd/yyyy'].includes(dateFormat) ||
         !['standard','simplifie','franchise','autre'].includes(taxRegime)) {
+      await conn.rollback();
       return res.status(400).json({ error: 'Un paramètre pays, langue, devise, fuseau horaire ou fiscalité est invalide.' });
     }
     const locale = language + '-' + country;
+
     if (currency !== currentCurrency) {
-      const [[history]] = await pool.query(
+      const [[history]] = await conn.query(
         'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_commandes WHERE user_id = ?) AS commandes, (SELECT COUNT(*) FROM pro_bons_livraison WHERE user_id = ?) AS livraisons, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
-        [owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req)]
+        [uid, uid, uid, uid, uid, uid, uid, uid, uid, uid]
       );
-      if (Number(history.factures) + Number(history.depenses) + Number(history.paiements) + Number(history.achats) + Number(history.commandes) + Number(history.livraisons) + Number(history.mouvements_stock) + Number(history.ecritures) + Number(history.produits) + Number(history.modeles_recurrents) > 0) {
+      const hasBusinessHistory = Object.values(history || {}).some(value => Number(value) > 0);
+      if (hasBusinessHistory) {
+        await conn.rollback();
         return res.status(409).json({
           error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents, produits tarifés, modèles récurrents ou mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
         });
       }
     }
-    await pool.query(
+
+    await conn.query(
       'UPDATE users SET pays_code = ?, langue = ?, locale = ?, devise = ?, fuseau_horaire = ?, format_date = ?, regime_fiscal = ? WHERE id = ?',
-      [country, language, locale, currency, timezone, dateFormat, taxRegime, owner(req)]
+      [country, language, locale, currency, timezone, dateFormat, taxRegime, uid]
     );
-    await audit(req, 'entreprise.localisation_modifiee', 'entreprise', owner(req), { country, language, currency, timezone, dateFormat, taxRegime });
+    await conn.commit();
+    await audit(req, 'entreprise.localisation_modifiee', 'entreprise', uid, { country, language, currency, timezone, dateFormat, taxRegime });
     res.json({ success: true, parametres: { pays_code: country, langue: language, locale, devise: currency, fuseau_horaire: timezone, format_date: dateFormat, regime_fiscal: taxRegime } });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 module.exports = router;
