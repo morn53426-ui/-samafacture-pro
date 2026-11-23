@@ -25,6 +25,8 @@ on:
       - 'server/tests/restore-backup-roundtrip.test.js'
       - 'server/tests/paiements.test.js'
       - 'server/tests/backup.test.js'
+      - 'server/routes/factures.js'
+      - 'server/tests/professional-tenant.test.js'
       - '.github/workflows/lint.yml'
   push:
     branches:
@@ -84,3 +86,5 @@ jobs:
           server/tests/restore-backup-roundtrip.test.js
           server/tests/paiements.test.js
           server/tests/backup.test.js
+          server/routes/factures.js
+          server/tests/professional-tenant.test.js
