@@ -614,7 +614,9 @@ Aucun code, donnée, route, schéma, paiement, migration, sauvegarde ou volume d
 - Revue complémentaire : le premier patch nettoyait `console.error`, mais appelait ensuite `captureException(err)` avec l'erreur originale. Le message brut pouvait donc aussi atteindre Sentry.
 - Correctif supplémentaire sur la branche `fix/sql-error-log-redaction-20261124` : la même erreur assainie est maintenant transmise à la console et à Sentry dans le middleware HTTP, `unhandledRejection` et `uncaughtException`. Le message d'échec de l'initialisation MySQL est également assaini. Un test statique vérifie qu'aucun de ces chemins ne passe l'erreur brute à Sentry. `app.js`, `utils/log-sanitizer.js` et le test dédié sont ajoutés au périmètre ESLint.
 - Head courant au moment de ce rapport : `044b4dbe2be1dac281a86de8a635489f7e1e3df0`.
-- CI sur ce head : ESLint run `45417327901` succès ; packaging ZIP `45417328226` succès ; tests Node/MySQL run `45417328228` encore en cours (préparation Docker terminée, étape d'exécution des tests active). Aucun résultat final des tests n'est revendiqué ici.
+- CI complète sur ce head : tests Node/MySQL run `45417328228` succès ; ESLint run `45417327901` succès ; packaging ZIP run `45417328226` succès.
+- Suite principale : **626 tests, 625 réussites, 0 échec, 1 ignoré** ; restauration chiffrée réelle séparée : **1 réussite, 0 échec**.
+- Smoke test MySQL/Redis : succès ; recette responsive : succès ; artefact `samafacture-recette-visuelle-1914` publié (329 fichiers, artefact ID `14932063638`).
 - Limite : aucun événement n'a été envoyé à un Sentry de test réel. Les tests vérifient le payload construit par le code et les appels qui utilisent l'erreur assainie ; une recette avec DSN de test restera nécessaire avant activation en production.
 
 ### État global et recommandation
