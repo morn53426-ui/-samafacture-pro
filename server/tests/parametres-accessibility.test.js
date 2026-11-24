@@ -111,4 +111,4 @@ test('les coordonnées de l’entreprise sont dans une grille responsive fermée
   assert.match(html, /@media\s*\(max-width:\s*700px\)[\s\S]*?\.settings-company-fields-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   assert.equal((html.match(/<form\b/g) || []).length, 1,
     'Le formulaire d’enregistrement unique ne doit pas être fragmenté.');
-});;
+});
