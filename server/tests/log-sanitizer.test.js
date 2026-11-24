@@ -138,10 +138,26 @@ describe('Journalisation des erreurs SQL sans valeurs sensibles', () => {
 
   test('app.js assainit les erreurs SQL avant console.error et Sentry', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-    assert.match(source, /const erreurSecurisee = sanitizeErrorForLog\\(err\\);\\s*console\\.error[\\s\\S]*?erreurSecurisee\\);\\s*captureException\\(erreurSecurisee\\);/);
-    assert.match(source, /const erreurSecurisee = sanitizeErrorForLog\\(reason instanceof Error \\? reason : new Error\\(String\\(reason\\)\\)\\);[\\s\\S]*?console\\.error[\\s\\S]*?captureException\\(erreurSecurisee\\);/);
-    assert.match(source, /const erreurSecurisee = sanitizeErrorForLog\\(err\\);[\\s\\S]*?console\\.error[\\s\\S]*?captureException\\(erreurSecurisee\\);/);
-    assert.doesNotMatch(source, /console\\.error\\([^\\n]*, (?:err|reason)\\);/, 'aucun console.error ne doit recevoir l’erreur brute');
-    assert.doesNotMatch(source, /captureException\\((?:err|reason)\\)/, 'Sentry ne doit jamais recevoir l’erreur SQL brute');
+
+    const handlerStart = source.indexOf('app.use((err, req, res, next) => {');
+    const handlerEnd = source.indexOf('\\n});', handlerStart);
+    const handler = source.slice(handlerStart, handlerEnd);
+    assert.ok(handler.includes('const erreurSecurisee = sanitizeErrorForLog(err);'));
+    assert.ok(handler.includes('console.error(') && handler.includes('erreurSecurisee'));
+    assert.ok(handler.includes('captureException(erreurSecurisee);'));
+    assert.ok(!handler.includes('captureException(err);'), 'le middleware ne doit pas transmettre l’erreur brute à Sentry');
+
+    const rejectionStart = source.indexOf("process.on('unhandledRejection'");
+    const rejectionEnd = source.indexOf('\\n  });', rejectionStart);
+    const rejection = source.slice(rejectionStart, rejectionEnd);
+    assert.ok(rejection.includes('sanitizeErrorForLog(reason instanceof Error ? reason : new Error(String(reason)))'));
+    assert.ok(rejection.includes('console.error(') && rejection.includes('captureException(erreurSecurisee);'));
+
+    const exceptionStart = source.indexOf("process.on('uncaughtException'");
+    const exceptionEnd = source.indexOf('\\n  });', exceptionStart);
+    const exception = source.slice(exceptionStart, exceptionEnd);
+    assert.ok(exception.includes('const erreurSecurisee = sanitizeErrorForLog(err);'));
+    assert.ok(exception.includes('console.error(') && exception.includes('captureException(erreurSecurisee);'));
+    assert.ok(!exception.includes('captureException(err);'), 'l’exception brute ne doit pas être envoyée à Sentry');
   });
 });
