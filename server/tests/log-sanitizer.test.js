@@ -140,7 +140,8 @@ describe('Journalisation des erreurs SQL sans valeurs sensibles', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 
     const handlerStart = source.indexOf('app.use((err, req, res, next) => {');
-    const handlerEnd = source.indexOf('\\n});', handlerStart);
+    const newline = String.fromCharCode(10);
+    const handlerEnd = source.indexOf(newline + '});', handlerStart);
     const handler = source.slice(handlerStart, handlerEnd);
     assert.ok(handler.includes('const erreurSecurisee = sanitizeErrorForLog(err);'));
     assert.ok(handler.includes('console.error(') && handler.includes('erreurSecurisee'));
@@ -148,13 +149,13 @@ describe('Journalisation des erreurs SQL sans valeurs sensibles', () => {
     assert.ok(!handler.includes('captureException(err);'), 'le middleware ne doit pas transmettre l’erreur brute à Sentry');
 
     const rejectionStart = source.indexOf("process.on('unhandledRejection'");
-    const rejectionEnd = source.indexOf('\\n  });', rejectionStart);
+    const rejectionEnd = source.indexOf(newline + '  });', rejectionStart);
     const rejection = source.slice(rejectionStart, rejectionEnd);
     assert.ok(rejection.includes('sanitizeErrorForLog(reason instanceof Error ? reason : new Error(String(reason)))'));
     assert.ok(rejection.includes('console.error(') && rejection.includes('captureException(erreurSecurisee);'));
 
     const exceptionStart = source.indexOf("process.on('uncaughtException'");
-    const exceptionEnd = source.indexOf('\\n  });', exceptionStart);
+    const exceptionEnd = source.indexOf(newline + '  });', exceptionStart);
     const exception = source.slice(exceptionStart, exceptionEnd);
     assert.ok(exception.includes('const erreurSecurisee = sanitizeErrorForLog(err);'));
     assert.ok(exception.includes('console.error(') && exception.includes('captureException(erreurSecurisee);'));
