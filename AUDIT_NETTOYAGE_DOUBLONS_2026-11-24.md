@@ -547,3 +547,39 @@ Le texte de la PR reconnaît que Sentry peut encore recevoir un message contenan
 3. **#221** : ne pas fusionner en l'état ; le nettoyage couvre la console mais pas l'événement Sentry. Ajouter d'abord le scrubber Sentry et le contrôle ESLint.
 
 Aucune PR n'a été fusionnée/fermée. Aucun code applicatif, donnée, migration, sauvegarde ou volume n'a été changé pendant cet audit. Seul le rapport documentaire est complété.
+
+
+## Suivi de correction du blocage Sentry — nouvelle PR #225
+
+À la suite de l'audit #221, une branche indépendante a été créée depuis le `main` observé au SHA `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`.
+
+PR #225 : [fix(security): sanitize SQL errors before Sentry and console logging](https://github.com/morn53426-ui/-samafacture-pro/pull/225)
+
+Head : `4cfad92cd2a07946e120a02b9dafd73b7eaf4514`.
+
+La correction :
+- installe `sanitizeSentryEvent` dans `beforeSend`, pour couvrir les événements capturés automatiquement par `Sentry.setupExpressErrorHandler` ;
+- nettoie les erreurs SQL avant les captures manuelles Sentry ;
+- nettoie les trois sorties `console.error` et le message de démarrage MySQL ;
+- supprime des événements les propriétés SQL, les emails, secrets de session, headers, cookies, corps de requête et variables locales, et masque les messages MySQL connus ;
+- ajoute des tests purs vérifiant que l'événement final ne contient ni email, ni hash bcrypt, ni jeton, ni cookie, ni requête SQL brute et que l'objet source n'est pas modifié ;
+- ajoute app, monitoring, sanitizer et tests au workflow ESLint et à la configuration de globals Node.
+
+### CI finale sur le head exact #225
+
+| Contrôle | Run | Résultat |
+|---|---:|---|
+| Tests Node.js et MySQL | `45414275886` | Succès |
+| ESLint | `45414275862` | Succès |
+| Packaging ZIP | `45414276107` | Succès |
+
+Logs confirmés :
+- Suite principale : **624 tests, 623 réussites, 0 échec, 1 ignoré**.
+- Les trois tests ajoutés au groupe `Assainissement des événements Sentry et erreurs SQL` sont tous verts.
+- Restauration chiffrée réelle : 1/1.
+- Smoke test cluster MySQL/Redis : succès.
+- Recette responsive : 147 captures, 7 largeurs, dataset extrême ; artefact `samafacture-recette-visuelle-1905` publié.
+
+**Limite restante :** la CI teste le filtre sur des événements Sentry simulés, sans compte Sentry réel ni envoi réseau. Une recette de canari sur un projet Sentry de test est recommandée avant l'activation de Sentry en production. Le PR #225 reste ouvert et en brouillon ; il n'est pas fusionné. Le PR #221 reste également ouvert et en brouillon pour conserver son historique, et ne doit pas être fusionné isolément.
+
+Aucun code, donnée, route, schéma, paiement, migration, sauvegarde ou volume du `main` n'a été changé. Seul ce rapport documentaire est complété.
