@@ -583,3 +583,44 @@ Logs confirmés :
 **Limite restante :** la CI teste le filtre sur des événements Sentry simulés, sans compte Sentry réel ni envoi réseau. Une recette de canari sur un projet Sentry de test est recommandée avant l'activation de Sentry en production. Le PR #225 reste ouvert et en brouillon ; il n'est pas fusionné. Le PR #221 reste également ouvert et en brouillon pour conserver son historique, et ne doit pas être fusionné isolément.
 
 Aucun code, donnée, route, schéma, paiement, migration, sauvegarde ou volume du `main` n'a été changé. Seul ce rapport documentaire est complété.
+
+
+## Audit des PR #218, #220 et #221 — 24 novembre 2026
+
+### PR #218 — empêcher le reset des données de supprimer l'historique protégé
+
+- Head : `4094e187eb56c5617efa61a6c86e4d0cfdc5d63a`, branche `fix/protect-dashboard-reset-accounting-history-20261123-run31`.
+- Diff : `server/routes/auth.js` et `server/tests/auth.test.js` (2 fichiers).
+- Le reset verrouille le compte et contrôle 25 familles de données historiques avant de supprimer uniquement les brouillons et données non historiques.
+- Les tests vérifient qu'un événement de contrepassation orphelin bloque le reset même si sa facture liée est un devis supprimé, que les brouillons peuvent être réinitialisés sans supprimer le compte et qu'une facture émise provoque HTTP 409 en restant présente.
+- CI sur ce head : tests run `45408171658` succès, ESLint `45408171625` succès, ZIP `45408171765` succès.
+- Suite principale : 623 tests, 622 réussites, 0 échec, 1 ignoré ; restauration chiffrée réelle séparée : 1 réussite, 0 échec.
+- Décision : correctif utile et ciblé, mais opération de suppression irréversible ; conserver la PR en brouillon jusqu'à revue humaine de la liste des historiques protégés et du comportement produit de la réinitialisation.
+
+### PR #220 — inscription concurrente avec le même email
+
+- Head : `fda48b159270d066601a970114b02a517032adee`, branche `fix/register-duplicate-email-409-20261124`.
+- Diff : `server/routes/auth.js` et nouveau `server/tests/register-concurrency.test.js` (2 fichiers).
+- Si l'index unique rejette une seconde insertion, l'API renvoie maintenant le même HTTP 409 que pour un doublon détecté avant l'INSERT, plutôt qu'un 500.
+- Les deux scénarios parallèles (plan Pro avec essai et Gratuit sans plan) lancent 4 requêtes : exactement une réponse 201 et trois 409, un seul compte, aucun jeton pour les refus, un seul essai démarré.
+- CI sur ce head : tests run `45359044892` succès, ESLint `45359044869` succès, ZIP `45359044984` succès.
+- Suite principale : 622 tests, 621 réussites, 0 échec, 1 ignoré ; restauration chiffrée réelle séparée : 1 réussite, 0 échec.
+- Limite connue explicitement laissée hors du lot : `POST /auth/google` conserve un parcours SELECT/INSERT similaire. La reproduction exige un jeton Google valide ; aucun test dédié n'a été réalisé. Ce cas doit être audité séparément, sans prétendre que #220 le corrige.
+
+### PR #221 — empêcher les erreurs SQL de divulguer des secrets dans les journaux
+
+- Head initial examiné : `2178fe395a07f637e35a1577afb21db046bca31b`.
+- La preuve fournie par la PR montre que les objets mysql2 contiennent la requête `sql` avec les valeurs substituées ; le journal pouvait donc exposer email et hash bcrypt.
+- Revue complémentaire : le premier patch nettoyait `console.error`, mais appelait ensuite `captureException(err)` avec l'erreur originale. Le message brut pouvait donc aussi atteindre Sentry.
+- Correctif supplémentaire sur la branche `fix/sql-error-log-redaction-20261124` : la même erreur assainie est maintenant transmise à la console et à Sentry dans le middleware HTTP, `unhandledRejection` et `uncaughtException`. Le message d'échec de l'initialisation MySQL est également assaini. Un test statique vérifie qu'aucun de ces chemins ne passe l'erreur brute à Sentry. `app.js`, `utils/log-sanitizer.js` et le test dédié sont ajoutés au périmètre ESLint.
+- Head courant au moment de ce rapport : `044b4dbe2be1dac281a86de8a635489f7e1e3df0`.
+- CI sur ce head : ESLint run `45417327901` succès ; packaging ZIP `45417328226` succès ; tests Node/MySQL run `45417328228` encore en cours (préparation Docker terminée, étape d'exécution des tests active). Aucun résultat final des tests n'est revendiqué ici.
+- Limite : aucun événement n'a été envoyé à un Sentry de test réel. Les tests vérifient le payload construit par le code et les appels qui utilisent l'erreur assainie ; une recette avec DSN de test restera nécessaire avant activation en production.
+
+### État global et recommandation
+
+- #218 et #220 ont une CI complète verte sur leur SHA exact. Les deux PR restent ouvertes et en brouillon.
+- #221 doit rester en brouillon jusqu'à la fin de la CI sur son head final `044b4db`.
+- #220 laisse le flux Google OAuth à auditer séparément.
+- Le correctif #221 ne doit pas être présenté comme une validation Sentry réelle tant qu'une instance de test n'a pas été utilisée.
+- Aucune de ces PR n'a été fusionnée ni fermée ; aucune modification n'a été faite directement sur `main`.
