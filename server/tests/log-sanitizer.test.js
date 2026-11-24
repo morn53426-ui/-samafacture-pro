@@ -136,13 +136,12 @@ describe('Journalisation des erreurs SQL sans valeurs sensibles', () => {
     assert.equal(sanitizeErrorForLog(null), null);
   });
 
-  test('app.js passe chaque erreur par le nettoyeur avant console.error', () => {
+  test('app.js assainit les erreurs SQL avant console.error et Sentry', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-    for (const motif of [
-      /user#\$\{req\.user\.id\}` : ''\}`, sanitizeErrorForLog\(err\)\)/,
-      /Promesse rejetée non gérée :', sanitizeErrorForLog\(reason\)\)/,
-      /redémarrage propre :', sanitizeErrorForLog\(err\)\)/
-    ]) assert.match(source, motif);
-    assert.doesNotMatch(source, /console\.error\([^\n]*, (?:err|reason)\);/, 'aucun console.error ne doit recevoir l’erreur brute');
+    assert.match(source, /const erreurSecurisee = sanitizeErrorForLog\\(err\\);\\s*console\\.error[\\s\\S]*?erreurSecurisee\\);\\s*captureException\\(erreurSecurisee\\);/);
+    assert.match(source, /const erreurSecurisee = sanitizeErrorForLog\\(reason instanceof Error \\? reason : new Error\\(String\\(reason\\)\\)\\);[\\s\\S]*?console\\.error[\\s\\S]*?captureException\\(erreurSecurisee\\);/);
+    assert.match(source, /const erreurSecurisee = sanitizeErrorForLog\\(err\\);[\\s\\S]*?console\\.error[\\s\\S]*?captureException\\(erreurSecurisee\\);/);
+    assert.doesNotMatch(source, /console\\.error\\([^\\n]*, (?:err|reason)\\);/, 'aucun console.error ne doit recevoir l’erreur brute');
+    assert.doesNotMatch(source, /captureException\\((?:err|reason)\\)/, 'Sentry ne doit jamais recevoir l’erreur SQL brute');
   });
 });
