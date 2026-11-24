@@ -290,6 +290,12 @@ describe('Authentification', () => {
         'INSERT INTO pro_compta_facture_events (user_id, facture_id, transition, previous_ecriture_id) VALUES (?, ?, ?, ?)',
         [resetUserId, invoiceResult.insertId, 'annulation', 987654]
       );
+      // Simule une facture supprimée par une ancienne voie de contournement :
+      // l'événement v22 doit subsister et bloquer le reset même sans ligne facture.
+      await pool.query(
+        'DELETE FROM factures WHERE id = ? AND user_id = ?',
+        [invoiceResult.insertId, resetUserId]
+      );
 
       const reset = await request(app)
         .delete('/api/auth/donnees')
@@ -307,7 +313,7 @@ describe('Authentification', () => {
         [resetUserId, invoiceResult.insertId]
       );
       assert.equal(Number(event.total), 1, 'l’événement de contrepassation doit rester présent');
-      assert.equal(Number(invoice.total), 1, 'le devis référencé doit rester présent après le refus');
+      assert.equal(Number(invoice.total), 0, 'le test doit bien exercer le cas de référence de facture orpheline');
     } finally {
       await nettoyerUtilisateur(resetUserId);
     }
