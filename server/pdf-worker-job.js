@@ -101,4 +101,4 @@ async function processPdfQueueEntry({
   return 'completed';
 }
 
-module.exports = { processPdfQueueEntry, parseJob };
+module.exports = { processPdfQueueEntry };
