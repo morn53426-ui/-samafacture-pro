@@ -160,5 +160,8 @@ describe('Journalisation des erreurs SQL sans valeurs sensibles', () => {
     assert.ok(exception.includes('const erreurSecurisee = sanitizeErrorForLog(err);'));
     assert.ok(exception.includes('console.error(') && exception.includes('captureException(erreurSecurisee);'));
     assert.ok(!exception.includes('captureException(err);'), 'l’exception brute ne doit pas être envoyée à Sentry');
+
+    const startupLog = "console.error('Impossible de se connecter à MySQL / initialiser la base :', erreurSecurisee.message);";
+    assert.ok(source.includes(startupLog), 'le message MySQL du démarrage doit aussi être assaini avant journalisation');
   });
 });
