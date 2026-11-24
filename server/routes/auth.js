@@ -950,11 +950,11 @@ router.delete('/donnees', requireAuth, async (req, res, next) => {
     ];
 
     for (const historique of historiques) {
-      const [[row]] = await conn.query(
-        `SELECT COUNT(*) AS total FROM ${historique.table} WHERE ${historique.where}`,
+      const [rows] = await conn.query(
+        `SELECT id FROM ${historique.table} WHERE ${historique.where} FOR UPDATE`,
         [req.user.id]
       );
-      if (Number(row.total) > 0) {
+      if (rows.length > 0) {
         await conn.rollback();
         return res.status(409).json({
           error: 'Réinitialisation refusée : des données métier ou comptables historiques sont présentes (' +
