@@ -899,11 +899,12 @@ router.put('/photo', requireAuth, async (req, res, next) => {
  * @openapi
  * /auth/donnees:
  *   delete:
- *     summary: Supprime définitivement le compte et toutes ses données (clients, factures, produits...)
- *     description: Action irréversible. Supprime en cascade tout ce qui est lié à l'utilisateur (contraintes ON DELETE CASCADE en base).
+ *     summary: Réinitialise les données métier du tableau de bord sans supprimer le compte
+ *     description: Action irréversible pour les données autorisées. Les factures émises et tout historique comptable ou opérationnel protégé font refuser la réinitialisation avec HTTP 409. L'identité du compte et les paramètres de l'entreprise sont conservés.
  *     tags: [Auth]
  *     responses:
- *       200: { description: "Compte et données supprimés." }
+ *       200: { description: "Données métier réinitialisées; le compte et ses paramètres sont conservés." }
+ *       409: { description: "Réinitialisation refusée car un historique métier ou comptable doit être conservé." }
  */
 router.delete('/donnees', requireAuth, async (req, res, next) => {
   const conn = await pool.getConnection();
