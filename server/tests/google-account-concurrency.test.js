@@ -1,8 +1,13 @@
 'use strict';
 
-const { test, describe } = require('node:test');
+process.env.GOOGLE_CLIENT_ID = 'samafacture-google-test.apps.googleusercontent.com';
+
+const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { linkGoogleIdentity, findGoogleUserAfterInsertConflict } = require('../utils/google-account');
+const { OAuth2Client } = require('google-auth-library');
+const request = require('supertest');
+const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 describe('Concurrence de liaison des comptes Google', () => {
   test('une identité Google déjà liée est réutilisée sans réinitialiser le mot de passe', async () => {
@@ -108,5 +113,84 @@ describe('Concurrence de liaison des comptes Google', () => {
     const pool = { query: async () => [[], []] };
     const result = await findGoogleUserAfterInsertConflict(pool, 'google-13', 'missing@example.test');
     assert.deepEqual(result, { source: 'missing', user: null });
+  });
+});
+
+describe('Route OAuth Google : courses d’inscription réelles sur MySQL', () => {
+  const emailsCreated = [];
+  before(async () => { await setupTestDatabase(); });
+  after(async () => {
+    for (const email of emailsCreated) {
+      const [rows] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+      for (const row of rows) await nettoyerUtilisateur(row.id);
+    }
+    await teardownTestEnvironment();
+  });
+
+  async function forceEmailSelectBarrier(email) {
+    const originalQuery = pool.query.bind(pool);
+    let arrivals = 0;
+    let release;
+    const barrier = new Promise(resolve => { release = resolve; });
+    pool.query = async (sql, params) => {
+      const result = await originalQuery(sql, params);
+      if (sql === 'SELECT * FROM users WHERE email = ?' && params && params[0] === email && arrivals < 2) {
+        arrivals += 1;
+        if (arrivals === 2) release();
+        await barrier;
+      }
+      return result;
+    };
+    return () => { pool.query = originalQuery; };
+  }
+
+  test('deux connexions simultanées du même Google ID retournent toutes deux une session', async t => {
+    const email = emailDeTest('google-identique');
+    emailsCreated.push(email);
+    const googleId = 'google-same-' + Date.now();
+    const payload = { sub: googleId, email, name: 'Test Google', email_verified: true };
+    t.mock.method(OAuth2Client.prototype, 'verifyIdToken', async ({ idToken }) => ({
+      getPayload: () => idToken === 'credential-same' ? payload : null
+    }));
+    const restoreQuery = await forceEmailSelectBarrier(email);
+    let responses;
+    try {
+      responses = await Promise.all([1, 2].map(() => request(app).post('/api/auth/google').send({
+        credential: 'credential-same', acceptTerms: true
+      })));
+    } finally {
+      restoreQuery();
+    }
+    assert.deepEqual(responses.map(response => response.status).sort(), [200, 200]);
+    const [rows] = await pool.query('SELECT id, google_id FROM users WHERE email = ?', [email]);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].google_id, googleId);
+  });
+
+  test('deux identités Google différentes sur le même email ne peuvent pas se remplacer', async t => {
+    const email = emailDeTest('google-conflit');
+    emailsCreated.push(email);
+    const googleIdA = 'google-a-' + Date.now();
+    const googleIdB = 'google-b-' + Date.now();
+    const payloads = {
+      'credential-a': { sub: googleIdA, email, name: 'Test Google A', email_verified: true },
+      'credential-b': { sub: googleIdB, email, name: 'Test Google B', email_verified: true }
+    };
+    t.mock.method(OAuth2Client.prototype, 'verifyIdToken', async ({ idToken }) => ({
+      getPayload: () => payloads[idToken] || null
+    }));
+    const restoreQuery = await forceEmailSelectBarrier(email);
+    let responses;
+    try {
+      responses = await Promise.all(['credential-a', 'credential-b'].map(credential =>
+        request(app).post('/api/auth/google').send({ credential, acceptTerms: true })
+      ));
+    } finally {
+      restoreQuery();
+    }
+    assert.deepEqual(responses.map(response => response.status).sort(), [200, 409]);
+    const [rows] = await pool.query('SELECT id, google_id FROM users WHERE email = ?', [email]);
+    assert.equal(rows.length, 1);
+    assert.ok([googleIdA, googleIdB].includes(rows[0].google_id));
   });
 });
