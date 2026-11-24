@@ -104,12 +104,12 @@ test('une base en version 7 reçoit la migration du quota sans bloquer les versi
     `SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'trial_status'`
   );
-  assert.equal(trialDefaultAfter.COLUMN_DEFAULT, 'not_started');
+  assert.equal(String(trialDefaultAfter.COLUMN_DEFAULT).replace(/^'(.*)'$/, '$1'), 'not_started');
   const [[expenseModeColumn]] = await pool.query(
     `SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'depenses' AND COLUMN_NAME = 'mode_reglement'`
   );
-  assert.equal(expenseModeColumn.COLUMN_DEFAULT, 'caisse');
+  assert.equal(String(expenseModeColumn.COLUMN_DEFAULT).replace(/^'(.*)'$/, '$1'), 'caisse');
   const [accountingEventsAfter] = await pool.query(
     `SELECT TABLE_NAME FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'`

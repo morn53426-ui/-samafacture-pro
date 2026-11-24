@@ -62,12 +62,12 @@ test('la version 23 expose comptabilité et essai sans activer de paiement ni cr
     `SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'trial_status'`
   );
-  assert.equal(trialStatus.COLUMN_DEFAULT, 'not_started');
+  assert.equal(String(trialStatus.COLUMN_DEFAULT).replace(/^'(.*)'$/, '$1'), 'not_started');
   const [[paymentMode]] = await pool.query(
     `SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'depenses' AND COLUMN_NAME = 'mode_reglement'`
   );
-  assert.equal(paymentMode.COLUMN_DEFAULT, 'caisse');
+  assert.equal(String(paymentMode.COLUMN_DEFAULT).replace(/^'(.*)'$/, '$1'), 'caisse');
   const [eventTable] = await pool.query(
     `SELECT TABLE_NAME FROM information_schema.TABLES
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'`

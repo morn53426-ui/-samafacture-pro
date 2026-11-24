@@ -256,7 +256,7 @@ test('une base v8 reçoit les migrations v9 à v23 sans perdre les données exis
   const [accountingEventsAfter] = await pool.query(`SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_facture_events'`);
   assert.equal(accountingEventsAfter.length, 1, 'la migration v19 doit créer la table des événements comptables.');
   const [expenseModeAfter] = await pool.query(`SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'depenses' AND COLUMN_NAME = 'mode_reglement'`);
-  assert.equal(expenseModeAfter[0]?.COLUMN_DEFAULT, 'caisse', 'la migration v20 doit restaurer le mode par défaut caisse.');
+  assert.equal(String(expenseModeAfter[0]?.COLUMN_DEFAULT).replace(/^'(.*)'$/, '$1'), 'caisse', 'la migration v20 doit restaurer le mode par défaut caisse.');
 });
 
 
