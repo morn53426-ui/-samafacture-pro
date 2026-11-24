@@ -85,7 +85,6 @@ async function execFacturesEnRetard(userId) {
 
 async function execResumeVentes(userId, { periode }) {
   let dateDebut;
-  const now = new Date();
   if (periode === 'mois_dernier') {
     dateDebut = `DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)`;
   } else if (periode === 'annee_courante') {

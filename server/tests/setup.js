@@ -13,7 +13,6 @@ process.env.DB_NAME = process.env.TEST_DB_NAME || 'samafacture_test';
 
 const path = require('path');
 const http = require('http');
-const { after } = require('node:test');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const { app } = require('../app');

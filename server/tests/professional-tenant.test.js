@@ -308,7 +308,7 @@ test('les espaces entreprise isolent les clients, les factures et les permission
     [memberId, ownerInvoiceId, foreignPaymentTokenHash, 100, 'FCFA']
   );
   const checkoutReference = 'c'.repeat(64);
-  const [foreignCheckout] = await pool.query(
+  await pool.query(
     'INSERT INTO pro_invoice_checkouts (user_id, facture_id, fournisseur, reference_interne, montant, devise, statut) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [memberId, ownerInvoiceId, 'wave', checkoutReference, 100, 'XOF', 'en_attente']
   );

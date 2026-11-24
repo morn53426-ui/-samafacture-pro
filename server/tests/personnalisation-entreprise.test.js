@@ -1,7 +1,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
+const { app, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 // Couvre la personnalisation (couleurs/logo/police) côté PUT /api/auth/entreprise. Même schéma
 // que entreprise-templates.test.js : nécessite une vraie base MySQL de test, donc non exécuté dans

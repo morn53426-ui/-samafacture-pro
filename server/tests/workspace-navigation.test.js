@@ -26,7 +26,6 @@ const pages = [
 ];
 
 const sidebarScript = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'sidebar.js'), 'utf8');
-const sidebarStyles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'style.css'), 'utf8');
 const enterpriseStyles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'enterprise-workspace.css'), 'utf8');
 const iconCatalogue = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'icons.js'), 'utf8');
 

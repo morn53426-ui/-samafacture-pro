@@ -26,26 +26,6 @@ function pruneDashboardCache(now = Date.now()) {
   }
 }
 
-function emptyDashboard() {
-  return {
-    chiffre_affaires: 0,
-    factures_emises: 0,
-    nouveaux_clients: 0,
-    valeur_stock: 0,
-    factures_payees: { n: 0, total: 0 },
-    factures_en_attente: { n: 0, total: 0 },
-    factures_en_retard: { n: 0, total: 0 },
-    derniers_paiements: [],
-    dernieres_factures: [],
-    derniers_clients: [],
-    evolution_mensuelle: [],
-    top_clients: [],
-    top_produits: [],
-    repartition_ventes: [],
-    tresorerie: 0
-  };
-}
-
 async function buildDashboard(userId) {
   // The civil date used for due/overdue status belongs to the company, not the DB host.
   // This is a lightweight indexed lookup; invoice/expense aggregation remains a single summary query.
