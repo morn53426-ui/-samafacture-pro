@@ -269,3 +269,51 @@ Les succès historiques n'annulent pas le statut `dirty` et ne valident pas une 
 5. Ne pas réintroduire de migrations, de modifications de schéma, de changement de règles de calcul OHADA ou d'activation de paiement réel dans cet audit.
 
 Aucune branche, PR, donnée, facture, sauvegarde ou volume n'a été modifié ou supprimé pendant cette comparaison.
+
+
+## Comparaison ciblée des PR #209 et #211 — grille responsive des coordonnées entreprise
+
+### État des branches et du main
+
+Les deux PR sont ouvertes, en brouillon, non fusionnées et déclarées fusionnables par GitHub. Elles ciblent toutes deux `main`, sont en avance de trois commits et en retard de zéro commit sur le main contrôlé. Le fichier `public/parametres.html` et le test `server/tests/parametres-accessibility.test.js` du main ne contiennent pas encore la classe `settings-company-fields-grid` : le correctif reste donc utile.
+
+Les deux PR touchent exactement les mêmes trois fichiers :
+- `.github/workflows/lint.yml`
+- `public/parametres.html`
+- `server/tests/parametres-accessibility.test.js`
+
+### Équivalence du rendu
+
+Le HTML des neuf champs est identique dans les deux branches : nom, adresse, téléphone, email, NINEA, RCCM, site web, banque et RIB. Les conditions de règlement et mentions légales restent après le conteneur de grille.
+
+Le CSS fonctionnel est également identique :
+- deux colonnes avec `minmax(0, 1fr)` sur grand écran ;
+- une seule colonne sous 700 px ;
+- champs autorisés à rétrécir avec `min-width: 0` ;
+- RIB pleine largeur via `grid-column: 1 / -1` sur grand écran.
+
+Les différences relèvent surtout de la documentation CSS, de l'organisation de la liste des fichiers ciblés par ESLint et des assertions de test.
+
+### Différences des tests
+
+- #209 ajoute 39 lignes et 1 suppression. Son test vérifie les neuf identifiants de champ, la classe pleine largeur du RIB, les deux colonnes, la colonne mobile, et la présence des deux champs légaux.
+- #211 ajoute 51 lignes et 1 suppression. Son test vérifie les neuf identifiants, la classe pleine largeur du RIB, la propriété `display: grid`, les deux colonnes, la colonne mobile et le maintien du formulaire unique.
+
+**Candidat recommandé : #211**, car il vérifie explicitement `display: grid` et la conservation du formulaire unique. Avant de déclarer le test définitif, conserver aussi une assertion explicite que les conditions de règlement et les mentions légales sont hors de la grille, comme l'intention du test #209 le demande.
+
+### CI sur les heads exacts
+
+| PR | Tests Node/MySQL | ESLint | Packaging ZIP |
+|---|---|---|---|
+| #209 — `9888f76` | run `45223608140` : succès | run `45223608516` : succès | run `45223608500` : succès |
+| #211 — `4518451` | run `45225973762` : succès | run `45225973707` : succès | run `45225973680` : succès |
+
+Les deux branches ont une CI verte sur leur head relevé et GitHub les déclare fusionnables. Cela ne vaut pas autorisation de fusion.
+
+### Décision
+
+- Conserver #211 comme candidat principal pour revue finale.
+- Ne pas fusionner #209 en doublon ; garder sa comparaison et son test comme référence pour le contrôle des champs légaux.
+- Ne fermer aucune des deux PR et ne modifier aucune branche sans autorisation explicite.
+
+Aucun changement de code n'a été fait dans #209 ou #211 pendant cette comparaison.
