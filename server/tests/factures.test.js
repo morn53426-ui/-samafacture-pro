@@ -440,6 +440,84 @@ describe('Factures : calcul et numérotation', () => {
     assert.equal(detail.body.facture.statut, 'payee');
   });
 
+  test('un paiement concurrent avec la même Idempotency-Key n’est comptabilisé qu’une seule fois', async () => {
+    const facture = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation: 'Paiement idempotent', quantite: 1, prix_unitaire: 1000, tva: 0 }] });
+    assert.equal(facture.status, 201, facture.text);
+
+    const key = `payment-idem-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const payer = () => request(app)
+      .post(`/api/factures/${facture.body.facture.id}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', key)
+      .send({ montant: 400, methode: 'Espèces' });
+
+    const responses = await Promise.all([payer(), payer()]);
+    assert.deepEqual(
+      responses.map(response => response.status).sort((a, b) => a - b),
+      [200, 201],
+      'une requête doit créer le paiement et l’autre retourner le rejeu idempotent'
+    );
+    const replay = responses.find(response => response.status === 200);
+    assert.equal(replay.body.idempotent_replay, true);
+
+    const detail = await request(app)
+      .get(`/api/factures/${facture.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(detail.status, 200, detail.text);
+    assert.equal(Number(detail.body.facture.montant_paye), 400);
+    assert.equal(detail.body.paiements.length, 1);
+
+    const [[storedPayment]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM paiements WHERE user_id = ? AND facture_id = ? AND idempotency_key = ?',
+      [userId, facture.body.facture.id, key]
+    );
+    assert.equal(Number(storedPayment.total), 1);
+  });
+
+  test('une Idempotency-Key de paiement ne peut pas être réutilisée sur une autre facture', async () => {
+    const createInvoice = designation => request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ client_id: clientId, type: 'facture', lignes: [{ designation, quantite: 1, prix_unitaire: 1000, tva: 0 }] });
+    const [firstInvoice, secondInvoice] = await Promise.all([
+      createInvoice('Facture clé idempotente A'),
+      createInvoice('Facture clé idempotente B')
+    ]);
+    assert.equal(firstInvoice.status, 201, firstInvoice.text);
+    assert.equal(secondInvoice.status, 201, secondInvoice.text);
+
+    const key = `payment-idem-cross-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const firstPayment = await request(app)
+      .post(`/api/factures/${firstInvoice.body.facture.id}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', key)
+      .send({ montant: 250, methode: 'Virement' });
+    assert.equal(firstPayment.status, 201, firstPayment.text);
+
+    const reusedKey = await request(app)
+      .post(`/api/factures/${secondInvoice.body.facture.id}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', key)
+      .send({ montant: 250, methode: 'Virement' });
+    assert.equal(reusedKey.status, 409, reusedKey.text);
+    assert.equal(reusedKey.body.code, 'IDEMPOTENCY_KEY_REUTILISEE');
+
+    const [[payments]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM paiements WHERE user_id = ? AND idempotency_key = ?',
+      [userId, key]
+    );
+    assert.equal(Number(payments.total), 1);
+
+    const secondDetail = await request(app)
+      .get(`/api/factures/${secondInvoice.body.facture.id}`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.equal(Number(secondDetail.body.facture.montant_paye), 0);
+    assert.equal(secondDetail.body.paiements.length, 0);
+  });
+
   test('une facture avec paiement ne peut pas être supprimée et conserve son règlement', async () => {
     const facture = await request(app)
       .post('/api/factures')
