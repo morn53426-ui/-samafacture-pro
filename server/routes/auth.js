@@ -909,8 +909,63 @@ router.delete('/donnees', requireAuth, async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    // L'ordre respecte les dépendances : factures d'abord (les lignes et paiements
-    // sont supprimés automatiquement via ON DELETE CASCADE), puis clients, produits, dépenses.
+
+    // Verrouille les plages des données qui seraient supprimées afin d'éviter qu'une
+    // création concurrente ne passe entre la vérification d'historique et le DELETE.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.user.id]);
+    for (const table of ['factures', 'clients', 'produits', 'depenses']) {
+      await conn.query(`SELECT id FROM ${table} WHERE user_id = ? FOR UPDATE`, [req.user.id]);
+    }
+
+    // Le reset historique supprimait toutes les factures émises et faisait cascader
+    // pro_compta_facture_events; il désolidarisait aussi les écritures des factures,
+    // les mouvements de stock des produits, et les activités CRM/portail des clients.
+    // Il ne doit être autorisé que sur un compte sans données métier/audit à préserver.
+    const historiques = [
+      { table: 'factures', where: "user_id = ? AND type = 'facture'", label: 'factures émises' },
+      { table: 'paiements', where: 'user_id = ?', label: 'paiements' },
+      { table: 'pro_compta_ecritures', where: 'user_id = ?', label: 'écritures comptables' },
+      { table: 'pro_compta_lignes', where: 'user_id = ?', label: 'lignes comptables' },
+      { table: 'pro_compta_facture_events', where: 'user_id = ?', label: 'événements de contrepassation' },
+      { table: 'pro_avoirs', where: 'user_id = ?', label: 'avoirs' },
+      { table: 'pro_acomptes', where: 'user_id = ?', label: 'acomptes' },
+      { table: 'pro_refund_requests', where: 'user_id = ?', label: 'demandes de remboursement' },
+      { table: 'pro_payment_links', where: 'user_id = ?', label: 'liens de paiement' },
+      { table: 'pro_invoice_checkouts', where: 'user_id = ?', label: 'sessions de paiement' },
+      { table: 'pro_mouvements_stock', where: 'user_id = ?', label: 'mouvements de stock' },
+      { table: 'pro_stocks_entrepots', where: 'user_id = ?', label: 'stocks entrepôts' },
+      { table: 'pro_commandes', where: 'user_id = ?', label: 'commandes clients' },
+      { table: 'pro_bons_livraison', where: 'user_id = ?', label: 'bons de livraison' },
+      { table: 'pro_commandes_fournisseurs', where: 'user_id = ?', label: 'commandes fournisseurs' },
+      { table: 'pro_commandes_fournisseurs_lignes', where: 'user_id = ?', label: 'lignes achats' },
+      { table: 'pro_receptions_achats', where: 'user_id = ?', label: 'réceptions achats' },
+      { table: 'pro_receptions_achats_lignes', where: 'user_id = ?', label: 'lignes de réception' },
+      { table: 'factures_recurrentes', where: 'user_id = ?', label: 'factures récurrentes' },
+      { table: 'pro_customer_portal_access', where: 'user_id = ?', label: 'accès portail client' },
+      { table: 'pro_portal_quote_decisions', where: 'user_id = ?', label: 'décisions portail' },
+      { table: 'pro_crm_activities', where: 'user_id = ?', label: 'activités CRM' },
+      { table: 'pro_documents', where: 'user_id = ? AND (facture_id IS NOT NULL OR client_id IS NOT NULL)', label: 'documents liés' },
+      { table: 'pro_audit_logs', where: 'user_id = ?', label: 'journal d’audit' },
+      { table: 'pro_caisse_operations', where: 'user_id = ?', label: 'opérations de caisse' }
+    ];
+
+    for (const historique of historiques) {
+      const [[row]] = await conn.query(
+        `SELECT COUNT(*) AS total FROM ${historique.table} WHERE ${historique.where}`,
+        [req.user.id]
+      );
+      if (Number(row.total) > 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: 'Réinitialisation refusée : des données métier ou comptables historiques sont présentes (' +
+            historique.label + '). Exportez et archivez vos données avant toute opération de réinitialisation.',
+          code: 'RESET_HISTORIQUE_PROTEGE'
+        });
+      }
+    }
+
+    // Compte sans historique protégé : les brouillons et données non comptabilisées
+    // peuvent être supprimés dans cette transaction; les données d'entreprise restent.
     await conn.query('DELETE FROM factures WHERE user_id = ?', [req.user.id]);
     await conn.query('DELETE FROM clients WHERE user_id = ?', [req.user.id]);
     await conn.query('DELETE FROM produits WHERE user_id = ?', [req.user.id]);
