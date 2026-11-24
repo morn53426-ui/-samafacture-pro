@@ -197,3 +197,75 @@ Détail des tests :
 Le rapport statique confirme les résultats précédemment consignés : Knip `issues: []`, aucune référence JS locale cassée, 10 clones/176 lignes dupliquées (1,02 %) et aucun nouveau clone détecté lors du dernier scan disponible.
 
 **Conclusion :** le code et les tests du PR #223 sont validés par la CI sur le head indiqué. Cette validation ne constitue pas une recette métier OHADA complète ni une validation sur imprimantes physiques. La PR reste en brouillon et n'est pas fusionnée.
+
+
+## Audit complémentaire des PR #179, #188, #171, #182, #183, #185 et #190 — 24 novembre 2026
+
+### État commun des branches
+
+Les sept PR examinées restent ouvertes, en brouillon et non fusionnées. GitHub les marque toutes `mergeable_state: dirty` et `rebaseable: false` par rapport à leur base : elles ne sont donc pas fusionnables en l'état.
+
+Comparaison de chaque head au `main` audité (`c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`) :
+
+| PR | Sujet | En avance | En retard | Fichiers touchés | Lecture |
+|---|---|---:|---:|---:|---|
+| #179 | Sécurité des relations facture/client/paiement/tenant | 23 | 47 | 8 | Variante de sécurité plus ancienne |
+| #188 | Même périmètre multi-tenant, avec checkout | 10 | 42 | 7 | Variante plus récente et plus ciblée |
+| #171 | Devise des commandes, affichage, relances, timezone et assainissement UI | 63 | 47 | 31 | Ancien lot large, plusieurs sujets distincts |
+| #182 | Verrou de devise du compte et commande professionnelle | 10 | 45 | 7 | Étape intermédiaire |
+| #183 | Verrou atomique des premières écritures métier | 21 | 45 | 13 | PR empilée sur la branche de #182, pas sur main |
+| #185 | Verrou atomique de devise et premières écritures | 13 | 45 | 13 | Variante ciblant directement main |
+| #190 | Même verrou atomique, basée sur un main plus récent | 15 | 42 | 11 | Variante la plus récente du lot |
+
+Les nombres de commits/en avance ne mesurent pas la quantité de code utile : ces branches ont accumulé des commits de préparation et leurs bases ont divergé du main depuis leur création.
+
+### Groupe sécurité multi-tenant — #179 et #188
+
+Les deux PR traitent le même défaut : une jointure pouvait suivre un identifiant de facture, client, commande ou paiement sans vérifier que le parent et l'enfant appartenaient au même `user_id`.
+
+- Les patches partagent les corrections de tableau de bord, factures, factures récurrentes et rapports.
+- #179 contient aussi des modifications de jointures professionnelles et de la liste API publique.
+- #188 est basé sur une base cinq commits plus récente que celle de #179 ; plusieurs filtres professionnels et le filtre client de l'API publique qui apparaissaient dans le diff de #179 sont déjà présents dans cette base plus récente.
+- #188 ajoute explicitement la contrainte tenant-aware à la lecture du statut checkout et davantage de fixtures/assertions de régression.
+- Le `main` actuel contient ces contrôles : jointures factures/clients, paiements/factures, commandes/clients, bons de livraison/commandes/clients, avoirs/factures, acomptes, liens de paiement et checkout. La lecture API publique des factures impose également `c.user_id = f.user_id`.
+- Le test actuel `server/tests/professional-tenant.test.js` couvre les références croisées sur factures, récurrences, paiements, API publique, commandes, livraison, avoirs, acomptes, liens de paiement et checkout, avec vérification des permissions du membre en lecture seule.
+
+**Conclusion sécurité :** les corrections fonctionnelles principales des PR #179/#188 sont déjà présentes dans le main et sa suite de tests. Elles sont considérées comme *supersédées par le code actuel*, et non comme deux lots à fusionner. La comparaison ligne à ligne de tout le reste de leurs tests/commentaires peut être conservée comme contrôle final avant toute décision de fermeture.
+
+### Groupe devise et concurrence — #171, #182, #183, #185 et #190
+
+Ces PR se recoupent mais n'ont pas toutes le même périmètre :
+
+- #171 est le lot le plus large : format monétaire, devise dynamique dans les pages produits/factures, emails et relances, timezone d'entreprise, webhook et échappement de messages d'erreur UI. Ce n'est pas un doublon pur du verrouillage transactionnel.
+- #182 est une étape antérieure, limitée principalement aux routes profil/commande et aux tests de devise.
+- #183 est empilée sur la branche de #182 : sa base est `fix/pro-orders-tenant-currency-main-20261123`, pas `main`. Elle n'a aucun check-run sur son head actuel.
+- #185 et #190 ont des patches applicatifs et de tests identiques sur dix fichiers : `auth.js`, `depenses.js`, `factures-recurrentes.js`, `factures.js`, `produits.js`, `professionnel.js`, `public-api.js`, `auth-currency.test.js`, `currency-lock-concurrency.test.js` et `setup.js`. La différence de patch observée porte sur les déclencheurs du workflow ESLint ; #185 modifie aussi les workflows packaging/tests, contrairement à #190.
+- #190 est basé sur une base plus récente et son diff est moins chargé de changements de workflow ; c'était le meilleur candidat historique à conserver si le correctif n'était pas encore dans main.
+
+**Vérification du main actuel :** le verrou est maintenant présent dans `PUT /auth/entreprise` et les premières écritures métier. Les routes de création de dépense, produit, facture, modèle récurrent, commande professionnelle et facture via API verrouillent le compte dans la transaction avant de figer la devise. Le générateur récurrent verrouille également le modèle et le client. La suite `server/tests/currency-lock-concurrency.test.js` existe sur main et couvre les changements de devise concurrents avec commande, produit, dépense, modèle récurrent, écriture comptable manuelle, achat fournisseur, devis/facture et API publique. Le helper `server/utils/money-format.js`, les relances locales par fuseau et le formatage par devise des emails sont aussi présents ; les pages produits/factures affichent la devise d'entreprise et les erreurs UI sont échappées.
+
+**Conclusion devise :** les principaux apports fonctionnels des branches #171/#182/#183/#185/#190 sont déjà intégrés au main actuel. La variante #190 est la plus propre des anciennes branches de verrouillage, mais elle ne doit pas être fusionnée ni rebasée juste pour réintroduire du code qui existe déjà. La présence d'une fonction dans main a été vérifiée dans les routes et tests nommés ci-dessus ; cette conclusion ne remplace pas une comparaison exhaustive de chaque ligne non fonctionnelle des 31 fichiers de #171.
+
+### CI sur les heads examinés
+
+| PR | Contrôles sur le head exact examiné |
+|---|---|
+| #179 | Aucun check-run sur le head actuel ; un ancien head a eu Tests, ESLint et ZIP réussis |
+| #188 | Aucun check-run sur le head actuel ; un ancien head a eu un échec de tests, puis un head antérieur était vert |
+| #171 | Tests, ESLint et ZIP réussis sur le head `953489e` |
+| #182 | Tests, ESLint et ZIP réussis sur le head `a078a35` |
+| #183 | Aucun check-run sur le head actuel |
+| #185 | Tests, ESLint et ZIP réussis sur le head `50b9fcc` |
+| #190 | Tests, ESLint et ZIP réussis sur le head `0abc044` |
+
+Les succès historiques n'annulent pas le statut `dirty` et ne valident pas une intégration sur le main actuel. #179/#188/#183 n'ont pas de validation CI retrouvée sur leur head actuel.
+
+### Décision et garde-fous
+
+1. Ne pas fusionner #179, #188, #171, #182, #183, #185 ou #190 : tous les heads sont périmés par rapport à main et marqués dirty.
+2. Considérer #179/#188 et le lot de devise #171/#182/#183/#185/#190 comme des candidats supersédés par les implémentations et tests présents dans main.
+3. Ne fermer aucune PR sans décision explicite ; ne supprimer aucune branche.
+4. Avant toute clôture, faire une dernière comparaison des différences résiduelles et vérifier qu'elles ne contiennent ni test unique utile ni correctif non repris.
+5. Ne pas réintroduire de migrations, de modifications de schéma, de changement de règles de calcul OHADA ou d'activation de paiement réel dans cet audit.
+
+Aucune branche, PR, donnée, facture, sauvegarde ou volume n'a été modifié ou supprimé pendant cette comparaison.
