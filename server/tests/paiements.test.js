@@ -6,6 +6,183 @@ const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardown
 // Ces tests couvrent la logique interne des paiements (idempotence, vérification du
 // montant, expiration) sans appeler les vraies API Wave/PayDunya (non joignables en test).
 // La vérification de signature/hash est couverte séparément (tests unitaires purs, sans DB).
+describe("Idempotence facture — contenu de la clé", () => {
+  let userId;
+  let token;
+  let clientId;
+
+  before(async () => {
+    await setupTestDatabase();
+    const inscription = await request(app)
+      .post('/api/auth/register')
+      .send({
+        nom: 'Testeur Conflit Idempotence',
+        email: emailDeTest('payment-payload'),
+        password: 'motdepasse123',
+        acceptTerms: true
+      });
+    userId = inscription.body.user.id;
+    token = inscription.body.token;
+
+    const client = await request(app)
+      .post('/api/clients')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Client Conflit Idempotence' });
+    assert.equal(client.status, 201, client.text);
+    clientId = client.body.client.id;
+  });
+
+  after(async () => {
+    await nettoyerUtilisateur(userId);
+  });
+
+  const creerFacture = async designation => {
+    const devis = await request(app)
+      .post('/api/factures')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        client_id: clientId,
+        type: 'devis',
+        lignes: [{ designation, quantite: 1, prix_unitaire: 1000, tva: 0 }]
+      });
+    assert.equal(devis.status, 201, devis.text);
+
+    const conversion = await request(app)
+      .post(`/api/factures/${devis.body.facture.id}/transformer-en-facture`)
+      .set('Authorization', `Bearer ${token}`);
+    assert.ok([200, 201].includes(conversion.status), conversion.text);
+    return conversion.body.facture.id;
+  };
+
+  test('la même clé est refusée si le montant, la méthode ou la référence changent', async () => {
+    const scenarios = [
+      {
+        champ: 'montant',
+        original: { montant: 250, methode: 'virement', reference: 'REF-MONTANT' },
+        modifie: { montant: 300, methode: 'virement', reference: 'REF-MONTANT' }
+      },
+      {
+        champ: 'méthode',
+        original: { montant: 250, methode: 'virement', reference: 'REF-METHODE' },
+        modifie: { montant: 250, methode: 'especes', reference: 'REF-METHODE' }
+      },
+      {
+        champ: 'référence',
+        original: { montant: 250, methode: 'virement' },
+        modifie: { montant: 250, methode: 'virement', reference: 'REF-AJOUTEE' }
+      }
+    ];
+
+    for (const [index, scenario] of scenarios.entries()) {
+      const factureId = await creerFacture(`Conflit idempotence ${scenario.champ}`);
+      const key = `idem-payload-${Date.now()}-${index}`;
+
+      const creation = await request(app)
+        .post(`/api/factures/${factureId}/paiements`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', key)
+        .send(scenario.original);
+      assert.equal(creation.status, 201, creation.text);
+
+      const conflit = await request(app)
+        .post(`/api/factures/${factureId}/paiements`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', key)
+        .send(scenario.modifie);
+      assert.equal(conflit.status, 409, conflit.text);
+      assert.equal(conflit.body.code, 'IDEMPOTENCY_KEY_CONFLIT_REQUETE');
+
+      const [payments] = await pool.query(
+        'SELECT montant, methode, reference FROM paiements WHERE user_id = ? AND facture_id = ? AND idempotency_key = ?',
+        [userId, factureId, key]
+      );
+      assert.equal(payments.length, 1, 'le conflit ne doit créer aucun second règlement');
+      assert.equal(Number(payments[0].montant), scenario.original.montant);
+      assert.equal(payments[0].methode, scenario.original.methode);
+      assert.equal(payments[0].reference ?? null, scenario.original.reference ?? null);
+
+      const [[facture]] = await pool.query(
+        'SELECT montant_paye FROM factures WHERE id = ? AND user_id = ?',
+        [factureId, userId]
+      );
+      assert.equal(Number(facture.montant_paye), scenario.original.montant);
+    }
+  });
+
+  test('deux requêtes concurrentes sur la même facture avec des contenus différents donnent 201 et 409', async () => {
+    const factureId = await creerFacture('Conflit idempotence concurrent');
+    const key = `idem-payload-race-${Date.now()}`;
+    const [a, b] = await Promise.all([
+      request(app)
+        .post(`/api/factures/${factureId}/paiements`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', key)
+        .send({ montant: 250, methode: 'virement', reference: 'RACE-A' }),
+      request(app)
+        .post(`/api/factures/${factureId}/paiements`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', key)
+        .send({ montant: 300, methode: 'virement', reference: 'RACE-B' })
+    ]);
+
+    assert.deepEqual(
+      [a.status, b.status].sort((left, right) => left - right),
+      [201, 409]
+    );
+    const conflit = [a, b].find(response => response.status === 409);
+    assert.equal(conflit.body.code, 'IDEMPOTENCY_KEY_CONFLIT_REQUETE');
+
+    const [payments] = await pool.query(
+      'SELECT montant FROM paiements WHERE user_id = ? AND facture_id = ? AND idempotency_key = ?',
+      [userId, factureId, key]
+    );
+    assert.equal(payments.length, 1);
+    const [[facture]] = await pool.query(
+      'SELECT montant_paye FROM factures WHERE id = ? AND user_id = ?',
+      [factureId, userId]
+    );
+    assert.equal(Number(facture.montant_paye), Number(payments[0].montant));
+  });
+
+  test('une même clé en concurrence sur deux factures reste refusée sur la facture perdante', async () => {
+    const premiereFacture = await creerFacture('Conflit clé multi-facture A');
+    const secondeFacture = await creerFacture('Conflit clé multi-facture B');
+    const key = `idem-cross-invoice-race-${Date.now()}`;
+
+    const [a, b] = await Promise.all([
+      request(app)
+        .post(`/api/factures/${premiereFacture}/paiements`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', key)
+        .send({ montant: 200, methode: 'virement' }),
+      request(app)
+        .post(`/api/factures/${secondeFacture}/paiements`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', key)
+        .send({ montant: 200, methode: 'virement' })
+    ]);
+
+    assert.deepEqual(
+      [a.status, b.status].sort((left, right) => left - right),
+      [201, 409]
+    );
+    const conflit = [a, b].find(response => response.status === 409);
+    assert.equal(conflit.body.code, 'IDEMPOTENCY_KEY_REUTILISEE');
+
+    const [payments] = await pool.query(
+      'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ?',
+      [userId, key]
+    );
+    assert.equal(payments.length, 1, 'une seule des deux factures doit recevoir ce règlement');
+    const [[factures]] = await pool.query(
+      'SELECT COUNT(*) AS n, SUM(montant_paye) AS total_paye FROM factures WHERE user_id = ? AND id IN (?, ?)',
+      [userId, premiereFacture, secondeFacture]
+    );
+    assert.equal(Number(factures.n), 2);
+    assert.equal(Number(factures.total_paye), 200);
+  });
+});
+
 describe("Paiements d'abonnement", () => {
   let userId, token, paiementId;
 
