@@ -98,7 +98,10 @@ export default [
       'server/tests/invoice-quota-migration-v8.test.js',
       'server/tests/subscription-schema.test.js',
       'server/tests/schema-v21-upgrade-compatibility.test.js',
-      'server/tests/paiements.test.js'
+      'server/tests/paiements.test.js',
+      'server/app.js',
+      'server/utils/log-sanitizer.js',
+      'server/tests/log-sanitizer.test.js'
     ],
     languageOptions: {
       ecmaVersion: 'latest',
