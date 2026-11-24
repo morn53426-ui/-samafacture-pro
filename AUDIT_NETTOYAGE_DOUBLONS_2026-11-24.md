@@ -317,3 +317,26 @@ Les deux branches ont une CI verte sur leur head relevé et GitHub les déclare 
 - Ne fermer aucune des deux PR et ne modifier aucune branche sans autorisation explicite.
 
 Aucun changement de code n'a été fait dans #209 ou #211 pendant cette comparaison.
+
+
+### Mise à jour après renforcement du test #211 — 24 novembre 2026
+
+Le candidat #211 a reçu un contrôle supplémentaire dans `server/tests/parametres-accessibility.test.js`, sans modification du HTML ou du CSS :
+- le champ RIB doit être présent dans la grille ;
+- le conteneur de grille doit se fermer après le champ RIB ;
+- les conditions de règlement et les mentions légales doivent rester à l'extérieur de ce conteneur ;
+- les assertions précédentes (neuf champs, RIB pleine largeur, `display: grid`, deux colonnes, une colonne mobile et formulaire unique) sont conservées.
+
+Head testé : `a9caf95bd16049c4922f4b4bb405b421b7888fb1`.
+
+CI sur ce head :
+- Tests automatisés run `45390855502` : succès.
+- ESLint run `45390855498` : succès.
+- Packaging ZIP run `45390855495` : succès.
+- La nouvelle assertion « les coordonnées de l’entreprise sont dans une grille responsive fermée avant les champs légaux » est explicitement verte dans les logs.
+- Suite principale : 621 tests, 620 réussites, 0 échec, 1 ignoré.
+- Restauration réelle chiffrée via les clients MySQL : 1 réussite, 0 échec.
+- Smoke test MySQL/Redis : succès.
+- Recette visuelle responsive : succès ; artefact `samafacture-recette-visuelle-1898` publié (329 fichiers).
+
+**Décision confirmée :** #211 est le meilleur candidat entre #209 et #211 pour une revue finale, car son test couvre aussi la fermeture du conteneur et la conservation des champs légaux hors grille. Cela ne constitue pas une autorisation de fusion. Les deux PR restent ouvertes et en brouillon.
