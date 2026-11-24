@@ -358,7 +358,14 @@ describe('Impression et génération PDF', () => {
   });
 
   test("les polices écran et PDF utilisent les familles réellement chargées", () => {
-    assert.match(cssSource, /@import url\('https:\/\/fonts\.googleapis\.com\/css2\?family=IBM\+Plex\+Mono/);
+    assert.doesNotMatch(cssSource, /fonts\.googleapis\.com|fonts\.gstatic\.com/,
+      'Les polices doivent être auto-hébergées : aucune dépendance à Google Fonts.');
+    for (const [family, weights] of [['IBM Plex Sans', [400, 500, 600, 700]], ['IBM Plex Mono', [400, 500]]]) {
+      for (const weight of weights) {
+        const pattern = new RegExp(`font-family:\\s*'${family}';[^}]*font-weight:\\s*${weight};[^}]*url\\('\\.\\./fonts/[^']+\\.woff2'\\)`, 's');
+        assert.match(cssSource, pattern, `${family} ${weight} doit être déclaré via @font-face local.`);
+      }
+    }
     assert.match(cssSource, /--font-display:\s*'IBM Plex Sans', Arial, sans-serif/);
     assert.match(cssSource, /--font-body:\s*'IBM Plex Sans', Arial, sans-serif/);
     assert.match(cssSource, /--font-mono:\s*'IBM Plex Mono', 'Courier New', monospace/);

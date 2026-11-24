@@ -79,14 +79,13 @@ async function signerTokenTemporaire(user) {
   );
 }
 
-const HOTES_POLICES_AUTORISES = new Set(['https://fonts.googleapis.com', 'https://fonts.gstatic.com']);
-
-// Règle réseau de la page PDF : application elle-même, data:/blob: et polices Google uniquement.
+// Règle réseau de la page PDF : application elle-même et data:/blob: uniquement. Les polices
+// IBM Plex sont servies par l'application (public/fonts), aucun hôte externe n'est autorisé.
 function urlPdfAutorisee(url, origineApp) {
   try {
     if (url.startsWith('data:') || url.startsWith('blob:') || url === 'about:blank') return true;
     const origine = new URL(url).origin;
-    return origine === origineApp || HOTES_POLICES_AUTORISES.has(origine);
+    return origine === origineApp;
   } catch (_) {
     return false;
   }
@@ -112,7 +111,7 @@ async function genererPdfFacture(factureId, user) {
     const apiBaseUrl = `${baseUrl}/api`;
 
     // Chromium tourne avec --no-sandbox et détient un JWT valide 2 min : on bloque toute requête
-    // sortante hors de l'application (et des polices Google), pour qu'un contenu injecté dans une
+    // sortante hors de l'application, pour qu'un contenu injecté dans une
     // facture ne puisse ni exfiltrer le jeton ni joindre le réseau interne (SSRF).
     const origineApp = new URL(baseUrl).origin;
     await page.setRequestInterception(true);

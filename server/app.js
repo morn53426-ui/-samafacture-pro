@@ -128,9 +128,9 @@ app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy', [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://accounts.google.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
-      "font-src 'self' data: https://fonts.gstatic.com",
+      "font-src 'self' data:",
       // cdnjs.cloudflare.com est ajouté ici (en plus de script-src) car le navigateur récupère
       // le sourcemap (.js.map) de socket.io.min.js via une requête soumise à connect-src, pas
       // script-src — sans cette origine, DevTools loggue une erreur CSP bloquant ce fichier
