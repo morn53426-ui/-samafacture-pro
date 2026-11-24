@@ -340,3 +340,77 @@ CI sur ce head :
 - Recette visuelle responsive : succès ; artefact `samafacture-recette-visuelle-1898` publié (329 fichiers).
 
 **Décision confirmée :** #211 est le meilleur candidat entre #209 et #211 pour une revue finale, car son test couvre aussi la fermeture du conteneur et la conservation des champs légaux hors grille. Cela ne constitue pas une autorisation de fusion. Les deux PR restent ouvertes et en brouillon.
+
+
+## Audit approfondi des PR #179 et #188 — sécurité multi-tenant
+
+Audit effectué le 24 novembre 2026 en comparant les deux descriptions, leurs patches, leurs têtes actuelles, leurs statuts CI et les fichiers de `main`.
+
+### Métadonnées observées
+
+| Élément | PR #179 | PR #188 |
+|---|---|---|
+| Titre | `security(invoices): enforce client and payment tenant ownership` | `security(tenant): enforce ownership across invoice-related records` |
+| Branche | `security/invoice-client-tenant-scope-20261123` | `security/invoice-client-tenant-current-main-after-181-20261123` |
+| Head observé | `5f554950cba1c4f0ea5dc6383b4f4588f7b61c64` | `39f27a324412cefae046181e22430ba79f24b5c5` |
+| Base SHA enregistré | `b43a94fc2937b0108077501a0260358c8569e11f` | `b276eba52b5179f351efe68d18cf540a170c70fd` |
+| Fichiers de la PR | 8 | 7 |
+| Commits de la PR | 23 | 10 |
+| État | ouverte, brouillon, non fusionnée | ouverte, brouillon, non fusionnée |
+| Mergeable au dernier relevé | false | false |
+
+Les branches ne partent pas du même commit. Le comparatif de leurs heads les signale comme divergentes (15 commits d'un côté et 23 de l'autre depuis leur base commune), et non comme deux branches simples l'une de l'autre. Comparées au `main` actuel au moment de l'audit, les têtes sont respectivement en avance de 23 / en retard de 47 commits (#179), et en avance de 10 / en retard de 42 commits (#188). Elles ne doivent pas être fusionnées telles quelles.
+
+### Recouvrement fonctionnel confirmé
+
+Les deux PR poursuivent le même objectif : empêcher des relations SQL mal rattachées de révéler des données d'une autre entreprise. Leurs patches se recouvrent sur :
+- listes et détails de factures, relance et envoi email ;
+- paiements associés au détail de facture ;
+- agrégats du tableau de bord et rapports par client ;
+- listing et génération des factures récurrentes, avec validation transactionnelle du client ;
+- commandes, bons de livraison, avoirs, acomptes, paiements et liens de paiement professionnels ;
+- tests de régression dans `server/tests/professional-tenant.test.js`.
+
+#179 modifie aussi `server/routes/public-api.js` pour joindre le client avec `c.user_id = f.user_id`. #188 ne présente pas cette modification dans son propre patch, mais son arbre contient déjà cette garde. Elle est également présente dans `main` : ce n'est donc pas un correctif à réappliquer.
+
+### Vérification de l'arbre `main`
+
+La lecture des fichiers de `main` confirme que les protections principales sont déjà présentes :
+- `dashboard.js` : relation paiement → facture → client filtrée par tenant ;
+- `factures-recurrentes.js` : client filtré dans la liste, verrouillé et validé avant génération ;
+- `factures.js` : client et facture du même tenant, paiements filtrés par `user_id`, mises à jour limitées au tenant ;
+- `professionnel.js` : jointures tenant-aware pour remboursements, paiements, commandes, livraisons, avoirs, acomptes, liens et checkouts ;
+- `public-api.js` : le client associé à une facture publique doit appartenir au même tenant ;
+- `rapports.js` : agrégats par client limités aux factures et clients du même tenant.
+
+La suite actuelle `server/tests/professional-tenant.test.js` dans `main` fait 469 lignes et comprend également des tests dédiés :
+- les routes publiques et l’assistant excluent les relations inter-entreprises ;
+- le relevé client exclut les remboursements liés à un paiement d’un autre tenant ;
+- les permissions lecture seule ne sont pas élargies pour tester les API keys ;
+- les dépendances de fixtures multi-tenant sont nettoyées dans l'ordre compatible avec les clés étrangères.
+
+### Écart précis dans la tête #188
+
+Dans la requête de relevé client de la branche #188, la jointure est :
+`pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id JOIN factures f ON f.id = p.facture_id`.
+
+Elle omet les deux contrôles :
+- `p.user_id = r.user_id` ;
+- `f.user_id = p.user_id`.
+
+La branche #179 et `main` possèdent ces contrôles. La version #188 est donc moins stricte sur ce chemin et ne doit pas servir de base de reprise sans correction. La suite de test actuelle sur `main` contient précisément un scénario de remboursement lié à un paiement d'un autre tenant.
+
+### Statuts CI sur les têtes exactes
+
+Les têtes actuellement déclarées par les PR ne disposent pas de check-run ni de statut attaché à leur SHA exact au moment de cette vérification.
+
+- #179 : des exécutions plus anciennes existent ; la suite tests, ESLint et ZIP ont été vertes sur le head précédent `4be36d680608a0287f7672693f69b04c26394bc7`. Cela ne valide pas le head actuel `5f554950...`.
+- #188 : les exécutions antérieures incluent une suite de tests échouée sur `1e82c9b65dd91a665e5f6b255a8456bd8d4b8a23` (ESLint et ZIP verts) et une suite précédente réussie sur `3112b8e645ee2ac2d58639c766b09d282af6a2fd`. Aucun de ces résultats ne valide le head actuel `39f27a324...`.
+
+### Conclusion et décision de consolidation
+
+**Aucune des deux PR n'est un candidat de fusion direct.** Les corrections métier principales sont déjà intégrées à `main`, avec une couverture de test plus complète que les anciennes variantes. La branche #179 contient le contrôle manquant sur la chaîne des remboursements, contrairement à #188, mais ses changements sont eux aussi déjà représentés sur `main` ; son arbre est en outre fortement en retard. #188 est plus proche de la base initiale récente, mais n'apporte plus de valeur de code à fusionner et son head présente l'omission citée.
+
+Recommandation : conserver les deux PR ouvertes et en brouillon tant qu'aucune autorisation explicite de fermeture n'est donnée ; ne pas cherry-pick ni fusionner leurs changements sans besoin identifié. En cas de nouvelle correction multi-tenant, partir du `main` actuel et ajouter un test dédié plutôt que reprendre l'une de ces branches anciennes.
+
+Aucune branche, PR, donnée, migration, sauvegarde ou volume n'a été modifié pendant cet audit. Seul ce rapport d'audit est complété.
