@@ -17,7 +17,7 @@ const browserGlobals = Object.fromEntries([
 ].map((name) => [name, 'readonly']));
 
 const nodeGlobals = Object.fromEntries([
-  '__dirname', '__filename', 'Buffer', 'clearImmediate', 'clearInterval',
+  '__dirname', '__filename', 'Buffer', 'URL', 'clearImmediate', 'clearInterval',
   'clearTimeout', 'console', 'exports', 'global', 'module', 'process', 'require',
   'setImmediate', 'setInterval', 'setTimeout'
 ].map((name) => [name, 'readonly']));
@@ -76,6 +76,10 @@ export default [
 
   {
     files: [
+      'server/app.js',
+      'server/config/monitoring.js',
+      'server/utils/log-sanitizer.js',
+      'server/tests/log-sanitizer.test.js',
       'server/config/db.js',
       'server/email-outbox.js',
       'server/routes/professionnel.js',
