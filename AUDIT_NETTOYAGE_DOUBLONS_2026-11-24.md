@@ -171,3 +171,29 @@ Le commit de regroupement est `acb276bc0dc85545c4119a4f09248845ddba2092`. La CI 
 ### Portée et limites
 
 Aucune logique de paiement, écriture financière, règle comptable OHADA, migration ou donnée n'a été modifiée dans cette étape : seules les assertions de tests ont été renforcées et regroupées. La PR reste en brouillon ; aucun merge ni déploiement n'a été effectué.
+
+
+## Validation finale du head du PR #223 — 24 novembre 2026
+
+Head vérifié : `a2a0645d42f1f15a8eaa2b42df15110b1ed0367a` (branche `audit/dead-code-consolidation-20261124-run33`, PR #223).
+
+Les quatre workflows déclenchés sur ce head sont terminés avec succès :
+
+| Contrôle | Run GitHub Actions | Résultat |
+|---|---:|---|
+| Tests Node.js et MySQL | `45377480121` | Succès |
+| ESLint — fichiers JavaScript ciblés | `45377480111` | Succès |
+| Audit statique (Knip, jscpd, références frontend) | `45377479953` | Succès |
+| Packaging ZIP | `45377480157` | Succès |
+
+Détail des tests :
+- Suite principale : **625 tests, 624 réussites, 0 échec, 1 ignoré**.
+- Le test ignoré est le scénario de restauration réelle avec les clients MySQL, non lancé dans la suite générique.
+- Ce scénario est exécuté séparément dans le même job avec `RUN_REAL_RESTORE_SMOKE=true`, `mysqldump` et `mysql` : **1 test, 1 réussite, 0 échec, 0 ignoré**. L'archive de sauvegarde a été chiffrée AES-256-GCM, puis restaurée avec succès.
+- Les deux scénarios HTTP d'idempotence de paiement sont verts : concurrence (réponses 201 et 200 avec `idempotent_replay: true`) et réutilisation inter-factures (409, aucun second paiement).
+- Les tests PDF/impression vérifient les 31 modèles en vrai PDF A4 pour factures et devis, la mise en page courte/longue, les polices et la pagination.
+- La recette visuelle responsive est passée et ses captures ont été archivées.
+
+Le rapport statique confirme les résultats précédemment consignés : Knip `issues: []`, aucune référence JS locale cassée, 10 clones/176 lignes dupliquées (1,02 %) et aucun nouveau clone détecté lors du dernier scan disponible.
+
+**Conclusion :** le code et les tests du PR #223 sont validés par la CI sur le head indiqué. Cette validation ne constitue pas une recette métier OHADA complète ni une validation sur imprimantes physiques. La PR reste en brouillon et n'est pas fusionnée.
