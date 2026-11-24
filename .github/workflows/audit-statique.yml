@@ -1,0 +1,77 @@
+name: Audit statique — code inutilisé
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'mobile/**'
+      - 'public/**'
+      - 'scripts/**'
+      - '.github/workflows/audit-statique.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyse-backend:
+    name: Knip — backend Node.js
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: Analyser les fichiers, exports et dépendances
+        working-directory: server
+        run: >-
+          npx --yes knip@6.48.0
+          --reporter json
+          --output-file json=knip-audit.json
+          --no-exit-code
+
+      - name: Archiver le rapport backend
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: audit-statique-backend
+          path: server/knip-audit.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  references-frontend:
+    name: Références statiques des scripts frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: Vérifier les scripts référencés par les pages
+        run: |
+          node scripts/audit-public-script-references.js "$RUNNER_TEMP/audit-public-scripts.md"
+          cat "$RUNNER_TEMP/audit-public-scripts.md"
+
+      - name: Archiver le rapport frontend
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: audit-statique-frontend
+          path: ${{ runner.temp }}/audit-public-scripts.md
+          if-no-files-found: warn
+          retention-days: 14
