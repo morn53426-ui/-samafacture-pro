@@ -89,3 +89,51 @@ Les 12 exports non consommés détectés au passage précédent étaient répart
 Ajout du job CI `Détection des blocs de code dupliqués` avec jscpd `5.4.3`, seuil de détection initial de 80 tokens et 8 lignes, sur les fichiers JavaScript de production backend/frontend (`server/app.js`, `server/cluster.js`, `server/config`, `server/middleware`, `server/routes`, `server/services`, `server/utils`, `public/js`). Le résultat est archivé en JSON pendant 14 jours.
 
 Ce premier passage est un relevé, pas un gate : un bloc commun peut être volontaire (formats, contrats et règles comptables identiques). Chaque paire devra être examinée avant de fusionner en une abstraction ou de supprimer un bloc.
+
+## Extraction du deuxième doublon utilitaire exact
+
+Le scan jscpd a confirmé que les deux définitions de `optionalText()` et `optionalIsoDate()` étaient identiques dans `server/routes/factures.js` et `server/routes/professionnel.js`.
+
+Correction :
+- création de `server/utils/optional-fields.js` ;
+- les deux routes importent maintenant les fonctions partagées ;
+- suppression des deux définitions locales ;
+- ajout de `server/tests/optional-fields.test.js` pour les valeurs absentes, les chaînes blanches, le tronquage, les dates valides, les dates impossibles et le format non pris en charge ;
+- ajout du nouveau test à ESLint.
+
+Le contrat est conservé : champ absent/chaîne vide → `null` ; date syntaxiquement ou calendriquement invalide → `undefined` ; date valide → chaîne `YYYY-MM-DD`. Aucune règle fiscale, de facture, de paiement ou comptable n'est modifiée.
+
+## Scan jscpd après extraction — head `24c24a949a11da56b52843aaf1e7296f8fb8fcf4`
+
+Rapport JSON de l'exécution CI :
+- Fichiers JavaScript analysés : 61.
+- Lignes analysées : 17 326.
+- Blocs identiques restants : **10**.
+- Lignes dupliquées : **176** (1,02 %).
+- Avant extraction des validateurs : 11 blocs et 191 lignes dupliquées (1,10 %).
+
+### Blocs restants à examiner
+
+| Fichiers / plages | Taille | Lecture de risque |
+|---|---:|---|
+| `routes/depenses.js:114–146` / `routes/produits.js:134–165` | 33 lignes | Queue transactionnelle et documentation de routes différentes ; abstraction de transaction à évaluer |
+| `routes/factures.js:1374–1390` / `routes/factures.js:1475–1491` | 17 lignes | Rejeu idempotent d'un paiement ; le chemin initial et le chemin de récupération après `ER_DUP_ENTRY` ont des comportements de repli différents |
+| `routes/produits.js:160–169` / `routes/produits.js:308–325` | 10 lignes | Recherche/verrouillage du produit dans modification et suppression ; vérifier les gardes de stock et d'historique avant factorisation |
+| `routes/professionnel.js:892–917` / `routes/professionnel.js:1005–1030` | 26 lignes | Acceptation et vérification d'invitation d'équipe ; tokens et conditions de sécurité diffèrent |
+| `routes/professionnel.js:999–1008` / `routes/professionnel.js:1637–1646` | 10 lignes | Validation des tokens dans deux parcours professionnels proches |
+| `routes/professionnel.js:1435–1446` / `routes/professionnel.js:1811–1822` | 12 lignes | Contrôles de membres/groupes ; dépendances tenant à vérifier |
+| `routes/professionnel.js:1506–1530` / `routes/professionnel.js:1643–1667` | 25 lignes | Verrous et validations de parcours de groupe/invitation |
+| `routes/professionnel.js:1530–1549` / `routes/professionnel.js:1667–1685` | 20 lignes | Contrôles qui suivent ces verrous ; ne pas mutualiser sans garder le même ordre transactionnel |
+| `routes/professionnel.js:1621–1631` / `routes/professionnel.js:1741–1751` | 11 lignes | Validation de jeton/compte similaire sur deux endpoints |
+| `routes/professionnel.js:2769–2780` / `routes/professionnel.js:2903–2908` | 12 lignes | Champs/écritures de commandes professionnelles à comparer au niveau métier |
+
+Ces 10 blocs restent **non modifiés** dans cette PR : les répétitions d'idempotence, de transactions, de permissions et d'invitations peuvent porter des différences fonctionnelles invisibles à un détecteur de clones. Le prochain lot recommandé est une revue séparée des routes professionnelles multi-sociétés et de l'idempotence des paiements, avec tests de concurrence, de tenant et de non-régression avant toute extraction.
+
+## Validation CI observée sur le head `24c24a949a11da56b52843aaf1e7296f8fb8fcf4`
+
+- ESLint : succès.
+- Packaging ZIP : succès.
+- Knip : succès, `issues: []`.
+- Références frontend : succès, aucune référence locale cassée.
+- jscpd : succès, rapport archivé ; les clones sont signalés mais ne font pas échouer le build.
+- Suite Node/MySQL : encore en cours au moment de la rédaction ; aucun résultat final ne doit être annoncé avant la fin.
