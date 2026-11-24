@@ -46,4 +46,37 @@ function sanitizeReferrerForLog(referrer) {
   }
 }
 
-module.exports = { sanitizeRequestTargetForLog, sanitizeReferrerForLog };
+const MASQUE = '[masqué]';
+
+/** Retire du message MySQL les valeurs de colonnes (email, jeton, hash…) citées entre apostrophes. */
+function masquerValeursSql(texte) {
+  return String(texte)
+    .replace(/(Duplicate entry )'[^']*'/g, `$1'${MASQUE}'`)
+    .replace(/(value: )'[^']*'/gi, `$1'${MASQUE}'`);
+}
+
+/**
+ * Prépare une erreur pour console.error. Une erreur mysql2 porte `sql` : la requête avec ses
+ * valeurs réelles déjà substituées (hash de mot de passe, email, jetons), que console.error
+ * imprimerait telle quelle. On renvoie alors une copie qui ne garde que le nom, le message
+ * masqué, la pile et les codes de diagnostic (code, errno, sqlState). Toute autre erreur est
+ * renvoyée inchangée.
+ */
+function sanitizeErrorForLog(err) {
+  if (!err || typeof err !== 'object') return err;
+  const estSql = typeof err.sql === 'string' || typeof err.sqlMessage === 'string' || typeof err.sqlState === 'string';
+  if (!estSql) return err;
+
+  const message = masquerValeursSql(err.message);
+  const sure = new Error(message);
+  sure.name = err.name;
+  if (typeof err.stack === 'string') {
+    sure.stack = err.message ? err.stack.split(err.message).join(message) : err.stack;
+  }
+  for (const cle of ['code', 'errno', 'sqlState']) {
+    if (err[cle] !== undefined) sure[cle] = err[cle];
+  }
+  return sure;
+}
+
+module.exports = { sanitizeRequestTargetForLog, sanitizeReferrerForLog, sanitizeErrorForLog };

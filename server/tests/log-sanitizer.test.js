@@ -2,9 +2,11 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const util = require('node:util');
 const {
   sanitizeRequestTargetForLog,
-  sanitizeReferrerForLog
+  sanitizeReferrerForLog,
+  sanitizeErrorForLog
 } = require('../utils/log-sanitizer');
 
 describe('Journalisation HTTP sans secrets dans les URL', () => {
@@ -82,5 +84,65 @@ describe('Journalisation HTTP sans secrets dans les URL', () => {
     assert.match(format[1], /\$sf_log_uri/);
     assert.match(format[1], /\$sf_log_referer/);
     assert.doesNotMatch(format[1], /\$request_uri|\$http_referer|\$request\b/);
+  });
+});
+
+describe('Journalisation des erreurs SQL sans valeurs sensibles', () => {
+  const HASH = '$2a$10$NcaUVhCGlIC5lQv/dxTDeO69e3LvvKZ7bcj5ct.se7HwydT6l.5tG';
+  const EMAIL = 'cliente.privee@exemple-test.com';
+  function erreurMysql() {
+    const message = `Duplicate entry '${EMAIL}' for key 'uk_users_email'`;
+    return Object.assign(new Error(message), {
+      code: 'ER_DUP_ENTRY', errno: 1062, sqlState: '23000', sqlMessage: message,
+      sql: `INSERT INTO users (email, password_hash) VALUES ('${EMAIL}', '${HASH}')`
+    });
+  }
+
+  test('une erreur mysql2 ne laisse plus fuiter ni la requête, ni le hash, ni l’email', () => {
+    const sortie = util.inspect(sanitizeErrorForLog(erreurMysql()), { depth: 5 });
+    assert.doesNotMatch(sortie, /\$2a\$10\$/, 'le hash de mot de passe ne doit pas être journalisé');
+    assert.doesNotMatch(sortie, /cliente\.privee/, 'l’email cité par MySQL doit être masqué');
+    assert.doesNotMatch(sortie, /INSERT INTO|VALUES/, 'la requête SQL avec ses valeurs ne doit pas être journalisée');
+  });
+
+  test('conserve de quoi diagnostiquer : nom, code, errno, sqlState, message masqué et pile', () => {
+    const sure = sanitizeErrorForLog(erreurMysql());
+    assert.equal(sure.name, 'Error');
+    assert.equal(sure.code, 'ER_DUP_ENTRY');
+    assert.equal(sure.errno, 1062);
+    assert.equal(sure.sqlState, '23000');
+    assert.match(sure.message, /Duplicate entry '\[masqué\]' for key 'uk_users_email'/);
+    assert.match(sure.stack, /\n\s+at /, 'la pile d’appels doit rester exploitable');
+    assert.doesNotMatch(sure.stack, /cliente\.privee/);
+  });
+
+  test('masque aussi les valeurs citées par « Incorrect … value »', () => {
+    const err = Object.assign(new Error("Incorrect integer value: 'abc' for column 'stock' at row 1"), { code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD', sqlState: 'HY000' });
+    assert.match(sanitizeErrorForLog(err).message, /value: '\[masqué\]' for column 'stock'/);
+  });
+
+  test('ne modifie pas l’erreur d’origine', () => {
+    const err = erreurMysql();
+    sanitizeErrorForLog(err);
+    assert.match(err.sql, /INSERT INTO users/);
+    assert.match(err.message, /cliente\.privee/);
+  });
+
+  test('une erreur non SQL et les valeurs non objet sont renvoyées inchangées', () => {
+    const err = new Error('Boom');
+    assert.equal(sanitizeErrorForLog(err), err);
+    assert.equal(sanitizeErrorForLog('texte'), 'texte');
+    assert.equal(sanitizeErrorForLog(undefined), undefined);
+    assert.equal(sanitizeErrorForLog(null), null);
+  });
+
+  test('app.js passe chaque erreur par le nettoyeur avant console.error', () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    for (const motif of [
+      /user#\$\{req\.user\.id\}` : ''\}`, sanitizeErrorForLog\(err\)\)/,
+      /Promesse rejetée non gérée :', sanitizeErrorForLog\(reason\)\)/,
+      /redémarrage propre :', sanitizeErrorForLog\(err\)\)/
+    ]) assert.match(source, motif);
+    assert.doesNotMatch(source, /console\.error\([^\n]*, (?:err|reason)\);/, 'aucun console.error ne doit recevoir l’erreur brute');
   });
 });
