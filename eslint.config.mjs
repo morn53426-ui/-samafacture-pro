@@ -100,7 +100,8 @@ export default [
       'server/tests/schema-v21-upgrade-compatibility.test.js',
       'server/tests/paiements.test.js',
       'server/utils/google-account.js',
-      'server/tests/google-account-concurrency.test.js'
+      'server/tests/google-account-concurrency.test.js',
+      'server/tests/register-concurrency.test.js'
     ],
     languageOptions: {
       ecmaVersion: 'latest',
