@@ -208,7 +208,7 @@ describe('Assainissement des événements Sentry et erreurs SQL', () => {
     });
     const safe = sanitizeErrorForLog(original);
 
-    assert.match(safe.message, /value: '\\[masqué\\]' for column 'stock'/);
+    assert.match(safe.message, /value: '\[masqué\]' for column 'stock'/);
     assert.doesNotMatch(safe.message, /abc/);
     assert.equal(original.message, message, 'l’erreur source doit rester intacte');
   });
@@ -228,11 +228,11 @@ describe('Assainissement des événements Sentry et erreurs SQL', () => {
     assert.notEqual(safe, original);
     assert.equal(safe.sql, undefined);
     assert.equal(safe.sqlMessage, undefined);
-    assert.doesNotMatch(safe.stack, /client\\.confidentiel/);
+    assert.doesNotMatch(safe.stack, /client\.confidentiel/);
     assert.equal(original.message, originalMessage);
     assert.equal(original.stack, originalStack);
     assert.equal(original.sql, sql);
-    assert.match(original.sqlMessage, /client\\.confidentiel/);
+    assert.match(original.sqlMessage, /client\.confidentiel/);
 
     const ordinaryError = new Error('erreur applicative non SQL');
     assert.equal(sanitizeErrorForLog(ordinaryError), ordinaryError);
