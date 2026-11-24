@@ -260,6 +260,116 @@ describe('Authentification', () => {
     assert.equal((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${reconnexion.body.token}`)).status, 200);
   });
 
+  test('la réinitialisation protège un événement de contrepassation même si la facture liée est un devis', async () => {
+    const { pool } = require('../config/db');
+    const registration = await request(app)
+      .post('/api/auth/register')
+      .send({
+        nom: 'Compte événement comptable',
+        email: emailDeTest('reset-event'),
+        password,
+        entreprise_nom: 'Société événement comptable',
+        acceptTerms: true
+      });
+    assert.equal(registration.status, 201, registration.text);
+    const resetUserId = registration.body.user.id;
+
+    try {
+      const [clientResult] = await pool.query(
+        'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+        [resetUserId, 'Client événement comptable']
+      );
+      const [invoiceResult] = await pool.query(
+        'INSERT INTO factures (user_id, client_id, numero, type, date_emission) VALUES (?, ?, ?, ?, CURRENT_DATE)',
+        [resetUserId, clientResult.insertId, 'RESET-EVENT-' + resetUserId, 'devis']
+      );
+      // Depuis le schéma v22, facture_id est conservé comme référence d'audit
+      // sans FK vers factures : l'événement doit rester protégé même si la
+      // facture n'est plus un document émis et même si le lien est orphelin.
+      const [eventResult] = await pool.query(
+        'INSERT INTO pro_compta_facture_events (user_id, facture_id, transition, previous_ecriture_id) VALUES (?, ?, ?, ?)',
+        [resetUserId, invoiceResult.insertId, 'annulation', 987654]
+      );
+
+      const reset = await request(app)
+        .delete('/api/auth/donnees')
+        .set('Authorization', 'Bearer ' + registration.body.token);
+      assert.equal(reset.status, 409, reset.text);
+      assert.equal(reset.body.code, 'RESET_HISTORIQUE_PROTEGE');
+      assert.match(reset.body.error, /contrepassation/i);
+
+      const [[event]] = await pool.query(
+        'SELECT COUNT(*) AS total FROM pro_compta_facture_events WHERE user_id = ? AND id = ?',
+        [resetUserId, eventResult.insertId]
+      );
+      const [[invoice]] = await pool.query(
+        'SELECT COUNT(*) AS total FROM factures WHERE user_id = ? AND id = ?',
+        [resetUserId, invoiceResult.insertId]
+      );
+      assert.equal(Number(event.total), 1, 'l’événement de contrepassation doit rester présent');
+      assert.equal(Number(invoice.total), 1, 'le devis référencé doit rester présent après le refus');
+    } finally {
+      await nettoyerUtilisateur(resetUserId);
+    }
+  });
+
+  test('la réinitialisation autorise les brouillons et conserve le compte et ses paramètres', async () => {
+    const { pool } = require('../config/db');
+    const registration = await request(app)
+      .post('/api/auth/register')
+      .send({
+        nom: 'Compte reset sans historique',
+        email: emailDeTest('reset-drafts'),
+        password,
+        entreprise_nom: 'Société à conserver',
+        acceptTerms: true
+      });
+    assert.equal(registration.status, 201, registration.text);
+    const resetUserId = registration.body.user.id;
+
+    try {
+      const [clientResult] = await pool.query(
+        'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+        [resetUserId, 'Client brouillon']
+      );
+      await pool.query(
+        'INSERT INTO produits (user_id, nom) VALUES (?, ?)',
+        [resetUserId, 'Produit sans mouvement']
+      );
+      await pool.query(
+        'INSERT INTO factures (user_id, client_id, numero, type, date_emission) VALUES (?, ?, ?, ?, CURRENT_DATE)',
+        [resetUserId, clientResult.insertId, 'RESET-DRAFT-' + resetUserId, 'devis']
+      );
+      await pool.query(
+        'INSERT INTO depenses (user_id, libelle, montant, date_depense) VALUES (?, ?, ?, CURRENT_DATE)',
+        [resetUserId, 'Dépense non comptabilisée', 1250]
+      );
+
+      const reset = await request(app)
+        .delete('/api/auth/donnees')
+        .set('Authorization', 'Bearer ' + registration.body.token);
+      assert.equal(reset.status, 200, reset.text);
+      assert.equal(reset.body.success, true);
+
+      const [[account]] = await pool.query(
+        'SELECT id, entreprise_nom FROM users WHERE id = ?',
+        [resetUserId]
+      );
+      assert.equal(Number(account.id), resetUserId);
+      assert.equal(account.entreprise_nom, 'Société à conserver');
+
+      for (const table of ['clients', 'produits', 'factures', 'depenses']) {
+        const [[count]] = await pool.query(
+          `SELECT COUNT(*) AS total FROM ${table} WHERE user_id = ?`,
+          [resetUserId]
+        );
+        assert.equal(Number(count.total), 0, 'les données non historiques de ' + table + ' doivent être réinitialisées');
+      }
+    } finally {
+      await nettoyerUtilisateur(resetUserId);
+    }
+  });
+
   test('la réinitialisation refuse de supprimer une facture émise et conserve les données liées', async () => {
     const { pool } = require('../config/db');
     const connexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
