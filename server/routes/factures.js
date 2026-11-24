@@ -1367,6 +1367,37 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/paiements', async (req, res, next) => {
   let conn;
   let idempotencyKey = null;
+  let montantNum = null;
+  let methodeValidee = null;
+  let referenceValidee = null;
+
+  const respondWithExistingPayment = async existingPayment => {
+    if (Number(existingPayment.facture_id) !== Number(req.params.id)) {
+      return res.status(409).json({
+        error: 'Cette Idempotency-Key est déjà utilisée pour une autre facture.',
+        code: 'IDEMPOTENCY_KEY_REUTILISEE'
+      });
+    }
+
+    const sameRequest =
+      round2(Number(existingPayment.montant)) === montantNum &&
+      existingPayment.methode === methodeValidee &&
+      (existingPayment.reference ?? null) === (referenceValidee ?? null);
+    if (!sameRequest) {
+      return res.status(409).json({
+        error: 'Cette Idempotency-Key a déjà été utilisée avec des paramètres différents.',
+        code: 'IDEMPOTENCY_KEY_CONFLIT_REQUETE'
+      });
+    }
+
+    const [existingFacture] = await pool.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ?',
+      [existingPayment.facture_id, req.tenantId]
+    );
+    if (!existingFacture.length) return res.status(404).json({ error: 'Facture introuvable.' });
+    return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
+  };
+
   try {
     idempotencyKey = req.get('Idempotency-Key')?.trim() || null;
     if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 100)) {
@@ -1374,9 +1405,9 @@ router.post('/:id/paiements', async (req, res, next) => {
     }
 
     const { montant, methode, reference } = req.body;
-    const montantNum = round2(Number(montant));
-    const methodeValidee = typeof methode === 'string' ? methode.trim().slice(0, 50) : '';
-    const referenceValidee = optionalText(reference, 100);
+    montantNum = round2(Number(montant));
+    methodeValidee = typeof methode === 'string' ? methode.trim().slice(0, 50) : '';
+    referenceValidee = optionalText(reference, 100);
     if (!Number.isFinite(montantNum) || montantNum <= 0 ||
         montantNum > 999999999999.99 || !methodeValidee) {
       return res.status(400).json({ error: 'Montant positif (au centime) et méthode de paiement valides requis.' });
@@ -1385,22 +1416,11 @@ router.post('/:id/paiements', async (req, res, next) => {
     // Rejeu optimiste : la connexion transactionnelle n'existe pas encore, utiliser le pool.
     if (idempotencyKey) {
       const [existingPayments] = await pool.query(
-        'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
+        'SELECT facture_id, montant, methode, reference FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
         [req.tenantId, idempotencyKey]
       );
       if (existingPayments.length) {
-        if (Number(existingPayments[0].facture_id) !== Number(req.params.id)) {
-          return res.status(409).json({
-            error: 'Cette Idempotency-Key est déjà utilisée pour une autre facture.',
-            code: 'IDEMPOTENCY_KEY_REUTILISEE'
-          });
-        }
-        const [existingFacture] = await pool.query(
-          'SELECT * FROM factures WHERE id = ? AND user_id = ?',
-          [existingPayments[0].facture_id, req.tenantId]
-        );
-        if (!existingFacture.length) return res.status(404).json({ error: 'Facture introuvable.' });
-        return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
+        return respondWithExistingPayment(existingPayments[0]);
       }
     }
 
@@ -1425,18 +1445,7 @@ router.post('/:id/paiements', async (req, res, next) => {
       );
       if (paymentRows.length) {
         await conn.rollback();
-        if (Number(paymentRows[0].facture_id) !== Number(req.params.id)) {
-          return res.status(409).json({
-            error: 'Cette Idempotency-Key est déjà utilisée pour une autre facture.',
-            code: 'IDEMPOTENCY_KEY_REUTILISEE'
-          });
-        }
-        const [existingFacture] = await pool.query(
-          'SELECT * FROM factures WHERE id = ? AND user_id = ?',
-          [paymentRows[0].facture_id, req.tenantId]
-        );
-        if (!existingFacture.length) return res.status(404).json({ error: 'Facture introuvable.' });
-        return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
+        return respondWithExistingPayment(paymentRows[0]);
       }
     }
 
@@ -1490,19 +1499,7 @@ router.post('/:id/paiements', async (req, res, next) => {
           [req.tenantId, idempotencyKey]
         );
         if (existingPayments.length) {
-          if (Number(existingPayments[0].facture_id) !== Number(req.params.id)) {
-            return res.status(409).json({
-              error: 'Cette Idempotency-Key est déjà utilisée pour une autre facture.',
-              code: 'IDEMPOTENCY_KEY_REUTILISEE'
-            });
-          }
-          const [existingFacture] = await pool.query(
-            'SELECT * FROM factures WHERE id = ? AND user_id = ?',
-            [existingPayments[0].facture_id, req.tenantId]
-          );
-          if (existingFacture.length) {
-            return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
-          }
+          return respondWithExistingPayment(existingPayments[0]);
         }
       } catch (replayErr) {
         return next(replayErr);
