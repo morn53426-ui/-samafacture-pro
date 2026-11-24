@@ -70,3 +70,22 @@ Pour passer d'une revue manuelle partielle à un relevé reproductible, la branc
 Knip construit un graphe à partir des points d'entrée déclarés ; les rapports ne sont fiables que si ces entrées couvrent les chargements réels. Les pages HTML et fonctions frontend globales ont un chemin de chargement distinct, couvert ici par le scanner dédié des balises `script`. Les chemins calculés à l'exécution, scripts injectés par le serveur et références générées demandent encore une revue manuelle.
 
 **Aucune suppression additionnelle n'est faite dans cette phase.** Les rapports CI du nouveau head sont attendus avant de transformer un candidat en suppression. Le workflow n'autorise ni suppression automatique, ni changement des dépendances, ni modification de données ou du schéma.
+
+## Résultats Knip après nettoyage — head `c003109d89474f003629b57aa8e32e160e488d49`
+
+Le rapport JSON de l'exécution CI du head `c003109...` contient `issues: []` après les ajustements ci-dessous.
+
+Les 12 exports non consommés détectés au passage précédent étaient répartis sur 10 modules. Le nettoyage final a :
+- supprimé l'export de `isMonitoringEnabled` (fonction conservée en usage interne) ;
+- retiré des exports `claimPendingEmails`, `isEmailJobDeliverable`, `markEmailCancelled` (implémentations conservées, utilisées par le worker) ;
+- retiré l'export `ensureTestHttpServer` (fonction conservée, appelée par `setupTestDatabase`) ;
+- retiré les exports `TYPES_CATALOGUE`, `TRIAL_PLANS`, `parseJob`, `sendWebhookRequest`, `parseCivilDate` et `parsePermissions` (fonctions/constantes internes conservées quand elles ont un usage dans leur module) ;
+- supprimé la fonction `positiveInt` de `server/utils/validation.js`, qui n'avait pas de consommateur détecté, ainsi que son export.
+
+**Aucun fichier applicatif complet n'a été supprimé.** Les fonctions nécessaires au comportement interne des workers, webhooks, essais, permissions et comptabilité restent en place. L'API publique d'aucun endpoint n'a été changée volontairement ; les exports internes de modules privés ont été resserrés.
+
+## Détection des duplications de code
+
+Ajout du job CI `Détection des blocs de code dupliqués` avec jscpd `5.4.3`, seuil de détection initial de 80 tokens et 8 lignes, sur les fichiers JavaScript de production backend/frontend (`server/app.js`, `server/cluster.js`, `server/config`, `server/middleware`, `server/routes`, `server/services`, `server/utils`, `public/js`). Le résultat est archivé en JSON pendant 14 jours.
+
+Ce premier passage est un relevé, pas un gate : un bloc commun peut être volontaire (formats, contrats et règles comptables identiques). Chaque paire devra être examinée avant de fusionner en une abstraction ou de supprimer un bloc.
