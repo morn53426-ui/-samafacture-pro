@@ -478,3 +478,72 @@ Le groupe #171/#182/#183/#185/#190 est une succession de versions empilées puis
 **Aucune de ces PR ne doit être fusionnée ou cherry-pickée telle quelle.** Reprendre le main actuel comme seule source de vérité pour tout futur correctif de devise. Garder les cinq PR ouvertes et en brouillon sans les fermer ; la politique des commandes multi-devises reste à faire arbitrer avant tout changement de comportement.
 
 Aucune branche, donnée, facture, migration, sauvegarde, volume ou règle financière n'a été modifié pendant cet audit. Seul ce rapport documentaire est complété.
+
+
+## Audit des PR #218, #220 et #221 — reset protégé, inscription concurrente et logs
+
+Audit effectué le 24 novembre 2026 : patches relus, comportement comparé au `main`, logs de CI des heads exacts inspectés.
+
+### PR #218 — protéger la réinitialisation des données métier
+
+Head : `4094e187eb56c5617efa61a6c86e4d0cfdc5d63a`.
+
+**Correction utile et non redondante :** `DELETE /api/auth/donnees` ne pouvait supprimer une facture émise, un événement de contrepassation ou de l'historique opérationnel attaché. La nouvelle transaction verrouille le compte et les tables principales, vérifie 25 catégories historiques et refuse avec HTTP 409 / `RESET_HISTORIQUE_PROTEGE` dès qu'un élément protégé est présent. Sans historique protégé, le reset supprime clients, produits, factures/devis et dépenses, mais conserve le compte et ses paramètres.
+
+Tests nouveaux explicitement verts :
+- événement de contrepassation rattaché à un devis, devenu orphelin : reset refusé et événement préservé ;
+- brouillons + dépense non comptabilisée : reset autorisé et compte/paramètres conservés ;
+- facture émise : reset refusé, facture et client conservés.
+
+CI sur le head exact :
+- Tests run `45408171658` : succès, suite 622/623 + restauration réelle 1/1 ;
+- ESLint `45408171625` : succès ;
+- ZIP `45408171765` : succès.
+
+**Recommandation :** conserver en brouillon pour revue métier/sécurité dédiée. C'est une route destructive : avant de la rendre prête, vérifier que les 25 catégories et les dépendances FK couvrent bien toutes les tables historiques de l'installation et confirmer le contrat produit du bouton « réinitialiser ». Les tests actuels sont ciblés et positifs, mais ne remplacent pas cette revue exhaustive. Ne pas fusionner automatiquement.
+
+### PR #220 — inscription simultanée avec même email
+
+Head : `fda48b159270d066601a970114b02a517032adee`.
+
+**Correction ciblée et cohérente :** le contrôle `SELECT email` seul ne suffit pas en cas de course ; l'index unique reste l'arbitre. Le traitement de `ER_DUP_ENTRY` autour de l'INSERT renvoie maintenant le même HTTP 409 que l'inscription séquentielle au lieu d'un 500. Il ne change ni l'essai de 15 jours, ni l'unicité, ni les autres erreurs.
+
+Deux tests réels MySQL verts :
+- 4 requêtes concurrentes avec plan Pro : statuts exacts `[201, 409, 409, 409]`, un compte et un seul essai ;
+- 4 requêtes concurrentes sans plan : mêmes statuts, un compte, pas de jeton sur les refus.
+
+CI sur le head exact :
+- Tests run `45359044892` : succès, suite 621/622 + restauration réelle 1/1 ;
+- ESLint `45359044869` : succès ;
+- ZIP `45359044984` : succès.
+
+**Risque résiduel identifié et explicitement hors périmètre par la PR :** le chemin Google `POST /auth/google` a une structure de création similaire mais n'est pas reproduit ni testé dans ce lot. Le correctif email/password est utile et isolé ; un test d'intégration avec jeton Google simulé ou une extraction commune de la gestion de doublon sera un lot séparé. PR à conserver en brouillon jusqu'à validation de ce parcours ou acceptation explicite du périmètre limité.
+
+### PR #221 — masquer les valeurs SQL dans les journaux
+
+Head : `2178fe395a07f637e35a1577afb21db046bca31b`.
+
+La fonction `sanitizeErrorForLog()` supprime les propriétés `sql`/`sqlMessage` et masque certains messages MySQL avant les trois appels `console.error`. Les tests ciblés confirment que le hash bcrypt, l'email et l'INSERT ne se retrouvent plus dans ces sorties console.
+
+CI exacte :
+- Tests run `45359424482` : succès, suite 625/626 + restauration réelle 1/1 ;
+- ZIP `45359424383` : succès ;
+- **aucun job ESLint n'est attaché à ce head**. Les chemins `server/app.js`, `server/utils/log-sanitizer.js` et `server/tests/log-sanitizer.test.js` ne sont pas ajoutés aux chemins surveillés par `.github/workflows/lint.yml`.
+
+**Blocage sécurité majeur avant revue prête : Sentry n'est pas assaini.**
+- `server/app.js` installe `Sentry.setupExpressErrorHandler(app)` avant le gestionnaire d'erreurs Express personnalisé.
+- Le handler personnalisé transmet une copie nettoyée à `console.error`, mais transmet encore l'erreur originale à `captureException(err)`.
+- Les handlers `unhandledRejection` et `uncaughtException` font également `captureException` sur l'objet brut.
+- `server/config/monitoring.js` n'a pas de `beforeSend` et appelle `Sentry.captureException(err)` directement. L'intégration Express peut donc capturer l'erreur brute avant le gestionnaire console ; le message `Duplicate entry '<email>'` et potentiellement les métadonnées SQL restent dans l'événement Sentry.
+
+Le texte de la PR reconnaît que Sentry peut encore recevoir un message contenant l'email et que ce cas n'a pas été vérifié sur une instance réelle. Il faut traiter cela comme un **blocage**, pas comme une simple note de limite : ajouter un scrubber `beforeSend` couvrant le message, les valeurs d'exception, les données SQL/extra et les éléments request sensibles ; utiliser l'objet nettoyé pour les appels manuels de capture ; ajouter tests unitaires sans compte Sentry réel et inclure les trois fichiers dans le workflow ESLint. Ne pas prétendre que la fuite est corrigée de bout en bout avant ces contrôles.
+
+**Recommandation :** laisser #221 en brouillon et ne pas fusionner avant correction Sentry + job ESLint.
+
+### Synthèse de priorité
+
+1. **#220** : meilleur candidat technique du groupe après validation du périmètre Google OAuth ; faible diff, tests de concurrence clairs et CI complète verte.
+2. **#218** : correction de conservation de l'historique importante, CI verte, mais exige une revue exhaustive des tables protégées et du contrat UX de reset.
+3. **#221** : ne pas fusionner en l'état ; le nettoyage couvre la console mais pas l'événement Sentry. Ajouter d'abord le scrubber Sentry et le contrôle ESLint.
+
+Aucune PR n'a été fusionnée/fermée. Aucun code applicatif, donnée, migration, sauvegarde ou volume n'a été changé pendant cet audit. Seul le rapport documentaire est complété.
