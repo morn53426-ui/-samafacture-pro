@@ -260,6 +260,42 @@ describe('Authentification', () => {
     assert.equal((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${reconnexion.body.token}`)).status, 200);
   });
 
+  test('la réinitialisation refuse de supprimer une facture émise et conserve les données liées', async () => {
+    const { pool } = require('../config/db');
+    const connexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
+    assert.equal(connexion.status, 200, connexion.text);
+    const token = connexion.body.token;
+
+    const [clientResult] = await pool.query(
+      'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+      [userId, 'Client historique reset guard']
+    );
+    const clientId = clientResult.insertId;
+    const numero = 'RESET-GUARD-' + userId;
+    const [invoiceResult] = await pool.query(
+      'INSERT INTO factures (user_id, client_id, numero, type, date_emission) VALUES (?, ?, ?, ?, CURRENT_DATE)',
+      [userId, clientId, numero, 'facture']
+    );
+    const factureId = invoiceResult.insertId;
+
+    const reset = await request(app)
+      .delete('/api/auth/donnees')
+      .set('Authorization', 'Bearer ' + token);
+    assert.equal(reset.status, 409, reset.text);
+    assert.equal(reset.body.code, 'RESET_HISTORIQUE_PROTEGE');
+
+    const [[facture]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM factures WHERE user_id = ? AND id = ?',
+      [userId, factureId]
+    );
+    const [[client]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM clients WHERE user_id = ? AND id = ?',
+      [userId, clientId]
+    );
+    assert.equal(Number(facture.total), 1, 'la facture émise doit rester présente après le refus');
+    assert.equal(Number(client.total), 1, 'le client lié doit rester présent après le refus');
+  });
+
   test('la déconnexion invalide aussi le jeton Bearer courant', async () => {
     const connexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
     assert.equal(connexion.status, 200, connexion.text);
