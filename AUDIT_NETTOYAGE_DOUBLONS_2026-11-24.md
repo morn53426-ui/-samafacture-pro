@@ -137,3 +137,37 @@ Ces 10 blocs restent **non modifiés** dans cette PR : les répétitions d'idemp
 - Références frontend : succès, aucune référence locale cassée.
 - jscpd : succès, rapport archivé ; les clones sont signalés mais ne font pas échouer le build.
 - Suite Node/MySQL : encore en cours au moment de la rédaction ; aucun résultat final ne doit être annoncé avant la fin.
+
+
+## Mise à jour de validation et de couverture paiement — 24 novembre 2026
+
+Cette section remplace les statuts de CI antérieurs qui indiquaient encore une suite en cours sur les anciens heads.
+
+### Dernier head entièrement validé avant regroupement des tests — `ea135d6de5e5f8521670c16a6cb87b81357548df`
+
+Exécution GitHub Actions :
+- Tests automatisés, run `45375463122` : **succès**.
+- ESLint, run `45375462885` : **succès**.
+- Audit statique, run `45375462912` : **succès**.
+- Packaging ZIP, run `45375462891` : **succès**.
+
+Détails vérifiés dans les logs et artefacts :
+- Les deux tests HTTP ajoutés pour les paiements idempotents ont chacun affiché `✔`.
+- Le résumé de la commande principale affiche 626 tests, 625 réussites et 0 échec ; une commande complémentaire distincte affiche 1 réussite et 0 échec.
+- La restauration d'une sauvegarde chiffrée de test, le démarrage cluster avec MySQL/Redis et la recette visuelle responsive ont terminé avec succès.
+- Knip : `issues: []`.
+- Scanner frontend : 39 pages HTML, 58 fichiers texte frontend et 14 scripts chargés ; zéro référence JS locale cassée et zéro candidat sans référence statique.
+- jscpd : 10 clones, 176 lignes dupliquées sur 17 326 (1,0158 %), **0 nouveau clone** sur ce passage.
+
+### Regroupement des tests de paiements
+
+La relecture de l'ensemble des tests a montré que `server/tests/paiements.test.js` possédait déjà un scénario de deux requêtes HTTP simultanées avec la même `Idempotency-Key`. Pour éviter un doublon de tests :
+- le scénario concurrent redondant a été retiré de `server/tests/factures.test.js` ;
+- le test HTTP existant dans `server/tests/paiements.test.js` est renforcé : il exige maintenant exactement un statut 201 et un statut 200, puis vérifie `idempotent_replay: true` sur la réponse de rejeu ;
+- un test complémentaire y vérifie qu'une clé déjà employée sur une première facture renvoie 409 si elle est réutilisée sur une seconde facture, sans enregistrer de second paiement ni modifier le solde de cette seconde facture.
+
+Le commit de regroupement est `acb276bc0dc85545c4119a4f09248845ddba2092`. La CI déclenchée par les commits intermédiaires de ce regroupement ne ciblait pas encore exactement ce head lors de la rédaction de cette section ; les nouveaux résultats doivent être contrôlés sur le head final avant de déclarer ce dernier validé.
+
+### Portée et limites
+
+Aucune logique de paiement, écriture financière, règle comptable OHADA, migration ou donnée n'a été modifiée dans cette étape : seules les assertions de tests ont été renforcées et regroupées. La PR reste en brouillon ; aucun merge ni déploiement n'a été effectué.
