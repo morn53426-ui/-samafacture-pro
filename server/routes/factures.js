@@ -16,6 +16,7 @@ const { notifierUtilisateur } = require('../realtime');
 const { enqueuePdfJob, getPdfJob, getPdfPath } = require('../pdf-queue');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
 const { recordInvoiceAccountingTransition } = require('../services/accounting-invoice-lifecycle');
+const { optionalText, optionalIsoDate } = require('../utils/optional-fields');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -40,19 +41,6 @@ async function nextNumero(conn, userId, type, year = new Date().getFullYear()) {
 
 function round2(n) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
-}
-
-function optionalText(value, maxLength) {
-  if (value === undefined || value === null) return null;
-  return String(value).trim().slice(0, maxLength) || null;
-}
-
-function optionalIsoDate(value) {
-  if (value === undefined || value === null || value === '') return null;
-  const text = String(value).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
-  const date = new Date(text + 'T00:00:00.000Z');
-  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text ? undefined : text;
 }
 
 /**
