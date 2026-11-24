@@ -15,7 +15,7 @@ const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
 const morgan = require('morgan');
-const { sanitizeRequestTargetForLog, sanitizeReferrerForLog } = require('./utils/log-sanitizer');
+const { sanitizeRequestTargetForLog, sanitizeReferrerForLog, sanitizeErrorForLog } = require('./utils/log-sanitizer');
 const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const path = require('path');
@@ -442,7 +442,7 @@ app.use((err, req, res, next) => {
   // Contexte minimal utile au diagnostic (méthode, chemin, utilisateur si authentifié) sans
   // aller au-delà : jamais le corps de la requête ni les en-têtes (risque de logger un mot
   // de passe, un jeton, ou une donnée client sensible par erreur).
-  console.error(`[${req.requestId || '-'}] [${req.method} ${sanitizeRequestTargetForLog(req.originalUrl || req.url)}]${req.user ? ` user#${req.user.id}` : ''}`, err);
+  console.error(`[${req.requestId || '-'}] [${req.method} ${sanitizeRequestTargetForLog(req.originalUrl || req.url)}]${req.user ? ` user#${req.user.id}` : ''}`, sanitizeErrorForLog(err));
   captureException(err);
   if (isPoolSaturationError(err)) {
     res.setHeader('Retry-After', '2');
@@ -462,11 +462,11 @@ const PORT = runtimeConfig.port;
 //   principal le redémarre automatiquement sans interrompre les autres workers.
 if (process.env.NODE_ENV !== 'test') {
   process.on('unhandledRejection', (reason) => {
-    console.error('⚠️  Promesse rejetée non gérée :', reason);
+    console.error('⚠️  Promesse rejetée non gérée :', sanitizeErrorForLog(reason));
     captureException(reason instanceof Error ? reason : new Error(String(reason)));
   });
   process.on('uncaughtException', (err) => {
-    console.error('🔥 Exception non interceptée, arrêt de ce worker pour redémarrage propre :', err);
+    console.error('🔥 Exception non interceptée, arrêt de ce worker pour redémarrage propre :', sanitizeErrorForLog(err));
     captureException(err);
     process.exit(1);
   });
@@ -505,7 +505,7 @@ async function start() {
     // d'un worker sans dépendre d'un leader fixe.
     stopEmailOutboxWorker = startEmailOutboxWorker();
   } catch (err) {
-    console.error('Impossible de se connecter à MySQL / initialiser la base :', err.message);
+    console.error('Impossible de se connecter à MySQL / initialiser la base :', sanitizeErrorForLog(err).message);
     console.error('Vérifiez que WAMPserver est démarré (icône verte) et que le fichier .env contient les bons identifiants.');
     process.exit(1);
   }
