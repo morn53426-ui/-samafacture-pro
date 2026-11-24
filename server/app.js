@@ -508,7 +508,8 @@ async function start() {
     // d'un worker sans dépendre d'un leader fixe.
     stopEmailOutboxWorker = startEmailOutboxWorker();
   } catch (err) {
-    console.error('Impossible de se connecter à MySQL / initialiser la base :', err.message);
+    const erreurSecurisee = sanitizeErrorForLog(err);
+    console.error('Impossible de se connecter à MySQL / initialiser la base :', erreurSecurisee.message);
     console.error('Vérifiez que WAMPserver est démarré (icône verte) et que le fichier .env contient les bons identifiants.');
     process.exit(1);
   }
