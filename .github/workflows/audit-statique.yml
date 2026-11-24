@@ -75,3 +75,37 @@ jobs:
           path: ${{ runner.temp }}/audit-public-scripts.md
           if-no-files-found: warn
           retention-days: 14
+
+  duplicate-code:
+    name: Détection des blocs de code dupliqués
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: Analyser les duplications JavaScript sans bloquer sur le seuil initial
+        run: |
+          npx --yes jscpd@5.4.3 \
+            --min-tokens 80 \
+            --min-lines 8 \
+            --reporters console,json \
+            --output "$RUNNER_TEMP/jscpd" \
+            server/app.js server/cluster.js server/config server/middleware \
+            server/routes server/services server/utils public/js
+
+      - name: Archiver le rapport des duplications
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: audit-duplicated-code
+          path: ${{ runner.temp }}/jscpd/jscpd-report.json
+          if-no-files-found: warn
+          retention-days: 14
