@@ -199,4 +199,46 @@ describe('Assainissement des événements Sentry et erreurs SQL', () => {
     assert.match(appSource, /sanitizeErrorForLog\(reason\)/);
     assert.doesNotMatch(appSource, /console\.error\([^\n]*, (?:err|reason)\);/);
   });
+
+  test('masque aussi les valeurs des erreurs MySQL « Incorrect … value »', () => {
+    const message = "Incorrect integer value: 'abc' for column 'stock' at row 1";
+    const original = Object.assign(new Error(message), {
+      code: 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
+      sqlState: 'HY000'
+    });
+    const safe = sanitizeErrorForLog(original);
+
+    assert.match(safe.message, /value: '\\[masqué\\]' for column 'stock'/);
+    assert.doesNotMatch(safe.message, /abc/);
+    assert.equal(original.message, message, 'l’erreur source doit rester intacte');
+  });
+
+  test('ne modifie pas une erreur SQL source et laisse les erreurs non SQL inchangées', () => {
+    const sql = `INSERT INTO users (email) VALUES ('${EMAIL}')`;
+    const original = Object.assign(new Error(`Duplicate entry '${EMAIL}' for key 'uk_users_email'`), {
+      code: 'ER_DUP_ENTRY',
+      sqlState: '23000',
+      sql,
+      sqlMessage: `Duplicate entry '${EMAIL}' for key 'uk_users_email'`
+    });
+    const originalMessage = original.message;
+    const originalStack = original.stack;
+    const safe = sanitizeErrorForLog(original);
+
+    assert.notEqual(safe, original);
+    assert.equal(safe.sql, undefined);
+    assert.equal(safe.sqlMessage, undefined);
+    assert.doesNotMatch(safe.stack, /client\\.confidentiel/);
+    assert.equal(original.message, originalMessage);
+    assert.equal(original.stack, originalStack);
+    assert.equal(original.sql, sql);
+    assert.match(original.sqlMessage, /client\\.confidentiel/);
+
+    const ordinaryError = new Error('erreur applicative non SQL');
+    assert.equal(sanitizeErrorForLog(ordinaryError), ordinaryError);
+    assert.equal(sanitizeErrorForLog('texte'), 'texte');
+    assert.equal(sanitizeErrorForLog(null), null);
+    assert.equal(sanitizeErrorForLog(undefined), undefined);
+  });
+
 });
