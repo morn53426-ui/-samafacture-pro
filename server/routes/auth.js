@@ -11,6 +11,7 @@ const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = req
 const { sendMail } = require('../config/mailer');
 const { incrementerTokenVersion, invaliderCacheVersion } = require('../utils/session');
 const { normalizeTrialPlan } = require('../utils/free-trial');
+const { linkGoogleIdentity, findGoogleUserAfterInsertConflict } = require('../utils/google-account');
 const { SUPPORTED_CURRENCIES } = require('../config/localization');
 
 function echapperHtml(valeur) {
@@ -340,6 +341,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
  *               properties:
  *                 token: { type: string }
  *                 user: { $ref: '#/components/schemas/Utilisateur' }
+ *       409: { description: "Le compte est déjà associé à une autre identité Google.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  *       503: { description: "Connexion Google non configurée sur ce serveur.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/google', async (req, res, next) => {
@@ -367,8 +369,9 @@ router.post('/google', async (req, res, next) => {
     }
     const emailLower = email.toLowerCase();
 
-    // Cherche d'abord un compte déjà lié à ce Google ID, puis un compte existant avec le
-    // même email (on le lie alors automatiquement à Google pour la prochaine connexion).
+    // Cherche d'abord l'identité Google, puis un compte existant par email.
+    // La liaison compare et met à jour google_id de façon conditionnelle afin qu'une
+    // requête concurrente ne puisse pas écraser l'identité liée par une autre requête.
     let [rows] = await pool.query('SELECT * FROM users WHERE google_id = ?', [googleId]);
     let user = rows[0];
 
@@ -376,15 +379,12 @@ router.post('/google', async (req, res, next) => {
       [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [emailLower]);
       user = rows[0];
       if (user) {
-        // Liaison d'un compte existant par email : le mot de passe existant est neutralisé et les
-        // sessions déjà ouvertes sont révoquées. Cela empêche un compte créé d'avance par un tiers
-        // avec l'email de la victime (« pre-hijacking ») de rester accessible après la liaison.
-        // L'utilisateur peut redéfinir un mot de passe via « Mot de passe oublié ».
-        const motDePasseInutilisable = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-        await pool.query('UPDATE users SET google_id = ?, password_hash = ?, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ?', [googleId, motDePasseInutilisable, user.id]);
-        await incrementerTokenVersion(null, user.id);
-        [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
-        user = rows[0];
+        user = await linkGoogleIdentity(pool, user, googleId, () =>
+          bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10)
+        );
+        if (!user) {
+          return res.status(409).json({ error: 'Ce compte est déjà associé à une autre identité Google.' });
+        }
       }
     }
 
@@ -403,23 +403,42 @@ router.post('/google', async (req, res, next) => {
         : null;
       const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
       let result;
-      if (trialPlan) {
-        [result] = await pool.query(
-          `INSERT INTO users
+      const insertSql = trialPlan
+        ? `INSERT INTO users
             (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version,
              plan, trial_plan, trial_started_at, trial_ends_at, trial_status)
-           VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 DAY), 'trialing')`,
-          [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION, trialPlan, trialPlan]
-        );
-      } else {
-        [result] = await pool.query(
-          `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version)
-           VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)`,
-          [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION]
-        );
+           VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 DAY), 'trialing')`
+        : `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version)
+           VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)`;
+      const insertParams = trialPlan
+        ? [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION, trialPlan, trialPlan]
+        : [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION];
+
+      try {
+        [result] = await pool.query(insertSql, insertParams);
+      } catch (insertErr) {
+        if (!insertErr || insertErr.code !== 'ER_DUP_ENTRY') throw insertErr;
+        // Une autre requête a pu créer la même identité ou le même email après nos SELECT.
+        // Relecture par google_id en premier permet de rejouer proprement une connexion identique.
+        const conflict = await findGoogleUserAfterInsertConflict(pool, googleId, emailLower);
+        if (conflict.source === 'google') {
+          user = conflict.user;
+        } else if (conflict.source === 'email') {
+          user = await linkGoogleIdentity(pool, conflict.user, googleId, () =>
+            bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10)
+          );
+          if (!user) {
+            return res.status(409).json({ error: 'Cette adresse email est déjà associée à une autre identité Google.' });
+          }
+        } else {
+          throw insertErr;
+        }
       }
-      [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-      user = rows[0];
+
+      if (!user && result && result.insertId) {
+        [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+        user = rows[0];
+      }
     }
 
     await pool.query(
