@@ -414,3 +414,67 @@ Les têtes actuellement déclarées par les PR ne disposent pas de check-run ni 
 Recommandation : conserver les deux PR ouvertes et en brouillon tant qu'aucune autorisation explicite de fermeture n'est donnée ; ne pas cherry-pick ni fusionner leurs changements sans besoin identifié. En cas de nouvelle correction multi-tenant, partir du `main` actuel et ajouter un test dédié plutôt que reprendre l'une de ces branches anciennes.
 
 Aucune branche, PR, donnée, migration, sauvegarde ou volume n'a été modifié pendant cet audit. Seul ce rapport d'audit est complété.
+
+
+## Audit approfondi du groupe devise/verrous — PR #171, #182, #183, #185 et #190
+
+Audit effectué le 24 novembre 2026 à partir des métadonnées, patches, CI sur les heads, des comparaisons de branches et des blobs présents dans `main`.
+
+### Hiérarchie des branches
+
+| PR | Head | Fichiers | Commits | Rôle observé |
+|---|---|---:|---:|---|
+| #171 | `953489e79a9a6779b03e9c436559b925904f5635` | 31 | 63 | Premier lot commandes/devise, empilé sur l'ancienne #168 ; également ajoute le formatage monétaire |
+| #182 | `a078a351d714fa05e4ecf5901040135e06dc6383` | 7 | 10 | Reconstruction du delta commandes/devise de #171 sur le main après #167/#168 |
+| #183 | `4a73d68d91ff3d7360e868d034bc6a1d8816966f` | 11 | 14 | Ajout du verrou atomique sur #182 ; 12 tests de concurrence ; PR empilée, base = head #182 |
+| #185 | `50b9fcc21b6655347d4feac1eb319dad38982996` | 13 | 13 | Consolidation du lot #171/#178/#182/#183 sur le main après #167/#168 |
+| #190 | `0abc0440d11b67ad513bc1e2793d7bb558d37229` | 11 | 15 | Consolidation plus récente sur le main après #181 ; candidate la plus récente historiquement |
+
+Toutes ces PR sont encore ouvertes, en brouillon, non fusionnées et marquées non mergeables par GitHub au dernier relevé. La #183 est empilée sur #182 ; elle ne doit pas être considérée comme une PR autonome à fusionner sur `main`.
+
+### CI observée sur les heads exacts
+
+| PR | Tests automatisés | ESLint | ZIP |
+|---|---|---|---|
+| #171 | run `45098452835` : succès | `45098452841` : succès | `45098452838` : succès |
+| #182 | `45135648623` : succès | `45135648688` : succès | `45135648729` : succès |
+| #183 | aucun run retrouvé sur la branche actuelle | — | — |
+| #185 | `45135968638` : succès | `45135968603` : succès | `45135968543` : succès |
+| #190 | `45137196795` : succès | `45137196790` : succès | `45137197090` : succès |
+
+Ces résultats valident les têtes indiquées, pas une éventuelle réintégration sur le `main` actuel.
+
+### Vérification d'intégration dans le main actuel
+
+Head de `main` au contrôle : `c32ed40a6fc032717489a0a6ca421c0ad0f9fa6c`.
+
+Les blobs de ces fichiers dans la branche #190 et dans `main` sont strictement identiques (SHA Git identique) :
+- `server/routes/auth.js` ;
+- `server/routes/depenses.js` ;
+- `server/routes/produits.js` ;
+- `server/routes/public-api.js` ;
+- `server/tests/currency-lock-concurrency.test.js` (542 lignes) ;
+- `server/tests/auth-currency.test.js` (150 lignes).
+
+Les sections métier essentielles des autres fichiers ont également été vérifiées dans `main` :
+- `professionnel.js` : création de commande sous `SELECT devise FROM users ... FOR UPDATE`, même verrou de compte que le changement de devise ;
+- `factures.js` : relecture de la devise du compte sous verrou, rejet d'une devise facture différente de la devise de base, puis réservation du quota ;
+- `factures-recurrentes.js` : verrou de compte lors de la création d'un modèle et relecture devise/fuseau sous verrou lors de la génération.
+
+**Durcissement déjà présent dans main, absent de la tête #190 :** la génération d'une facture récurrente verrouille et vérifie également que son client appartient au même tenant. `main` renvoie `CLIENT_TENANT_MISMATCH` avant génération. Le fichier `factures-recurrentes.js` de #190 ne contient pas cette vérification supplémentaire ; son head n'est donc pas une base sûre pour écraser ou remplacer le fichier actuel.
+
+Les têtes #185 et #190 sont divergentes (18 commits d'un côté et 13 de l'autre depuis leur base commune). #190 est plus récent historiquement, mais reste en retard d'environ 42 commits sur le `main` actuel et GitHub le marque non mergeable. #185 est encore plus ancien (environ 45 commits de retard). Il ne faut pas fusionner les deux versions ni les comparer comme des branches parent/enfant.
+
+### Décision métier encore ouverte : commandes multi-devises
+
+Dans `POST /api/pro/orders`, le code de `main` et la branche #190 utilise la devise explicitement transmise si elle est prise en charge, même si elle diffère de la devise de base du tenant. L'écran de commande actuel utilise la devise du tenant et ne propose pas le choix explicite. Les routes facture et achat fournisseur, elles, imposent la devise du tenant.
+
+Cette différence n'est pas une simple duplication technique : elle définit une politique financière. Aucune modification n'est faite sans décision métier explicite. Les PR #171/#182/#185/#190 restent en brouillon sur ce point.
+
+### Conclusion et recommandation
+
+Le groupe #171/#182/#183/#185/#190 est une succession de versions empilées puis consolidées. Les verrous et les tests de concurrence principaux sont **déjà présents dans le main actuel**, ce qui est confirmé par les blobs identiques et la lecture des routes. Le main contient en plus des durcissements récents (notamment la validation du client de modèle récurrent).
+
+**Aucune de ces PR ne doit être fusionnée ou cherry-pickée telle quelle.** Reprendre le main actuel comme seule source de vérité pour tout futur correctif de devise. Garder les cinq PR ouvertes et en brouillon sans les fermer ; la politique des commandes multi-devises reste à faire arbitrer avant tout changement de comportement.
+
+Aucune branche, donnée, facture, migration, sauvegarde, volume ou règle financière n'a été modifié pendant cet audit. Seul ce rapport documentaire est complété.
