@@ -56,3 +56,17 @@ Un inventaire global fiable nécessite une exécution locale/CI de l’analyse s
 ## Validation
 
 Les tests locaux n’ont pas été exécutés depuis cette session. La CI GitHub doit valider le nouveau head de cette branche avant qu’un correctif soit déclaré validé. La revue PDF/impression, la recette sur téléphone physique et la validation OHADA restent hors du périmètre de ce petit nettoyage.
+
+## Contrôle statique automatisé ajouté à la branche
+
+Pour passer d'une revue manuelle partielle à un relevé reproductible, la branche ajoute :
+
+- `server/knip.json` : déclare les points d'entrée backend (serveur, cluster, sauvegarde/restauration, worker PDF, scripts et tests) et les fichiers JavaScript du backend à analyser.
+- `.github/workflows/audit-statique.yml` : exécute Knip 6.48.0 sur le backend à chaque PR ciblant `main` qui touche le serveur, puis archive le rapport JSON pendant 14 jours.
+- `scripts/audit-public-script-references.js` : compare les 14 scripts `public/js` aux balises `<script src>` HTML et aux références littérales des ressources frontend ; signale les liens locaux cassés et les candidats sans référence statique. Les candidats ne font pas échouer la CI et ne sont jamais supprimés automatiquement.
+
+### Interprétation des résultats
+
+Knip construit un graphe à partir des points d'entrée déclarés ; les rapports ne sont fiables que si ces entrées couvrent les chargements réels. Les pages HTML et fonctions frontend globales ont un chemin de chargement distinct, couvert ici par le scanner dédié des balises `script`. Les chemins calculés à l'exécution, scripts injectés par le serveur et références générées demandent encore une revue manuelle.
+
+**Aucune suppression additionnelle n'est faite dans cette phase.** Les rapports CI du nouveau head sont attendus avant de transformer un candidat en suppression. Le workflow n'autorise ni suppression automatique, ni changement des dépendances, ni modification de données ou du schéma.
