@@ -1440,7 +1440,7 @@ router.post('/:id/paiements', async (req, res, next) => {
     // le contrôle optimiste avant l'insertion du premier règlement.
     if (idempotencyKey) {
       const [paymentRows] = await conn.query(
-        'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
+        'SELECT facture_id, montant, methode, reference FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
         [req.tenantId, idempotencyKey]
       );
       if (paymentRows.length) {
@@ -1495,7 +1495,7 @@ router.post('/:id/paiements', async (req, res, next) => {
     if (err?.code === 'ER_DUP_ENTRY' && idempotencyKey) {
       try {
         const [existingPayments] = await pool.query(
-          'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
+          'SELECT facture_id, montant, methode, reference FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
           [req.tenantId, idempotencyKey]
         );
         if (existingPayments.length) {
