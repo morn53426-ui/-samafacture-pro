@@ -292,9 +292,6 @@ module.exports = {
   retryDelaySeconds,
   safeErrorCode,
   extractEmailVerificationToken,
-  claimPendingEmails,
-  isEmailJobDeliverable,
-  markEmailCancelled,
   dispatchPendingEmails,
   startEmailOutboxWorker
 };
