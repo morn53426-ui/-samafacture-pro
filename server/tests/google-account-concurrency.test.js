@@ -35,7 +35,7 @@ describe('Concurrence de liaison des comptes Google', () => {
     });
     assert.equal(linked, linkedRow);
     assert.equal(hashCalls, 1);
-    assert.match(calls[0].sql, /token_version = token_version \\+ 1/);
+    assert.match(calls[0].sql, /token_version = token_version \+ 1/);
     assert.match(calls[0].sql, /google_id IS NULL OR google_id = ''/);
     assert.deepEqual(calls[0].params, ['google-8', 'hash-aleatoire', 8]);
     assert.equal(calls.length, 2);
