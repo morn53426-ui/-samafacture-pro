@@ -10,6 +10,7 @@ on:
       - 'public/js/workspace-modals.js'
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/local-date-format.test.js'
+      - 'server/tests/optional-fields.test.js'
       - 'server/tests/workspace-navigation.test.js'
       - 'server/tests/sidebar-mobile-keyboard.test.js'
       - 'server/tests/dashboard-ui.test.js'
@@ -91,6 +92,7 @@ jobs:
           public/js/workspace-modals.js
           server/tests/visual/recette-visuelle.js
           server/tests/local-date-format.test.js
+          server/tests/optional-fields.test.js
           server/tests/workspace-navigation.test.js
           server/tests/dashboard-ui.test.js
           server/tests/sidebar-mobile-keyboard.test.js
