@@ -13,10 +13,8 @@ const { incrementerTokenVersion, invaliderCacheVersion } = require('../utils/ses
 const { normalizeTrialPlan } = require('../utils/free-trial');
 const { linkGoogleIdentity, findGoogleUserAfterInsertConflict } = require('../utils/google-account');
 const { SUPPORTED_CURRENCIES } = require('../config/localization');
+const { escapeHtmlEmail } = require('../utils/email-escape');
 
-function echapperHtml(valeur) {
-  return String(valeur == null ? '' : valeur).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
 
 const router = express.Router();
 
@@ -533,7 +531,7 @@ router.post('/mot-de-passe-oublie', resetLimiter, async (req, res, next) => {
         to: user.email,
         subject: 'Réinitialisation de votre mot de passe SamaFacture Pro',
         text: `Bonjour ${user.nom},\n\nVous avez demandé à réinitialiser votre mot de passe. Cliquez sur ce lien (valable 30 minutes) :\n${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
-        html: `<p>Bonjour ${echapperHtml(user.nom)},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
+        html: `<p>Bonjour ${escapeHtmlEmail(user.nom)},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
       });
     }
 

@@ -38,4 +38,4 @@ function captureException(err) {
   if (sentryInstance) sentryInstance.captureException(err);
 }
 
-module.exports = { initMonitoring, captureException, isMonitoringEnabled };
+module.exports = { initMonitoring, captureException };
