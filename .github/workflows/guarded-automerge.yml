@@ -51,20 +51,22 @@ jobs:
             fi
           }
 
-          pr_json="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" --json baseRefName,isDraft,labels,files)"
+          pr_json="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" --json baseRefName,isDraft,labels)"
           base="$(jq -r '.baseRefName // ""' <<< "$pr_json")"
           is_draft="$(jq -r '.isDraft // true' <<< "$pr_json")"
           has_label="$(jq -r '[.labels[].name] | index("ai-automerge-safe") != null' <<< "$pr_json")"
 
-          # Le label et le statut de la PR sont relus à chaque événement,
-          # pas seulement au moment où le label est ajouté.
+          # Le label et le statut sont relus à chaque événement, pas seulement
+          # au moment où le label est ajouté.
           if [[ "$base" != "main" || "$is_draft" == "true" || "$has_label" != "true" ]]; then
             disable_auto_merge_if_enabled
             echo "Aucune autorisation active : base main, PR non-Draft et label humain requis."
             exit 0
           fi
 
-          files="$(jq -r '.files[].path' <<< "$pr_json")"
+          # Pagination REST : aucun fichier au-delà de la première page ne doit
+          # échapper à la liste d'autorisation.
+          files="$(gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[].filename')"
           if [[ -z "$files" ]]; then
             disable_auto_merge_if_enabled
             echo "::error::PR vide ou liste de fichiers indisponible."
