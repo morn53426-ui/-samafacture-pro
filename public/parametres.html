@@ -363,8 +363,24 @@
   .invoice-template-preview-watermark {
     position: absolute; right: 8px; bottom: 7px; z-index: 2;
     padding: 4px 7px; border: 1px solid rgba(15, 27, 51, .08);
-    border-radius: 5px; background: #fff; color: #374151;
+    border-radius: 5px; background: #FFFFFF; color: #1F2937;
     font-size: .52rem; font-weight: 850; letter-spacing: .1em; pointer-events: none;
+  }
+  /* Les badges doivent rester lisibles dans les deux thèmes, indépendamment
+     des accents décoratifs et des variables de palette. */
+  .invoice-template-tier.tier-enterprise {
+    background: #D1FAE5;
+    color: #066144;
+  }
+  :root[data-theme="dark"] .invoice-template-tier.tier-enterprise {
+    background: #173D2B;
+    color: #9DE7BC;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .invoice-template-tier.tier-enterprise {
+      background: #173D2B;
+      color: #9DE7BC;
+    }
   }
   .invoice-template-card-footer { display: flex; margin-top: 12px; }
   .invoice-template-choice {
