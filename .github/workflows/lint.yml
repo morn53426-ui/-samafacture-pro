@@ -12,6 +12,7 @@ on:
       - 'server/tests/local-date-format.test.js'
       - 'server/tests/optional-fields.test.js'
       - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/parametres-accessibility.test.js'
       - 'server/tests/sidebar-mobile-keyboard.test.js'
       - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
@@ -104,6 +105,7 @@ jobs:
           server/tests/local-date-format.test.js
           server/tests/optional-fields.test.js
           server/tests/workspace-navigation.test.js
+          server/tests/parametres-accessibility.test.js
           server/tests/dashboard-ui.test.js
           server/tests/sidebar-mobile-keyboard.test.js
           server/tests/accounting-expense-mappings.test.js
