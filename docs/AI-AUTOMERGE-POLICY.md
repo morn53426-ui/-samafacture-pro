@@ -1,34 +1,54 @@
-# Politique de merge automatique OpenCode (SUNUPILOT)
+# Politique d'automatisation IA gardée — SUNUPILOT
 
 ## Principe
-L'automatisation ne merge jamais sur la seule base d'une confiance déclarée par l'IA. Elle s'appuie sur des contrôles GitHub vérifiables et une étiquette de décision explicite.
+L'IA peut analyser, proposer et préparer des changements. Elle ne décide jamais seule qu'un changement est sûr à fusionner. La décision d'autoriser l'auto-merge appartient à un mainteneur de confiance et reste soumise aux protections GitHub.
+
+## Cycle d'une contribution IA
+1. L'agent lit `AGENTS.md`, les skills applicables et l'état Git avant toute modification.
+2. Il travaille exclusivement sur une branche dédiée, jamais directement sur `main`.
+3. Il produit un diff ciblé, explique les fichiers modifiés, les hypothèses et les risques.
+4. Il exécute les tests pertinents et indique les commandes réellement lancées et leurs résultats.
+5. Un agent de revue indépendant, en lecture seule, recherche les régressions et les risques.
+6. Une PR est ouverte en Draft avec un résumé, les tests, les captures/artefacts utiles et les points restant à vérifier.
+7. Un mainteneur examine le diff et les contrôles avant de rendre la PR prête ou d'ajouter le label spécial.
 
 ## Label d'autorisation
-- Label requis : `ai-automerge-safe`
-- Ce label doit être ajouté manuellement par un mainteneur après revue du diff.
-- L'agent ne doit pas pouvoir s'auto-attribuer ce label via ses permissions de workflow.
-- Une PR sans ce label reste ouverte et non mergée.
+- Label requis : `ai-automerge-safe`.
+- Le label est ajouté manuellement par une personne de confiance après examen du diff.
+- L'agent de codage ne doit pas pouvoir s'attribuer ce label.
+- Une PR sans ce label ne doit pas activer l'auto-merge.
+- Le workflow relit le label, l'état Draft, la branche cible et la liste complète des fichiers à chaque ajout/retrait du label, nouveau commit, réouverture ou passage en revue.
+- Si le label disparaît, si la PR repasse en Draft ou si un fichier hors périmètre apparaît, le workflow tente de désactiver tout auto-merge déjà programmé et échoue fermé.
 
-## Conditions supplémentaires
-- PR ouverte vers `main`.
-- Tous les contrôles CI requis par les règles de protection de `main` doivent réussir.
-- Merge natif GitHub Auto-merge activé; méthode Squash.
-- La PR ne doit toucher que les chemins de faible risque autorisés par le workflow.
-- Si un fichier non autorisé est modifié, le workflow refuse l'auto-merge et laisse la PR ouverte.
-- Aucun merge direct, aucune suppression de branche, aucun force-push, aucune modification de volume, sauvegarde ou données.
-- Aucun paiement réel ni changement de configuration de paiement.
-- Les PR qui touchent facturation, comptabilité OHADA, paiements, abonnements, authentification, autorisations, sécurité, migrations, Docker, CI/workflows, secrets, infrastructure ou configuration restent soumises à une approbation humaine.
-
-## Chemins autorisés (liste conservative)
+## Changements éventuellement éligibles
+Liste volontairement limitée :
 - `docs/**`
-- `*.md` à la racine
+- `*.md` à la racine uniquement
 - `server/tests/**`
 - `public/css/**`
 
-Les autres chemins sont refusés par défaut. Cette liste peut être élargie uniquement par revue humaine dédiée.
+Les changements CSS ne sont éligibles que s'ils ne modifient pas le comportement métier, les données, les droits ou les calculs. Tout fichier non listé est refusé par défaut.
 
-## Contrôles
-Le workflow `.github/workflows/guarded-automerge.yml` ne fait qu'activer l'Auto-merge GitHub (Squash) après validation des critères; il ne fusionne pas immédiatement. GitHub attend les checks et les règles de protection configurés sur `main`.
+## Exclusions : revue et autorisation humaines obligatoires
+Aucun auto-merge IA pour :
+- facturation, montants, taxes, soldes, remises, avoirs et paiements ;
+- comptabilité, journaux et conformité OHADA ;
+- abonnements, essais gratuits, quotas, prix et activation de paiement ;
+- authentification, sessions, permissions, multi-tenant et sécurité ;
+- base de données, migrations, sauvegardes et restauration ;
+- génération PDF, impression des factures et documents réglementaires ;
+- Docker, CI, GitHub Actions, secrets, déploiement et infrastructure ;
+- configuration OpenCode, agents et permissions.
+
+## Contrôles techniques indispensables
+- Les tests CI applicables doivent être requis dans les règles de protection de `main`.
+- GitHub Auto-merge doit être activé au niveau du dépôt avant usage.
+- Le Squash est la seule méthode demandée par ce workflow.
+- Le label doit être réservé à un rôle de confiance.
+- Les agents doivent fonctionner avec le minimum de permissions et ne jamais recevoir de secrets dans leurs prompts ou leurs logs.
+- Aucun paiement réel ne doit être activé par une automatisation.
 
 ## Limites
-Le workflow n'exécute pas de code provenant de la PR et n'utilise pas `pull_request_target`. L'étiquette constitue une décision humaine, pas une preuve technique de sûreté. Le dépôt doit avoir des règles de protection de `main` avec les checks pertinents exigés.
+Le workflow ne remplace pas les protections de branche GitHub et ne garantit pas l'absence de bogue. La permission du label, la protection de `main` et les checks requis doivent être contrôlés dans les paramètres du dépôt. Le workflow utilise `pull_request`, jamais `pull_request_target`, et ne checkout ni n'exécute le code de la PR.
+
+L'auto-merge natif de GitHub est seulement demandé après validation du périmètre ; GitHub doit encore attendre tous les contrôles et toutes les approbations exigés.
