@@ -42,6 +42,12 @@ permissions:
     resource: "git branch -d*"
     effect: deny
   - action: shell
+    resource: "git checkout main*"
+    effect: deny
+  - action: shell
+    resource: "git switch main*"
+    effect: deny
+  - action: shell
     resource: "gh pr merge*"
     effect: deny
   - action: shell
@@ -79,7 +85,7 @@ Méthode obligatoire :
 
 Interdictions :
 - Ne pas pousser de commit, fusionner, fermer une PR ou supprimer une branche.
-- Ne jamais toucher directement à `main).
+- Ne jamais toucher directement à `main`.
 - Ne jamais supprimer de volume, donnée, sauvegarde ou base.
 - Ne jamais activer de paiement réel ni modifier des secrets.
 - Ne jamais modifier un calcul de facture, une taxe, un solde, une règle OHADA ou une autorisation sans demande explicite et tests dédiés.
