@@ -1100,6 +1100,62 @@ input[type=checkbox]:disabled, input[type=radio]:disabled { cursor: not-allowed;
   .invoice-doc .head { page-break-after: avoid; }
   .invoice-doc table thead { display: table-header-group; }
 }
+/* Modèle Executive : réduire les espacements périphériques en A4 sans toucher
+   aux colonnes, aux lignes, aux montants ni à la typographie du tableau. */
+@media print {
+  .invoice-doc.tpl-executive .sf-executive-header {
+    padding: 17px 40px 15px !important;
+    margin-bottom: 15px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-meta {
+    gap: 10px !important;
+    margin-bottom: 13px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-recipient {
+    padding: 9px 11px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-references {
+    padding: 9px 11px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-references > div {
+    line-height: 1.5 !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-totals {
+    margin-top: 12px !important;
+  }
+  .invoice-doc.tpl-executive .sf-executive-totals > div {
+    padding: 9px 12px !important;
+  }
+  .invoice-doc.tpl-executive .sf-doc-meta {
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+    padding: 8px 10px !important;
+  }
+  .invoice-doc.tpl-executive .sf-doc-footer {
+    margin-top: 18px !important;
+  }
+  .invoice-doc.tpl-executive .sf-doc-extras {
+    gap: 6px !important;
+    margin-top: 10px !important;
+  }
+  .invoice-doc.tpl-executive .sf-doc-extras > * + * {
+    margin-top: 6px !important;
+  }
+  .invoice-doc.tpl-executive .sf-extra-panel {
+    padding: 8px 10px !important;
+  }
+  .invoice-doc.tpl-executive .sf-acceptance-copy {
+    margin-bottom: 8px !important;
+    line-height: 1.4 !important;
+  }
+  .invoice-doc.tpl-executive .sf-acceptance-grid {
+    gap: 9px !important;
+  }
+  .invoice-doc.tpl-executive .sf-sign-field {
+    gap: 10px !important;
+  }
+}
+
 @media (max-width: 640px) {
   /* Aperçu de facture/devis sur mobile : moins de marge intérieure, en-tête empilé,
      et défilement horizontal interne plutôt qu'un débordement de toute la page
