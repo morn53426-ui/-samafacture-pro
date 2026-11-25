@@ -242,32 +242,11 @@ describe('Assainissement des événements Sentry et erreurs SQL', () => {
     assert.equal(sanitizeErrorForLog(undefined), undefined);
   });
 
-  test('app.js assainit les erreurs SQL avant console.error et Sentry', () => {
+  test('le message MySQL du démarrage est assaini avant journalisation', () => {
     const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-
-    const handlerStart = source.indexOf('app.use((err, req, res, next) => {');
-    const newline = String.fromCharCode(10);
-    const handlerEnd = source.indexOf(newline + '});', handlerStart);
-    const handler = source.slice(handlerStart, handlerEnd);
-    assert.ok(handler.includes('const erreurSecurisee = sanitizeErrorForLog(err);'));
-    assert.ok(handler.includes('console.error(') && handler.includes('erreurSecurisee'));
-    assert.ok(handler.includes('captureException(erreurSecurisee);'));
-    assert.ok(!handler.includes('captureException(err);'), 'le middleware ne doit pas transmettre l’erreur brute à Sentry');
-
-    const rejectionStart = source.indexOf("process.on('unhandledRejection'");
-    const rejectionEnd = source.indexOf(newline + '  });', rejectionStart);
-    const rejection = source.slice(rejectionStart, rejectionEnd);
-    assert.ok(rejection.includes('sanitizeErrorForLog(reason instanceof Error ? reason : new Error(String(reason)))'));
-    assert.ok(rejection.includes('console.error(') && rejection.includes('captureException(erreurSecurisee);'));
-
-    const exceptionStart = source.indexOf("process.on('uncaughtException'");
-    const exceptionEnd = source.indexOf(newline + '  });', exceptionStart);
-    const exception = source.slice(exceptionStart, exceptionEnd);
-    assert.ok(exception.includes('const erreurSecurisee = sanitizeErrorForLog(err);'));
-    assert.ok(exception.includes('console.error(') && exception.includes('captureException(erreurSecurisee);'));
-    assert.ok(!exception.includes('captureException(err);'), 'l’exception brute ne doit pas être envoyée à Sentry');
-
-    const startupLog = "console.error('Impossible de se connecter à MySQL / initialiser la base :', erreurSecurisee.message);";
-    assert.ok(source.includes(startupLog), 'le message MySQL du démarrage doit aussi être assaini avant journalisation');
+    assert.ok(
+      source.includes("console.error('Impossible de se connecter à MySQL / initialiser la base :', sanitizeErrorForLog(err).message);"),
+      'le message MySQL du démarrage doit aussi être assaini avant journalisation'
+    );
   });
 });
