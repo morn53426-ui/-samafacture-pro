@@ -153,6 +153,20 @@ app.use((req, res, next) => {
 // des virgules dans .env, ex: "https://samafacturepro.com,https://www.samafacturepro.com").
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
 const isProduction = process.env.NODE_ENV === 'production';
+// L'origine publique de l'application doit être autorisée dès qu'une politique CORS
+// s'applique : les navigateurs envoient un en-tête Origin sur les POST/PUT/PATCH/DELETE
+// même same-origin. Si ALLOWED_ORIGINS a été configuré sans elle (ou avec une ancienne
+// valeur), l'inscription et les autres écritures étaient rejetées par le middleware CORS
+// avant même d'atteindre la route. En développement sans liste explicite, on conserve le
+// repli permissif (aucune politique) pour ne pas gêner Live Server ou un autre port local.
+if (allowedOrigins.length > 0 || isProduction) {
+  try {
+    const appOrigin = new URL(process.env.APP_URL).origin;
+    if (appOrigin && !allowedOrigins.includes(appOrigin)) allowedOrigins.push(appOrigin);
+  } catch {
+    // APP_URL absente ou invalide : la validation de runtime s'en charge en production.
+  }
+}
 if (isProduction && allowedOrigins.length === 0) {
   // Avant : ce cas laissait l'API ouverte à toute origine (comportement par défaut du
   // package cors) — un simple avertissement au démarrage suffisait à documenter le risque
@@ -181,7 +195,10 @@ app.use(cors(hasOriginPolicy ? {
     // origin est undefined pour les requêtes sans en-tête Origin (ex: curl, apps mobiles,
     // requêtes same-origin) — on les laisse toujours passer.
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Origine non autorisée par la politique CORS.'));
+    const err = new Error('Origine non autorisée par la politique CORS.');
+    err.status = 403;
+    err.code = 'CORS_ORIGIN_REFUSEE';
+    return callback(err);
   }
 } : undefined));
 // { verify: ... } conserve le corps brut de la requête (req.rawBody), nécessaire pour
@@ -444,6 +461,9 @@ app.use((err, req, res, next) => {
   // de passe, un jeton, ou une donnée client sensible par erreur).
   console.error(`[${req.requestId || '-'}] [${req.method} ${sanitizeRequestTargetForLog(req.originalUrl || req.url)}]${req.user ? ` user#${req.user.id}` : ''}`, err);
   captureException(err);
+  if (err && err.code === 'CORS_ORIGIN_REFUSEE') {
+    return res.status(403).json({ error: err.message });
+  }
   if (isPoolSaturationError(err)) {
     res.setHeader('Retry-After', '2');
     return res.status(503).json({ error: 'Serveur temporairement surchargé, veuillez réessayer.' });

@@ -103,12 +103,12 @@ async function genererPdfFacture(factureId, user) {
     const baseUrl = (process.env.PDF_BASE_URL || process.env.APP_URL || 'http://localhost:4000').replace(/\/$/, '');
 
     // La page PDF peut être servie par un serveur HTTP de test sur un port aléatoire
-    // (ou par un reverse-proxy distinct du port API). api.js redirige normalement les
-    // navigateurs localhost non-4000 vers :4000 pour éviter Live Server, mais ce comportement
-    // est incorrect ici : Puppeteer navigue précisément vers le serveur HTTP de test.
-    // On force donc l'URL API à être celle du même serveur que la page avant l'exécution
-    // de tout script applicatif. Cela supprime les timeouts PDF dus à des appels API envoyés
-    // vers un autre port.
+    // (ou par un reverse-proxy distinct du port API). api.js ne redirige vers :4000 que
+    // les navigateurs ouverts via Live Server (ports 550x) ; pour tout autre port il reste
+    // en same-origin. On force néanmoins l'URL API à être celle du même serveur que la page
+    // avant l'exécution de tout script applicatif : cela couvre aussi une éventuelle
+    // redirection résiduelle et supprime les timeouts PDF dus à des appels API envoyés vers
+    // un autre port.
     const apiBaseUrl = `${baseUrl}/api`;
 
     // Chromium tourne avec --no-sandbox et détient un JWT valide 2 min : on bloque toute requête

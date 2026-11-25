@@ -12,14 +12,16 @@
 const API_BASE = window.SAMAFACTURE_API_URL || (() => {
   // En local, l'application peut être ouverte par erreur via Live Server (5500/5501...)
   // alors que l'API Express écoute sur 4000. Dans ce cas, '/api' pointe vers le mauvais
-  // serveur et les boutons de sauvegarde semblent « ne rien faire ». On redirige donc
-  // automatiquement les appels API vers Express pour localhost/127.0.0.1 lorsque la page
-  // n'est pas elle-même servie par le port API 4000. SAMAFACTURE_API_URL reste prioritaire
-  // pour Capacitor, un autre port local ou un déploiement avec API séparée.
+  // serveur et les boutons de sauvegarde semblent « ne rien faire ». On ne redirige donc
+  // que pour ces ports de développement connus. Pour tout autre port (nginx, reverse-proxy,
+  // serveur de test), on reste en same-origin : le serveur qui sert la page expose aussi
+  // /api, et forcer :4000 casserait l'accès (port non publié, CSP connect-src 'self').
+  // SAMAFACTURE_API_URL reste prioritaire pour Capacitor ou une API réellement séparée.
   const host = window.location.hostname;
   const port = window.location.port;
   const localHost = host === 'localhost' || host === '127.0.0.1';
-  if (localHost && port && port !== '4000') return `http://${host}:4000/api`;
+  const liveServerPort = /^550\d$/.test(port);
+  if (localHost && liveServerPort) return `http://${host}:4000/api`;
   return '/api';
 })();
 
