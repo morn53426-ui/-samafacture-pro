@@ -1,0 +1,51 @@
+name: Auto-merge gardé — PR à faible risque
+
+on:
+  pull_request:
+    types: [labeled]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  guarded-auto-merge:
+    if: github.event.label.name == 'ai-automerge-safe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Vérifier les critères de faible risque
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          files="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" --json files --jq '.files[].path')"
+          echo "Fichiers de la PR :"
+          printf '%s\n' "$files"
+
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            case "$path" in
+              docs/*|*.md|server/tests/*|public/css/*)
+                ;;
+              *)
+                echo "::error::Chemin non autorisé pour l'auto-merge : $path"
+                exit 1
+                ;;
+            esac
+          done <<< "$files"
+
+          if [ -z "$files" ]; then
+            echo "::error::PR vide ou liste de fichiers indisponible."
+            exit 1
+          fi
+
+      - name: Activer l'Auto-merge GitHub (Squash)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh pr merge "$PR_NUMBER" --repo "$REPOSITORY" --auto --squash
