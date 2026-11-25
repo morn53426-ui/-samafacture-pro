@@ -1,0 +1,64 @@
+name: Validate OpenCode agent configuration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'opencode.jsonc'
+      - '.opencode/agents/**'
+      - 'docs/OPENCODE-AGENT-WORKFLOW.md'
+      - '.github/workflows/validate-opencode-config.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-agent-config:
+    name: Validate OpenCode config and agent frontmatter
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: Validate JSONC configuration (strict JSON subset)
+        run: |
+          node -e "const fs=require('node:fs'); const c=JSON.parse(fs.readFileSync('opencode.jsonc','utf8')); if(c.default_agent!=='plan') throw new Error('Default agent must remain plan'); if(!c.agents?.plan || !c.agents?.build) throw new Error('Missing guarded plan/build profiles'); console.log('OpenCode config JSON syntax: OK');"
+
+      - name: Validate agent Markdown frontmatter
+        shell: bash
+        run: |
+          ruby <<'RUBY'
+          require 'yaml'
+          files = Dir.glob('.opencode/agents/*.md').sort
+          abort 'No OpenCode agent files found' if files.empty?
+
+          files.each do |file|
+            content = File.read(file)
+            match = content.match(/\A---\s*\n(.*?)\n---\s*\n/m)
+            abort "Missing YAML frontmatter: #{file}" unless match
+
+            metadata = YAML.safe_load(match[1], permitted_classes: [], permitted_symbols: [], aliases: false)
+            abort "Invalid metadata object: #{file}" unless metadata.is_a?(Hash)
+            abort "Missing description: #{file}" unless metadata['description'].is_a?(String) && !metadata['description'].strip.empty?
+            abort "Agent must be a subagent: #{file}" unless metadata['mode'] == 'subagent'
+            permissions = metadata['permissions']
+            abort "Missing permissions: #{file}" unless permissions.is_a?(Array) && !permissions.empty?
+
+            permissions.each do |permission|
+              abort "Invalid permission rule in #{file}" unless
+                permission.is_a?(Hash) &&
+                %w[allow ask deny].include?(permission['effect']) &&
+                permission['action'].is_a?(String) &&
+                permission['resource'].is_a?(String)
+            end
+            puts "Validated #{file}"
+          end
+          RUBY
