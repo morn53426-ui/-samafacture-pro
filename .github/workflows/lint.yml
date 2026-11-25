@@ -16,6 +16,10 @@ on:
       - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
+      - 'server/app.js'
+      - 'server/config/monitoring.js'
+      - 'server/utils/log-sanitizer.js'
+      - 'server/tests/log-sanitizer.test.js'
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
@@ -101,6 +105,10 @@ jobs:
           server/tests/sidebar-mobile-keyboard.test.js
           server/tests/accounting-expense-mappings.test.js
           server/tests/workspace-modal-accessibility.test.js
+          server/app.js
+          server/config/monitoring.js
+          server/utils/log-sanitizer.js
+          server/tests/log-sanitizer.test.js
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
