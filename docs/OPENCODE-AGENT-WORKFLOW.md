@@ -20,17 +20,17 @@ La configuration doit être testée avec la version OpenCode installée localeme
 | `sunupilot-test-engineer` | Sous-agent | Stratégie et exécution des tests | Pas d'édition ; chaque commande demande approbation |
 
 ## Workflow recommandé
-1. Ouvrir le dépôt sur une branche de travail dédiée ; vérifier `git status) et ne jamais travailler sur `main`.
+1. Ouvrir le dépôt sur une branche de travail dédiée ; vérifier `git status` et ne jamais travailler sur `main`.
 2. Utiliser `plan` pour analyser la demande et produire le plan, sans modification.
 3. Faire examiner le périmètre par `sunupilot-architect` et, selon le risque, par `sunupilot-ohada-reviewer` ou `sunupilot-pdf-reviewer`.
 4. Après validation humaine du plan, faire intervenir `sunupilot-implementer` sur un diff limité.
-5. Faire examiner le diff complet par `sunupilot-code-reviewer), puis établir la matrice de tests avec `sunupilot-test-engineer`.
+5. Faire examiner le diff complet par `sunupilot-code-reviewer`, puis établir la matrice de tests avec `sunupilot-test-engineer`.
 6. Lancer les tests pertinents après approbation des commandes ; conserver les logs et artefacts.
 7. Préparer une PR en Draft avec résumé, captures/PDF utiles, tests réellement exécutés, risques et limites.
 8. Laisser un mainteneur rendre la PR prête et décider si elle peut recevoir le label `ai-automerge-safe`.
 
 ## Garde-fous
-- Pas de modification directe de `main), pas de merge ou fermeture de PR par l'agent.
+- Pas de modification directe de `main`, pas de merge ou fermeture de PR par l'agent.
 - Aucune suppression de branche, volume, sauvegarde, base ou donnée.
 - Pas de push automatique depuis les profils locaux ; toute publication doit passer par la revue et l'autorisation explicite.
 - Pas de paiement réel, pas de secret dans les prompts, fichiers de log ou artefacts.
