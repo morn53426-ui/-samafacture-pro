@@ -131,6 +131,9 @@ body.workspace-modal-open{overflow:hidden}
 
 /* Fenêtres Nouveau client / Catalogue : zone défilable indépendante et commandes
    persistantes au bas de la fenêtre quand le formulaire est plus haut que l'écran. */
+/* Les modales sont des enfants directs du body : elles doivent passer au-dessus
+   du bandeau fixe mobile (z-index 110), sinon le titre reste masqué derrière le menu. */
+body > .workspace-create-modal{z-index:1300!important}
 .workspace-create-modal{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
 .workspace-create-modal .workspace-modal-panel{min-width:0;max-width:100%;-webkit-overflow-scrolling:touch}
 @media(max-width:560px){
