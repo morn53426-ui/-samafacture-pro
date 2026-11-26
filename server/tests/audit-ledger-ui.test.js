@@ -32,6 +32,13 @@ test('l’espace professionnel utilise le nouveau registre d’audit avec filtre
   assert.ok(page.includes("Api.get('/pro/audit-events?' + params.toString())"));
   assert.ok(page.includes("Api.get('/pro/audit-events/integrity')"));
   assert.match(page, /setHidden\('audit-section', !can\('audit\.read'\)\)/);
+  assert.match(page, /id="pro-audit"/);
+  const integrationsStart = page.indexOf('id="pro-integrations"');
+  const auditCardStart = page.indexOf('id="pro-audit"');
+  assert.ok(integrationsStart >= 0 && auditCardStart > integrationsStart);
+  assert.ok(page.indexOf('</section>', integrationsStart) < auditCardStart,
+    'le registre d’audit doit être indépendant du module intégrations pour les rôles audit.read seuls');
+  assert.match(page, /setHidden\('pro-audit', !can\('audit\.read'\)\)/);
   assert.equal(page.includes("optionalApiGet('/pro/audit')"), false,
     'la page ne doit plus consommer l’ancien endpoint limité de l’audit');
   assert.match(page, /can\('audit\.export'\)/);
