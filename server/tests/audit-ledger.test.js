@@ -305,6 +305,40 @@ test('création de facture et encaissement : audit atomique avec les opérations
     .set('Authorization', 'Bearer ' + ownerAToken)
     .send({ nom: 'Client audit financier' });
   assert.equal(client.status, 201, client.text);
+  const clientId = Number(client.body.client.id);
+
+  const clientUpdate = await request(app)
+    .put('/api/clients/' + clientId)
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({ nom: 'Client audit financier mis à jour' });
+  assert.equal(clientUpdate.status, 200, clientUpdate.text);
+
+  const removableClient = await request(app)
+    .post('/api/clients')
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({ nom: 'Client sans historique à supprimer' });
+  assert.equal(removableClient.status, 201, removableClient.text);
+  const clientDelete = await request(app)
+    .delete('/api/clients/' + removableClient.body.client.id)
+    .set('Authorization', 'Bearer ' + ownerAToken);
+  assert.equal(clientDelete.status, 200, clientDelete.text);
+
+  const [clientEvents] = await pool.query(
+    "SELECT event_type, entity_id, metadata_json FROM pro_audit_events WHERE tenant_scope_id = ? AND event_type IN ('client.created', 'client.updated', 'client.deleted')",
+    [ownerA]
+  );
+  assert.ok(clientEvents.some(event => event.event_type === 'client.created' && event.entity_id === String(clientId)));
+  const updatedClientEvent = clientEvents.find(event =>
+    event.event_type === 'client.updated' && event.entity_id === String(clientId)
+  );
+  assert.ok(updatedClientEvent);
+  const updatedMetadata = typeof updatedClientEvent.metadata_json === 'string'
+    ? JSON.parse(updatedClientEvent.metadata_json)
+    : updatedClientEvent.metadata_json;
+  assert.deepEqual(updatedMetadata.changed_fields, ['nom']);
+  assert.ok(clientEvents.some(event =>
+    event.event_type === 'client.deleted' && event.entity_id === String(removableClient.body.client.id)
+  ));
 
   const created = await request(app)
     .post('/api/factures')
