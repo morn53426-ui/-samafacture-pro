@@ -790,6 +790,11 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   }
 
   if (pageDefinition.name === 'admin') {
+    await page.waitForFunction(() => {
+      const traffic = document.getElementById('traffic-chart');
+      const signups = document.getElementById('signup-chart');
+      return traffic?.dataset.sfChartType && signups?.dataset.sfChartType;
+    }, { timeout: 15000 });
     const adminUi = await page.evaluate(() => ({
       dashboardVisible: document.getElementById('admin-dashboard')?.hidden === false,
       kpiCount: document.querySelectorAll('.admin-kpi').length,
