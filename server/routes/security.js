@@ -21,7 +21,7 @@ function noStore(res) {
 }
 
 function positiveId(value) {
-  if (Array.isArray(value) || !/^\\d+$/.test(String(value || ''))) return null;
+  if (Array.isArray(value) || !/^\d+$/.test(String(value || ''))) return null;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
