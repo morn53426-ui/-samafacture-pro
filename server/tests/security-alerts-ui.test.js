@@ -17,6 +17,9 @@ test('le centre de sécurité expose les alertes et dossiers selon les permissio
     'security-critical-count',
     'security-investigation-count',
     'security-alert-status',
+    'security-alert-assignee-wrap',
+    'security-alert-assignee',
+    'security-investigation-assignee',
     'security-refresh',
     'security-alerts-list',
     'security-investigation-form',
@@ -35,6 +38,8 @@ test('le centre de sécurité expose les alertes et dossiers selon les permissio
   assert.match(page, /X-SF-Company-Owner/);
   assert.match(page, /data-security-action="ack"/);
   assert.match(page, /data-security-action="note"/);
+  assert.match(page, /data-security-action="assign-alert"/);
+  assert.match(page, /security.alerts.manage/);
   assert.match(page, /setHidden\('pro-security-center'/);
 });
 
