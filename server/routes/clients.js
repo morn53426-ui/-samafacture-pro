@@ -1,5 +1,6 @@
 const express = require('express');
 const { pool } = require('../config/db');
+const { appendAuditEvent } = require('../utils/audit-ledger');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
@@ -127,20 +128,42 @@ router.get('/:id', async (req, res, next) => {
  *         content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } }
  */
 router.post('/', async (req, res, next) => {
+  let conn;
   try {
     const { nom, email, telephone, whatsapp, adresse, notes, photo } = req.body;
     if (!nom) return res.status(400).json({ error: 'Le nom du client est obligatoire.' });
 
-    const [result] = await pool.query(
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [result] = await conn.query(
       `INSERT INTO clients (user_id, nom, email, telephone, whatsapp, adresse, notes, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.tenantId, nom, email || null, telephone || null, whatsapp || null, adresse || null, notes || null, photo || null]
     );
+    await appendAuditEvent({
+      tenantId: Number(req.tenantId),
+      actorUserId: Number(req.actorId || req.user.id),
+      eventType: 'client.created',
+      category: 'crm',
+      entityType: 'client',
+      entityId: String(result.insertId),
+      outcome: 'success',
+      ipAddress: req.ip || null,
+      userAgent: req.get('user-agent') || null,
+      requestId: req.requestId || null,
+      metadata: { changed_fields: ['nom', 'email', 'telephone', 'whatsapp', 'adresse', 'notes', 'photo'] }
+    }, conn);
+    const [rows] = await conn.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
+    await conn.commit();
 
-    const [rows] = await pool.query('SELECT * FROM clients WHERE id = ?', [result.insertId]);
     res.status(201).json({ client: rows[0] });
     notifierUtilisateur(req.tenantId, 'nouveau_client', { client: rows[0] });
     queueWebhookEvent(req.tenantId, 'client.created', { client_id: rows[0].id, nom: rows[0].nom }).catch(err => console.warn('Webhook client.created ignoré :', err.message));
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 /**
@@ -164,30 +187,56 @@ router.post('/', async (req, res, next) => {
  *       409: { description: Client avec historique protégé., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.put('/:id', async (req, res, next) => {
+  let conn;
   try {
-    const [existingRows] = await pool.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [existingRows] = await conn.query(
+      'SELECT * FROM clients WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
     const existing = existingRows[0];
-    if (!existing) return res.status(404).json({ error: 'Client introuvable.' });
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Client introuvable.' });
+    }
 
     const { nom, email, telephone, whatsapp, adresse, notes, photo } = req.body;
-    // Le nom est obligatoire à la création (voir POST /clients ci-dessus) ; la mise à jour
-    // doit respecter la même règle — sans ce contrôle, envoyer `{ nom: "" }` effaçait
-    // silencieusement le nom d'un client existant (nom ?? existing.nom ne bloque que
-    // null/undefined, pas une chaîne vide explicitement fournie).
     if (nom !== undefined && !nom) {
+      await conn.rollback();
       return res.status(400).json({ error: 'Le nom du client est obligatoire.' });
     }
-    await pool.query(
-      `UPDATE clients SET nom=?, email=?, telephone=?, whatsapp=?, adresse=?, notes=?, photo=? WHERE id = ?`,
+    const changedFields = ['nom', 'email', 'telephone', 'whatsapp', 'adresse', 'notes', 'photo']
+      .filter(field => Object.prototype.hasOwnProperty.call(req.body, field));
+    await conn.query(
+      `UPDATE clients SET nom=?, email=?, telephone=?, whatsapp=?, adresse=?, notes=?, photo=? WHERE id = ? AND user_id = ?`,
       [
         nom ?? existing.nom, email ?? existing.email, telephone ?? existing.telephone, whatsapp ?? existing.whatsapp,
-        adresse ?? existing.adresse, notes ?? existing.notes, photo ?? existing.photo, existing.id
+        adresse ?? existing.adresse, notes ?? existing.notes, photo ?? existing.photo, existing.id, req.tenantId
       ]
     );
-
-    const [rows] = await pool.query('SELECT * FROM clients WHERE id = ?', [existing.id]);
+    await appendAuditEvent({
+      tenantId: Number(req.tenantId),
+      actorUserId: Number(req.actorId || req.user.id),
+      eventType: 'client.updated',
+      category: 'crm',
+      entityType: 'client',
+      entityId: String(existing.id),
+      outcome: 'success',
+      ipAddress: req.ip || null,
+      userAgent: req.get('user-agent') || null,
+      requestId: req.requestId || null,
+      metadata: { changed_fields: changedFields }
+    }, conn);
+    const [rows] = await conn.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    await conn.commit();
     res.json({ client: rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 /**
@@ -256,6 +305,19 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     await conn.query('DELETE FROM clients WHERE id = ? AND user_id = ?', [clientId, req.tenantId]);
+    await appendAuditEvent({
+      tenantId: Number(req.tenantId),
+      actorUserId: Number(req.actorId || req.user.id),
+      eventType: 'client.deleted',
+      category: 'crm',
+      severity: 'medium',
+      entityType: 'client',
+      entityId: String(clientId),
+      outcome: 'success',
+      ipAddress: req.ip || null,
+      userAgent: req.get('user-agent') || null,
+      requestId: req.requestId || null
+    }, conn);
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
