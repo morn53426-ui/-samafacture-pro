@@ -1,0 +1,189 @@
+'use strict';
+
+const crypto = require('node:crypto');
+const { pool } = require('../config/db');
+const { appendAuditEvent, normalizeMetadata } = require('./audit-ledger');
+
+const SEVERITY_RANK = { info: 0, low: 1, medium: 2, high: 3, critical: 4 };
+
+function positiveId(value, label) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) throw new TypeError(label + ' invalide.');
+  return parsed;
+}
+
+function cleanText(value, max, label, required = false) {
+  const text = String(value == null ? '' : value).trim();
+  if (required && !text) throw new TypeError(label + ' obligatoire.');
+  if (text.length > max) throw new RangeError(label + ' dépasse ' + max + ' caractères.');
+  return text || null;
+}
+
+function buildFingerprint(tenantId, alertType, entityType, entityId, deduplicationKey) {
+  return crypto.createHash('sha256')
+    .update([
+      'SamaFacturePro/security-alert/v1',
+      tenantId,
+      alertType,
+      entityType || '',
+      entityId || '',
+      deduplicationKey || ''
+    ].join('\n'), 'utf8')
+    .digest('hex');
+}
+
+async function inTransaction(task, connection = null) {
+  if (connection) return task(connection);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const result = await task(conn);
+    await conn.commit();
+    return result;
+  } catch (err) {
+    await conn.rollback().catch(() => {});
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+async function createOrRefreshSecurityAlert(input, connection = null) {
+  if (!input || typeof input !== 'object') throw new TypeError('Une alerte de sécurité est obligatoire.');
+  const tenantId = positiveId(input.tenantId, 'Tenant');
+  const alertType = cleanText(input.alertType, 120, 'Type d’alerte', true);
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{1,119}$/.test(alertType)) throw new TypeError('Type d’alerte invalide.');
+  const category = cleanText(input.category || 'security', 40, 'Catégorie', true).toLowerCase();
+  if (!/^[a-z][a-z0-9_-]{1,39}$/.test(category)) throw new TypeError('Catégorie invalide.');
+  const severity = String(input.severity || 'medium').toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(SEVERITY_RANK, severity) || severity === 'info') {
+    throw new TypeError('La gravité doit être low, medium, high ou critical.');
+  }
+  const title = cleanText(input.title, 190, 'Titre', true);
+  const description = cleanText(input.description, 4000, 'Description');
+  const entityType = cleanText(input.entityType, 80, 'Type d’entité');
+  const entityId = input.entityId == null ? null : cleanText(input.entityId, 100, 'Identifiant d’entité');
+  const sourceEventId = input.sourceEventId == null ? null : positiveId(input.sourceEventId, 'Événement source');
+  const details = normalizeMetadata(input.details || {});
+  const fingerprint = buildFingerprint(
+    tenantId,
+    alertType,
+    entityType,
+    entityId,
+    cleanText(input.deduplicationKey, 160, 'Clé de déduplication')
+  );
+
+  return inTransaction(async conn => {
+    const [result] = await conn.query(
+      `INSERT INTO pro_security_alerts
+        (tenant_scope_id, fingerprint, alert_type, category, severity, status, title, description,
+         source_event_id, entity_type, entity_id, occurrences, first_seen_at, last_seen_at, details_json)
+       VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?)
+       ON DUPLICATE KEY UPDATE
+         id = LAST_INSERT_ID(id),
+         resolved_by_user_id = IF(status IN ('resolved', 'false_positive', 'closed'), NULL, resolved_by_user_id),
+         resolved_at = IF(status IN ('resolved', 'false_positive', 'closed'), NULL, resolved_at),
+         resolution_note = IF(status IN ('resolved', 'false_positive', 'closed'), NULL, resolution_note),
+         status = IF(status IN ('resolved', 'false_positive', 'closed'), 'open', status),
+         occurrences = occurrences + 1,
+         last_seen_at = UTC_TIMESTAMP(6),
+         severity = IF(FIELD(VALUES(severity), 'low', 'medium', 'high', 'critical') > FIELD(severity, 'low', 'medium', 'high', 'critical'), VALUES(severity), severity),
+         source_event_id = COALESCE(VALUES(source_event_id), source_event_id),
+         description = COALESCE(VALUES(description), description),
+         details_json = COALESCE(VALUES(details_json), details_json)`,
+      [
+        tenantId, fingerprint, alertType, category, severity, title, description,
+        sourceEventId, entityType, entityId, JSON.stringify(details)
+      ]
+    );
+    const alertId = Number(result.insertId);
+    const [[alert]] = await conn.query(
+      'SELECT * FROM pro_security_alerts WHERE id = ? AND tenant_scope_id = ? FOR UPDATE',
+      [alertId, tenantId]
+    );
+    if (!alert) throw new Error('Alerte de sécurité introuvable après écriture.');
+
+    const repeated = Number(alert.occurrences) > 1;
+    await conn.query(
+      `INSERT INTO pro_security_case_activity
+        (tenant_scope_id, alert_id, investigation_id, actor_user_id, activity_type,
+         previous_status, new_status, details_json)
+       VALUES (?, ?, NULL, NULL, ?, NULL, ?, ?)`,
+      [
+        tenantId,
+        alertId,
+        repeated ? 'alert.repeated' : 'alert.created',
+        alert.status,
+        JSON.stringify(normalizeMetadata({
+          occurrences: Number(alert.occurrences),
+          severity: alert.severity,
+          source_event_id: sourceEventId
+        }))
+      ]
+    );
+    await appendAuditEvent({
+      tenantId,
+      actorUserId: null,
+      actorKind: 'system',
+      eventType: repeated ? 'security.alert.repeated' : 'security.alert.created',
+      category: 'security',
+      severity: alert.severity,
+      entityType: 'security_alert',
+      entityId: alertId,
+      outcome: 'success',
+      metadata: {
+        alert_type: alert.alert_type,
+        occurrences: Number(alert.occurrences),
+        source_event_id: sourceEventId
+      }
+    }, conn);
+    return alert;
+  }, connection);
+}
+
+async function detectRepeatedLoginFailures(input) {
+  const tenantId = positiveId(input.tenantId, 'Tenant');
+  const accountId = cleanText(input.accountId, 100, 'Compte', true);
+  const threshold = Number(input.threshold || 5);
+  const windowMinutes = Number(input.windowMinutes || 15);
+  if (!Number.isSafeInteger(threshold) || threshold < 3 || threshold > 50 ||
+      !Number.isSafeInteger(windowMinutes) || windowMinutes < 1 || windowMinutes > 60) {
+    throw new TypeError('Seuil de détection invalide.');
+  }
+
+  const [[counts]] = await pool.query(
+    `SELECT COUNT(*) AS attempts, MAX(id) AS latest_event_id
+       FROM pro_audit_events
+      WHERE tenant_scope_id = ?
+        AND event_type = 'auth.login.failed'
+        AND category = 'security'
+        AND entity_type = 'account'
+        AND entity_id = ?
+        AND outcome = 'failure'
+        AND created_at >= DATE_SUB(UTC_TIMESTAMP(6), INTERVAL ? MINUTE)`,
+    [tenantId, accountId, windowMinutes]
+  );
+  const attempts = Number(counts.attempts || 0);
+  if (attempts < threshold) return null;
+
+  return createOrRefreshSecurityAlert({
+    tenantId,
+    alertType: 'auth.failed_login_burst',
+    category: 'authentication',
+    severity: attempts >= threshold * 2 ? 'critical' : 'high',
+    title: 'Échecs répétés de connexion',
+    description: 'Le compte a subi au moins ' + threshold + ' échecs de connexion en ' + windowMinutes + ' minutes.',
+    entityType: 'account',
+    entityId: accountId,
+    sourceEventId: counts.latest_event_id == null ? null : Number(counts.latest_event_id),
+    deduplicationKey: 'repeated-failures',
+    details: { observed_attempts: attempts, threshold, window_minutes: windowMinutes }
+  });
+}
+
+module.exports = {
+  createOrRefreshSecurityAlert,
+  detectRepeatedLoginFailures,
+  buildFingerprint,
+  SEVERITY_RANK
+};
