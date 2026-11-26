@@ -96,7 +96,7 @@ function csvCell(value) {
     ? ''
     : (typeof value === 'object' ? JSON.stringify(value) : String(value));
   // Évite qu'un libellé contrôlé par un utilisateur devienne une formule à l'ouverture dans Excel/Calc.
-  if (/^[=+\-@\\t\\r]/.test(text)) text = "'" + text;
+  if (/^[=+\-@]/.test(text) || text.charCodeAt(0) === 9 || text.charCodeAt(0) === 13) text = "'" + text;
   return '"' + text.replace(/"/g, '""') + '"';
 }
 
