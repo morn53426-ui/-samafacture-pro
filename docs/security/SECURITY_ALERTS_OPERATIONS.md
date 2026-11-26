@@ -69,4 +69,4 @@ Aucune notification email/SMS/push n'est envoyée. Aucun prestataire KYC, AML ou
 
 - Migration additive : `015_security_alerts_investigations.sql`, schéma v26.
 - Le script de migration est idempotent ; les triggers sont créés uniquement s'ils ne sont pas déjà présents.
-- Le rollback `015_security_alerts_investigations.down.sql` retire uniquement les triggers d'immutabilité. Les tables et toutes les activités/alertes/dossiers sont conservés.
+- Le rollback `015_security_alerts_investigations.down.sql` retire les triggers d'immutabilité et ramène uniquement le marqueur `_samafacture_schema_meta` à v25. Les tables et toutes les activités/alertes/dossiers sont conservés ; un prochain démarrage v26 peut ainsi rejouer la migration et recréer les triggers.
