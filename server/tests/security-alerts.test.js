@@ -58,7 +58,7 @@ before(async () => {
 
   await pool.query(
     'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json, active) VALUES (?, ?, ?, ?, 1)',
-    [ownerA, memberA, 'personnalise', JSON.stringify(['security.alerts.read', 'security.investigations.read'])]
+    [ownerA, memberA, 'personnalise', JSON.stringify(['team.read', 'security.alerts.read', 'security.investigations.read'])]
   );
 });
 
@@ -166,6 +166,12 @@ test('API alertes : isolation tenant, lecture membre et triage autorisé', async
     .set('Authorization', 'Bearer ' + ownerAToken)
     .send({});
   assert.equal(resolveWithoutNote.status, 400, resolveWithoutNote.text);
+  const memberTeamRead = await request(app)
+    .get('/api/pro/team')
+    .set(memberHeaders);
+  assert.equal(memberTeamRead.status, 200, memberTeamRead.text,
+    'le routeur sécurité ne doit pas bloquer les autres routes professionnelles');
+
   const memberRead = await request(app).get('/api/pro/security/alerts').set(memberHeaders);
   assert.equal(memberRead.status, 200, memberRead.text);
   const memberMutation = await request(app)
