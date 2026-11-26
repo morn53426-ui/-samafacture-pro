@@ -100,7 +100,7 @@ describe('Dashboard — régression et scalabilité', () => {
 
   test('les migrations 17 et 18 mémorisent l’entrepôt des factures et rendent le backfill historique idempotent', () => {
     const dbSource = fs.readFileSync(path.join(__dirname, '..', 'config', 'db.js'), 'utf8');
-    const professionalSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'professionnel.js'), 'utf8');
+    const professionalSource = require('./helpers/professional-source').readProfessionalSource();
     const schemaSource = fs.readFileSync(path.join(__dirname, '..', 'database', 'schema.sql'), 'utf8');
     assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 23/);
     assert.match(dbSource, /v19 : historique des contrepassations/);
