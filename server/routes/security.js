@@ -509,14 +509,16 @@ router.patch('/security/investigations/:id', async (req, res, next) => {
   if (!investigationId) return res.status(400).json({ error: 'Identifiant d’investigation invalide.' });
   const status = req.body.status === undefined ? undefined : String(req.body.status);
   const priority = req.body.priority === undefined ? undefined : String(req.body.priority).toLowerCase();
-  const assignedId = req.body.assigned_to_user_id === undefined
+  const assignedRaw = req.body.assigned_to_user_id;
+  const assignedId = assignedRaw === undefined
     ? undefined
-    : (req.body.assigned_to_user_id === null || req.body.assigned_to_user_id === '' ? null : positiveId(req.body.assigned_to_user_id));
+    : (assignedRaw === null || assignedRaw === '' ? null : positiveId(assignedRaw));
+  const invalidAssignee = assignedRaw !== undefined && assignedRaw !== null && assignedRaw !== '' && assignedId === null;
   const resolutionRaw = req.body.resolution_note === undefined ? undefined : String(req.body.resolution_note).trim();
   const resolutionNote = resolutionRaw === undefined ? undefined : safeCaseNote(resolutionRaw);
   if ((status !== undefined && !INVESTIGATION_STATUSES.has(status)) ||
       (priority !== undefined && !PRIORITIES.has(priority)) ||
-      (req.body.assigned_to_user_id !== undefined && assignedId === undefined) ||
+      invalidAssignee ||
       (resolutionRaw !== undefined && (resolutionRaw.length > 2000 || !resolutionNote)) ||
       (status !== undefined && ['resolved', 'closed'].includes(status) && (!resolutionNote || resolutionNote.length < 10))) {
     return res.status(400).json({ error: 'Mise à jour du dossier invalide. Une note de décision est requise pour clôturer.' });
