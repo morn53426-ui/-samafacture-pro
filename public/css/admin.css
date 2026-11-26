@@ -36,8 +36,10 @@
 :root[data-theme="dark"] .admin-eyebrow {
   color: #6EE7AE;
 }
-:root[data-theme="dark"] .admin-panel-tag {
-  color: #A7F3D0;
+:root[data-theme="dark"] body.sunupilot-admin-page .admin-panel-tag {
+  color: #C5F3D4 !important;
+  background: #12352C !important;
+  border: 1px solid #2D6B52;
 }
 :root[data-theme="dark"] .admin-caution {
   color: #F4DCA8;
