@@ -49,7 +49,7 @@ L'empreinte est calculée avec une clé dérivée du secret par une étiquette d
 
 ### Conservation
 
-Une purge planifiée (au démarrage puis toutes les `RECURRING_CHECK_INTERVAL_MIN` minutes, 60 par défaut, sous verrou MySQL) supprime par lots les vues plus anciennes que `SUNUPILOT_ANALYTICS_RETENTION_DAYS` (395 jours par défaut, borné entre 30 et 825). La valeur par défaut est une proposition technique : la durée définitive reste à valider.
+Aucune donnée analytique n'est supprimée automatiquement par défaut. La purge planifiée (au démarrage puis toutes les `RECURRING_CHECK_INTERVAL_MIN` minutes, 60 par défaut, sous verrou MySQL) reste inactive tant que `SUNUPILOT_ANALYTICS_PURGE_ENABLED` n'est pas réglé explicitement sur `true`. Après décision documentée sur la durée de conservation, la purge supprime par lots les seules vues analytiques plus anciennes que `SUNUPILOT_ANALYTICS_RETENTION_DAYS` (395 jours par défaut, borné entre 30 et 825). L'activation de cette suppression doit faire l'objet d'une autorisation spécifique et d'une validation juridique.
 
 ### Limites connues
 
