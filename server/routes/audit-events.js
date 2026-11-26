@@ -96,7 +96,10 @@ function csvCell(value) {
     ? ''
     : (typeof value === 'object' ? JSON.stringify(value) : String(value));
   // Évite qu'un libellé contrôlé par un utilisateur devienne une formule à l'ouverture dans Excel/Calc.
-  if (/^[=+\-@]/.test(text) || text.charCodeAt(0) === 9 || text.charCodeAt(0) === 13) text = "'" + text;
+  // Les tableurs peuvent ignorer des espaces ou caractères de contrôle avant une formule.
+  // Détecter le premier caractère significatif, pas uniquement le premier octet de la cellule.
+  const formulaProbe = text.replace(/^[\u0000-\u0020\uFEFF]+/, '');
+  if (/^[=+\-@]/.test(formulaProbe) || /^[\t\r\n]/.test(text)) text = "'" + text;
   return '"' + text.replace(/"/g, '""') + '"';
 }
 
