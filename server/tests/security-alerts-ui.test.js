@@ -5,6 +5,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const securityRoute = fs.readFileSync(
+  path.join(__dirname, '..', 'routes', 'security.js'),
+  'utf8'
+);
+
 const page = fs.readFileSync(
   path.join(__dirname, '..', '..', 'public', 'professionnel.html'),
   'utf8'
@@ -44,6 +49,10 @@ test('le centre de sécurité expose les alertes et dossiers selon les permissio
   assert.match(page, /security\/assignees/);
   assert.match(page, /security.alerts.manage/);
   assert.match(page, /setHidden\('pro-security-center'/);
+});
+
+test('le middleware sécurité est limité au préfixe /security et ne bloque pas les autres routes /api/pro', () => {
+  assert.match(securityRoute, /if \(!req\.path\.startsWith\('\/security\/'\)\) return next\(\)/);
 });
 
 test('les libellés des alertes et investigations sont échappés avant affichage', () => {
