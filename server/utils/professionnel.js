@@ -82,6 +82,18 @@ function companyGroupPaginationMeta(total, pagination) {
   };
 }
 
+/** Valide un identifiant numérique positif (chaîne de chiffres > 0). */
+function idOk(value) {
+  return /^\d+$/.test(String(value || '')) && Number(value) > 0;
+}
+
+/** Arrondit un montant au centime près, sans dérive flottante. */
+function money(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 999999999999) return null;
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
+
 /** Échappe une valeur pour une insertion sûre dans du HTML (texte brut). */
 function htmlEscape(value) {
   return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
@@ -97,5 +109,7 @@ module.exports = {
   parseJson,
   parseCompanyGroupPagination,
   companyGroupPaginationMeta,
-  htmlEscape
+  htmlEscape,
+  idOk,
+  money
 };
