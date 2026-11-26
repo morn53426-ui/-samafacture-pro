@@ -21,6 +21,7 @@ let ownerA;
 let ownerB;
 let memberA;
 let ownerAToken;
+let ownerAEmail;
 let ownerBToken;
 let memberAToken;
 let alertId;
@@ -49,6 +50,7 @@ before(async () => {
   const member = await createAccount('security-alert-member-a');
   ownerA = a.id;
   ownerAToken = a.token;
+  ownerAEmail = a.email;
   ownerB = b.id;
   ownerBToken = b.token;
   memberA = member.id;
@@ -96,7 +98,7 @@ test('migration v26 : tables d’alertes, investigations et activité append-onl
 test('cinq échecs de connexion en quinze minutes créent une alerte dédupliquée', async () => {
   for (let i = 0; i < 5; i++) {
     const failed = await request(app).post('/api/auth/login').send({
-      email: emailDeTest('security-alert-owner-a'),
+      email: ownerAEmail,
       password: 'mot-de-passe-incorrect'
     });
     assert.equal(failed.status, 401, failed.text);
@@ -113,7 +115,7 @@ test('cinq échecs de connexion en quinze minutes créent une alerte dédupliqu�
   assert.equal(Number(rows[0].occurrences), 1);
 
   const sixth = await request(app).post('/api/auth/login').send({
-    email: emailDeTest('security-alert-owner-a'),
+    email: ownerAEmail,
     password: 'mot-de-passe-incorrect'
   });
   assert.equal(sixth.status, 401, sixth.text);
