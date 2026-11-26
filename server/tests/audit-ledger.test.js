@@ -1,0 +1,187 @@
+'use strict';
+
+process.env.AUDIT_LOG_HMAC_KEY = process.env.AUDIT_LOG_HMAC_KEY || 'test-only-audit-ledger-key-at-least-32-bytes';
+process.env.AUDIT_LOG_HMAC_KEY_VERSION = process.env.AUDIT_LOG_HMAC_KEY_VERSION || '1';
+
+const { test, before, after } = require('node:test');
+const assert = require('node:assert/strict');
+const request = require('supertest');
+const {
+  app,
+  pool,
+  setupTestDatabase,
+  emailDeTest,
+  nettoyerUtilisateur,
+  teardownTestEnvironment
+} = require('./setup');
+const { appendAuditEvent, verifyAuditChain } = require('../utils/audit-ledger');
+
+let ownerA;
+let ownerB;
+let memberA;
+let ownerAToken;
+let ownerBToken;
+let memberAToken;
+let firstEventId;
+const createdUsers = [];
+
+async function register(prefix) {
+  const response = await request(app).post('/api/auth/register').send({
+    nom: 'Audit test',
+    email: emailDeTest(prefix),
+    password: 'motdepasse123',
+    entreprise_nom: 'Entreprise audit ' + prefix,
+    acceptTerms: true
+  });
+  assert.equal(response.status, 201, response.text);
+  createdUsers.push(response.body.user.id);
+  return { id: Number(response.body.user.id), token: response.body.token };
+}
+
+before(async () => {
+  await setupTestDatabase();
+  const a = await register('audit-ledger-owner-a');
+  const b = await register('audit-ledger-owner-b');
+  const member = await register('audit-ledger-member-a');
+  ownerA = a.id;
+  ownerAToken = a.token;
+  ownerB = b.id;
+  ownerBToken = b.token;
+  memberA = member.id;
+  memberAToken = member.token;
+
+  await pool.query(
+    'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json, active) VALUES (?, ?, ?, ?, 1)',
+    [ownerA, memberA, 'lecture_seule', JSON.stringify(['clients.read'])]
+  );
+});
+
+test('journal signé : redaction des secrets, concurrence et intégrité de la chaîne', async () => {
+  const pendingConnection = await pool.getConnection();
+  let rolledBackId;
+  try {
+    await pendingConnection.beginTransaction();
+    const pending = await appendAuditEvent({
+      tenantId: ownerA,
+      actorUserId: ownerA,
+      eventType: 'audit.test.rolled_back',
+      category: 'security',
+      metadata: { transaction: 'rollback' }
+    }, pendingConnection);
+    rolledBackId = pending.id;
+    await pendingConnection.rollback();
+  } finally {
+    pendingConnection.release();
+  }
+  const [rolledBackRows] = await pool.query('SELECT id FROM pro_audit_events WHERE id = ?', [rolledBackId]);
+  assert.equal(rolledBackRows.length, 0, 'un rollback métier doit aussi annuler son événement d’audit');
+
+  const first = await appendAuditEvent({
+    tenantId: ownerA,
+    actorUserId: ownerA,
+    eventType: 'audit.test.created',
+    category: 'security',
+    severity: 'info',
+    entityType: 'invoice',
+    entityId: 'INV-AUDIT-1',
+    metadata: {
+      invoice_id: 42,
+      password: 'ne-doit-pas-etre-stocke',
+      apiKey: 'ne-doit-pas-etre-stocke',
+      bearer_note: 'Bearer secret-value-ne-doit-pas-etre-stocke',
+      reference: 'opération de test'
+    }
+  });
+  firstEventId = first.id;
+
+  const concurrent = await Promise.all(Array.from({ length: 6 }, (_, index) =>
+    appendAuditEvent({
+      tenantId: ownerA,
+      actorUserId: ownerA,
+      eventType: 'audit.test.concurrent',
+      category: 'security',
+      metadata: { index }
+    })
+  ));
+  const sequences = [first.sequence, ...concurrent.map(item => item.sequence)].sort((a, b) => a - b);
+  assert.deepEqual(sequences, [1, 2, 3, 4, 5, 6, 7], 'les écritures concurrentes doivent recevoir une séquence continue');
+
+  const [storedRows] = await pool.query(
+    'SELECT metadata_json FROM pro_audit_events WHERE id = ? AND tenant_scope_id = ?',
+    [first.id, ownerA]
+  );
+  const metadata = typeof storedRows[0].metadata_json === 'string'
+    ? JSON.parse(storedRows[0].metadata_json)
+    : storedRows[0].metadata_json;
+  assert.equal(metadata.password, '[REDACTED]');
+  assert.equal(metadata.apiKey, '[REDACTED]');
+  assert.equal(metadata.bearer_note, 'Bearer [REDACTED]');
+  assert.equal(metadata.invoice_id, 42);
+
+  const integrity = await verifyAuditChain(ownerA);
+  assert.equal(integrity.valid, true, JSON.stringify(integrity));
+  assert.equal(integrity.checked, 7);
+});
+
+test('les événements sont immuables au niveau SQL', async () => {
+  assert.ok(firstEventId);
+  await assert.rejects(
+    () => pool.query('UPDATE pro_audit_events SET outcome = ? WHERE id = ?', ['failure', firstEventId]),
+    err => /append-only/i.test(String(err.sqlMessage || err.message))
+  );
+  await assert.rejects(
+    () => pool.query('DELETE FROM pro_audit_events WHERE id = ?', [firstEventId]),
+    err => /append-only/i.test(String(err.sqlMessage || err.message))
+  );
+  const integrity = await verifyAuditChain(ownerA);
+  assert.equal(integrity.valid, true, JSON.stringify(integrity));
+});
+
+test('API audit : pagination, filtres, vérification et isolation stricte des tenants', async () => {
+  const filtered = await request(app)
+    .get('/api/pro/audit-events?event_type=audit.test.created&limit=10')
+    .set('Authorization', 'Bearer ' + ownerAToken);
+  assert.equal(filtered.status, 200, filtered.text);
+  assert.equal(filtered.body.pagination.total, 1);
+  assert.equal(filtered.body.events[0].event_type, 'audit.test.created');
+  assert.equal(filtered.body.events[0].metadata.password, '[REDACTED]');
+
+  const invalid = await request(app)
+    .get('/api/pro/audit-events?page=0&limit=1000')
+    .set('Authorization', 'Bearer ' + ownerAToken);
+  assert.equal(invalid.status, 400);
+
+  const integrity = await request(app)
+    .get('/api/pro/audit-events/integrity')
+    .set('Authorization', 'Bearer ' + ownerAToken);
+  assert.equal(integrity.status, 200, integrity.text);
+  assert.equal(integrity.body.valid, true);
+  assert.ok(integrity.body.checked >= 9);
+
+  const memberForbidden = await request(app)
+    .get('/api/pro/audit-events')
+    .set('Authorization', 'Bearer ' + memberAToken)
+    .set('X-SF-Company-Owner', String(ownerA));
+  assert.equal(memberForbidden.status, 403, memberForbidden.text);
+
+  const tenantB = await appendAuditEvent({
+    tenantId: ownerB,
+    actorUserId: ownerB,
+    eventType: 'audit.test.tenant_b',
+    category: 'security'
+  });
+  assert.ok(tenantB.id);
+  const tenantBRead = await request(app)
+    .get('/api/pro/audit-events')
+    .set('Authorization', 'Bearer ' + ownerBToken);
+  assert.equal(tenantBRead.status, 200, tenantBRead.text);
+  assert.ok(tenantBRead.body.events.some(event => event.event_type === 'audit.test.tenant_b'));
+  assert.equal(tenantBRead.body.events.some(event => event.event_type === 'audit.test.created'), false);
+});
+
+after(async () => {
+  for (const userId of createdUsers) {
+    await nettoyerUtilisateur(userId);
+  }
+  await teardownTestEnvironment();
+});
