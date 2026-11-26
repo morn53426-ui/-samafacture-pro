@@ -2,7 +2,7 @@ const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const request = require('supertest');
-const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur } = require('./setup');
+const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
 describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
   let userId;
@@ -98,3 +98,6 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
     assert.equal(badFormat.status, 400);
   });
 });
+
+// Ferme MySQL et le serveur HTTP après le nettoyage des données de test.
+after(teardownTestEnvironment);
