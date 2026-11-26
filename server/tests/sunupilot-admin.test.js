@@ -158,6 +158,27 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
     }
   });
 
+  test('la purge peut réutiliser la connexion déjà verrouillée sans reprendre le pool', async () => {
+    const previous = process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS;
+    process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS = '30';
+    const calls = [];
+    const connection = {
+      async query(sql, values) {
+        calls.push({ sql, values });
+        return [{ affectedRows: 0 }];
+      }
+    };
+    try {
+      assert.equal(await purgeOldPageviews(connection), 0);
+      assert.equal(calls.length, 1);
+      assert.match(calls[0].sql, /DELETE FROM sunupilot_analytics_pageviews/);
+      assert.deepEqual(calls[0].values, [30]);
+    } finally {
+      if (previous === undefined) delete process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS;
+      else process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS = previous;
+    }
+  });
+
   test('la durée de conservation est bornée', () => {
     const previous = process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS;
     try {
