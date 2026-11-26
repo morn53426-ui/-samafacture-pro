@@ -6,6 +6,7 @@ process.env.AUDIT_LOG_HMAC_KEY_VERSION = process.env.AUDIT_LOG_HMAC_KEY_VERSION 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
+const bcrypt = require('bcryptjs');
 const {
   app,
   pool,
@@ -26,24 +27,32 @@ let memberAToken;
 let firstEventId;
 const createdUsers = [];
 
-async function register(prefix) {
-  const response = await request(app).post('/api/auth/register').send({
-    nom: 'Audit test',
-    email: emailDeTest(prefix),
-    password: 'motdepasse123',
-    entreprise_nom: 'Entreprise audit ' + prefix,
-    acceptTerms: true
+async function createAccount(prefix) {
+  // Fixtures neutres : les tests de migration vérifient l'absence d'essais
+  // rétroactifs dans toute la base. Ne pas créer ici d'essai public de 15 jours.
+  const email = emailDeTest(prefix);
+  const passwordHash = await bcrypt.hash('motdepasse123', 10);
+  const [insert] = await pool.query(
+    `INSERT INTO users (nom, email, password_hash, entreprise_nom, plan, trial_status)
+     VALUES (?, ?, ?, ?, 'gratuit', 'not_started')`,
+    ['Audit test', email, passwordHash, 'Entreprise audit ' + prefix]
+  );
+  const id = Number(insert.insertId);
+  createdUsers.push(id);
+
+  const login = await request(app).post('/api/auth/login').send({
+    email,
+    password: 'motdepasse123'
   });
-  assert.equal(response.status, 201, response.text);
-  createdUsers.push(response.body.user.id);
-  return { id: Number(response.body.user.id), token: response.body.token, email: response.body.user.email };
+  assert.equal(login.status, 200, login.text);
+  return { id, token: login.body.token, email };
 }
 
 before(async () => {
   await setupTestDatabase();
-  const a = await register('audit-ledger-owner-a');
-  const b = await register('audit-ledger-owner-b');
-  const member = await register('audit-ledger-member-a');
+  const a = await createAccount('audit-ledger-owner-a');
+  const b = await createAccount('audit-ledger-owner-b');
+  const member = await createAccount('audit-ledger-member-a');
   ownerA = a.id;
   ownerAToken = a.token;
   ownerB = b.id;
