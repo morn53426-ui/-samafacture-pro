@@ -80,7 +80,7 @@ async function evaluateSecuritySignal(connection, event, sourceEventId) {
     `UPDATE pro_security_alerts
         SET status = ?, source_event_id = ?, source_event_type = 'auth.login.failed',
             last_seen_at = COALESCE(?, UTC_TIMESTAMP(6)),
-            occurrence_count = GREATEST(occurrence_count, ?),
+            occurrence_count = occurrence_count + 1,
             resolved_at = IF(?, NULL, resolved_at),
             resolution_code = IF(?, NULL, resolution_code),
             updated_at = UTC_TIMESTAMP(6)
@@ -89,7 +89,6 @@ async function evaluateSecuritySignal(connection, event, sourceEventId) {
       shouldReopen ? 'open' : existing.status,
       sourceEventId,
       aggregate.last_seen,
-      attempts,
       shouldReopen ? 1 : 0,
       shouldReopen ? 1 : 0,
       existing.id,
