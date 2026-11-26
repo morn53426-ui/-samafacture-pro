@@ -218,6 +218,12 @@ test('investigation : création liée, notes filtrées, changement de statut et 
   assert.equal(created.body.investigation.status, 'open');
   assert.equal(Number(created.body.investigation.assigned_to_user_id), memberA);
 
+  const prematureAlertClose = await request(app)
+    .post('/api/pro/security/alerts/' + alertId + '/resolve')
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({ resolution_note: 'Clôture prématurée du dossier test.' });
+  assert.equal(prematureAlertClose.status, 409, prematureAlertClose.text);
+
   const reassigned = await request(app)
     .patch('/api/pro/security/investigations/' + investigationId)
     .set('Authorization', 'Bearer ' + ownerAToken)
