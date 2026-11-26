@@ -32,6 +32,14 @@ Déployer d'abord la nouvelle configuration à l'ensemble des workers, puis repr
 
 L'accès est protégé par l'authentification existante, la résolution du tenant et la permission `audit.read`. Chaque lecture et chaque vérification est elle-même enregistrée dans le registre. Les réponses ne sont pas mises en cache.
 
+## Consultation et exports
+
+- `GET /api/pro/audit-events` accepte les filtres `from`, `to`, `category`, `severity`, `event_type`, `actor_user_id`, `q`, ainsi que `page` et `limit`.
+- `GET /api/pro/audit-events/export.csv` réutilise les filtres, produit un CSV UTF-8 avec BOM et protège les cellules susceptibles d'être interprétées comme des formules par les tableurs. La limite est de 10 000 lignes ; l'en-tête `X-Export-Truncated` signale un export tronqué.
+- `GET /api/pro/audit-events/export.pdf` produit un rapport PDF A4 paysage, limité à 1 000 lignes. Chromium n'est pas autorisé à contacter des hôtes réseau externes pendant le rendu.
+- Chaque export réussi ajoute `audit.events.exported` au registre après la lecture des lignes. L'événement conserve le format, le nombre de lignes, l'indication de troncature et les filtres, sans enregistrer la valeur de la recherche.
+- La permission `audit.read` autorise la consultation ; la permission distincte `audit.export` est exigée pour exporter. Dans ce premier lot, seuls les rôles disposant de tous les droits (propriétaire/administrateur) détiennent `audit.export`. Les rôles Manager et Comptable peuvent consulter si leur rôle possède `audit.read`, mais pas exporter.
+
 ## Modèle d'intégrité
 
 Chaque tenant possède une séquence indépendante. Les écritures concurrentes se sérialisent via la ligne verrouillée de `pro_audit_chain_heads`. Chaque événement porte le hash HMAC de son contenu normalisé, de sa séquence, de l'horodatage, de la version de clé et du hash précédent. Des triggers MySQL refusent UPDATE et DELETE sur les événements.
