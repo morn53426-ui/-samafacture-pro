@@ -178,6 +178,7 @@ async function runMigrations(conn) {
   // v22 : les événements comptables de facture ne doivent pas être supprimés en cascade par une suppression de facture.
   // v23 : correspondances comptables propres à chaque entreprise, pour ventes et catégories de dépenses.
   // v24 : statistiques de fréquentation pseudonymisées pour le centre administrateur Sunupilot.
+  // v25 : registre d’audit signé, append-only, avec chaînes indépendantes par tenant.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
