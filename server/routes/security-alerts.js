@@ -346,12 +346,12 @@ router.put('/security-cases/:id/status', async (req, res, next) => {
         `UPDATE pro_security_alerts
             SET status = ?,
                 resolved_at = IF(? IN ('resolved', 'closed'), COALESCE(resolved_at, UTC_TIMESTAMP(6)), NULL),
-                resolution_code = NULL,
+                resolution_code = IF(? IN ('resolved', 'closed'), 'mitigated', NULL),
                 updated_at = UTC_TIMESTAMP(6)
           WHERE id = ? AND tenant_scope_id = ?`,
         [
           nextStatus === 'resolved' || nextStatus === 'closed' ? 'resolved' : 'investigating',
-          nextStatus, current.source_alert_id, scope
+          nextStatus, nextStatus, current.source_alert_id, scope
         ]
       );
       await appendAuditEvent(auditContext(
