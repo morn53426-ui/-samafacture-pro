@@ -179,7 +179,12 @@ function closeSidebar() {
 
 function ensureWorkspaceTopbar() {
   const main = document.querySelector('.main-content');
-  if (!main || document.getElementById('topbar-root')) return;
+  if (!main) return;
+  const hasPageHeading = Array.from(main.children).some(child =>
+    child.classList.contains('page-header') || child.classList.contains('workspace-page-header')
+  );
+  main.classList.toggle('workspace-page-has-heading', hasPageHeading);
+  if (document.getElementById('topbar-root')) return;
   const root = document.createElement('div');
   root.id = 'topbar-root';
   main.insertBefore(root, main.firstChild);
