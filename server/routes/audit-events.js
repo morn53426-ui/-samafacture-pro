@@ -71,7 +71,7 @@ function buildExportFilters(req) {
   if (eventType) { clauses.push('event_type = ?'); params.push(eventType); }
   if (actorId) { clauses.push('actor_user_id = ?'); params.push(actorId); }
   if (search) {
-    const escaped = '%' + search.replace(/[\\%_]/g, '\\function handleAuditError(err, res, next) {') + '%';
+    const escaped = '%' + search.replace(/[\\%_]/g, '\\$&') + '%';
     clauses.push('(event_type LIKE ? OR entity_type LIKE ? OR entity_id LIKE ? OR outcome LIKE ? OR ip_address LIKE ? OR CAST(metadata_json AS CHAR) LIKE ?)');
     params.push(escaped, escaped, escaped, escaped, escaped, escaped);
   }
