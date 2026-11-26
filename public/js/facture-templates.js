@@ -960,11 +960,24 @@ function createFactureTemplates(helpers) {
       user.entreprise_banque ? ['Banque', escapeHtml(user.entreprise_banque)] : null,
       user.entreprise_rib ? ['RIB / IBAN / compte', escapeHtml(user.entreprise_rib)] : null
     ].filter(Boolean);
+    // SVG intégrés pour garantir le rendu des pictogrammes dans Chromium, les PDF
+    // et l'impression, sans dépendre d'un chargement asynchrone d'icônes.
+    const legalContactIcon = (type) => {
+      const drawing = type === 'mail'
+        ? '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/>'
+        : '<path d="M7.2 3.5h2.5l1.2 4.2-1.8 1.3a14.3 14.3 0 0 0 5.9 5.9l1.3-1.8 4.2 1.2v2.5a1.7 1.7 0 0 1-1.8 1.7A16.9 16.9 0 0 1 5.5 5.3a1.7 1.7 0 0 1 1.7-1.8Z"/>';
+      return `<svg class="sf-doc-legal-icon" data-icon="${type}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${drawing}</svg>`;
+    };
+    const legalContactItem = (type, value, accessibleLabel) => {
+      const normalized = String(value ?? '').trim();
+      if (!normalized) return null;
+      return `<span class="sf-doc-legal-item sf-doc-legal-item-${type}" role="group" aria-label="${accessibleLabel}">${legalContactIcon(type)}<span class="sf-doc-legal-value">${escapeHtml(normalized)}</span></span>`;
+    };
     const legalDetails = [
       user.entreprise_ninea ? 'NINEA : ' + escapeHtml(user.entreprise_ninea) : null,
       user.entreprise_rccm ? 'RCCM : ' + escapeHtml(user.entreprise_rccm) : null,
-      user.entreprise_telephone ? 'Tél. : ' + escapeHtml(user.entreprise_telephone) : null,
-      user.entreprise_email ? 'Email : ' + escapeHtml(user.entreprise_email) : null,
+      legalContactItem('phone', user.entreprise_telephone, 'Téléphone de l’entreprise'),
+      legalContactItem('mail', user.entreprise_email, 'Adresse e-mail de l’entreprise'),
       user.entreprise_site_web ? escapeHtml(user.entreprise_site_web) : null
     ].filter(Boolean);
     const legalMentions = user.entreprise_mentions_legales
