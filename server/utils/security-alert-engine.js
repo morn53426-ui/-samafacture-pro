@@ -38,8 +38,8 @@ async function evaluateSecuritySignal(connection, event, sourceEventId) {
         AND entity_type = 'account'
         AND entity_id = ?
         AND outcome = 'failure'
-        AND created_at >= UTC_TIMESTAMP(6) - INTERVAL ? MINUTE`,
-    [event.tenantScopeId, event.tenantId, accountId, FAILED_LOGIN_RULE.windowMinutes]
+        AND created_at >= DATE_SUB(UTC_TIMESTAMP(6), INTERVAL ${FAILED_LOGIN_RULE.windowMinutes} MINUTE)`,
+    [event.tenantScopeId, event.tenantId, accountId]
   );
   const attempts = Number(aggregate?.attempts || 0);
   if (attempts < FAILED_LOGIN_RULE.threshold) return null;
