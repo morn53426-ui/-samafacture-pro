@@ -13,7 +13,18 @@ const ALERT_STATUSES = new Set(['open', 'acknowledged', 'investigating', 'resolv
 const INVESTIGATION_STATUSES = new Set(['open', 'in_progress', 'pending_review', 'resolved', 'closed']);
 const PRIORITIES = new Set(['low', 'medium', 'high', 'critical']);
 
-router.use(requireAuth, resolveTenant, requirePermission);
+router.use((req, res, next) => {
+  // Ce routeur est monté sur /api/pro : ne jamais appliquer ses gardes aux
+  // routes professionnelles voisines gérées par professionnelRoutes.
+  if (!req.path.startsWith('/security/')) return next();
+  requireAuth(req, res, err => {
+    if (err) return next(err);
+    resolveTenant(req, res, tenantErr => {
+      if (tenantErr) return next(tenantErr);
+      return requirePermission(req, res, next);
+    });
+  });
+});
 
 function noStore(res) {
   res.set('Cache-Control', 'no-store, max-age=0');
