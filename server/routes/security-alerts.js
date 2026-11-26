@@ -135,6 +135,9 @@ router.put('/security-alerts/:id/status', async (req, res, next) => {
     if (!id || !ALERT_STATUSES.has(nextStatus)) {
       return res.status(400).json({ error: 'Identifiant ou statut d’alerte invalide.' });
     }
+    if ((nextStatus === 'resolved' || nextStatus === 'dismissed') && !resolutionCode) {
+      return res.status(400).json({ error: 'Un code de résolution est obligatoire pour clôturer une alerte.' });
+    }
     if (resolutionCode !== null && !RESOLUTION_CODES.has(resolutionCode)) {
       return res.status(400).json({ error: 'Code de résolution invalide.' });
     }
@@ -159,7 +162,7 @@ router.put('/security-alerts/:id/status', async (req, res, next) => {
         `UPDATE pro_security_alerts
             SET status = ?,
                 resolved_at = IF(? IN ('resolved', 'dismissed'), UTC_TIMESTAMP(6), NULL),
-                resolution_code = IF(? IN ('resolved', 'dismissed'), COALESCE(?, 'accepted'), NULL),
+                resolution_code = IF(? IN ('resolved', 'dismissed'), ?, NULL),
                 updated_at = UTC_TIMESTAMP(6)
           WHERE id = ? AND tenant_scope_id = ?`,
         [nextStatus, nextStatus, nextStatus, resolutionCode, id, scope]
