@@ -664,6 +664,7 @@ async function loadSecurityCenter() {
   }
   section.hidden = false;
   const requests = await Promise.all([
+    securityRequest('GET', '/pro/security/assignees'),
     canReadAlerts
       ? securityRequest('GET', '/pro/security/alerts/summary')
       : Promise.resolve(null),
@@ -674,7 +675,8 @@ async function loadSecurityCenter() {
       ? securityRequest('GET', '/pro/security/investigations?limit=20')
       : Promise.resolve({ investigations: [] })
   ]);
-  const [summary, alertResult, investigationResult] = requests;
+  const [assigneeResult, summary, alertResult, investigationResult] = requests;
+  securityTeamMembersCache = (assigneeResult.assignees || []).map(person => ({ member_user_id: person.id, nom: person.nom }));
   const byStatus = summary?.by_status || {};
   const active = Number(byStatus.open || 0) + Number(byStatus.acknowledged || 0) + Number(byStatus.investigating || 0);
   el('security-open-count').textContent = String(active);
@@ -720,10 +722,15 @@ async function loadSecurityCenter() {
   const manageInvestigations = can('security.investigations.manage');
   setList('security-investigations-list', (investigationResult.investigations || []).map(item => {
     const noteControl = manageInvestigations
-      ? '<div class="pro-inline-fields"><input type="text" maxlength="4000" data-investigation-note="' + Number(item.id) + '" placeholder="Ajouter une note au dossier" /><button class="btn btn-sm btn-outline" data-security-action="note" data-investigation-id="' + Number(item.id) + '">Ajouter</button>' +
+      ? '<div class="pro-inline-fields"><select aria-label="Responsable du dossier" data-investigation-assignee="' + Number(item.id) + '">' +
+        '<option value="">Non attribué</option>' + securityTeamMembersCache.map(member => '<option value="' + Number(member.member_user_id) + '"' +
+          (Number(item.assigned_to_user_id) === Number(member.member_user_id) ? ' selected' : '') + '>' + escapeHtml(member.nom || ('Membre #' + member.member_user_id)) + '</option>').join('') +
+        '</select><button class="btn btn-sm btn-outline" data-security-action="assign-investigation" data-investigation-id="' + Number(item.id) + '">Affecter</button>' +
+        '<input type="text" maxlength="4000" data-investigation-note="' + Number(item.id) + '" placeholder="Ajouter une note au dossier" /><button class="btn btn-sm btn-outline" data-security-action="note" data-investigation-id="' + Number(item.id) + '">Ajouter</button>' +
+        '<button class="btn btn-sm btn-outline" data-security-action="history" data-investigation-id="' + Number(item.id) + '">Historique</button>' +
         (!['resolved', 'closed'].includes(item.status) ? '<button class="btn btn-sm btn-outline" data-security-action="close" data-investigation-id="' + Number(item.id) + '">Clôturer</button>' : '') +
-        '</div>'
-      : '';
+        '</div><div class="pro-muted" id="security-investigation-activity-' + Number(item.id) + '" hidden></div>'
+      : '<button class="btn btn-sm btn-outline" data-security-action="history" data-investigation-id="' + Number(item.id) + '">Historique</button><div id="security-investigation-activity-' + Number(item.id) + '" hidden></div>';
     return '<div class="pro-list-row"><div><strong>' + escapeHtml(item.reference) + ' · ' + escapeHtml(item.title) +
       '</strong><small>' + escapeHtml(securityLabel(item.priority)) + ' · ' + escapeHtml(securityLabel(item.status)) +
       (item.alert_id ? ' · Alerte #' + Number(item.alert_id) : ' · Dossier manuel') +
@@ -757,6 +764,21 @@ async function handleSecurityAction(event) {
         priority: alertResult.alert.severity || 'medium',
         assigned_to_user_id: Number(el('security-investigation-assignee').value) || null
       });
+    } else if (action === 'assign-investigation') {
+      const field = document.querySelector('[data-investigation-assignee="' + investigationId + '"]');
+      await securityRequest('PATCH', '/pro/security/investigations/' + investigationId, {
+        assigned_to_user_id: field && field.value ? Number(field.value) : null
+      });
+    } else if (action === 'history') {
+      const detail = await securityRequest('GET', '/pro/security/investigations/' + investigationId);
+      const target = el('security-investigation-activity-' + investigationId);
+      target.hidden = false;
+      target.innerHTML = (detail.activity || []).map(item =>
+        '<div><strong>' + escapeHtml(item.activity_type) + '</strong> · ' +
+        escapeHtml(item.created_at) + (item.details?.note ? '<p>' + escapeHtml(item.details.note) + '</p>' : '') +
+        '</div>'
+      ).join('') || '<p>Aucune activité enregistrée.</p>';
+      return;
     } else if (action === 'note') {
       const field = document.querySelector('[data-investigation-note="' + investigationId + '"]');
       await securityRequest('POST', '/pro/security/investigations/' + investigationId + '/notes', { note: field.value });
