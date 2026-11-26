@@ -139,6 +139,8 @@ router.post('/', async (req, res, next) => {
       `INSERT INTO clients (user_id, nom, email, telephone, whatsapp, adresse, notes, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.tenantId, nom, email || null, telephone || null, whatsapp || null, adresse || null, notes || null, photo || null]
     );
+    const changedFields = ['nom', 'email', 'telephone', 'whatsapp', 'adresse', 'notes', 'photo']
+      .filter(field => Object.prototype.hasOwnProperty.call(req.body, field));
     await appendAuditEvent({
       tenantId: Number(req.tenantId),
       actorUserId: Number(req.actorId || req.user.id),
@@ -150,7 +152,7 @@ router.post('/', async (req, res, next) => {
       ipAddress: req.ip || null,
       userAgent: req.get('user-agent') || null,
       requestId: req.requestId || null,
-      metadata: { changed_fields: ['nom', 'email', 'telephone', 'whatsapp', 'adresse', 'notes', 'photo'] }
+      metadata: { changed_fields: changedFields }
     }, conn);
     const [rows] = await conn.query('SELECT * FROM clients WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
     await conn.commit();
