@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <script src="js/theme.js"></script><script src="js/icons.js"></script>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Administration plateforme — Sunupilot</title>
+  <link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/admin.css">
+  <meta name="theme-color" content="#29265E"><script src="js/chart-loader.js"></script>
+</head>
+<body class="sunupilot-admin-page">
+<div class="admin-shell">
+  <header class="admin-header">
+    <a class="admin-brand" href="dashboard.html"><img src="images/sunupilot-mark.svg" alt=""><span><strong>Sunupilot</strong><small>Administration plateforme</small></span></a>
+    <div class="admin-header-actions"><span class="admin-security-note"><i></i> Espace protégé</span><a class="admin-exit-link" href="dashboard.html">Retour à l’application</a></div>
+  </header>
+  <main class="admin-main">
+    <section class="admin-intro">
+      <div><p class="admin-eyebrow">Centre de pilotage</p><h1>Vue d’ensemble</h1><p class="admin-muted">Fréquentation, comptes, abonnements et paiements confirmés.</p></div>
+      <form class="admin-period-form" id="period-form">
+        <label>Du<input type="date" id="period-from" required></label>
+        <label>Au<input type="date" id="period-to" required></label>
+        <button class="admin-button" type="submit">Appliquer</button>
+      </form>
+    </section>
+    <div class="admin-notice" id="admin-notice" role="status" hidden></div>
+    <section class="admin-state" id="admin-state" role="status"><span class="admin-loader"></span>Chargement des indicateurs sécurisés…</section>
+    <div id="admin-dashboard" hidden>
+      <p class="admin-period-caption" id="period-caption"></p>
+      <section class="admin-kpi-grid" aria-label="Indicateurs principaux">
+        <article class="admin-kpi"><span>Pages consultées</span><strong id="kpi-pageviews">—</strong><small>Vues sur la période</small></article>
+        <article class="admin-kpi"><span>Sessions estimées</span><strong id="kpi-sessions">—</strong><small>Par onglet, pas par personne</small></article>
+        <article class="admin-kpi"><span>Comptes inscrits</span><strong id="kpi-accounts">—</strong><small id="kpi-new-accounts">Nouvelles inscriptions : —</small></article>
+        <article class="admin-kpi"><span>Essais gratuits actifs</span><strong id="kpi-trials">—</strong><small>Essais non expirés</small></article>
+        <article class="admin-kpi"><span>Comptes avec formule payante</span><strong id="kpi-paid-plans">—</strong><small>Plan enregistré, paiement non présumé</small></article>
+        <article class="admin-kpi"><span>Abonnements SaaS actifs</span><strong id="kpi-active-subscriptions">—</strong><small>Registre des abonnements actifs</small></article>
+      </section>
+      <section class="admin-panel-grid">
+        <article class="admin-panel"><div class="admin-panel-heading"><div><p class="admin-eyebrow">Audience</p><h2>Fréquentation</h2></div><span class="admin-panel-tag">Données réelles</span></div><div class="admin-chart-wrap"><canvas id="traffic-chart" role="img" aria-label="Pages consultées et sessions estimées"></canvas></div><p class="admin-footnote">Une actualisation compte comme une nouvelle vue. Une session est liée à un onglet.</p></article>
+        <article class="admin-panel"><div class="admin-panel-heading"><div><p class="admin-eyebrow">Acquisition</p><h2>Nouvelles inscriptions</h2></div></div><div class="admin-chart-wrap"><canvas id="signup-chart" role="img" aria-label="Évolution des nouvelles inscriptions"></canvas></div></article>
+      </section>
+      <section class="admin-panel admin-revenue-panel">
+        <div class="admin-panel-heading"><div><p class="admin-eyebrow">Finances</p><h2>Revenus d’abonnement</h2><p class="admin-muted">Seuls les paiements d’abonnement confirmés sont inclus. Les paiements des factures clients sont exclus.</p></div></div>
+        <div class="admin-revenue-cards" id="revenue-cards"></div>
+        <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Période</th><th>Devise</th><th>Paiements confirmés</th><th>Montant encaissé</th></tr></thead><tbody id="revenue-table"></tbody></table></div>
+        <p class="admin-caution" id="recurring-note"></p>
+      </section>
+      <section class="admin-panel-grid admin-bottom-grid">
+        <article class="admin-panel"><div class="admin-panel-heading"><div><p class="admin-eyebrow">Formules</p><h2>Comptes par formule</h2></div></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Formule</th><th>Comptes</th><th>Abonnements actifs</th></tr></thead><tbody id="plans-table"></tbody></table></div><p class="admin-footnote">Un compte en essai peut aussi avoir une formule sélectionnée ; ce tableau ne prouve pas un encaissement.</p></article>
+        <article class="admin-panel"><div class="admin-panel-heading"><div><p class="admin-eyebrow">Contenu</p><h2>Pages les plus consultées</h2></div></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Page</th><th>Vues</th><th>Sessions estimées</th></tr></thead><tbody id="pages-table"></tbody></table></div></article>
+      </section>
+      <p class="admin-data-note">Montants séparés par devise, sans conversion ni addition entre devises différentes.</p>
+    </div>
+  </main>
+</div>
+<script src="js/api.js"></script><script src="js/admin.js"></script>
+</body></html>
