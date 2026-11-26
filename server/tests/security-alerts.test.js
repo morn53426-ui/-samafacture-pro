@@ -5,6 +5,8 @@ process.env.AUDIT_LOG_HMAC_KEY_VERSION = process.env.AUDIT_LOG_HMAC_KEY_VERSION 
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const request = require('supertest');
 const bcrypt = require('bcryptjs');
 const {
@@ -60,6 +62,16 @@ before(async () => {
     'INSERT INTO pro_team_members (owner_user_id, member_user_id, role, permissions_json, active) VALUES (?, ?, ?, ?, 1)',
     [ownerA, memberA, 'personnalise', JSON.stringify(['team.read', 'security.alerts.read', 'security.investigations.read'])]
   );
+});
+
+test('rollback v26 : conservation des données et réactivation possible de la migration', () => {
+  const rollback = fs.readFileSync(
+    path.join(__dirname, '..', 'database', 'rollbacks', '015_security_alerts_investigations.down.sql'),
+    'utf8'
+  );
+  assert.match(rollback, /DROP TRIGGER IF EXISTS trg_pro_security_case_activity_block_update/);
+  assert.match(rollback, /UPDATE _samafacture_schema_meta SET version = 25/);
+  assert.doesNotMatch(rollback, /DROP TABLE/i, 'le rollback ne doit jamais supprimer alertes, dossiers ou activités');
 });
 
 test('migration v26 : tables d’alertes, investigations et activité append-only', async () => {
