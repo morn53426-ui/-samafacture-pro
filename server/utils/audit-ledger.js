@@ -84,14 +84,24 @@ function getKeyForVersion(version) {
   }
 
   let material = keyring[String(version)];
-  if (!material && version === getCurrentKeyVersion()) material = process.env.AUDIT_LOG_HMAC_KEY;
+  if (!material && version === getCurrentKeyVersion()) {
+    material = process.env.AUDIT_LOG_HMAC_KEY || process.env.DATA_ENCRYPTION_KEY;
+  }
   if (!material && process.env.NODE_ENV !== 'production' && version === 1) material = process.env.JWT_SECRET;
   if (typeof material !== 'string' || Buffer.byteLength(material, 'utf8') < 32) {
     throw new AuditConfigurationError(
-      'Clé HMAC d’audit indisponible ou trop courte. Configurez AUDIT_LOG_HMAC_KEY (32 octets minimum) et conservez les anciennes clés dans AUDIT_LOG_HMAC_KEYRING.'
+      'Clé HMAC d’audit indisponible ou trop courte. Configurez AUDIT_LOG_HMAC_KEY (32 octets minimum) ou DATA_ENCRYPTION_KEY, et conservez les anciennes clés dans AUDIT_LOG_HMAC_KEYRING.'
     );
   }
-  return Buffer.from(material, 'utf8');
+  // Domain separation : la clé de signature est dérivée sans réutiliser directement
+  // la clé source employée par le chiffrement des secrets.
+  return Buffer.from(crypto.hkdfSync(
+    'sha256',
+    Buffer.from(material, 'utf8'),
+    Buffer.from('SamaFacturePro/audit-ledger', 'utf8'),
+    Buffer.from('hmac-sha256/version:' + version, 'utf8'),
+    32
+  ));
 }
 
 function normalizeEvent(input) {
