@@ -144,6 +144,11 @@ test('API alertes : isolation tenant, lecture membre et triage autorisé', async
     .set('Authorization', 'Bearer ' + ownerBToken);
   assert.equal(crossTenantDetail.status, 404);
 
+  const invalidAlertId = await request(app)
+    .get('/api/pro/security/alerts/not-a-number')
+    .set('Authorization', 'Bearer ' + ownerAToken);
+  assert.equal(invalidAlertId.status, 400);
+
   const memberHeaders = {
     Authorization: 'Bearer ' + memberAToken,
     'X-SF-Company-Owner': String(ownerA)
@@ -208,10 +213,18 @@ test('investigation : création liée, notes filtrées, changement de statut et 
   const note = await request(app)
     .post('/api/pro/security/investigations/' + investigationId + '/notes')
     .set('Authorization', 'Bearer ' + ownerAToken)
-    .send({ note: 'Analyse réalisée avec contact test@example.test et IBAN SN12345678901234567890.' });
+    .send({ note: 'Analyse réalisée avec contact test@example.test, IBAN SN12345678901234567890, jeton Bearer abc.def_ghi et carte 4111111111111111.' });
   assert.equal(note.status, 201, note.text);
   assert.match(note.body.activity.details.note, /\[EMAIL MASQUÉ\]/);
   assert.match(note.body.activity.details.note, /\[IBAN MASQUÉ\]/);
+  assert.match(note.body.activity.details.note, /\[JETON MASQUÉ\]/);
+  assert.match(note.body.activity.details.note, /\[NUMÉRO DE CARTE MASQUÉ\]/);
+
+  const invalidAssignee = await request(app)
+    .patch('/api/pro/security/investigations/' + investigationId)
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({ assigned_to_user_id: 0 });
+  assert.equal(invalidAssignee.status, 400, invalidAssignee.text);
 
   const updated = await request(app)
     .patch('/api/pro/security/investigations/' + investigationId)
