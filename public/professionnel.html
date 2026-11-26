@@ -397,7 +397,116 @@ function optionList(rows, label, value) {
   return '<option value="">Choisir</option>' + rows.map(r => '<option value="' + escapeHtml(r[value]) + '">' + escapeHtml(r[label]) + '</option>').join('');
 }
 function statusPill(text) { return '<span class="pro-status">' + escapeHtml(text || '—') + '</span>'; }
+let auditPage = 1;
+let auditTotalPages = 1;
+let auditRequestSequence = 0;
 let activePermissions = ['*'];
+
+async function loadAuditEvents(page = 1) {
+  if (!can('audit.read')) return;
+  const requestSequence = ++auditRequestSequence;
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: '25'
+  });
+  const filters = {
+    q: el('audit-search').value.trim(),
+    category: el('audit-category').value,
+    severity: el('audit-severity').value,
+    from: el('audit-from').value,
+    to: el('audit-to').value,
+    event_type: el('audit-event-type').value.trim()
+  };
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+
+  setList('audit-list', '<p class="pro-muted">Chargement du registre sécurisé…</p>');
+  try {
+    const response = await Api.get('/pro/audit-events?' + params.toString());
+    if (requestSequence !== auditRequestSequence) return;
+
+    const events = Array.isArray(response.events) ? response.events : [];
+    const pagination = response.pagination || {};
+    auditPage = Number(pagination.page || page);
+    auditTotalPages = Math.max(1, Number(pagination.total_pages || 1));
+
+    setList('audit-list', events.map(event => {
+      const identity = event.actor_user_id
+        ? 'Utilisateur #' + event.actor_user_id
+        : (event.actor_kind === 'system' ? 'Système' : 'Anonyme');
+      const entity = [event.entity_type, event.entity_id ? '#' + event.entity_id : ''].filter(Boolean).join(' ');
+      const metadata = event.metadata && typeof event.metadata === 'object'
+        ? JSON.stringify(event.metadata).slice(0, 320)
+        : '';
+      const fingerprint = String(event.event_hash || '').slice(0, 16);
+      return '<div class="pro-list-row"><div><strong>' +
+        escapeHtml(event.event_type) + ' · ' + escapeHtml(entity || '—') +
+        '</strong><small>' + formatDate(event.created_at) + ' · ' +
+        escapeHtml(identity) + ' · ' + escapeHtml(event.category) + ' · ' +
+        escapeHtml(event.outcome) + '</small><small>Risque : ' +
+        escapeHtml(event.severity) + (event.ip_address ? ' · IP ' + escapeHtml(event.ip_address) : '') +
+        (metadata ? ' · ' + escapeHtml(metadata) : '') +
+        (fingerprint ? ' · Empreinte ' + escapeHtml(fingerprint) + '…' : '') +
+        '</small></div>' + statusPill(event.severity) + '</div>';
+    }).join(''));
+
+    el('audit-pagination-info').textContent = events.length
+      ? 'Page ' + auditPage + ' / ' + auditTotalPages + ' · ' +
+        Number(pagination.total || 0).toLocaleString('fr-FR') + ' événement(s)'
+      : 'Aucun événement correspondant aux filtres.';
+    el('audit-prev').disabled = auditPage <= 1;
+    el('audit-next').disabled = auditPage >= auditTotalPages;
+  } catch (err) {
+    if (requestSequence !== auditRequestSequence) return;
+    setList('audit-list', '<p class="pro-muted">' + escapeHtml(err.message || 'Lecture du registre impossible.') + '</p>');
+    el('audit-pagination-info').textContent = 'Registre indisponible.';
+    el('audit-prev').disabled = true;
+    el('audit-next').disabled = true;
+  }
+}
+
+async function verifyAuditIntegrity() {
+  if (!can('audit.read')) return;
+  const button = el('audit-integrity-check');
+  const status = el('audit-integrity-status');
+  button.disabled = true;
+  status.textContent = 'Vérification de la chaîne en cours…';
+  try {
+    const result = await Api.get('/pro/audit-events/integrity');
+    if (result.valid) {
+      status.textContent = 'Chaîne valide · ' +
+        Number(result.checked || 0).toLocaleString('fr-FR') +
+        ' événement(s) vérifié(s) · contrôle effectué le ' + formatDate(result.checked_at);
+      status.dataset.integrity = 'valid';
+    } else {
+      status.textContent = 'Anomalie d’intégrité détectée : ' + String(result.reason || 'cause inconnue') +
+        ' · séquence ' + String(result.failedSequence || 'non précisée');
+      status.dataset.integrity = 'invalid';
+    }
+  } catch (err) {
+    status.textContent = 'Vérification impossible : ' + String(err.message || 'erreur inconnue');
+    status.dataset.integrity = 'error';
+  } finally {
+    button.disabled = false;
+  }
+}
+
+el('audit-filters').addEventListener('submit', event => {
+  event.preventDefault();
+  loadAuditEvents(1);
+});
+el('audit-reset').addEventListener('click', () => {
+  el('audit-filters').reset();
+  loadAuditEvents(1);
+});
+el('audit-prev').addEventListener('click', () => {
+  if (auditPage > 1) loadAuditEvents(auditPage - 1);
+});
+el('audit-next').addEventListener('click', () => {
+  if (auditPage < auditTotalPages) loadAuditEvents(auditPage + 1);
+});
+el('audit-integrity-check').addEventListener('click', verifyAuditIntegrity);
 function can(permission) {
   const implied = {
     'clients.read':'clients.write', 'products.read':'products.write',
@@ -443,8 +552,7 @@ function applyModulePermissions() {
   setHidden('pro-integrations', !can('integrations.read') && !can('integrations.manage'));
   setHidden('api-key-form', !can('integrations.manage'));
   setHidden('webhook-form', !can('integrations.manage'));
-  const auditHeading = el('audit-list')?.parentElement;
-  if (auditHeading) auditHeading.hidden = !can('audit.read');
+  setHidden('audit-section', !can('audit.read'));
   if (!can('sales.write')) document.querySelectorAll('#orders-list button').forEach(button => { button.hidden = true; });
   if (!can('invoices.write')) document.querySelectorAll('#credits-list button').forEach(button => { button.hidden = true; });
   if (!can('payments.write')) document.querySelectorAll('#payments-list button, #refunds-list button, #deposits-list button').forEach(button => { button.hidden = true; });
@@ -459,10 +567,10 @@ async function loadWorkspace() {
       optionalApiGet('/pro/team'), optionalApiGet('/pro/establishments'), optionalApiGet('/pro/cash/registers'),
       optionalApiGet('/pro/payments'), optionalApiGet('/pro/payment-links'), optionalApiGet('/pro/documents'),
       optionalApiGet('/pro/automations'), optionalApiGet('/pro/integrations/api-keys'), optionalApiGet('/pro/integrations/webhooks'),
-      optionalApiGet('/pro/audit'), Api.get('/pro/team/companies'), optionalApiGet('/clients?page=1&limite=100'),
+      Api.get('/pro/team/companies'), optionalApiGet('/clients?page=1&limite=100'),
       optionalApiGet('/factures?type=facture&page=1&limite=100'), optionalApiGet('/pro/cash/operations')
     ]);
-    const [orders, delivery, credits, deposits, team, branches, registers, payments, links, docs, automations, keys, webhooks, audit, companies, clients, invoices, cashOps] = results;
+    const [orders, delivery, credits, deposits, team, branches, registers, payments, links, docs, automations, keys, webhooks, companies, clients, invoices, cashOps] = results;
     activePermissions = Array.isArray(companies.permissions) ? companies.permissions : ['*'];
     applyModulePermissions();
     customRolesCache = team.roles || [];
@@ -512,7 +620,7 @@ async function loadWorkspace() {
     setList('automations-list', (automations.automatisations || []).map(a => '<div class="pro-list-row"><div><strong>' + escapeHtml(a.nom) + '</strong><small>' + escapeHtml(a.type) + ' · prochaine exécution ' + formatDate(a.prochaine_execution) + '</small></div><label class="pro-switch"><input type="checkbox" ' + (a.actif ? 'checked' : '') + ' onchange="toggleAutomation(' + a.id + ',this.checked)" /> Actif</label></div>').join(''));
     setList('api-keys-list', (keys.cles || []).map(k => '<div class="pro-list-row"><div><strong>' + escapeHtml(k.nom) + '</strong><small>' + escapeHtml((k.scopes || []).join(', ')) + ' · ' + formatDate(k.created_at) + '</small></div>' + statusPill(k.revoked_at ? 'Révoquée' : 'Active') + (!k.revoked_at ? '<button class="btn btn-sm btn-outline" onclick="revokeKey(' + k.id + ')">Révoquer</button>' : '') + '</div>').join(''));
     setList('webhooks-list', (webhooks.webhooks || []).map(w => '<div class="pro-list-row"><div><strong>' + escapeHtml(w.url) + '</strong><small>' + escapeHtml((w.evenements || []).join(', ')) + '</small></div><button class="btn btn-sm btn-outline" onclick="testWebhook(' + w.id + ')">Tester</button><button class="btn btn-sm btn-outline" onclick="deleteWebhook(' + w.id + ')">Supprimer</button></div>').join(''));
-    setList('audit-list', (audit.journal || []).slice(0, 25).map(a => '<div class="pro-list-row"><div><strong>' + escapeHtml(a.action) + ' · ' + escapeHtml(a.entite) + '</strong><small>' + formatDate(a.created_at) + ' · ' + escapeHtml(a.adresse_ip || '') + '</small></div></div>').join(''));
+    if (can('audit.read')) await loadAuditEvents(1);
 
     const select = el('company-select');
     const previous = localStorage.getItem('sf_company_owner') || '';
