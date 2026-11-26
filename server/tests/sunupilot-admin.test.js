@@ -132,7 +132,8 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
     const hash = hashVisitor(sessionId);
     assert.equal(hash, hashVisitor(sessionId));
     assert.notEqual(hash, sessionId);
-    assert.notEqual(hash, hashVisitor(sessionId.replace(/0$/, '1')));
+    const changedSessionId = sessionId.slice(0, -1) + (sessionId.endsWith('1') ? '2' : '1');
+    assert.notEqual(hash, hashVisitor(changedSessionId));
   });
 
   test('la purge supprime les vues expirées et conserve les vues récentes', async () => {
