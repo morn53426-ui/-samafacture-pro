@@ -42,7 +42,7 @@ Toutes les routes sont sous `/api/pro`, requièrent une session authentifiée et
 | `PATCH /security/investigations/:id` | `security.investigations.manage` | Changer statut, priorité, affectation ou décision |
 | `POST /security/investigations/:id/notes` | `security.investigations.manage` | Ajouter une note au fil append-only |
 
-Les assignations sont validées contre les membres actifs du tenant. Un dossier actif unique est autorisé par alerte. La clôture d'une investigation liée fait passer l'alerte associée à l'état résolu. Les résolutions et faux positifs exigent une justification.
+Les assignations sont validées contre les membres actifs du tenant. Un dossier actif unique est autorisé par alerte. Tant qu'une investigation liée reste active, l'alerte ne peut pas être résolue directement ou marquée faux positif : la décision doit passer par la clôture motivée du dossier. La clôture d'une investigation liée fait passer l'alerte associée à l'état résolu. Les résolutions et faux positifs autonomes exigent une justification.
 
 ## Rôles
 
