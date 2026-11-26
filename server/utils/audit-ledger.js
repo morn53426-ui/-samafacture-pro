@@ -28,7 +28,9 @@ function sortedValue(value, depth = 0) {
   }
   if (Array.isArray(value)) return value.slice(0, 50).map(item => sortedValue(item, depth + 1));
   if (typeof value === 'object') {
-    const result = {};
+    // Un dictionnaire sans prototype évite qu'une clé JSON "__proto__" ne modifie
+    // le prototype pendant la normalisation des métadonnées fournies par les routes.
+    const result = Object.create(null);
     for (const key of Object.keys(value).sort().slice(0, 80)) {
       result[key.slice(0, 100)] = SENSITIVE_KEY.test(key)
         ? '[REDACTED]'
