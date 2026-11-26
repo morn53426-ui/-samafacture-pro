@@ -4832,17 +4832,17 @@ input:focus, select:focus, textarea:focus {
 /* Sur petit écran, le titre métier précède la barre de recherche globale.
    Le bandeau fixe de navigation reste au-dessus du contenu sans masquer les titres. */
 @media (max-width: 900px) {
-  body .main-content.workspace-page:has(> .page-header) {
+  body .main-content.workspace-page.workspace-page-has-heading {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
   }
-  body .main-content.workspace-page:has(> .page-header) > .page-header {
+  body .main-content.workspace-page.workspace-page-has-heading > .page-header {
     grid-column: 1;
     grid-row: 1;
   }
-  body .main-content.workspace-page:has(> .page-header) > #topbar-root,
-  body .main-content.workspace-page:has(> .page-header) > .app-topbar {
+  body .main-content.workspace-page.workspace-page-has-heading > #topbar-root,
+  body .main-content.workspace-page.workspace-page-has-heading > .app-topbar {
     grid-column: 1;
     grid-row: 2;
   }
