@@ -45,7 +45,8 @@ const PAGES = [
   { name: 'abonnement', file: 'abonnement.html', ready: '#plan-cards .subscription-plan-card' },
   { name: 'groupe-entreprise', file: 'groupe-entreprise.html', ready: '#invite-company-form', plan: 'entreprise' },
   { name: 'invitation', file: 'invitation.html?type=company-group&token=' + 'a'.repeat(64), ready: '#accept-invite', public: true },
-  { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true }
+  { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true },
+  { name: 'admin', file: 'admin.html', ready: '#admin-dashboard:not([hidden])', noWorkspaceShell: true }
 ];
 
 const DOCUMENT_TEMPLATES = [
@@ -452,6 +453,80 @@ function fixtureFor(pathname, fixtures) {
       { id: 2, nom: 'Alertes de stock faible', type: 'alerte_stock_email', actif: false, configuration: { frequence_jours: 1 }, derniere_execution: '2026-11-11 08:00:00', prochaine_execution: null, dernier_resultat: 'smtp_non_configure' }
     ]
   };
+  if (pathname === '/api/admin/overview') {
+    const empty = DATASET === 'empty';
+    const large = DATASET === 'worst';
+    const value = empty ? 0 : (large ? 999999999999.99 : 1250000);
+    const count = empty ? 0 : (large ? 999999999 : 42);
+    return {
+      period: { from: '2026-10-28', to: '2026-11-26', days: 30, bucket: '%Y-%m-%d' },
+      summary: {
+        page_views: count,
+        estimated_sessions: empty ? 0 : (large ? 888888888 : 31),
+        registered_accounts: empty ? 0 : (large ? 999999999 : 248),
+        new_accounts: empty ? 0 : (large ? 999999 : 18),
+        active_trials: empty ? 0 : (large ? 999999 : 12),
+        accounts_with_paid_plan: empty ? 0 : (large ? 999999 : 73),
+        active_saas_subscriptions: empty ? 0 : (large ? 999999 : 39),
+        accounts_with_confirmed_subscription_payment: empty ? 0 : (large ? 999999 : 28)
+      },
+      plans: {
+        accounts_by_plan: empty ? [] : [
+          { plan: 'gratuit', accounts: large ? 999999999 : 175 },
+          { plan: 'starter', accounts: large ? 888888888 : 32 },
+          { plan: 'pro', accounts: large ? 777777777 : 27 },
+          { plan: 'entreprise', accounts: large ? 666666666 : 14 }
+        ],
+        active_saas_subscriptions_by_plan: empty ? [] : [
+          { plan: 'pro', subscriptions: large ? 99999999 : 22 },
+          { plan: 'entreprise', subscriptions: large ? 88888888 : 17 }
+        ]
+      },
+      revenue: {
+        period_by_currency: empty ? [] : [
+          { currency: 'XOF', confirmed_payments: large ? 999999 : 17, amount: value },
+          { currency: 'EUR', confirmed_payments: large ? 888888 : 3, amount: large ? 888888888888.88 : 950 }
+        ],
+        all_time_by_currency: empty ? [] : [
+          { currency: 'XOF', confirmed_payments: large ? 9999999 : 83, amount: large ? 999999999999.99 : 12850000 },
+          { currency: 'EUR', confirmed_payments: large ? 8888888 : 9, amount: large ? 888888888888.88 : 4200 }
+        ],
+        trend: empty ? [] : [
+          { bucket: '2026-11-01', currency: 'XOF', confirmed_payments: large ? 999999 : 5, amount: large ? 999999999999.99 : 450000 },
+          { bucket: '2026-11-12', currency: 'XOF', confirmed_payments: large ? 888888 : 7, amount: large ? 888888888888.88 : 620000 },
+          { bucket: '2026-11-20', currency: 'EUR', confirmed_payments: large ? 777777 : 2, amount: large ? 777777777777.77 : 950 }
+        ],
+        by_plan_by_currency: empty ? [] : [
+          { plan: 'pro', currency: 'XOF', confirmed_payments: large ? 999999 : 11, amount: large ? 999999999999.99 : 890000 },
+          { plan: 'entreprise', currency: 'EUR', confirmed_payments: large ? 888888 : 3, amount: large ? 888888888888.88 : 950 }
+        ],
+        recurring_metrics_available: false,
+        recurring_metrics_note: 'MRR et ARR non calculés : aucun cycle SaaS approuvé.'
+      },
+      traffic: {
+        trend: empty ? [] : [
+          { bucket: '2026-11-01', page_views: large ? 999999999 : 120, estimated_sessions: large ? 888888888 : 80 },
+          { bucket: '2026-11-15', page_views: large ? 777777777 : 245, estimated_sessions: large ? 666666666 : 162 }
+        ],
+        top_pages: empty ? [] : [
+          { page_path: '/dashboard.html', page_views: large ? 999999999 : 185, estimated_sessions: large ? 888888888 : 112 },
+          { page_path: '/facture-detail.html', page_views: large ? 888888888 : 94, estimated_sessions: large ? 777777777 : 61 },
+          { page_path: '/abonnement.html', page_views: large ? 777777777 : 36, estimated_sessions: large ? 666666666 : 24 }
+        ]
+      },
+      signups: {
+        trend: empty ? [] : [
+          { bucket: '2026-11-01', new_accounts: large ? 999999999 : 8 },
+          { bucket: '2026-11-15', new_accounts: large ? 888888888 : 13 }
+        ]
+      },
+      definitions: {
+        estimated_sessions: 'Sessions estimées par onglet.',
+        accounts_with_paid_plan: 'Formule sélectionnée, ne prouvant pas un paiement.',
+        subscription_revenue: 'Paiements d’abonnement confirmés uniquement.'
+      }
+    };
+  }
   if (pathname === '/api/portal/') return {
     client: { nom: fixtures.clients[0]?.nom || 'Client de recette', email: fixtures.clients[0]?.email || 'client@example.test' },
     entreprise: { nom: 'SamaFacture — Société de test', logo: null, email: 'support@example.test', telephone: '+221 77 000 00 00', site_web: 'https://example.test', devise: 'FCFA', langue: 'fr', locale: 'fr-SN' },
@@ -563,7 +638,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   const pageErrors = [];
   const onPageError = (error) => pageErrors.push(error.message);
   page.on('pageerror', onPageError);
-  const workspacePage = !pageDefinition.public && !pageDefinition.standaloneDocument;
+  const workspacePage = !pageDefinition.public && !pageDefinition.standaloneDocument && !pageDefinition.noWorkspaceShell;
 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
   if (pageDefinition.plan) {
@@ -712,6 +787,36 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       cell.right <= mobileTableMetrics.tableRight + 1
     ), pageDefinition.name + ' : désignation, quantité, prix, TVA et montant TTC doivent tous être visibles et étiquetés : ' +
       JSON.stringify(mobileTableMetrics.cells));
+  }
+
+  if (pageDefinition.name === 'admin') {
+    const adminUi = await page.evaluate(() => ({
+      dashboardVisible: document.getElementById('admin-dashboard')?.hidden === false,
+      kpiCount: document.querySelectorAll('.admin-kpi').length,
+      trafficChart: Boolean(document.getElementById('traffic-chart')?.dataset.sfChartType),
+      signupChart: Boolean(document.getElementById('signup-chart')?.dataset.sfChartType),
+      revenueChartCount: document.querySelectorAll('#revenue-charts canvas').length,
+      revenueCards: document.querySelectorAll('#revenue-cards .admin-revenue-card').length,
+      revenueRows: document.querySelectorAll('#revenue-table tr').length,
+      planRows: document.querySelectorAll('#plans-table tr').length,
+      pageRows: document.querySelectorAll('#pages-table tr').length,
+      fromDate: document.getElementById('period-from')?.value || '',
+      toDate: document.getElementById('period-to')?.value || '',
+      horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth
+    }));
+    assert.equal(adminUi.dashboardVisible, true,
+      'Le centre administrateur doit terminer son chargement avec des données de démonstration.');
+    assert.equal(adminUi.kpiCount, 6, 'Les six indicateurs de pilotage doivent être affichés.');
+    assert.equal(adminUi.trafficChart, true, 'Le graphique de fréquentation doit être construit.');
+    assert.equal(adminUi.signupChart, true, 'Le graphique des inscriptions doit être construit.');
+    assert.ok(adminUi.revenueChartCount >= (DATASET === 'empty' ? 0 : 2),
+      'Les graphiques de revenus doivent être séparés par devise : ' + JSON.stringify(adminUi));
+    assert.ok(adminUi.revenueCards >= 1, 'La synthèse de revenus doit afficher ses cartes.');
+    assert.ok(adminUi.revenueRows >= 1 && adminUi.planRows >= 1 && adminUi.pageRows >= 1,
+      'Les tableaux des revenus, formules et pages doivent être présents.');
+    assert.ok(adminUi.fromDate && adminUi.toDate, 'Les deux filtres de période doivent être initialisés.');
+    assert.ok(adminUi.horizontalOverflow <= 1,
+      'Le centre administrateur ne doit pas déborder horizontalement à ' + viewport.width + 'px : ' + JSON.stringify(adminUi));
   }
 
   if (pageDefinition.name === 'produits') {
