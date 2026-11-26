@@ -153,6 +153,19 @@ test('API alertes : isolation tenant, lecture membre et triage autorisé', async
     Authorization: 'Bearer ' + memberAToken,
     'X-SF-Company-Owner': String(ownerA)
   };
+  await pool.query(
+    'UPDATE pro_team_members SET permissions_json = ? WHERE owner_user_id = ? AND member_user_id = ?',
+    [JSON.stringify(['clients.read']), ownerA, memberA]
+  );
+  const assigneesDenied = await request(app)
+    .get('/api/pro/security/assignees')
+    .set(memberHeaders);
+  assert.equal(assigneesDenied.status, 403, assigneesDenied.text);
+  await pool.query(
+    'UPDATE pro_team_members SET permissions_json = ? WHERE owner_user_id = ? AND member_user_id = ?',
+    [JSON.stringify(['security.alerts.read', 'security.investigations.read']), ownerA, memberA]
+  );
+
   const assigneeList = await request(app)
     .get('/api/pro/security/assignees')
     .set(memberHeaders);
