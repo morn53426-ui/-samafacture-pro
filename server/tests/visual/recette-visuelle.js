@@ -931,6 +931,15 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       const save = actions?.querySelector('button[type="submit"]');
       const panelRect = panel?.getBoundingClientRect();
       const actionsRect = actions?.getBoundingClientRect();
+      const title = panel?.querySelector('#modal-title');
+      const titleRect = title?.getBoundingClientRect();
+      const sidebar = document.querySelector('#app-sidebar, .sidebar');
+      const modalZ = Number.parseInt(getComputedStyle(dialog).zIndex, 10) || 0;
+      const sidebarZ = sidebar ? Number.parseInt(getComputedStyle(sidebar).zIndex, 10) || 0 : 0;
+      const titleHit = titleRect && document.elementFromPoint(
+        Math.min(window.innerWidth - 1, Math.max(0, titleRect.left + Math.min(12, titleRect.width / 2))),
+        Math.min(window.innerHeight - 1, Math.max(0, titleRect.top + Math.min(12, titleRect.height / 2)))
+      );
       return {
         visible: Boolean(dialog && getComputedStyle(dialog).display !== 'none'),
         focusManaged: Boolean(dialog?.contains(document.activeElement)),
@@ -938,6 +947,14 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
         panelWithinViewport: Boolean(panelRect && panelRect.top >= -1 &&
           panelRect.bottom <= window.innerHeight + 1 && panelRect.width <= window.innerWidth + 1),
         panelScrolls: Boolean(panel && ['auto', 'scroll'].includes(getComputedStyle(panel).overflowY)),
+        titleFound: Boolean(title && titleRect),
+        titleVisible: Boolean(titleRect && titleRect.width > 0 && titleRect.height > 0 &&
+          titleRect.top >= -1 && titleRect.bottom <= window.innerHeight + 1 &&
+          getComputedStyle(title).visibility !== 'hidden' && getComputedStyle(title).display !== 'none'),
+        titleUnobscured: Boolean(titleHit && panel?.contains(titleHit)),
+        modalZ,
+        sidebarZ,
+        modalAboveSidebar: modalZ > sidebarZ,
         actionsFound: Boolean(actions && save),
         actionsVisible: Boolean(actionsRect && actionsRect.height >= 40 &&
           actionsRect.top >= panelRect.top - 1 && actionsRect.bottom <= panelRect.bottom + 1),
@@ -951,6 +968,13 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.equal(dialogMetrics.panelWithinViewport, true,
       pageDefinition.name + ' : le panneau doit rester dans le viewport : ' + JSON.stringify(dialogMetrics));
     assert.equal(dialogMetrics.panelScrolls, true, pageDefinition.name + ' : le formulaire doit pouvoir défiler.');
+    assert.equal(dialogMetrics.titleFound, true, pageDefinition.name + ' : le titre de la fenêtre doit exister.');
+    assert.equal(dialogMetrics.titleVisible, true,
+      pageDefinition.name + ' : le titre de la modale doit rester visible dans le viewport : ' + JSON.stringify(dialogMetrics));
+    assert.equal(dialogMetrics.titleUnobscured, true,
+      pageDefinition.name + ' : le bandeau mobile ne doit pas recouvrir le titre de la modale : ' + JSON.stringify(dialogMetrics));
+    assert.equal(dialogMetrics.modalAboveSidebar, true,
+      pageDefinition.name + ' : la modale doit être empilée au-dessus du menu mobile : ' + JSON.stringify(dialogMetrics));
     assert.equal(dialogMetrics.actionsFound, true, pageDefinition.name + ' : les actions du formulaire doivent exister.');
     assert.equal(dialogMetrics.actionsVisible, true,
       pageDefinition.name + ' : les actions doivent rester accessibles dans le panneau : ' + JSON.stringify(dialogMetrics));
