@@ -7,6 +7,7 @@ const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const bcrypt = require('bcryptjs');
+const { appendAuditEvent } = require('../utils/audit-ledger');
 const {
   app,
   pool,
@@ -248,6 +249,49 @@ test('dossier d’investigation : création idempotente, transitions et historiq
     () => pool.query('DELETE FROM pro_security_case_events WHERE id = ?', [historyRows[0].id]),
     error => /append-only/i.test(String(error.sqlMessage || error.message))
   );
+
+  // Un nouveau signal après résolution doit rouvrir l'alerte et le dossier associé.
+  await appendAuditEvent({
+    tenantId: ownerA,
+    actorUserId: null,
+    actorKind: 'anonymous',
+    eventType: 'auth.login.failed',
+    category: 'security',
+    severity: 'medium',
+    entityType: 'account',
+    entityId: String(ownerA),
+    outcome: 'failure',
+    metadata: { auth_method: 'password', reason: 'invalid_credentials' }
+  });
+
+  const reopenedAlert = await request(app).get('/api/pro/security-alerts').set(auth(ownerAToken));
+  assert.equal(reopenedAlert.status, 200, reopenedAlert.text);
+  assert.equal(reopenedAlert.body.alerts[0].status, 'open');
+  assert.equal(Number(reopenedAlert.body.alerts[0].occurrence_count), 7);
+  assert.equal(Number(reopenedAlert.body.alerts[0].case_id), caseId);
+
+  const reopenedCase = await request(app).get('/api/pro/security-cases').set(auth(ownerAToken));
+  assert.equal(reopenedCase.status, 200, reopenedCase.text);
+  assert.equal(reopenedCase.body.cases[0].status, 'open');
+
+  const reopenedTimeline = await request(app)
+    .get('/api/pro/security-cases/' + caseId + '/events')
+    .set(auth(ownerAToken));
+  assert.equal(reopenedTimeline.status, 200, reopenedTimeline.text);
+  assert.equal(reopenedTimeline.body.events.at(-1).event_type, 'case.reopened');
+  assert.equal(reopenedTimeline.body.events.at(-1).from_status, 'resolved');
+  assert.equal(reopenedTimeline.body.events.at(-1).to_status, 'open');
+
+  const [reopenAuditEvents] = await pool.query(
+    `SELECT metadata_json FROM pro_audit_events
+      WHERE tenant_scope_id = ? AND event_type = 'security.alert.reopened' AND entity_id = ?`,
+    [ownerA, String(alertId)]
+  );
+  assert.equal(reopenAuditEvents.length, 1);
+  const reopenMetadata = typeof reopenAuditEvents[0].metadata_json === 'string'
+    ? JSON.parse(reopenAuditEvents[0].metadata_json)
+    : reopenAuditEvents[0].metadata_json;
+  assert.equal(Number(reopenMetadata.case_id), caseId);
 });
 
 test('les dossiers et leur historique restent invisibles hors du tenant propriétaire', async () => {
