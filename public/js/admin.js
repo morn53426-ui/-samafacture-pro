@@ -43,6 +43,7 @@ async function renderCharts(data){
    rows.forEach(row=>values.set(row.bucket,(values.get(row.bucket)||0)+safe(row.amount)));
    charts.push(new Chart(byId('admin-revenue-chart-'+index),{type:'line',data:{labels:rows.map(row=>bucketLabel(row.bucket)),datasets:[{label:'Encaissé en '+currency,data:rows.map(row=>values.get(row.bucket)||0),borderColor:green,backgroundColor:green,tension:.25,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:context=>fmtAmount(context.parsed.y,currency)}}},scales:{x:{ticks:{color:ink,maxRotation:0,autoSkip:true},grid:{display:false}},y:{beginAtZero:true,ticks:{color:ink,callback:value=>new Intl.NumberFormat('fr-FR',{notation:'compact'}).format(value)},grid:{color:grid}}}}}));
  });
+}
 function render(data){
  const s=data.summary||{};
  byId('kpi-pageviews').textContent=fmtCount(s.page_views);byId('kpi-sessions').textContent=fmtCount(s.estimated_sessions);byId('kpi-accounts').textContent=fmtCount(s.registered_accounts);byId('kpi-new-accounts').textContent='Nouvelles inscriptions : '+fmtCount(s.new_accounts);byId('kpi-trials').textContent=fmtCount(s.active_trials);byId('kpi-paid-subscribers').textContent=fmtCount(s.accounts_with_confirmed_subscription_payment);byId('kpi-active-subscriptions').textContent=fmtCount(s.active_saas_subscriptions);
