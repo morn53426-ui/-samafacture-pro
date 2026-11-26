@@ -248,7 +248,8 @@ async function appendAuditEvent(input, connection = null) {
         metadata: {
           rule_code: securitySignal.ruleCode,
           source_event_id: Number(insertResult.insertId),
-          attempts_in_window: securitySignal.attempts
+          attempts_in_window: securitySignal.attempts,
+          case_id: securitySignal.caseId || null
         }
       }, conn);
     }
