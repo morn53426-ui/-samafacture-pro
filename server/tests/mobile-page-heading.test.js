@@ -49,7 +49,7 @@ describe('Titres des pages métier sur petit écran', () => {
   });
 
   test('le titre garde une taille lisible et ne peut pas être masqué sur téléphone', () => {
-    assert.match(styles, /body \.main-content\.workspace-page > \.page-header h1\s*\{[\s\S]*?display:\s*block[\s\S]*?visibility:\s*visible[\s\S]*?font-size:\s*clamp\(1\.55rem, 6\.5vw, 1\.9rem\)/);
+    assert.match(styles, /body \.main-content\.workspace-page > \.page-header h1,\s*body \.main-content\.workspace-page > \.workspace-page-header h1\s*\{[\s\S]*?display:\s*block[\s\S]*?visibility:\s*visible[\s\S]*?font-size:\s*clamp\(1\.55rem, 6\.5vw, 1\.9rem\)/);
     assert.match(styles, /@media \(max-width: 380px\)[\s\S]*?font-size:\s*1\.5rem/);
   });
 
