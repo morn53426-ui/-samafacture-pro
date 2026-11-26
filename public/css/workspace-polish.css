@@ -116,3 +116,38 @@ body.workspace-modal-open{overflow:hidden}
 .accounting-account-submit{display:flex;align-items:end}
 .accounting-account-submit .btn{min-height:42px}
 @media(max-width:760px){.accounting-accounts-form{grid-template-columns:minmax(0,1fr)}.accounting-account-submit .btn{width:100%}}
+
+
+/* Actions de création prioritaires sur téléphone : la barre reste visible
+   après le titre et les outils globaux, sans dupliquer l'action sur desktop. */
+.workspace-mobile-create-actions{display:none;min-width:0}
+.workspace-mobile-create-actions>.btn{width:100%;min-height:48px;justify-content:center;white-space:normal;text-align:center;line-height:1.3}
+.workspace-desktop-create-action{display:inline-flex}
+@media(max-width:640px){
+  .workspace-desktop-create-action{display:none!important}
+  .workspace-mobile-create-actions{display:flex;align-items:stretch;width:100%;margin:-2px 0 16px}
+  .workspace-mobile-create-actions>.btn{min-height:48px;padding:12px 16px}
+}
+
+/* Fenêtres Nouveau client / Catalogue : zone défilable indépendante et commandes
+   persistantes au bas de la fenêtre quand le formulaire est plus haut que l'écran. */
+.workspace-create-modal{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
+.workspace-create-modal .workspace-modal-panel{min-width:0;max-width:100%;-webkit-overflow-scrolling:touch}
+@media(max-width:560px){
+  .workspace-create-modal{align-items:flex-start!important;justify-content:center!important;padding:max(10px,env(safe-area-inset-top,0px)) 10px max(10px,env(safe-area-inset-bottom,0px))!important}
+  .workspace-create-modal .workspace-modal-panel{
+    width:100%!important;max-width:100%!important;min-width:0;
+    max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 20px);
+    margin:auto 0;padding:16px!important;overflow-y:auto;overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;scroll-padding-block:16px
+  }
+  .workspace-create-modal .workspace-modal-panel form{min-width:0}
+  .workspace-create-modal .workspace-modal-panel :is(input,select,textarea){min-height:44px;font-size:16px}
+  .workspace-create-modal .workspace-modal-panel textarea{min-height:88px}
+  .workspace-create-modal .workspace-modal-actions{
+    position:sticky;bottom:-16px;z-index:2;display:flex;flex-direction:column-reverse;
+    align-items:stretch;gap:8px!important;margin:16px -16px -16px;padding:12px 16px max(12px,env(safe-area-inset-bottom,0px));
+    border-top:1px solid var(--line);background:var(--paper)
+  }
+  .workspace-create-modal .workspace-modal-actions>.btn{width:100%;min-height:46px;justify-content:center}
+}
