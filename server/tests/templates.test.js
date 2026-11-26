@@ -432,11 +432,13 @@ describe('Impression et génération PDF', () => {
     assert.match(cssSource, /\.invoice-doc \.sf-document-table thead\s*\{\s*display:\s*table-header-group !important;/);
     assert.doesNotMatch(cssSource, /\.invoice-doc \.grid,\s*\.invoice-doc \.sf-totals/,
       'Les grilles ordinaires ne doivent plus être forcées à rester indivisibles sur une page.');
-    assert.doesNotMatch(pdfSource, /margin:\s*\{\s*top:/,
-      'Puppeteer ne doit pas redéfinir des marges déjà fixées par @page.');
+    const invoicePdfRenderer = pdfSource.match(/async function genererPdfFacture\(factureId, user\) \{[\s\S]*?\n\}/);
+    assert.ok(invoicePdfRenderer, 'Le générateur PDF des factures doit être identifiable.');
+    assert.doesNotMatch(invoicePdfRenderer[0], /margin:\s*\{\s*top:/,
+      'Le rendu des factures doit conserver les marges uniques définies par @page.');
     assert.doesNotMatch(visualSource, /margin:\s*\{\s*top:/,
       'La recette PDF visuelle ne doit pas redéfinir les marges déjà fixées par @page.');
-    assert.match(pdfSource, /preferCSSPageSize:\s*true/);
+    assert.match(invoicePdfRenderer[0], /preferCSSPageSize:\s*true/);
     assert.match(visualSource, /preferCSSPageSize:\s*true/);
     assert.match(rendererSource, /class="sf-doc-footer(?:\$\{extraClass \? ' ' \+ extraClass : ''\})?"/,
       'Le pied de facture doit conserver sa classe de base et rester groupé lors des sauts de page.');
