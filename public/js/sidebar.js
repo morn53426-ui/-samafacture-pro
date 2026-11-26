@@ -33,10 +33,10 @@ function renderSidebar(activePage) {
       { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' }
     ]},
     { group: 'Aide et ressources', items: [
-      { id: 'aide', icon: 'help-circle', label: 'Centre d’aide', href: 'aide.html' },
-      { id: 'support', icon: 'message-square', label: 'Support technique', href: 'support.html' },
-      { id: 'confidentialite', icon: 'shield-check', label: 'Confidentialité', href: 'confidentialite.html' },
-      { id: 'conditions', icon: 'file-text', label: "Conditions d'utilisation", href: 'conditions.html' }
+      { id: 'aide', icon: 'help-circle', label: 'Centre d’aide', href: 'aide.html?from=workspace' },
+      { id: 'support', icon: 'message-square', label: 'Support technique', href: 'support.html?from=workspace' },
+      { id: 'confidentialite', icon: 'shield-check', label: 'Confidentialité', href: 'confidentialite.html?from=workspace' },
+      { id: 'conditions', icon: 'file-text', label: "Conditions d'utilisation", href: 'conditions.html?from=workspace' }
     ]}
   ];
 
