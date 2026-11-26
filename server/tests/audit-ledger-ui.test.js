@@ -23,7 +23,9 @@ test('l’espace professionnel utilise le nouveau registre d’audit avec filtre
     'audit-list',
     'audit-pagination-info',
     'audit-prev',
-    'audit-next'
+    'audit-next',
+    'audit-export-csv',
+    'audit-export-pdf'
   ]) {
     assert.match(page, new RegExp('id="' + id + '"'), 'contrôle UI absent : ' + id);
   }
@@ -32,6 +34,10 @@ test('l’espace professionnel utilise le nouveau registre d’audit avec filtre
   assert.match(page, /setHidden\('audit-section', !can\('audit\.read'\)\)/);
   assert.equal(page.includes("optionalApiGet('/pro/audit')"), false,
     'la page ne doit plus consommer l’ancien endpoint limité de l’audit');
+  assert.match(page, /can\('audit\.export'\)/);
+  assert.match(page, /audit-events\/export\.'/);
+  assert.match(page, /Authorization: 'Bearer ' \+ Api\.token\(\)/);
+  assert.match(page, /X-SF-Company-Owner/);
 });
 
 test('les événements du registre sont échappés avant insertion dans le DOM', () => {
