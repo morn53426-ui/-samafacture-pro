@@ -165,9 +165,14 @@ test('API alertes : isolation tenant, lecture membre et triage autorisé', async
     Authorization: 'Bearer ' + memberAToken,
     'X-SF-Company-Owner': String(ownerA)
   };
-  const assigneeList = await request(app)
+  const readOnlyAssignees = await request(app)
     .get('/api/pro/security/assignees')
     .set(memberHeaders);
+  assert.equal(readOnlyAssignees.status, 403, readOnlyAssignees.text,
+    'les rôles en lecture seule ne doivent pas consulter l’annuaire des responsables');
+  const assigneeList = await request(app)
+    .get('/api/pro/security/assignees')
+    .set('Authorization', 'Bearer ' + ownerAToken);
   assert.equal(assigneeList.status, 200, assigneeList.text);
   assert.ok(assigneeList.body.assignees.some(person => Number(person.id) === ownerA));
   assert.ok(assigneeList.body.assignees.some(person => Number(person.id) === memberA));
