@@ -45,7 +45,8 @@ const PAGES = [
   { name: 'abonnement', file: 'abonnement.html', ready: '#plan-cards .subscription-plan-card' },
   { name: 'groupe-entreprise', file: 'groupe-entreprise.html', ready: '#invite-company-form', plan: 'entreprise' },
   { name: 'invitation', file: 'invitation.html?type=company-group&token=' + 'a'.repeat(64), ready: '#accept-invite', public: true },
-  { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true }
+  { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true },
+  { name: 'admin', file: 'admin.html', ready: '#admin-dashboard:not([hidden])', noWorkspaceShell: true }
 ];
 
 const DOCUMENT_TEMPLATES = [
@@ -452,6 +453,80 @@ function fixtureFor(pathname, fixtures) {
       { id: 2, nom: 'Alertes de stock faible', type: 'alerte_stock_email', actif: false, configuration: { frequence_jours: 1 }, derniere_execution: '2026-11-11 08:00:00', prochaine_execution: null, dernier_resultat: 'smtp_non_configure' }
     ]
   };
+  if (pathname === '/api/admin/overview') {
+    const empty = DATASET === 'empty';
+    const large = DATASET === 'worst';
+    const value = empty ? 0 : (large ? 999999999999.99 : 1250000);
+    const count = empty ? 0 : (large ? 999999999 : 42);
+    return {
+      period: { from: '2026-10-28', to: '2026-11-26', days: 30, bucket: '%Y-%m-%d' },
+      summary: {
+        page_views: count,
+        estimated_sessions: empty ? 0 : (large ? 888888888 : 31),
+        registered_accounts: empty ? 0 : (large ? 999999999 : 248),
+        new_accounts: empty ? 0 : (large ? 999999 : 18),
+        active_trials: empty ? 0 : (large ? 999999 : 12),
+        accounts_with_paid_plan: empty ? 0 : (large ? 999999 : 73),
+        active_saas_subscriptions: empty ? 0 : (large ? 999999 : 39),
+        accounts_with_confirmed_subscription_payment: empty ? 0 : (large ? 999999 : 28)
+      },
+      plans: {
+        accounts_by_plan: empty ? [] : [
+          { plan: 'gratuit', accounts: large ? 999999999 : 175 },
+          { plan: 'starter', accounts: large ? 888888888 : 32 },
+          { plan: 'pro', accounts: large ? 777777777 : 27 },
+          { plan: 'entreprise', accounts: large ? 666666666 : 14 }
+        ],
+        active_saas_subscriptions_by_plan: empty ? [] : [
+          { plan: 'pro', subscriptions: large ? 99999999 : 22 },
+          { plan: 'entreprise', subscriptions: large ? 88888888 : 17 }
+        ]
+      },
+      revenue: {
+        period_by_currency: empty ? [] : [
+          { currency: 'XOF', confirmed_payments: large ? 999999 : 17, amount: value },
+          { currency: 'EUR', confirmed_payments: large ? 888888 : 3, amount: large ? 888888888888.88 : 950 }
+        ],
+        all_time_by_currency: empty ? [] : [
+          { currency: 'XOF', confirmed_payments: large ? 9999999 : 83, amount: large ? 999999999999.99 : 12850000 },
+          { currency: 'EUR', confirmed_payments: large ? 8888888 : 9, amount: large ? 888888888888.88 : 4200 }
+        ],
+        trend: empty ? [] : [
+          { bucket: '2026-11-01', currency: 'XOF', confirmed_payments: large ? 999999 : 5, amount: large ? 999999999999.99 : 450000 },
+          { bucket: '2026-11-12', currency: 'XOF', confirmed_payments: large ? 888888 : 7, amount: large ? 888888888888.88 : 620000 },
+          { bucket: '2026-11-20', currency: 'EUR', confirmed_payments: large ? 777777 : 2, amount: large ? 777777777777.77 : 950 }
+        ],
+        by_plan_by_currency: empty ? [] : [
+          { plan: 'pro', currency: 'XOF', confirmed_payments: large ? 999999 : 11, amount: large ? 999999999999.99 : 890000 },
+          { plan: 'entreprise', currency: 'EUR', confirmed_payments: large ? 888888 : 3, amount: large ? 888888888888.88 : 950 }
+        ],
+        recurring_metrics_available: false,
+        recurring_metrics_note: 'MRR et ARR non calculés : aucun cycle SaaS approuvé.'
+      },
+      traffic: {
+        trend: empty ? [] : [
+          { bucket: '2026-11-01', page_views: large ? 999999999 : 120, estimated_sessions: large ? 888888888 : 80 },
+          { bucket: '2026-11-15', page_views: large ? 777777777 : 245, estimated_sessions: large ? 666666666 : 162 }
+        ],
+        top_pages: empty ? [] : [
+          { page_path: '/dashboard.html', page_views: large ? 999999999 : 185, estimated_sessions: large ? 888888888 : 112 },
+          { page_path: '/facture-detail.html', page_views: large ? 888888888 : 94, estimated_sessions: large ? 777777777 : 61 },
+          { page_path: '/abonnement.html', page_views: large ? 777777777 : 36, estimated_sessions: large ? 666666666 : 24 }
+        ]
+      },
+      signups: {
+        trend: empty ? [] : [
+          { bucket: '2026-11-01', new_accounts: large ? 999999999 : 8 },
+          { bucket: '2026-11-15', new_accounts: large ? 888888888 : 13 }
+        ]
+      },
+      definitions: {
+        estimated_sessions: 'Sessions estimées par onglet.',
+        accounts_with_paid_plan: 'Formule sélectionnée, ne prouvant pas un paiement.',
+        subscription_revenue: 'Paiements d’abonnement confirmés uniquement.'
+      }
+    };
+  }
   if (pathname === '/api/portal/') return {
     client: { nom: fixtures.clients[0]?.nom || 'Client de recette', email: fixtures.clients[0]?.email || 'client@example.test' },
     entreprise: { nom: 'SamaFacture — Société de test', logo: null, email: 'support@example.test', telephone: '+221 77 000 00 00', site_web: 'https://example.test', devise: 'FCFA', langue: 'fr', locale: 'fr-SN' },
@@ -563,7 +638,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   const pageErrors = [];
   const onPageError = (error) => pageErrors.push(error.message);
   page.on('pageerror', onPageError);
-  const workspacePage = !pageDefinition.public && !pageDefinition.standaloneDocument;
+  const workspacePage = !pageDefinition.public && !pageDefinition.standaloneDocument && !pageDefinition.noWorkspaceShell;
 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
   if (pageDefinition.plan) {
@@ -712,6 +787,67 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       cell.right <= mobileTableMetrics.tableRight + 1
     ), pageDefinition.name + ' : désignation, quantité, prix, TVA et montant TTC doivent tous être visibles et étiquetés : ' +
       JSON.stringify(mobileTableMetrics.cells));
+  }
+
+  if (pageDefinition.name === 'admin') {
+    await page.waitForFunction(() => {
+      const traffic = document.getElementById('traffic-chart');
+      const signups = document.getElementById('signup-chart');
+      return traffic?.dataset.sfChartType && signups?.dataset.sfChartType;
+    }, { timeout: 15000 });
+    const adminUi = await page.evaluate(() => ({
+      dashboardVisible: document.getElementById('admin-dashboard')?.hidden === false,
+      loadingStateHidden: (() => {
+        const loading = document.getElementById('admin-state');
+        return Boolean(loading && loading.hidden &&
+          getComputedStyle(loading).display === 'none' &&
+          loading.getClientRects().length === 0);
+      })(),
+      kpiCount: document.querySelectorAll('.admin-kpi').length,
+      trafficChart: Boolean(document.getElementById('traffic-chart')?.dataset.sfChartType),
+      signupChart: Boolean(document.getElementById('signup-chart')?.dataset.sfChartType),
+      revenueChartCount: document.querySelectorAll('#revenue-charts canvas').length,
+      revenueCards: document.querySelectorAll('#revenue-cards .admin-revenue-card').length,
+      revenueRows: document.querySelectorAll('#revenue-table tr').length,
+      planRows: document.querySelectorAll('#plans-table tr').length,
+      pageRows: document.querySelectorAll('#pages-table tr').length,
+      fromDate: document.getElementById('period-from')?.value || '',
+      toDate: document.getElementById('period-to')?.value || '',
+      horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth
+    }));
+    assert.equal(adminUi.dashboardVisible, true,
+      'Le centre administrateur doit terminer son chargement avec des données de démonstration.');
+    assert.equal(adminUi.loadingStateHidden, true,
+      'Le panneau de chargement doit être masqué et ne plus occuper d’espace après le rendu.');
+    assert.equal(adminUi.kpiCount, 6, 'Les six indicateurs de pilotage doivent être affichés.');
+    assert.equal(adminUi.trafficChart, true, 'Le graphique de fréquentation doit être construit.');
+    assert.equal(adminUi.signupChart, true, 'Le graphique des inscriptions doit être construit.');
+    assert.ok(adminUi.revenueChartCount >= (DATASET === 'empty' ? 0 : 2),
+      'Les graphiques de revenus doivent être séparés par devise : ' + JSON.stringify(adminUi));
+    assert.ok(adminUi.revenueCards >= 1, 'La synthèse de revenus doit afficher ses cartes.');
+    assert.ok(adminUi.revenueRows >= 1 && adminUi.planRows >= 1 && adminUi.pageRows >= 1,
+      'Les tableaux des revenus, formules et pages doivent être présents.');
+    assert.ok(adminUi.fromDate && adminUi.toDate, 'Les deux filtres de période doivent être initialisés.');
+    assert.ok(adminUi.horizontalOverflow <= 1,
+      'Le centre administrateur ne doit pas déborder horizontalement à ' + viewport.width + 'px : ' + JSON.stringify(adminUi));
+  }
+
+  if (pageDefinition.name === 'admin') {
+    const skipLink = await page.evaluate(() => {
+      const link = document.querySelector('.admin-skip-link');
+      const main = document.getElementById('main-content');
+      return {
+        exists: Boolean(link),
+        targetExists: Boolean(link && main && link.getAttribute('href') === '#main-content'),
+        targetIsMain: Boolean(main && main.tagName === 'MAIN'),
+        firstTabStop: Boolean(link && link.tabIndex === 0 &&
+          document.querySelector('body')?.firstElementChild === link)
+      };
+    });
+    assert.equal(skipLink.exists, true, 'Le centre admin doit proposer un lien d’évitement clavier.');
+    assert.equal(skipLink.targetExists, true, 'Le lien d’évitement doit cibler le contenu principal.');
+    assert.equal(skipLink.targetIsMain, true, 'La cible du lien d’évitement doit être le repère principal.');
+    assert.equal(skipLink.firstTabStop, true, 'Le lien d’évitement doit être le premier arrêt clavier.');
   }
 
   if (pageDefinition.name === 'produits') {
@@ -1713,17 +1849,41 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   await normalPage.waitForFunction(() =>
     document.getElementById('chart-evolution')?.dataset.dashboardPeriod === '6m'
   );
-  const bounds = await periodSelect.boundingBox();
+  assert.equal(
+    await periodSelect.evaluate((element) => element.disabled),
+    false,
+    'Le sélecteur de période doit rester disponible après le changement de vue.'
+  );
+
+  // :active est ici vérifié sur un vrai bouton HTML. Un <select> ouvre un menu natif
+  // et ne conserve pas forcément cet état pendant une mesure Puppeteer prolongée.
+  const pressButton = await normalPage.evaluateHandle(() => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-primary';
+    button.textContent = 'Contrôle du retour tactile';
+    Object.assign(button.style, {
+      position: 'fixed',
+      right: '16px',
+      bottom: '16px',
+      zIndex: '99999'
+    });
+    document.body.appendChild(button);
+    return button;
+  });
+  const bounds = await pressButton.boundingBox();
+  assert.ok(bounds, 'Le bouton de contrôle doit être visible pour la mesure.');
   await normalPage.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await normalPage.mouse.down();
   // Laisser la transition de 130 ms atteindre son état final avant de lire la matrice.
   await new Promise((resolve) => setTimeout(resolve, 180));
-  const buttonState = await periodSelect.evaluate((element) => ({
+  const buttonState = await pressButton.evaluate((element) => ({
     active: element.matches(':active'),
     transform: getComputedStyle(element).transform
   }));
   await normalPage.mouse.up();
-  assert.equal(buttonState.active, true, 'Le sélecteur de période doit rester actif pendant la mesure.');
+  await pressButton.dispose();
+  assert.equal(buttonState.active, true, 'Le bouton doit rester actif pendant la mesure.');
   const pressMatrix = buttonState.transform.match(/^matrix\(([^)]+)\)$/);
   const pressScale = pressMatrix ? pressMatrix[1].split(',').map(Number) : [];
   assert.ok(pressScale.length === 6 &&
@@ -3066,8 +3226,20 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
               Number(navToggleStyle.opacity) > 0 && navToggleRect.width >= 32 && navToggleRect.height >= 32),
             mobileToggleAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
               navToggleLabel && navToggleControls === 'app-navigation' &&
-              document.getElementById(navToggleControls))
-          };
+              document.getElementById(navToggleControls)),
+            adminReturnLinkVisible: (() => {
+              const link = document.querySelector('.admin-exit-link');
+              if (!link) return false;
+              const style = getComputedStyle(link);
+              const rect = link.getBoundingClientRect();
+              return style.display !== 'none' && style.visibility !== 'hidden' &&
+                Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+                rect.right > 0 && rect.left < window.innerWidth &&
+                rect.bottom > 0 && rect.top < window.innerHeight &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+            })()
+};
         });
 
         assert.equal(metrics.viewport, viewport.width,
@@ -3085,12 +3257,17 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
         assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
           pageDefinition.name + ' : la zone métier doit rester dans le viewport à ' + viewport.width + 'px : ' +
           JSON.stringify(metrics));
-        assert.equal(metrics.mobileToggleExists, true,
-          pageDefinition.name + ' doit exposer une commande de navigation mobile.');
-        assert.equal(metrics.mobileToggleVisible, true,
-          pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
-        assert.equal(metrics.mobileToggleAccessible, true,
-          pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        if (pageDefinition.noWorkspaceShell) {
+          assert.equal(metrics.adminReturnLinkVisible, true,
+            pageDefinition.name + ' doit conserver un lien de retour accessible vers l’application sur mobile.');
+        } else {
+          assert.equal(metrics.mobileToggleExists, true,
+            pageDefinition.name + ' doit exposer une commande de navigation mobile.');
+          assert.equal(metrics.mobileToggleVisible, true,
+            pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
+          assert.equal(metrics.mobileToggleAccessible, true,
+            pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        }
 
         const screenshot = 'theme-sombre-' + pageDefinition.name + '-' + viewport.name + '.png';
         await page.screenshot({
@@ -3200,8 +3377,20 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
               Number(navToggleStyle.opacity) > 0 && navToggleRect.width >= 32 && navToggleRect.height >= 32),
             mobileToggleAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
               navToggleLabel && navToggleControls === 'app-navigation' &&
-              document.getElementById(navToggleControls))
-          };
+              document.getElementById(navToggleControls)),
+            adminReturnLinkVisible: (() => {
+              const link = document.querySelector('.admin-exit-link');
+              if (!link) return false;
+              const style = getComputedStyle(link);
+              const rect = link.getBoundingClientRect();
+              return style.display !== 'none' && style.visibility !== 'hidden' &&
+                Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+                rect.right > 0 && rect.left < window.innerWidth &&
+                rect.bottom > 0 && rect.top < window.innerHeight &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+            })()
+};
         });
 
         assert.equal(metrics.viewport, viewport.width,
@@ -3219,12 +3408,17 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
         assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
           pageDefinition.name + ' : la zone métier doit rester dans le viewport à ' + viewport.width + 'px : ' +
           JSON.stringify(metrics));
-        assert.equal(metrics.mobileToggleExists, true,
-          pageDefinition.name + ' doit exposer une commande de navigation mobile.');
-        assert.equal(metrics.mobileToggleVisible, true,
-          pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
-        assert.equal(metrics.mobileToggleAccessible, true,
-          pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        if (pageDefinition.noWorkspaceShell) {
+          assert.equal(metrics.adminReturnLinkVisible, true,
+            pageDefinition.name + ' doit conserver un lien de retour accessible vers l’application sur mobile.');
+        } else {
+          assert.equal(metrics.mobileToggleExists, true,
+            pageDefinition.name + ' doit exposer une commande de navigation mobile.');
+          assert.equal(metrics.mobileToggleVisible, true,
+            pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
+          assert.equal(metrics.mobileToggleAccessible, true,
+            pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        }
 
         const screenshot = 'theme-clair-' + pageDefinition.name + '-' + viewport.name + '.png';
         await page.screenshot({
@@ -3326,6 +3520,18 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
             Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
           navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
             navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          adminReturnLinkVisible: (() => {
+            const link = document.querySelector('.admin-exit-link');
+            if (!link) return false;
+            const style = getComputedStyle(link);
+            const rect = link.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' &&
+              Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+                rect.right > 0 && rect.left < window.innerWidth &&
+                rect.bottom > 0 && rect.top < window.innerHeight &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+          })(),
           responsiveTables
         };
       });
@@ -3340,10 +3546,15 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
         pageDefinition.name + ' déborde horizontalement au zoom 200 % : ' + JSON.stringify(metrics));
       assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
         pageDefinition.name + ' sort du viewport utile au zoom 200 % : ' + JSON.stringify(metrics));
-      assert.equal(metrics.navigationVisible, true,
-        pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
-      assert.equal(metrics.navigationAccessible, true,
-        pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      if (pageDefinition.noWorkspaceShell) {
+        assert.equal(metrics.adminReturnLinkVisible, true,
+          pageDefinition.name + ' doit conserver son lien de retour accessible au zoom 200 %.');
+      } else {
+        assert.equal(metrics.navigationVisible, true,
+          pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
+        assert.equal(metrics.navigationAccessible, true,
+          pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      }
       for (const table of metrics.responsiveTables) {
         assert.equal(table.tableDisplay, 'block',
           pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
@@ -3467,6 +3678,18 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
             Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
           navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
             navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          adminReturnLinkVisible: (() => {
+            const link = document.querySelector('.admin-exit-link');
+            if (!link) return false;
+            const style = getComputedStyle(link);
+            const rect = link.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' &&
+              Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+                rect.right > 0 && rect.left < window.innerWidth &&
+                rect.bottom > 0 && rect.top < window.innerHeight &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+          })(),
           responsiveTables
         };
       });
@@ -3484,10 +3707,15 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
         pageDefinition.name + ' déborde horizontalement en thème sombre au zoom 200 % : ' + JSON.stringify(metrics));
       assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
         pageDefinition.name + ' sort du viewport utile en thème sombre au zoom 200 % : ' + JSON.stringify(metrics));
-      assert.equal(metrics.navigationVisible, true,
-        pageDefinition.name + ' doit garder la navigation visible en thème sombre au zoom 200 %.');
-      assert.equal(metrics.navigationAccessible, true,
-        pageDefinition.name + ' doit garder un bouton de navigation accessible en thème sombre au zoom 200 %.');
+      if (pageDefinition.noWorkspaceShell) {
+        assert.equal(metrics.adminReturnLinkVisible, true,
+          pageDefinition.name + ' doit conserver son lien de retour accessible au zoom 200 %.');
+      } else {
+        assert.equal(metrics.navigationVisible, true,
+          pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
+        assert.equal(metrics.navigationAccessible, true,
+          pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      }
       for (const table of metrics.responsiveTables) {
         assert.equal(table.tableDisplay, 'block',
           pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');

@@ -29,6 +29,7 @@
         <p>Voici la synthèse de votre activité sur Sunupilot.</p>
       </div>
       <div class="dashboard-context"><i class="ic" data-icon="calendar"></i><span id="dashboard-period-label">Vue d'ensemble de votre activité</span></div>
+      <a class="dashboard-chip" id="platform-admin-shortcut" href="admin.html" hidden>Administration plateforme <i class="ic" data-icon="arrow-up-right"></i></a>
     </section>
 
     <section class="dashboard-kpis" id="stats-grid" aria-label="Indicateurs clés">
@@ -170,6 +171,12 @@
   requireAuthPage();
   renderSidebar('dashboard');
   renderTopbar('Tableau de bord', "Vue d'ensemble de votre activité");
+  Api.get('/admin/access').then(() => {
+    const shortcut = document.getElementById('platform-admin-shortcut');
+    if (shortcut) shortcut.hidden = false;
+  }).catch(() => {
+    // Un compte sans autorisation ne voit pas le raccourci administrateur.
+  });
 
   let chart;
   let salesChart;
