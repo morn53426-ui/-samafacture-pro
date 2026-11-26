@@ -4837,20 +4837,25 @@ input:focus, select:focus, textarea:focus {
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
   }
-  body .main-content.workspace-page.workspace-page-has-heading > .page-header {
+  body .main-content.workspace-page.workspace-page-has-heading > .page-header,
+  body .main-content.workspace-page.workspace-page-has-heading > .workspace-page-header {
     grid-column: 1;
     grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
   }
   body .main-content.workspace-page.workspace-page-has-heading > #topbar-root,
   body .main-content.workspace-page.workspace-page-has-heading > .app-topbar {
     grid-column: 1;
     grid-row: 2;
   }
-  body .main-content.workspace-page > .page-header > div:first-child {
+  body .main-content.workspace-page > .page-header > div:first-child,
+  body .main-content.workspace-page > .workspace-page-header > div:first-child {
     min-width: 0;
     width: 100%;
   }
-  body .main-content.workspace-page > .page-header h1 {
+  body .main-content.workspace-page > .page-header h1,
+  body .main-content.workspace-page > .workspace-page-header h1 {
     display: block;
     visibility: visible;
     max-width: 100%;
@@ -4861,7 +4866,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 380px) {
-  body .main-content.workspace-page > .page-header h1 {
+  body .main-content.workspace-page > .page-header h1,
+  body .main-content.workspace-page > .workspace-page-header h1 {
     font-size: 1.5rem;
   }
 }
