@@ -166,6 +166,11 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       assert.match(html, /Reste à payer/, 'le solde restant dû doit apparaître');
       assert.match(html, /Détail de la TVA par taux/, 'les taux de TVA multiples doivent être détaillés');
       assert.match(html, /SN-DKR-2026-B-1234/, 'le RCCM de l’entreprise doit apparaître');
+      assert.match(html, /NINEA : 123456789/, 'le NINEA doit rester visible dans le pied de page');
+      assert.match(html, /sf-doc-legal-item-phone[\\s\\S]*?data-icon="phone"/,
+        'le numéro doit être précédé de son icône téléphone dans le pied de page');
+      assert.match(html, /sf-doc-legal-item-mail[\\s\\S]*?data-icon="mail"/,
+        'l’adresse email doit être précédée de son icône enveloppe dans le pied de page');
       assert.match(html, /\+221 33 000 00 00/, 'le téléphone de l’entreprise doit apparaître');
       assert.match(html, /contact@entreprise-test\.sn/, 'l’email de l’entreprise doit apparaître');
       assert.match(html, /Banque de Test/, 'les coordonnées bancaires doivent apparaître');
@@ -192,6 +197,7 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
   test('un devis conserve sa zone Bon pour accord même sans coordonnées bancaires ou mentions légales', () => {
     const user = userDeTest({
       entreprise_ninea: null, entreprise_rccm: null, entreprise_site_web: null,
+      entreprise_telephone: null, entreprise_email: null,
       entreprise_banque: null, entreprise_rib: null,
       entreprise_conditions_reglement: null, entreprise_mentions_legales: null
     });
@@ -208,6 +214,10 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
     });
     assert.match(html, /Bon pour accord/);
     assert.match(html, /Signature et cachet/);
+    assert.doesNotMatch(html, /sf-doc-legal-item-(?:phone|mail)/,
+      'les icônes de contact ne doivent pas apparaître lorsque les coordonnées sont absentes');
+    assert.doesNotMatch(html, /NINEA\\s*:/,
+      'le NINEA ne doit pas être remplacé par une valeur fictive lorsqu’il est absent');
     assert.doesNotMatch(html, /undefined|NaN/);
   });
 
