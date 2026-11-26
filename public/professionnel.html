@@ -594,7 +594,8 @@ function can(permission) {
     'expenses.read':'expenses.write', 'documents.read':'documents.write',
     'sales.read':'sales.write', 'cash.read':'cash.write',
     'team.read':'team.manage', 'integrations.read':'integrations.manage',
-    'automations.read':'automations.manage'
+    'automations.read':'automations.manage',
+    'security.read':'security.manage'
   };
   return activePermissions.includes('*') || activePermissions.includes(permission) ||
     (implied[permission] && activePermissions.includes(implied[permission]));
