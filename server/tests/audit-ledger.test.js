@@ -125,6 +125,8 @@ test('journal signé : redaction des secrets, concurrence et intégrité de la c
       invoice_id: 42,
       password: 'ne-doit-pas-etre-stocke',
       apiKey: 'ne-doit-pas-etre-stocke',
+      email: 'personne@example.test',
+      iban: 'SN00TEST123456789',
       bearer_note: 'Bearer secret-value-ne-doit-pas-etre-stocke',
       reference: 'opération de test'
     }
@@ -152,6 +154,8 @@ test('journal signé : redaction des secrets, concurrence et intégrité de la c
     : storedRows[0].metadata_json;
   assert.equal(metadata.password, '[REDACTED]');
   assert.equal(metadata.apiKey, '[REDACTED]');
+  assert.equal(metadata.email, '[REDACTED]');
+  assert.equal(metadata.iban, '[REDACTED]');
   assert.equal(metadata.bearer_note, 'Bearer [REDACTED]');
   assert.equal(metadata.invoice_id, 42);
 
