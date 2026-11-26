@@ -38,16 +38,27 @@ Chaque tenant possède une séquence indépendante. Les écritures concurrentes 
 
 Les événements ne possèdent volontairement aucune clé étrangère vers `users` : une suppression de compte ne doit pas effacer ces traces. L'identifiant du tenant et celui de l'acteur sont conservés comme références historiques ; il faut traiter les demandes d'anonymisation/rétention selon les obligations applicables et une procédure validée.
 
-La chaîne HMAC et les triggers augmentent la résistance à l'altération, mais ne remplacent pas :
-- des identifiants SQL de production à privilèges minimaux ;
-- la sauvegarde chiffrée et la restauration contrôlée ;
-- la conservation hors site des clés et des preuves ;
-- la surveillance des accès administrateur MySQL et du système hôte.
+La chaîne HMAC et les triggers augmentent la résistance à l'altération, mais ne constituent pas une preuve inviolable contre un administrateur de base de données ou une personne disposant de privilèges DDL élevés. En particulier, `TRUNCATE TABLE`, `DROP TABLE`, la suppression/désactivation des triggers ou la modification des objets par un compte privilégié peuvent contourner les protections ligne par ligne. En production, il faut donc :
+- utiliser des identifiants SQL avec les privilèges minimaux nécessaires et séparer le compte d'exécution applicatif du compte de migration ;
+- interdire au compte d'exécution les privilèges `DROP`, `ALTER`, `TRIGGER` et les opérations de maintenance non nécessaires sur le registre ;
+- exporter périodiquement les têtes de chaîne et des checkpoints signés vers un stockage séparé et non modifiable par le serveur applicatif ;
+- conserver les sauvegardes chiffrées et les clés hors du même domaine d'administration ;
+- surveiller les accès administrateur MySQL et système hôte.
 
 ## Rollback
 
 Le script `server/database/rollbacks/014_audit_ledger.down.sql` retire uniquement les triggers d'immuabilité après arrêt des versions applicatives qui écrivent dans le registre. Il conserve les tables, les événements et les têtes de chaîne. Il n'existe volontairement aucune instruction de suppression des preuves dans ce rollback.
 
-## Limites fonctionnelles de ce lot
+## Couverture fonctionnelle du premier lot
 
-Ce lot établit le registre, l'API de consultation et le contrôle de chaîne. Il ne journalise pas encore automatiquement toutes les mutations de connexion, factures, clients, paiements et abonnements. Il ne fournit pas encore l'interface frontend dédiée, les exports, les alertes, AML ou KYC. Ces intégrations seront réalisées par étapes avec des tests transactionnels sur chaque route métier.
+Le premier lot journalise actuellement :
+- inscription et événements d'authentification (succès/échec de connexion par mot de passe, connexion Google et déconnexion) ;
+- création de facture/devis, changement de statut, suppression de devis et paiement manuel ;
+- création, modification et suppression de clients ;
+- consultations du registre et vérifications d'intégrité.
+
+Les événements de facture, paiement et cycle de vie client sont ajoutés dans la transaction métier correspondante. Les métadonnées utilisent une liste de champs modifiés et des valeurs non sensibles ; elles ne sérialisent pas les corps de requête.
+
+L'espace professionnel possède désormais une interface de consultation avec filtres, recherche, pagination et vérification d'intégrité. Les exports PDF/CSV, l'attribution d'alertes, les dossiers d'investigation, le traitement des événements de factures récurrentes, d'abonnements et des paiements fournisseurs/webhooks restent à compléter.
+
+Aucun moteur de détection de fraude, aucun module AML/KYC ni aucun tableau de bord central conformité n'est encore livré. Ce premier lot ne doit pas être présenté comme une solution complète ou une certification de conformité.
