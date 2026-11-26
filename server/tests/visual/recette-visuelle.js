@@ -1713,17 +1713,41 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   await normalPage.waitForFunction(() =>
     document.getElementById('chart-evolution')?.dataset.dashboardPeriod === '6m'
   );
-  const bounds = await periodSelect.boundingBox();
+  assert.equal(
+    await periodSelect.evaluate((element) => element.disabled),
+    false,
+    'Le sélecteur de période doit rester disponible après le changement de vue.'
+  );
+
+  // :active est ici vérifié sur un vrai bouton HTML. Un <select> ouvre un menu natif
+  // et ne conserve pas forcément cet état pendant une mesure Puppeteer prolongée.
+  const pressButton = await normalPage.evaluateHandle(() => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-primary';
+    button.textContent = 'Contrôle du retour tactile';
+    Object.assign(button.style, {
+      position: 'fixed',
+      right: '16px',
+      bottom: '16px',
+      zIndex: '99999'
+    });
+    document.body.appendChild(button);
+    return button;
+  });
+  const bounds = await pressButton.boundingBox();
+  assert.ok(bounds, 'Le bouton de contrôle doit être visible pour la mesure.');
   await normalPage.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await normalPage.mouse.down();
   // Laisser la transition de 130 ms atteindre son état final avant de lire la matrice.
   await new Promise((resolve) => setTimeout(resolve, 180));
-  const buttonState = await periodSelect.evaluate((element) => ({
+  const buttonState = await pressButton.evaluate((element) => ({
     active: element.matches(':active'),
     transform: getComputedStyle(element).transform
   }));
   await normalPage.mouse.up();
-  assert.equal(buttonState.active, true, 'Le sélecteur de période doit rester actif pendant la mesure.');
+  await pressButton.dispose();
+  assert.equal(buttonState.active, true, 'Le bouton doit rester actif pendant la mesure.');
   const pressMatrix = buttonState.transform.match(/^matrix\(([^)]+)\)$/);
   const pressScale = pressMatrix ? pressMatrix[1].split(',').map(Number) : [];
   assert.ok(pressScale.length === 6 &&
