@@ -667,7 +667,7 @@ async function loadSecurityCenter() {
   }
   section.hidden = false;
   const requests = await Promise.all([
-    securityRequest('GET', '/pro/security/assignees'),
+    (can('security.alerts.manage') || can('security.investigations.manage'))\n      ? securityRequest('GET', '/pro/security/assignees')\n      : Promise.resolve({ assignees: [] }),
     canReadAlerts
       ? securityRequest('GET', '/pro/security/alerts/summary')
       : Promise.resolve(null),
