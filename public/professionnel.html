@@ -324,6 +324,9 @@
           </form>
           <div id="webhooks-list" class="pro-list"></div>
         </div>
+      </section>
+
+      <section class="card pro-module" id="pro-audit">
         <div class="pro-subsection" id="audit-section">
           <h3>Journal d'audit sécurisé</h3>
           <form id="audit-filters" class="pro-form">
@@ -605,6 +608,7 @@ function applyModulePermissions() {
   setHidden('pro-integrations', !can('integrations.read') && !can('integrations.manage'));
   setHidden('api-key-form', !can('integrations.manage'));
   setHidden('webhook-form', !can('integrations.manage'));
+  setHidden('pro-audit', !can('audit.read'));
   setHidden('audit-section', !can('audit.read'));
   setHidden('audit-export-csv', !can('audit.export'));
   setHidden('audit-export-pdf', !can('audit.export'));
