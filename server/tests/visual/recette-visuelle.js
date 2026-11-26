@@ -3200,8 +3200,18 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
               Number(navToggleStyle.opacity) > 0 && navToggleRect.width >= 32 && navToggleRect.height >= 32),
             mobileToggleAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
               navToggleLabel && navToggleControls === 'app-navigation' &&
-              document.getElementById(navToggleControls))
-          };
+              document.getElementById(navToggleControls)),
+            adminReturnLinkVisible: (() => {
+              const link = document.querySelector('.admin-exit-link');
+              if (!link) return false;
+              const style = getComputedStyle(link);
+              const rect = link.getBoundingClientRect();
+              return style.display !== 'none' && style.visibility !== 'hidden' &&
+                Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 20 &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+            })()
+};
         });
 
         assert.equal(metrics.viewport, viewport.width,
@@ -3219,12 +3229,17 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
         assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
           pageDefinition.name + ' : la zone métier doit rester dans le viewport à ' + viewport.width + 'px : ' +
           JSON.stringify(metrics));
-        assert.equal(metrics.mobileToggleExists, true,
-          pageDefinition.name + ' doit exposer une commande de navigation mobile.');
-        assert.equal(metrics.mobileToggleVisible, true,
-          pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
-        assert.equal(metrics.mobileToggleAccessible, true,
-          pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        if (pageDefinition.noWorkspaceShell) {
+          assert.equal(metrics.adminReturnLinkVisible, true,
+            pageDefinition.name + ' doit conserver un lien de retour accessible vers l’application sur mobile.');
+        } else {
+          assert.equal(metrics.mobileToggleExists, true,
+            pageDefinition.name + ' doit exposer une commande de navigation mobile.');
+          assert.equal(metrics.mobileToggleVisible, true,
+            pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
+          assert.equal(metrics.mobileToggleAccessible, true,
+            pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        }
 
         const screenshot = 'theme-sombre-' + pageDefinition.name + '-' + viewport.name + '.png';
         await page.screenshot({
@@ -3334,8 +3349,18 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
               Number(navToggleStyle.opacity) > 0 && navToggleRect.width >= 32 && navToggleRect.height >= 32),
             mobileToggleAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
               navToggleLabel && navToggleControls === 'app-navigation' &&
-              document.getElementById(navToggleControls))
-          };
+              document.getElementById(navToggleControls)),
+            adminReturnLinkVisible: (() => {
+              const link = document.querySelector('.admin-exit-link');
+              if (!link) return false;
+              const style = getComputedStyle(link);
+              const rect = link.getBoundingClientRect();
+              return style.display !== 'none' && style.visibility !== 'hidden' &&
+                Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 20 &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+            })()
+};
         });
 
         assert.equal(metrics.viewport, viewport.width,
@@ -3353,12 +3378,17 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
         assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
           pageDefinition.name + ' : la zone métier doit rester dans le viewport à ' + viewport.width + 'px : ' +
           JSON.stringify(metrics));
-        assert.equal(metrics.mobileToggleExists, true,
-          pageDefinition.name + ' doit exposer une commande de navigation mobile.');
-        assert.equal(metrics.mobileToggleVisible, true,
-          pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
-        assert.equal(metrics.mobileToggleAccessible, true,
-          pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        if (pageDefinition.noWorkspaceShell) {
+          assert.equal(metrics.adminReturnLinkVisible, true,
+            pageDefinition.name + ' doit conserver un lien de retour accessible vers l’application sur mobile.');
+        } else {
+          assert.equal(metrics.mobileToggleExists, true,
+            pageDefinition.name + ' doit exposer une commande de navigation mobile.');
+          assert.equal(metrics.mobileToggleVisible, true,
+            pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
+          assert.equal(metrics.mobileToggleAccessible, true,
+            pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        }
 
         const screenshot = 'theme-clair-' + pageDefinition.name + '-' + viewport.name + '.png';
         await page.screenshot({
@@ -3460,6 +3490,16 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
             Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
           navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
             navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          adminReturnLinkVisible: (() => {
+            const link = document.querySelector('.admin-exit-link');
+            if (!link) return false;
+            const style = getComputedStyle(link);
+            const rect = link.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' &&
+              Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 20 &&
+              link.getAttribute('href') === 'dashboard.html' &&
+              (link.textContent || '').trim().length > 0;
+          })(),
           responsiveTables
         };
       });
@@ -3474,10 +3514,15 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
         pageDefinition.name + ' déborde horizontalement au zoom 200 % : ' + JSON.stringify(metrics));
       assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
         pageDefinition.name + ' sort du viewport utile au zoom 200 % : ' + JSON.stringify(metrics));
-      assert.equal(metrics.navigationVisible, true,
-        pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
-      assert.equal(metrics.navigationAccessible, true,
-        pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      if (pageDefinition.noWorkspaceShell) {
+        assert.equal(metrics.adminReturnLinkVisible, true,
+          pageDefinition.name + ' doit conserver son lien de retour accessible au zoom 200 %.');
+      } else {
+        assert.equal(metrics.navigationVisible, true,
+          pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
+        assert.equal(metrics.navigationAccessible, true,
+          pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      }
       for (const table of metrics.responsiveTables) {
         assert.equal(table.tableDisplay, 'block',
           pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
@@ -3601,6 +3646,16 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
             Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
           navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
             navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          adminReturnLinkVisible: (() => {
+            const link = document.querySelector('.admin-exit-link');
+            if (!link) return false;
+            const style = getComputedStyle(link);
+            const rect = link.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' &&
+              Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 20 &&
+              link.getAttribute('href') === 'dashboard.html' &&
+              (link.textContent || '').trim().length > 0;
+          })(),
           responsiveTables
         };
       });
@@ -3618,10 +3673,15 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
         pageDefinition.name + ' déborde horizontalement en thème sombre au zoom 200 % : ' + JSON.stringify(metrics));
       assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
         pageDefinition.name + ' sort du viewport utile en thème sombre au zoom 200 % : ' + JSON.stringify(metrics));
-      assert.equal(metrics.navigationVisible, true,
-        pageDefinition.name + ' doit garder la navigation visible en thème sombre au zoom 200 %.');
-      assert.equal(metrics.navigationAccessible, true,
-        pageDefinition.name + ' doit garder un bouton de navigation accessible en thème sombre au zoom 200 %.');
+      if (pageDefinition.noWorkspaceShell) {
+        assert.equal(metrics.adminReturnLinkVisible, true,
+          pageDefinition.name + ' doit conserver son lien de retour accessible au zoom 200 %.');
+      } else {
+        assert.equal(metrics.navigationVisible, true,
+          pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
+        assert.equal(metrics.navigationAccessible, true,
+          pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      }
       for (const table of metrics.responsiveTables) {
         assert.equal(table.tableDisplay, 'block',
           pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
