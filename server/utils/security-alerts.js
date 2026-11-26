@@ -74,45 +74,73 @@ async function createOrRefreshSecurityAlert(input, connection = null) {
   );
 
   return inTransaction(async conn => {
-    const [result] = await conn.query(
-      `INSERT INTO pro_security_alerts
+    await conn.query(
+      `INSERT IGNORE INTO pro_security_alerts
         (tenant_scope_id, fingerprint, alert_type, category, severity, status, title, description,
          source_event_id, entity_type, entity_id, occurrences, first_seen_at, last_seen_at, details_json)
-       VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?)
-       ON DUPLICATE KEY UPDATE
-         id = LAST_INSERT_ID(id),
-         resolved_by_user_id = IF(status IN ('resolved', 'false_positive', 'closed'), NULL, resolved_by_user_id),
-         resolved_at = IF(status IN ('resolved', 'false_positive', 'closed'), NULL, resolved_at),
-         resolution_note = IF(status IN ('resolved', 'false_positive', 'closed'), NULL, resolution_note),
-         status = IF(status IN ('resolved', 'false_positive', 'closed'), 'open', status),
-         occurrences = occurrences + 1,
-         last_seen_at = UTC_TIMESTAMP(6),
-         severity = IF(FIELD(VALUES(severity), 'low', 'medium', 'high', 'critical') > FIELD(severity, 'low', 'medium', 'high', 'critical'), VALUES(severity), severity),
-         source_event_id = COALESCE(VALUES(source_event_id), source_event_id),
-         description = COALESCE(VALUES(description), description),
-         details_json = COALESCE(VALUES(details_json), details_json)`,
+       VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, 1, UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), ?)`,
       [
         tenantId, fingerprint, alertType, category, severity, title, description,
         sourceEventId, entityType, entityId, JSON.stringify(details)
       ]
     );
-    const alertId = Number(result.insertId);
-    const [[alert]] = await conn.query(
-      'SELECT * FROM pro_security_alerts WHERE id = ? AND tenant_scope_id = ? FOR UPDATE',
-      [alertId, tenantId]
+    const [[current]] = await conn.query(
+      'SELECT * FROM pro_security_alerts WHERE tenant_scope_id = ? AND fingerprint = ? LIMIT 1 FOR UPDATE',
+      [tenantId, fingerprint]
     );
-    if (!alert) throw new Error('Alerte de sécurité introuvable après écriture.');
+    if (!current) throw new Error('Alerte de sécurité introuvable après écriture.');
 
-    const repeated = Number(alert.occurrences) > 1;
+    const created = Number(current.occurrences) === 1 &&
+      current.source_event_id != null &&
+      Number(current.source_event_id) === Number(sourceEventId);
+    const previousStatus = created ? null : current.status;
+    const reopened = !created && ['resolved', 'false_positive', 'closed'].includes(current.status);
+    const nextStatus = reopened ? 'open' : current.status;
+    const nextSeverity = SEVERITY_RANK[severity] > SEVERITY_RANK[current.severity]
+      ? severity
+      : current.severity;
+    let alert = current;
+
+    if (!created) {
+      await conn.query(
+        `UPDATE pro_security_alerts
+            SET status = ?,
+                severity = ?,
+                occurrences = occurrences + 1,
+                last_seen_at = UTC_TIMESTAMP(6),
+                source_event_id = COALESCE(?, source_event_id),
+                description = COALESCE(?, description),
+                details_json = COALESCE(?, details_json),
+                acknowledged_by_user_id = IF(?, NULL, acknowledged_by_user_id),
+                acknowledged_at = IF(?, NULL, acknowledged_at),
+                resolved_by_user_id = IF(?, NULL, resolved_by_user_id),
+                resolved_at = IF(?, NULL, resolved_at),
+                resolution_note = IF(?, NULL, resolution_note)
+          WHERE id = ? AND tenant_scope_id = ?`,
+        [
+          nextStatus, nextSeverity, sourceEventId, description, JSON.stringify(details),
+          reopened, reopened, reopened, reopened, reopened, Number(current.id), tenantId
+        ]
+      );
+      [[alert]] = await conn.query(
+        'SELECT * FROM pro_security_alerts WHERE id = ? AND tenant_scope_id = ? LIMIT 1',
+        [current.id, tenantId]
+      );
+    }
+
+    const repeated = !created;
+    const activityType = created ? 'alert.created' : (reopened ? 'alert.reopened' : 'alert.repeated');
+    const auditEventType = created ? 'security.alert.created' : (reopened ? 'security.alert.reopened' : 'security.alert.repeated');
     await conn.query(
       `INSERT INTO pro_security_case_activity
         (tenant_scope_id, alert_id, investigation_id, actor_user_id, activity_type,
          previous_status, new_status, details_json)
-       VALUES (?, ?, NULL, NULL, ?, NULL, ?, ?)`,
+       VALUES (?, ?, NULL, NULL, ?, ?, ?, ?)`,
       [
         tenantId,
-        alertId,
-        repeated ? 'alert.repeated' : 'alert.created',
+        Number(alert.id),
+        activityType,
+        previousStatus,
         alert.status,
         JSON.stringify(normalizeMetadata({
           occurrences: Number(alert.occurrences),
@@ -125,11 +153,11 @@ async function createOrRefreshSecurityAlert(input, connection = null) {
       tenantId,
       actorUserId: null,
       actorKind: 'system',
-      eventType: repeated ? 'security.alert.repeated' : 'security.alert.created',
+      eventType: auditEventType,
       category: 'security',
       severity: alert.severity,
       entityType: 'security_alert',
-      entityId: alertId,
+      entityId: Number(alert.id),
       outcome: 'success',
       metadata: {
         alert_type: alert.alert_type,
