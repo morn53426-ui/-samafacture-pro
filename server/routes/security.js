@@ -416,7 +416,8 @@ router.get('/security/investigations/:id', async (req, res, next) => {
 });
 
 router.post('/security/investigations', async (req, res, next) => {
-  const title = String(req.body.title || '').trim();
+  const titleRaw = String(req.body.title || '').trim();
+  const title = sanitizeCaseText(titleRaw, 190);
   const descriptionRaw = String(req.body.description || '').trim();
   const description = sanitizeCaseText(descriptionRaw, 4000);
   const alertId = req.body.alert_id == null || req.body.alert_id === '' ? null : positiveId(req.body.alert_id);
@@ -424,7 +425,7 @@ router.post('/security/investigations', async (req, res, next) => {
   const assignedId = req.body.assigned_to_user_id == null || req.body.assigned_to_user_id === ''
     ? null
     : positiveId(req.body.assigned_to_user_id);
-  if (!title || title.length > 190 || description.length > 4000 ||
+  if (!title || titleRaw.length > 190 || description.length > 4000 ||
       (req.body.alert_id != null && req.body.alert_id !== '' && !alertId) ||
       (descriptionRaw.length > 4000) ||
       !PRIORITIES.has(priority) || (req.body.assigned_to_user_id != null && req.body.assigned_to_user_id !== '' && !assignedId)) {
