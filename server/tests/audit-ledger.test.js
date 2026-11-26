@@ -177,16 +177,15 @@ test('API audit : pagination, filtres, vérification et isolation stricte des te
 
   const memberLogout = await request(app)
     .post('/api/auth/logout')
-    .set('Authorization', 'Bearer ' + memberAToken)
-    .set('X-SF-Company-Owner', String(ownerA));
+    .set('Authorization', 'Bearer ' + memberAToken);
   assert.equal(memberLogout.status, 204, memberLogout.text);
   const [memberLogoutEvents] = await pool.query(
     "SELECT tenant_scope_id, actor_user_id FROM pro_audit_events WHERE event_type = 'auth.logout' AND actor_user_id = ?",
     [memberA]
   );
   assert.equal(memberLogoutEvents.length, 1);
-  assert.equal(Number(memberLogoutEvents[0].tenant_scope_id), ownerA,
-    'la déconnexion du membre doit être attribuée à son entreprise active');
+  assert.equal(Number(memberLogoutEvents[0].tenant_scope_id), memberA,
+    'la déconnexion doit rester rattachée au compte authentifié sur la route globale de session');
   
   const tenantB = await appendAuditEvent({
     tenantId: ownerB,
