@@ -1,14 +1,13 @@
-// Test unitaire de insererLignesFacture() (server/routes/factures.js) — voir
+// Test unitaire de insererLignesFacture() (server/services/factures.js) — voir
 // AMELIORATIONS_SCALABILITE.md. Simule la connexion MySQL (conn.query mocké) plutôt que
 // d'utiliser une vraie base : suffisant pour vérifier que la requête générée est correcte, sans
-// dépendre de MySQL. Non exécuté dans cet environnement : charger server/routes/factures.js tire
-// avec lui express/qrcode/mysql2/... (aucun n'est installé ici, voir AUDIT_PRODUCTION.md §1.1) —
-// à lancer avec `npm test` une fois `npm install` fait.
+// dépendre de MySQL. Non exécuté dans cet environnement : charger server/services/factures.js tire
+// avec lui config/db (mysql2/...). À lancer avec `npm test` une fois `npm install` fait.
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'secret-de-test-ne-jamais-utiliser-en-production';
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { insererLignesFacture } = require('../routes/factures');
+const { insererLignesFacture } = require('../services/factures');
 
 function connFactice() {
   const appels = [];

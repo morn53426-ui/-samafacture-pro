@@ -2,6 +2,7 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+const { readDomainSource } = require('./helpers/route-source');
 
 describe('Dashboard — régression et scalabilité', () => {
   const file = path.join(__dirname, '..', 'routes', 'dashboard.js');
@@ -100,7 +101,7 @@ describe('Dashboard — régression et scalabilité', () => {
 
   test('les migrations 17 et 18 mémorisent l’entrepôt des factures et rendent le backfill historique idempotent', () => {
     const dbSource = fs.readFileSync(path.join(__dirname, '..', 'config', 'db.js'), 'utf8');
-    const professionalSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'professionnel.js'), 'utf8');
+    const professionalSource = readDomainSource('professionnel');
     const schemaSource = fs.readFileSync(path.join(__dirname, '..', 'database', 'schema.sql'), 'utf8');
     assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 24/);
     assert.match(dbSource, /v19 : historique des contrepassations/);

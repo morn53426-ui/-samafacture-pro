@@ -1,7 +1,8 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../config/db');
-const { computeTotals, insererLignesFacture, ajusterStockFacture } = require('./factures');
+const { computeTotals } = require('../utils/factures');
+const { insererLignesFacture, ajusterStockFacture } = require('../services/factures');
 const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
 const { localDateString } = require('../utils/local-date');

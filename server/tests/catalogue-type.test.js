@@ -5,9 +5,10 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 const helper = require('../utils/catalogue-type');
+const { readDomainSource } = require('./helpers/route-source');
 const route = fs.readFileSync(path.join(root, 'routes', 'produits.js'), 'utf8');
-const invoices = fs.readFileSync(path.join(root, 'routes', 'factures.js'), 'utf8');
-const professional = fs.readFileSync(path.join(root, 'routes', 'professionnel.js'), 'utf8');
+const invoices = readDomainSource('factures');
+const professional = readDomainSource('professionnel');
 const migration = fs.readFileSync(path.join(root, 'config', 'db.js'), 'utf8');
 const schema = fs.readFileSync(path.join(root, 'database', 'schema.sql'), 'utf8');
 const page = fs.readFileSync(path.join(root, '..', 'public', 'produits.html'), 'utf8');

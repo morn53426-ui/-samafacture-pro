@@ -3,7 +3,8 @@ const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { positiveNumber, percentage } = require('../utils/validation');
-const { computeTotals, insererLignesFacture, ajusterStockFacture, resoudreEntrepotFacture } = require('./factures');
+const { computeTotals } = require('../utils/factures');
+const { insererLignesFacture, ajusterStockFacture, resoudreEntrepotFacture } = require('../services/factures');
 const { reserveMonthlyInvoiceQuota } = require('../utils/invoice-quota');
 const { localDateString } = require('../utils/local-date');
 

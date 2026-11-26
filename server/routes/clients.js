@@ -4,7 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 const { notifierUtilisateur } = require('../realtime');
-const { ajusterStockFacture } = require('./factures');
+const { ajusterStockFacture } = require('../services/factures');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
 
 const router = express.Router();
