@@ -102,7 +102,7 @@ function permissionForRequest(req) {
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
   }
   if (base.endsWith('/pro')) {
-    if (path === '/security/assignees' && method === 'GET') return null;
+    if (path === '/security/assignees' && method === 'GET') return 'security.assignees.read';
     if (path.startsWith('/security/alerts')) return method === 'GET' ? 'security.alerts.read' : 'security.alerts.manage';
     if (path.startsWith('/security/investigations')) return method === 'GET' ? 'security.investigations.read' : 'security.investigations.manage';
     if (path.startsWith('/audit-events/export.')) return method === 'GET' ? 'audit.export' : 'admin.only';
@@ -138,6 +138,18 @@ function permissionForRequest(req) {
 
 function requirePermission(req, res, next) {
   const permission = permissionForRequest(req);
+  if (permission === 'security.assignees.read') {
+    const readableSecurityPermissions = [
+      'security.alerts.read',
+      'security.alerts.manage',
+      'security.investigations.read',
+      'security.investigations.manage'
+    ];
+    const allowed = req.permissions.includes('*') ||
+      readableSecurityPermissions.some(item => req.permissions.includes(item));
+    if (!allowed) return res.status(403).json({ error: 'Cette action n’est pas autorisée pour votre rôle.' });
+    return next();
+  }
   const writeImpliesRead = {
     'clients.read': 'clients.write',
     'products.read': 'products.write',
