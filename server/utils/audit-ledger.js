@@ -179,9 +179,9 @@ async function appendAuditEvent(input, connection = null) {
 
   const append = async conn => {
     await conn.query(
-      \`INSERT INTO pro_audit_chain_heads (tenant_scope_id, last_sequence, last_hash)
+      `INSERT INTO pro_audit_chain_heads (tenant_scope_id, last_sequence, last_hash)
        VALUES (?, 0, ?)
-       ON DUPLICATE KEY UPDATE tenant_scope_id = VALUES(tenant_scope_id)\`,
+       ON DUPLICATE KEY UPDATE tenant_scope_id = VALUES(tenant_scope_id)`,
       [event.tenantScopeId, GENESIS_HASH]
     );
     const [heads] = await conn.query(
@@ -199,11 +199,11 @@ async function appendAuditEvent(input, connection = null) {
     const eventHash = signPayload(buildHashPayload(event, sequence, previousHash, createdAt, keyVersion), key);
 
     const [insertResult] = await conn.query(
-      \`INSERT INTO pro_audit_events
+      `INSERT INTO pro_audit_events
         (tenant_scope_id, tenant_id, actor_user_id, actor_kind, event_type, category, severity,
          entity_type, entity_id, outcome, ip_address, user_agent, request_id, metadata_json,
          chain_sequence, previous_hash, event_hash, key_version, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         event.tenantScopeId, event.tenantId, event.actorUserId, event.actorKind,
         event.eventType, event.category, event.severity, event.entityType, event.entityId,
@@ -239,11 +239,11 @@ async function verifyAuditChain(tenantId, connection = pool) {
   }
   const scopeId = normalizedTenant === null ? 0 : normalizedTenant;
   const [rows] = await connection.query(
-    \`SELECT tenant_scope_id, tenant_id, actor_user_id, actor_kind, event_type, category, severity,
+    `SELECT tenant_scope_id, tenant_id, actor_user_id, actor_kind, event_type, category, severity,
             entity_type, entity_id, outcome, ip_address, user_agent, request_id, metadata_json,
             chain_sequence, previous_hash, event_hash, key_version,
             DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s.%f') AS created_at
-       FROM pro_audit_events WHERE tenant_scope_id = ? ORDER BY chain_sequence ASC\`,
+       FROM pro_audit_events WHERE tenant_scope_id = ? ORDER BY chain_sequence ASC`,
     [scopeId]
   );
 
