@@ -102,10 +102,10 @@ test('une base v19 conservant un essai actif migre vers v24 sans perdre ses date
 
   const migration = runMigrationInNewProcess();
   assert.equal(migration.error, undefined, migration.error?.message);
-  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v19 → v24 a échoué.');
+  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v19 → v26 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 25);
+  assert.equal(Number(meta.version), 26);
 
   const [[account]] = await pool.query(
     'SELECT plan, trial_plan, trial_started_at, trial_ends_at, trial_status FROM users WHERE id = ?',
@@ -125,7 +125,7 @@ test('une base v19 conservant un essai actif migre vers v24 sans perdre ses date
       trial_status: account.trial_status
     },
     trialBefore,
-    'La migration v19 → v24 ne doit ni redémarrer ni raccourcir l’essai actif.'
+    'La migration v19 → v26 ne doit ni redémarrer ni raccourcir l’essai actif.'
   );
 
   const [[expense]] = await pool.query(
@@ -172,10 +172,10 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
 
   const migration = runMigrationInNewProcess();
   assert.equal(migration.error, undefined, migration.error?.message);
-  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v20 → v25 a échoué.');
+  assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v20 → v26 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 25);
+  assert.equal(Number(meta.version), 26);
 
   const [[account]] = await pool.query(
     'SELECT trial_plan, trial_started_at, trial_ends_at, trial_status FROM users WHERE id = ?',
@@ -206,7 +206,7 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   const repeatedMigration = runMigrationInNewProcess();
   assert.equal(repeatedMigration.error, undefined, repeatedMigration.error?.message);
   assert.equal(repeatedMigration.status, 0,
-    repeatedMigration.stderr || repeatedMigration.stdout || 'La migration répétée v20 → v25 a échoué.');
+    repeatedMigration.stderr || repeatedMigration.stdout || 'La migration répétée v20 → v26 a échoué.');
   const [[repeatedMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
   assert.equal(Number(repeatedMeta.version), 25);
   const [[repeatedExpense]] = await pool.query(
@@ -266,10 +266,10 @@ test('une base v21 protège les événements comptables contre la suppression en
 
     const migration = runMigrationInNewProcess();
     assert.equal(migration.error, undefined, migration.error?.message);
-    assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v21 → v25 a échoué.');
+    assert.equal(migration.status, 0, migration.stderr || migration.stdout || 'La migration v21 → v26 a échoué.');
 
     const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-    assert.equal(Number(meta.version), 25);
+    assert.equal(Number(meta.version), 26);
     const [[mappingTable]] = await pool.query(
       "SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_compta_correspondances'"
     );
@@ -305,7 +305,7 @@ test('une base v21 protège les événements comptables contre la suppression en
     await pool.query('UPDATE _samafacture_schema_meta SET version = 21 WHERE id = 1');
     const repeated = runMigrationInNewProcess();
     assert.equal(repeated.error, undefined, repeated.error?.message);
-    assert.equal(repeated.status, 0, repeated.stderr || repeated.stdout || 'La migration v21 → v25 rejouée a échoué.');
+    assert.equal(repeated.status, 0, repeated.stderr || repeated.stdout || 'La migration v21 → v26 rejouée a échoué.');
     const [[repeatMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
     assert.equal(Number(repeatMeta.version), 25);
     const [[repeatEvent]] = await pool.query(
