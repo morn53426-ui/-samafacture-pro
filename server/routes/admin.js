@@ -79,6 +79,7 @@ router.get('/overview', async (req, res, next) => {
       pool.query("SELECT COUNT(*) AS registered_accounts, SUM(created_at >= ? AND created_at < ?) AS new_accounts, SUM(trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP()) AS active_trials, SUM(plan IN ('starter', 'standard', 'pro', 'entreprise')) AS accounts_with_paid_plan FROM users", dates),
       pool.query("SELECT plan, COUNT(*) AS accounts FROM users GROUP BY plan ORDER BY FIELD(plan, 'gratuit', 'starter', 'pro', 'entreprise'), plan"),
       pool.query("SELECT COUNT(*) AS active_saas_subscriptions FROM saas_subscriptions WHERE statut = 'active' AND (current_period_end IS NULL OR current_period_end >= UTC_DATE())"),
+      pool.query("SELECT COUNT(DISTINCT user_id) AS accounts_with_confirmed_subscription_payment FROM abonnement_paiements WHERE statut = 'payee'"),
       pool.query("SELECT plan, COUNT(*) AS subscriptions FROM saas_subscriptions WHERE statut = 'active' AND (current_period_end IS NULL OR current_period_end >= UTC_DATE()) GROUP BY plan ORDER BY plan"),
       pool.query("SELECT devise AS currency, COUNT(*) AS confirmed_payments, SUM(montant) AS amount FROM abonnement_paiements WHERE statut = 'payee' AND COALESCE(paid_at, created_at) >= ? AND COALESCE(paid_at, created_at) < ? GROUP BY devise ORDER BY devise", dates),
       pool.query("SELECT devise AS currency, COUNT(*) AS confirmed_payments, SUM(montant) AS amount FROM abonnement_paiements WHERE statut = 'payee' GROUP BY devise ORDER BY devise"),
@@ -91,6 +92,7 @@ router.get('/overview', async (req, res, next) => {
     const traffic = rows[0][0] || {};
     const users = rows[1][0] || {};
     const saas = rows[3][0] || {};
+    const confirmedPayers = rows[4][0] || {};
     return res.json({
       period: { from: period.from, to: period.to, days: period.days, bucket: period.bucket },
       summary: {
@@ -100,21 +102,22 @@ router.get('/overview', async (req, res, next) => {
         new_accounts: Number(users.new_accounts || 0),
         active_trials: Number(users.active_trials || 0),
         accounts_with_paid_plan: Number(users.accounts_with_paid_plan || 0),
-        active_saas_subscriptions: Number(saas.active_saas_subscriptions || 0)
+        active_saas_subscriptions: Number(saas.active_saas_subscriptions || 0),
+        accounts_with_confirmed_subscription_payment: Number(confirmedPayers.accounts_with_confirmed_subscription_payment || 0)
       },
       plans: {
         accounts_by_plan: rows[2],
-        active_saas_subscriptions_by_plan: rows[4]
+        active_saas_subscriptions_by_plan: rows[5]
       },
       revenue: {
-        period_by_currency: rows[5],
-        all_time_by_currency: rows[6],
-        trend: rows[9],
+        period_by_currency: rows[6],
+        all_time_by_currency: rows[7],
+        trend: rows[10],
         recurring_metrics_available: false,
         recurring_metrics_note: "MRR et ARR ne sont pas calculés : aucun catalogue de prix approuvé ni cycle de renouvellement SaaS actif n'est actuellement confirmé."
       },
-      traffic: { trend: rows[7], top_pages: rows[10] },
-      signups: { trend: rows[8] },
+      traffic: { trend: rows[8], top_pages: rows[11] },
+      signups: { trend: rows[9] },
       definitions: {
         estimated_sessions: "Identifiant aléatoire conservé dans sessionStorage pour un onglet ; ce n'est pas un décompte certifié de personnes physiques.",
         accounts_with_paid_plan: "Comptes avec Starter, Pro ou Entreprise dans le champ plan ; ce compteur ne prouve pas un paiement encaissé.",

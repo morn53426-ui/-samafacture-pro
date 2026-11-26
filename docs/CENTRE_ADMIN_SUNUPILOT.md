@@ -25,6 +25,7 @@ Redémarrer le serveur après configuration. Une liste vide bloque tous les comp
 
 - Pages consultées : chargements de pages ; un rechargement est une nouvelle vue.
 - Sessions estimées : empreintes HMAC distinctes issues d'un identifiant aléatoire en sessionStorage, par onglet. Ce n'est pas un décompte de personnes physiques.
+- Comptes ayant payé un abonnement : utilisateurs distincts ayant au moins un enregistrement `abonnement_paiements` confirmé (`payee`) dans l'historique ; ce total historique n'est pas une preuve d'abonnement encore actif.
 - Comptes avec formule payante : utilisateurs dont le plan vaut Starter, Pro ou Entreprise ; un essai avec formule choisie n'est pas une preuve de paiement.
 - Abonnements actifs : entrées `saas_subscriptions` avec une période courante valide.
 - Revenus d'abonnement : lignes `abonnement_paiements` au statut `payee`, regroupées par devise. Les paiements des factures émises par les utilisateurs sont exclus.

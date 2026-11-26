@@ -84,6 +84,7 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
     assert.equal(response.body.revenue.recurring_metrics_available, false);
     assert.equal(JSON.stringify(response.body).includes(registeredEmail), false);
     assert.ok(response.body.summary.registered_accounts >= 1);
+    assert.ok(response.body.summary.accounts_with_confirmed_subscription_payment >= 0);
   });
 
   test('les périodes inversées et au mauvais format sont refusées', async () => {

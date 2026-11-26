@@ -34,7 +34,7 @@ async function renderCharts(data){
 }
 function render(data){
  const s=data.summary||{};
- byId('kpi-pageviews').textContent=fmtCount(s.page_views);byId('kpi-sessions').textContent=fmtCount(s.estimated_sessions);byId('kpi-accounts').textContent=fmtCount(s.registered_accounts);byId('kpi-new-accounts').textContent='Nouvelles inscriptions : '+fmtCount(s.new_accounts);byId('kpi-trials').textContent=fmtCount(s.active_trials);byId('kpi-paid-plans').textContent=fmtCount(s.accounts_with_paid_plan);byId('kpi-active-subscriptions').textContent=fmtCount(s.active_saas_subscriptions);
+ byId('kpi-pageviews').textContent=fmtCount(s.page_views);byId('kpi-sessions').textContent=fmtCount(s.estimated_sessions);byId('kpi-accounts').textContent=fmtCount(s.registered_accounts);byId('kpi-new-accounts').textContent='Nouvelles inscriptions : '+fmtCount(s.new_accounts);byId('kpi-trials').textContent=fmtCount(s.active_trials);byId('kpi-paid-subscribers').textContent=fmtCount(s.accounts_with_confirmed_subscription_payment);byId('kpi-active-subscriptions').textContent=fmtCount(s.active_saas_subscriptions);
  byId('period-caption').textContent='Période analysée : du '+data.period.from+' au '+data.period.to+' (UTC).';
  renderRevenue(data.revenue||{});renderPlans(data.plans||{});renderPages(data.traffic&&data.traffic.top_pages);
  byId('admin-state').hidden=true;byId('admin-dashboard').hidden=false;renderCharts(data).catch(()=>notice('Impossible de construire les graphiques.'));
