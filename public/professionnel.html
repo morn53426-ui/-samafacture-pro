@@ -805,6 +805,7 @@ async function handleSecurityAction(event) {
 el('security-alerts-list').addEventListener('click', handleSecurityAction);
 el('security-investigations-list').addEventListener('click', handleSecurityAction);
 el('security-refresh').addEventListener('click', () => loadSecurityCenter().catch(err => alert(err.message)));
+el('security-alert-assignee').addEventListener('change', () => loadSecurityCenter().catch(err => alert(err.message)));
 el('security-alert-status').addEventListener('change', () => loadSecurityCenter().catch(err => alert(err.message)));
 el('security-investigation-form').addEventListener('submit', async event => {
   event.preventDefault();
