@@ -39,6 +39,9 @@ test('le centre de sécurité expose les alertes et dossiers selon les permissio
   assert.match(page, /data-security-action="ack"/);
   assert.match(page, /data-security-action="note"/);
   assert.match(page, /data-security-action="assign-alert"/);
+  assert.match(page, /data-security-action="assign-investigation"/);
+  assert.match(page, /data-security-action="history"/);
+  assert.match(page, /security\/assignees/);
   assert.match(page, /security.alerts.manage/);
   assert.match(page, /setHidden\('pro-security-center'/);
 });
