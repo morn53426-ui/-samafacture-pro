@@ -248,61 +248,86 @@ async function verifyAuditChain(tenantId, connection = pool) {
     throw new TypeError('Identifiant de tenant invalide.');
   }
   const scopeId = normalizedTenant === null ? 0 : normalizedTenant;
-  const [rows] = await connection.query(
-    `SELECT tenant_scope_id, tenant_id, actor_user_id, actor_kind, event_type, category, severity,
-            entity_type, entity_id, outcome, ip_address, user_agent, request_id, metadata_json,
-            chain_sequence, previous_hash, event_hash, key_version,
-            DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s.%f') AS created_at
-       FROM pro_audit_events WHERE tenant_scope_id = ? ORDER BY chain_sequence ASC`,
-    [scopeId]
-  );
-
+  const batchSize = 500;
   let expectedSequence = 1;
   let previousHash = GENESIS_HASH;
-  for (const row of rows) {
-    const sequence = Number(row.chain_sequence);
-    if (sequence !== expectedSequence) return { valid: false, reason: 'sequence_gap', checked: expectedSequence - 1, failedSequence: sequence };
-    if (String(row.previous_hash) !== previousHash) return { valid: false, reason: 'previous_hash_mismatch', checked: expectedSequence - 1, failedSequence: sequence };
+  let checked = 0;
+  let cursor = 0;
 
-    let key;
-    try { key = getKeyForVersion(Number(row.key_version)); }
-    catch (_) { return { valid: false, reason: 'key_unavailable', checked: expectedSequence - 1, failedSequence: sequence }; }
+  // Parcours borné en mémoire : un historique long ne doit pas être chargé en une seule fois.
+  while (true) {
+    const [rows] = await connection.query(
+      `SELECT tenant_scope_id, tenant_id, actor_user_id, actor_kind, event_type, category, severity,
+              entity_type, entity_id, outcome, ip_address, user_agent, request_id, metadata_json,
+              chain_sequence, previous_hash, event_hash, key_version,
+              DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s.%f') AS created_at
+         FROM pro_audit_events
+        WHERE tenant_scope_id = ? AND chain_sequence > ?
+        ORDER BY chain_sequence ASC
+        LIMIT ?`,
+      [scopeId, cursor, batchSize]
+    );
+    if (!rows.length) break;
 
-    const event = {
-      tenantId: row.tenant_id === null ? null : Number(row.tenant_id),
-      tenantScopeId: Number(row.tenant_scope_id),
-      actorUserId: row.actor_user_id === null ? null : Number(row.actor_user_id),
-      actorKind: row.actor_kind,
-      eventType: row.event_type,
-      category: row.category,
-      severity: row.severity,
-      entityType: row.entity_type,
-      entityId: row.entity_id,
-      outcome: row.outcome,
-      ipAddress: row.ip_address,
-      userAgent: row.user_agent,
-      requestId: row.request_id,
-      metadata: parseMetadata(row.metadata_json)
-    };
-    const payload = buildHashPayload(event, sequence, previousHash, row.created_at, Number(row.key_version));
-    const expectedHash = signPayload(payload, key);
-    const receivedHash = String(row.event_hash || '');
-    const matches = /^[a-f0-9]{64}$/.test(receivedHash) &&
-      crypto.timingSafeEqual(Buffer.from(expectedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
-    if (!matches) return { valid: false, reason: 'event_hash_mismatch', checked: expectedSequence - 1, failedSequence: sequence };
-    previousHash = receivedHash;
-    expectedSequence += 1;
+    for (const row of rows) {
+      const sequence = Number(row.chain_sequence);
+      if (sequence !== expectedSequence) {
+        return { valid: false, reason: 'sequence_gap', checked, failedSequence: sequence };
+      }
+      if (String(row.previous_hash) !== previousHash) {
+        return { valid: false, reason: 'previous_hash_mismatch', checked, failedSequence: sequence };
+      }
+
+      let key;
+      try {
+        key = getKeyForVersion(Number(row.key_version));
+      } catch (_) {
+        return { valid: false, reason: 'key_unavailable', checked, failedSequence: sequence };
+      }
+
+      const event = {
+        tenantId: row.tenant_id === null ? null : Number(row.tenant_id),
+        tenantScopeId: Number(row.tenant_scope_id),
+        actorUserId: row.actor_user_id === null ? null : Number(row.actor_user_id),
+        actorKind: row.actor_kind,
+        eventType: row.event_type,
+        category: row.category,
+        severity: row.severity,
+        entityType: row.entity_type,
+        entityId: row.entity_id,
+        outcome: row.outcome,
+        ipAddress: row.ip_address,
+        userAgent: row.user_agent,
+        requestId: row.request_id,
+        metadata: parseMetadata(row.metadata_json)
+      };
+      const payload = buildHashPayload(event, sequence, previousHash, row.created_at, Number(row.key_version));
+      const expectedHash = signPayload(payload, key);
+      const receivedHash = String(row.event_hash || '');
+      const matches = /^[a-f0-9]{64}$/.test(receivedHash) &&
+        crypto.timingSafeEqual(Buffer.from(expectedHash, 'hex'), Buffer.from(receivedHash, 'hex'));
+      if (!matches) {
+        return { valid: false, reason: 'event_hash_mismatch', checked, failedSequence: sequence };
+      }
+      previousHash = receivedHash;
+      expectedSequence += 1;
+      checked += 1;
+      cursor = sequence;
+    }
+    if (rows.length < batchSize) break;
   }
 
   const [heads] = await connection.query(
     'SELECT last_sequence, last_hash FROM pro_audit_chain_heads WHERE tenant_scope_id = ? LIMIT 1',
     [scopeId]
   );
-  if (rows.length === 0 && heads.length === 0) return { valid: true, checked: 0, lastHash: GENESIS_HASH };
-  if (!heads.length || Number(heads[0].last_sequence) !== rows.length || String(heads[0].last_hash) !== previousHash) {
-    return { valid: false, reason: 'chain_head_mismatch', checked: rows.length };
+  if (checked === 0 && heads.length === 0) {
+    return { valid: true, checked: 0, lastHash: GENESIS_HASH };
   }
-  return { valid: true, checked: rows.length, lastHash: previousHash };
+  if (!heads.length || Number(heads[0].last_sequence) !== checked || String(heads[0].last_hash) !== previousHash) {
+    return { valid: false, reason: 'chain_head_mismatch', checked };
+  }
+  return { valid: true, checked, lastHash: previousHash };
 }
 
 module.exports = { appendAuditEvent, verifyAuditChain, AuditConfigurationError, GENESIS_HASH, normalizeMetadata };
