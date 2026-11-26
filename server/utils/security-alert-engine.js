@@ -76,6 +76,30 @@ async function evaluateSecuritySignal(connection, event, sourceEventId) {
 
   const existing = existingRows[0];
   const shouldReopen = existing.status === 'resolved' || existing.status === 'dismissed';
+  let reopenedCaseId = null;
+  if (shouldReopen) {
+    const [relatedCases] = await connection.query(
+      `SELECT id, status FROM pro_security_cases
+        WHERE tenant_scope_id = ? AND source_alert_id = ?
+        LIMIT 1 FOR UPDATE`,
+      [event.tenantScopeId, existing.id]
+    );
+    if (relatedCases.length && ['resolved', 'closed'].includes(relatedCases[0].status)) {
+      reopenedCaseId = Number(relatedCases[0].id);
+      await connection.query(
+        `UPDATE pro_security_cases
+            SET status = 'open', resolved_at = NULL, closed_at = NULL, updated_at = UTC_TIMESTAMP(6)
+          WHERE id = ? AND tenant_scope_id = ?`,
+        [reopenedCaseId, event.tenantScopeId]
+      );
+      await connection.query(
+        `INSERT INTO pro_security_case_events
+          (tenant_scope_id, case_id, actor_user_id, event_type, from_status, to_status)
+         VALUES (?, ?, NULL, 'case.reopened', ?, 'open')`,
+        [event.tenantScopeId, reopenedCaseId, relatedCases[0].status]
+      );
+    }
+  }
   await connection.query(
     `UPDATE pro_security_alerts
         SET status = ?, source_event_id = ?, source_event_type = 'auth.login.failed',
@@ -98,6 +122,7 @@ async function evaluateSecuritySignal(connection, event, sourceEventId) {
   return {
     action: shouldReopen ? 'reopened' : 'updated',
     alertId: Number(existing.id),
+    caseId: reopenedCaseId,
     attempts,
     ruleCode: FAILED_LOGIN_RULE.code
   };
