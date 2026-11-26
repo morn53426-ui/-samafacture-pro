@@ -21,10 +21,10 @@ function cleanText(value, max, label, required = false) {
 
 function sanitizeCaseText(value, maxLength = 4000) {
   return String(value == null ? '' : value).trim()
-    .replace(/\\bBearer\\s+[A-Za-z0-9._~+/=-]+/gi, '[JETON MASQUÉ]')
-    .replace(/\\b[A-Z]{2}\\d{2}[A-Z0-9]{10,30}\\b/gi, '[IBAN MASQUÉ]')
-    .replace(/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/gi, '[EMAIL MASQUÉ]')
-    .replace(/\\b(?:\\d[ -]*?){13,19}\\b/g, '[NUMÉRO DE CARTE MASQUÉ]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, '[JETON MASQUÉ]')
+    .replace(/\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b/gi, '[IBAN MASQUÉ]')
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[EMAIL MASQUÉ]')
+    .replace(/\b(?:\d[ -]*?){13,19}\b/g, '[NUMÉRO DE CARTE MASQUÉ]')
     .slice(0, maxLength);
 }
 
