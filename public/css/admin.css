@@ -56,3 +56,5 @@
 :root[data-theme="dark"] .admin-exit-link:hover {
   text-decoration: underline;
 }
+.admin-skip-link{position:absolute;z-index:1000;top:-64px;left:12px;padding:10px 14px;border:2px solid var(--gold);border-radius:var(--radius-sm);background:var(--paper);color:var(--ink);font-weight:700;text-decoration:none;box-shadow:var(--shadow-sm)}
+.admin-skip-link:focus-visible{top:12px;outline:3px solid var(--gold);outline-offset:2px}
