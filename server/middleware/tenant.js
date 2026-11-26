@@ -4,8 +4,8 @@ const { isEnterprisePlan } = require('../utils/plans');
 const ROLE_PERMISSIONS = {
   proprietaire: ['*'],
   administrateur: ['*'],
-  manager: ['dashboard.read', 'clients.read', 'clients.write', 'products.read', 'products.write', 'invoices.read', 'invoices.write', 'payments.read', 'payments.write', 'expenses.read', 'expenses.write', 'reports.read', 'documents.read', 'documents.write', 'sales.read', 'sales.write', 'purchasing.read', 'purchasing.write', 'inventory.read', 'inventory.write', 'accounting.read', 'accounting.write', 'cash.read', 'cash.write', 'team.read', 'crm.read', 'crm.write', 'localization.read', 'localization.write', 'audit.read'],
-  comptable: ['dashboard.read', 'clients.read', 'products.read', 'invoices.read', 'payments.read', 'payments.write', 'expenses.read', 'expenses.write', 'reports.read', 'accounting.read', 'accounting.write', 'documents.read', 'documents.write', 'audit.read'],
+  manager: ['dashboard.read', 'clients.read', 'clients.write', 'products.read', 'products.write', 'invoices.read', 'invoices.write', 'payments.read', 'payments.write', 'expenses.read', 'expenses.write', 'reports.read', 'documents.read', 'documents.write', 'sales.read', 'sales.write', 'purchasing.read', 'purchasing.write', 'inventory.read', 'inventory.write', 'accounting.read', 'accounting.write', 'cash.read', 'cash.write', 'team.read', 'crm.read', 'crm.write', 'localization.read', 'localization.write', 'audit.read', 'security.alerts.read', 'security.alerts.manage', 'security.investigations.read', 'security.investigations.manage'],
+  comptable: ['dashboard.read', 'clients.read', 'products.read', 'invoices.read', 'payments.read', 'payments.write', 'expenses.read', 'expenses.write', 'reports.read', 'accounting.read', 'accounting.write', 'documents.read', 'documents.write', 'audit.read', 'security.alerts.read', 'security.investigations.read'],
   commercial: ['dashboard.read', 'clients.read', 'clients.write', 'products.read', 'invoices.read', 'invoices.write', 'sales.read', 'sales.write', 'crm.read', 'crm.write', 'documents.read'],
   caissier: ['dashboard.read', 'clients.read', 'invoices.read', 'payments.read', 'payments.write', 'cash.read', 'cash.write'],
   employe: ['dashboard.read', 'clients.read', 'products.read', 'invoices.read', 'sales.read'],
@@ -102,6 +102,8 @@ function permissionForRequest(req) {
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
   }
   if (base.endsWith('/pro')) {
+    if (path.startsWith('/security/alerts')) return method === 'GET' ? 'security.alerts.read' : 'security.alerts.manage';
+    if (path.startsWith('/security/investigations')) return method === 'GET' ? 'security.investigations.read' : 'security.investigations.manage';
     if (path.startsWith('/audit-events/export.')) return method === 'GET' ? 'audit.export' : 'admin.only';
     if (path.startsWith('/audit-events')) return method === 'GET' ? 'audit.read' : 'admin.only';
     // Expose uniquement le code devise du tenant actif aux membres qui doivent
@@ -151,7 +153,9 @@ function requirePermission(req, res, next) {
     'inventory.read': 'inventory.write',
     'accounting.read': 'accounting.write',
     'crm.read': 'crm.write',
-    'localization.read': 'localization.write'
+    'localization.read': 'localization.write',
+    'security.alerts.read': 'security.alerts.manage',
+    'security.investigations.read': 'security.investigations.manage'
   };
   if (!permission || req.permissions.includes('*') || req.permissions.includes(permission) ||
       (writeImpliesRead[permission] && req.permissions.includes(writeImpliesRead[permission]))) return next();
