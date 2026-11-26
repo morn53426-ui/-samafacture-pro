@@ -8302,3 +8302,39 @@ a.btn .icon {
 
 /* Hidden is explicit even when a component class sets display:inline-flex. */
 #platform-admin-shortcut[hidden] { display: none !important; }
+
+
+/* Navigation de retour persistante pour les pages d'information ouvertes
+   depuis l'espace de travail, y compris sur les petits écrans. */
+body.info-page .lp-header{
+  position:sticky;top:0;z-index:100;width:100%;box-sizing:border-box;
+  padding-top:max(14px,env(safe-area-inset-top,0px));
+  padding-left:max(18px,env(safe-area-inset-left,0px));
+  padding-right:max(18px,env(safe-area-inset-right,0px));
+  background:var(--paper);border-bottom:1px solid var(--line);
+}
+body.info-page .lp-back-link{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  flex:0 0 auto;min-height:44px;padding:9px 14px;
+  border:1px solid var(--line);border-radius:9px;
+  background:var(--cream);color:var(--ink);font-size:.88rem;font-weight:650;
+  text-decoration:none;touch-action:manipulation
+}
+body.info-page .lp-back-link:hover,
+body.info-page .lp-back-link:focus-visible{background:var(--emerald-light);border-color:var(--emerald);color:var(--emerald)}
+body.info-page .lp-back-link:focus-visible{outline:2px solid var(--emerald);outline-offset:2px}
+body.info-page .lp-back-link span{font-size:1.2rem;line-height:1}
+body.info-page .lp-content{scroll-margin-top:100px}
+@media(max-width:860px){
+  body.info-page .lp-header{
+    gap:10px;justify-content:space-between;flex-wrap:nowrap;
+    padding: max(10px,env(safe-area-inset-top,0px)) 14px 10px;
+  }
+  body.info-page .lp-header .brand{gap:8px;min-width:0;flex:1 1 auto;font-size:.96rem;white-space:nowrap}
+  body.info-page .lp-header .brand img{width:34px;height:34px;flex:0 0 34px}
+  body.info-page .lp-back-link{min-width:88px;padding:8px 12px;font-size:.84rem}
+}
+@media(max-width:360px){
+  body.info-page .lp-header .brand{font-size:.9rem}
+  body.info-page .lp-back-link{min-width:80px;padding:8px 10px}
+}
