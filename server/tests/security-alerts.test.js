@@ -153,6 +153,19 @@ test('API alertes : isolation tenant, lecture membre et triage autorisé', async
     Authorization: 'Bearer ' + memberAToken,
     'X-SF-Company-Owner': String(ownerA)
   };
+  const assigneeList = await request(app)
+    .get('/api/pro/security/assignees')
+    .set(memberHeaders);
+  assert.equal(assigneeList.status, 200, assigneeList.text);
+  assert.ok(assigneeList.body.assignees.some(person => Number(person.id) === ownerA));
+  assert.ok(assigneeList.body.assignees.some(person => Number(person.id) === memberA));
+  assert.equal(assigneeList.body.assignees.some(person => Number(person.id) === ownerB), false,
+    'la liste des responsables ne doit pas divulguer les membres d’un autre tenant');
+  const resolveWithoutNote = await request(app)
+    .post('/api/pro/security/alerts/' + alertId + '/resolve')
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({});
+  assert.equal(resolveWithoutNote.status, 400, resolveWithoutNote.text);
   const memberRead = await request(app).get('/api/pro/security/alerts').set(memberHeaders);
   assert.equal(memberRead.status, 200, memberRead.text);
   const memberMutation = await request(app)
@@ -197,6 +210,14 @@ test('investigation : création liée, notes filtrées, changement de statut et 
   investigationId = Number(created.body.investigation.id);
   assert.match(created.body.investigation.reference, /^INV-\d{4}-[A-F0-9]{8}$/);
   assert.equal(created.body.investigation.status, 'open');
+  assert.equal(Number(created.body.investigation.assigned_to_user_id), memberA);
+
+  const reassigned = await request(app)
+    .patch('/api/pro/security/investigations/' + investigationId)
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({ assigned_to_user_id: ownerA });
+  assert.equal(reassigned.status, 200, reassigned.text);
+  assert.equal(Number(reassigned.body.investigation.assigned_to_user_id), ownerA);
 
   const duplicate = await request(app)
     .post('/api/pro/security/investigations')
