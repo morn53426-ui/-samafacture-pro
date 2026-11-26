@@ -2,7 +2,7 @@ name: Audit statique — code inutilisé
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'feat/compliance-audit-ledger-lot1-20261126']
     paths:
       - 'server/**'
       - 'mobile/**'
