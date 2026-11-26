@@ -67,6 +67,32 @@ before(async () => {
   );
 });
 
+test('migration v25 : tables d’audit signées, triggers immuables et absence de FK vers users', async () => {
+  const [tables] = await pool.query(
+    `SELECT TABLE_NAME FROM information_schema.TABLES
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME IN ('pro_audit_events', 'pro_audit_chain_heads')`
+  );
+  assert.deepEqual(tables.map(row => row.TABLE_NAME).sort(), ['pro_audit_chain_heads', 'pro_audit_events']);
+
+  const [triggers] = await pool.query(
+    `SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
+     WHERE TRIGGER_SCHEMA = DATABASE()
+       AND TRIGGER_NAME IN ('trg_pro_audit_events_block_update', 'trg_pro_audit_events_block_delete')`
+  );
+  assert.deepEqual(triggers.map(row => row.TRIGGER_NAME).sort(), [
+    'trg_pro_audit_events_block_delete',
+    'trg_pro_audit_events_block_update'
+  ]);
+
+  const [foreignKeys] = await pool.query(
+    `SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pro_audit_events'
+       AND REFERENCED_TABLE_NAME IS NOT NULL`
+  );
+  assert.equal(foreignKeys.length, 0, 'le cycle de vie d’un compte ne doit pas supprimer ses preuves d’audit');
+});
+
 test('journal signé : redaction des secrets, concurrence et intégrité de la chaîne', async () => {
   const pendingConnection = await pool.getConnection();
   let rolledBackId;
