@@ -797,6 +797,12 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     }, { timeout: 15000 });
     const adminUi = await page.evaluate(() => ({
       dashboardVisible: document.getElementById('admin-dashboard')?.hidden === false,
+      loadingStateHidden: (() => {
+        const loading = document.getElementById('admin-state');
+        return Boolean(loading && loading.hidden &&
+          getComputedStyle(loading).display === 'none' &&
+          loading.getClientRects().length === 0);
+      })(),
       kpiCount: document.querySelectorAll('.admin-kpi').length,
       trafficChart: Boolean(document.getElementById('traffic-chart')?.dataset.sfChartType),
       signupChart: Boolean(document.getElementById('signup-chart')?.dataset.sfChartType),
@@ -811,6 +817,8 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     }));
     assert.equal(adminUi.dashboardVisible, true,
       'Le centre administrateur doit terminer son chargement avec des données de démonstration.');
+    assert.equal(adminUi.loadingStateHidden, true,
+      'Le panneau de chargement doit être masqué et ne plus occuper d’espace après le rendu.');
     assert.equal(adminUi.kpiCount, 6, 'Les six indicateurs de pilotage doivent être affichés.');
     assert.equal(adminUi.trafficChart, true, 'Le graphique de fréquentation doit être construit.');
     assert.equal(adminUi.signupChart, true, 'Le graphique des inscriptions doit être construit.');
