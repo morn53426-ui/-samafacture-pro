@@ -27,10 +27,10 @@ test('l’espace professionnel utilise le nouveau registre d’audit avec filtre
   ]) {
     assert.match(page, new RegExp('id="' + id + '"'), 'contrôle UI absent : ' + id);
   }
-  assert.match(page, /Api\.get\('\\/pro\\/audit-events\?' \+ params\.toString\(\)\)/);
-  assert.match(page, /Api\.get\('\\/pro\\/audit-events\/integrity'\)/);
+  assert.ok(page.includes("Api.get('/pro/audit-events?' + params.toString())"));
+  assert.ok(page.includes("Api.get('/pro/audit-events/integrity')"));
   assert.match(page, /setHidden\('audit-section', !can\('audit\.read'\)\)/);
-  assert.doesNotMatch(page, /optionalApiGet\('\\/pro\\/audit'\)/,
+  assert.equal(page.includes("optionalApiGet('/pro/audit')"), false,
     'la page ne doit plus consommer l’ancien endpoint limité de l’audit');
 });
 
