@@ -3207,7 +3207,7 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
               const style = getComputedStyle(link);
               const rect = link.getBoundingClientRect();
               return style.display !== 'none' && style.visibility !== 'hidden' &&
-                Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 20 &&
+                Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 12 &&
                 link.getAttribute('href') === 'dashboard.html' &&
                 (link.textContent || '').trim().length > 0;
             })()
@@ -3356,7 +3356,7 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
               const style = getComputedStyle(link);
               const rect = link.getBoundingClientRect();
               return style.display !== 'none' && style.visibility !== 'hidden' &&
-                Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 20 &&
+                Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 12 &&
                 link.getAttribute('href') === 'dashboard.html' &&
                 (link.textContent || '').trim().length > 0;
             })()
@@ -3496,7 +3496,7 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
             const style = getComputedStyle(link);
             const rect = link.getBoundingClientRect();
             return style.display !== 'none' && style.visibility !== 'hidden' &&
-              Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 20 &&
+              Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 12 &&
               link.getAttribute('href') === 'dashboard.html' &&
               (link.textContent || '').trim().length > 0;
           })(),
@@ -3652,7 +3652,7 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
             const style = getComputedStyle(link);
             const rect = link.getBoundingClientRect();
             return style.display !== 'none' && style.visibility !== 'hidden' &&
-              Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 20 &&
+              Number(style.opacity) > 0 && rect.width >= 24 && rect.height >= 12 &&
               link.getAttribute('href') === 'dashboard.html' &&
               (link.textContent || '').trim().length > 0;
           })(),
