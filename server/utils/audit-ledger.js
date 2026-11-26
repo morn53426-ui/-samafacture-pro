@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const { pool } = require('../config/db');
 
 const GENESIS_HASH = '0'.repeat(64);
-const SENSITIVE_KEY = /(password|passwd|pwd|passphrase|secret|token|authorization|cookie|api.?key|private.?key|cvv|cvc|card.?number|otp|one.?time|verification.?code|reset.?token|signature)/i;
+const SENSITIVE_KEY = /(password|passwd|pwd|passphrase|secret|token|authorization|cookie|api.?key|private.?key|cvv|cvc|card.?number|otp|one.?time|verification.?code|reset.?token|signature|email|e.?mail|phone|telephone|mobile|iban|rib|bank.?account|account.?number|identity.?number|document.?number|ninea|rccm|birth|address)/i;
 const BEARER_VALUE = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const CARD_VALUE = /\b(?:\d[ -]*?){13,19}\b/g;
 const SEVERITIES = new Set(['info', 'low', 'medium', 'high', 'critical']);
