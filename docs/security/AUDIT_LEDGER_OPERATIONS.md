@@ -22,7 +22,7 @@ AUDIT_LOG_HMAC_KEY_VERSION=2
 AUDIT_LOG_HMAC_KEYRING={"1":"<ancienne-cle>","2":"<nouvelle-cle>"}
 ```
 
-Déployer d'abord la nouvelle configuration à l'ensemble des workers, puis reprendre les écritures avec la nouvelle version. Ne retirer une clé historique qu'après preuve qu'aucun événement ne dépend de cette version et après approbation de la procédure de conservation. Les valeurs d'exemple ci-dessus sont des placeholders, pas des secrets utilisables.
+Déployer d'abord la nouvelle configuration à l'ensemble des workers, puis reprendre les écritures avec la nouvelle version. Ne retirer une clé historique qu'après preuve qu'aucun événement ne dépend de cette version et après approbation de la procédure de conservation. Les valeurs d'exemple ci-dessus sont des placeholders, pas des secrets utilisables. Le trousseau stocke les matériaux source pour chaque version ; le service applique la même dérivation HKDF lors de la vérification.
 
 ## API disponible
 
