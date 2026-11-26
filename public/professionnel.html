@@ -402,6 +402,7 @@
                 <option value="false_positive">Faux positif</option>
               </select>
             </div>
+            <div class="field"><label for="security-alert-assignee">Responsable des alertes</label><select id="security-alert-assignee"><option value="">Choisir un membre actif</option></select></div>
             <button class="btn btn-outline" id="security-refresh" type="button">Actualiser</button>
           </div>
           <div id="security-alerts-list" class="pro-list" aria-live="polite"></div>
@@ -416,6 +417,7 @@
                 <option value="low">Faible</option><option value="medium" selected>Modérée</option><option value="high">Élevée</option><option value="critical">Critique</option>
               </select>
             </div>
+            <div class="field"><label for="security-investigation-assignee">Responsable du dossier</label><select id="security-investigation-assignee"><option value="">Non attribué</option></select></div>
             <button class="btn btn-primary" type="submit">Créer le dossier</button>
           </form>
         </div>
@@ -442,6 +444,7 @@ let establishmentsCache = [];
 let cashRegistersCache = [];
 let documentsCache = [];
 let customRolesCache = [];
+let securityTeamMembersCache = [];
 let currentPaymentLink = '';
 
 function el(id) { return document.getElementById(id); }
@@ -681,6 +684,17 @@ async function loadSecurityCenter() {
   );
 
   const manageAlerts = can('security.alerts.manage');
+  const memberOptions = securityTeamMembersCache.map(member =>
+    '<option value="' + Number(member.member_user_id) + '">' + escapeHtml(member.nom || ('Membre #' + member.member_user_id)) + '</option>'
+  ).join('');
+  const alertAssignee = el('security-alert-assignee');
+  const selectedAlertAssignee = alertAssignee.value;
+  alertAssignee.innerHTML = '<option value="">Choisir un membre actif</option>' + memberOptions;
+  if (selectedAlertAssignee) alertAssignee.value = selectedAlertAssignee;
+  const investigationAssignee = el('security-investigation-assignee');
+  const selectedInvestigationAssignee = investigationAssignee.value;
+  investigationAssignee.innerHTML = '<option value="">Non attribué</option>' + memberOptions;
+  if (selectedInvestigationAssignee) investigationAssignee.value = selectedInvestigationAssignee;
   setList('security-alerts-list', (alertResult.alerts || []).map(alert => {
     const activeInvestigation = (investigationResult.investigations || []).some(item =>
       Number(item.alert_id) === Number(alert.id) && !['resolved', 'closed'].includes(item.status)
@@ -688,6 +702,9 @@ async function loadSecurityCenter() {
     const actions = [];
     if (manageAlerts && alert.status === 'open') {
       actions.push('<button class="btn btn-sm btn-outline" data-security-action="ack" data-alert-id="' + Number(alert.id) + '">Prendre en compte</button>');
+    }
+    if (manageAlerts && alertAssignee.value) {
+      actions.push('<button class="btn btn-sm btn-outline" data-security-action="assign-alert" data-alert-id="' + Number(alert.id) + '">Affecter</button>');
     }
     if (can('security.investigations.manage') && !activeInvestigation && !['resolved', 'false_positive'].includes(alert.status)) {
       actions.push('<button class="btn btn-sm btn-outline" data-security-action="investigate" data-alert-id="' + Number(alert.id) + '">Ouvrir une investigation</button>');
@@ -726,13 +743,18 @@ async function handleSecurityAction(event) {
   try {
     if (action === 'ack') {
       await securityRequest('POST', '/pro/security/alerts/' + alertId + '/acknowledge', {});
+    } else if (action === 'assign-alert') {
+      const assigneeId = Number(el('security-alert-assignee').value);
+      if (!assigneeId) return;
+      await securityRequest('POST', '/pro/security/alerts/' + alertId + '/assign', { assigned_to_user_id: assigneeId });
     } else if (action === 'investigate') {
       const alertResult = await securityRequest('GET', '/pro/security/alerts/' + alertId);
       await securityRequest('POST', '/pro/security/investigations', {
         alert_id: alertId,
         title: 'Investigation · ' + alertResult.alert.title,
         description: alertResult.alert.description || '',
-        priority: alertResult.alert.severity || 'medium'
+        priority: alertResult.alert.severity || 'medium',
+        assigned_to_user_id: Number(el('security-investigation-assignee').value) || null
       });
     } else if (action === 'note') {
       const field = document.querySelector('[data-investigation-note="' + investigationId + '"]');
@@ -764,7 +786,8 @@ el('security-investigation-form').addEventListener('submit', async event => {
     await securityRequest('POST', '/pro/security/investigations', {
       title: el('security-investigation-title').value,
       description: el('security-investigation-description').value,
-      priority: el('security-investigation-priority').value
+      priority: el('security-investigation-priority').value,
+      assigned_to_user_id: Number(el('security-investigation-assignee').value) || null
     });
     event.target.reset();
     await loadSecurityCenter();
@@ -833,6 +856,7 @@ async function loadWorkspace() {
     activePermissions = Array.isArray(companies.permissions) ? companies.permissions : ['*'];
     applyModulePermissions();
     customRolesCache = team.roles || [];
+    securityTeamMembersCache = (team.membres || []).filter(member => Number(member.active) === 1);
     el('invite-custom-role').innerHTML = '<option value="">Choisir un rôle enregistré</option>' + customRolesCache.map(r => '<option value="' + r.id + '">' + escapeHtml(r.nom) + '</option>').join('');
     clientsCache = clients.clients || [];
     invoicesCache = invoices.factures || [];
