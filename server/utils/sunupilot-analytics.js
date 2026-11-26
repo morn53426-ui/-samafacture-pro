@@ -47,11 +47,11 @@ function retentionDays() {
 
 // Supprime par lots les vues plus anciennes que la durée de conservation, sans verrouiller
 // longuement la table. Retourne le nombre total de lignes supprimées.
-async function purgeOldPageviews() {
+async function purgeOldPageviews(connection = pool) {
   const days = retentionDays();
   let total = 0;
   for (let batch = 0; batch < PURGE_MAX_BATCHES; batch += 1) {
-    const [result] = await pool.query(
+    const [result] = await connection.query(
       'DELETE FROM sunupilot_analytics_pageviews WHERE created_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? DAY) LIMIT ' + PURGE_BATCH_SIZE,
       [days]
     );
