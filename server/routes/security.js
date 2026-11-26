@@ -342,6 +342,15 @@ async function finalizeAlert(req, res, next, finalStatus) {
         err.status = 409;
         throw err;
       }
+      const [[activeInvestigation]] = await conn.query(
+        "SELECT id FROM pro_security_investigations WHERE tenant_scope_id = ? AND alert_id = ? AND status NOT IN ('resolved', 'closed') LIMIT 1 FOR UPDATE",
+        [tenant(req), alertId]
+      );
+      if (activeInvestigation) {
+        const err = new Error('Clôturez d’abord l’investigation active liée à cette alerte.');
+        err.status = 409;
+        throw err;
+      }
       await conn.query(
         'UPDATE pro_security_alerts SET status = ?, resolved_by_user_id = ?, resolved_at = UTC_TIMESTAMP(6), resolution_note = ? WHERE id = ? AND tenant_scope_id = ?',
         [finalStatus, actor(req), note, alertId, tenant(req)]
