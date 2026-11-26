@@ -715,6 +715,10 @@ async function loadSecurityCenter() {
     if (can('security.investigations.manage') && !activeInvestigation && !['resolved', 'false_positive'].includes(alert.status)) {
       actions.push('<button class="btn btn-sm btn-outline" data-security-action="investigate" data-alert-id="' + Number(alert.id) + '">Ouvrir une investigation</button>');
     }
+    if (manageAlerts && !activeInvestigation && !['resolved', 'false_positive'].includes(alert.status)) {
+      actions.push('<button class="btn btn-sm btn-outline" data-security-action="resolve-alert" data-alert-id="' + Number(alert.id) + '">Résoudre</button>');
+      actions.push('<button class="btn btn-sm btn-outline" data-security-action="false-positive" data-alert-id="' + Number(alert.id) + '">Faux positif</button>');
+    }
     return '<div class="pro-list-row"><div><strong>' + escapeHtml(alert.title) + '</strong><small>' +
       escapeHtml(alert.alert_type) + ' · ' + escapeHtml(securityLabel(alert.severity)) +
       ' · ' + Number(alert.occurrences) + ' occurrence(s) · Dernier signalement : ' + formatDate(alert.last_seen_at) +
@@ -752,7 +756,14 @@ async function handleSecurityAction(event) {
   const investigationId = Number(button.dataset.investigationId);
   button.disabled = true;
   try {
-    if (action === 'ack') {
+    if (action === 'resolve-alert' || action === 'false-positive') {
+      const resolution = prompt('Justification de la décision (10 caractères minimum) :');
+      if (!resolution || resolution.trim().length < 10) return;
+      const route = action === 'false-positive' ? '/false-positive' : '/resolve';
+      await securityRequest('POST', '/pro/security/alerts/' + alertId + route, {
+        resolution_note: resolution.trim()
+      });
+    } else if (action === 'ack') {
       await securityRequest('POST', '/pro/security/alerts/' + alertId + '/acknowledge', {});
     } else if (action === 'assign-alert') {
       const assigneeId = Number(el('security-alert-assignee').value);
