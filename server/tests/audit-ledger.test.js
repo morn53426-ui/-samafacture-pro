@@ -21,6 +21,7 @@ let ownerB;
 let memberA;
 let ownerAToken;
 let ownerBToken;
+let ownerBEmail;
 let memberAToken;
 let firstEventId;
 const createdUsers = [];
@@ -35,7 +36,7 @@ async function register(prefix) {
   });
   assert.equal(response.status, 201, response.text);
   createdUsers.push(response.body.user.id);
-  return { id: Number(response.body.user.id), token: response.body.token };
+  return { id: Number(response.body.user.id), token: response.body.token, email: response.body.user.email };
 }
 
 before(async () => {
@@ -47,6 +48,7 @@ before(async () => {
   ownerAToken = a.token;
   ownerB = b.id;
   ownerBToken = b.token;
+  ownerBEmail = b.email;
   memberA = member.id;
   memberAToken = member.token;
 
@@ -104,7 +106,7 @@ test('journal signé : redaction des secrets, concurrence et intégrité de la c
     })
   ));
   const sequences = [first.sequence, ...concurrent.map(item => item.sequence)].sort((a, b) => a - b);
-  assert.deepEqual(sequences, [1, 2, 3, 4, 5, 6, 7], 'les écritures concurrentes doivent recevoir une séquence continue');
+  assert.deepEqual(sequences, [2, 3, 4, 5, 6, 7, 8], 'les écritures concurrentes doivent recevoir une séquence continue après l’événement d’inscription');
 
   const [storedRows] = await pool.query(
     'SELECT metadata_json FROM pro_audit_events WHERE id = ? AND tenant_scope_id = ?',
@@ -120,7 +122,7 @@ test('journal signé : redaction des secrets, concurrence et intégrité de la c
 
   const integrity = await verifyAuditChain(ownerA);
   assert.equal(integrity.valid, true, JSON.stringify(integrity));
-  assert.equal(integrity.checked, 7);
+  assert.equal(integrity.checked, 8);
 });
 
 test('les événements sont immuables au niveau SQL', async () => {
@@ -156,7 +158,7 @@ test('API audit : pagination, filtres, vérification et isolation stricte des te
     .set('Authorization', 'Bearer ' + ownerAToken);
   assert.equal(integrity.status, 200, integrity.text);
   assert.equal(integrity.body.valid, true);
-  assert.ok(integrity.body.checked >= 9);
+  assert.ok(integrity.body.checked >= 10);
 
   const memberForbidden = await request(app)
     .get('/api/pro/audit-events')
@@ -177,6 +179,72 @@ test('API audit : pagination, filtres, vérification et isolation stricte des te
   assert.equal(tenantBRead.status, 200, tenantBRead.text);
   assert.ok(tenantBRead.body.events.some(event => event.event_type === 'audit.test.tenant_b'));
   assert.equal(tenantBRead.body.events.some(event => event.event_type === 'audit.test.created'), false);
+
+  const failedLogin = await request(app).post('/api/auth/login').send({
+    email: ownerBEmail,
+    password: 'mot-de-passe-volontairement-incorrect'
+  });
+  assert.equal(failedLogin.status, 401);
+
+  const successfulLogin = await request(app).post('/api/auth/login').send({
+    email: ownerBEmail,
+    password: 'motdepasse123'
+  });
+  assert.equal(successfulLogin.status, 200, successfulLogin.text);
+  const logout = await request(app)
+    .post('/api/auth/logout')
+    .set('Authorization', 'Bearer ' + successfulLogin.body.token);
+  assert.equal(logout.status, 204, logout.text);
+
+  const [authEvents] = await pool.query(
+    'SELECT event_type, outcome FROM pro_audit_events WHERE tenant_scope_id = ? ORDER BY chain_sequence',
+    [ownerB]
+  );
+  assert.ok(authEvents.some(event => event.event_type === 'auth.login.failed' && event.outcome === 'failure'));
+  assert.ok(authEvents.some(event => event.event_type === 'auth.login.succeeded' && event.outcome === 'success'));
+  assert.ok(authEvents.some(event => event.event_type === 'auth.logout' && event.outcome === 'success'));
+  const tenantBIntegrity = await verifyAuditChain(ownerB);
+  assert.equal(tenantBIntegrity.valid, true, JSON.stringify(tenantBIntegrity));
+});
+
+test('création de facture et encaissement : audit atomique avec les opérations métier', async () => {
+  const client = await request(app)
+    .post('/api/clients')
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({ nom: 'Client audit financier' });
+  assert.equal(client.status, 201, client.text);
+
+  const created = await request(app)
+    .post('/api/factures')
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({
+      client_id: client.body.client.id,
+      type: 'facture',
+      lignes: [{ designation: 'Prestation audit', quantite: 1, prix_unitaire: 1250, tva: 0 }]
+    });
+  assert.equal(created.status, 201, created.text);
+  const invoice = created.body.facture;
+  assert.ok(invoice.id);
+
+  const [createdEvents] = await pool.query(
+    'SELECT event_type, entity_id, metadata_json FROM pro_audit_events WHERE tenant_scope_id = ? AND entity_id = ?',
+    [ownerA, String(invoice.id)]
+  );
+  assert.ok(createdEvents.some(event => event.event_type === 'invoice.created'));
+
+  const payment = await request(app)
+    .post('/api/factures/' + invoice.id + '/paiements')
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({ montant: invoice.total, methode: 'Espèces', reference: 'audit-ledger-test' });
+  assert.equal(payment.status, 201, payment.text);
+
+  const [paymentEvents] = await pool.query(
+    "SELECT event_type, entity_id FROM pro_audit_events WHERE tenant_scope_id = ? AND event_type = 'payment.received'",
+    [ownerA]
+  );
+  assert.equal(paymentEvents.length, 1);
+  const integrity = await verifyAuditChain(ownerA);
+  assert.equal(integrity.valid, true, JSON.stringify(integrity));
 });
 
 after(async () => {
