@@ -99,12 +99,14 @@ router.get('/security-alerts', async (req, res, next) => {
       params
     );
     const [alerts] = await pool.query(
-      `SELECT id, rule_code, severity, status, title, summary, source_event_id,
-              source_event_type, first_seen_at, last_seen_at, occurrence_count,
-              resolved_at, created_at, updated_at
-         FROM pro_security_alerts
-        WHERE ${clause}
-        ORDER BY FIELD(severity, 'critical', 'high', 'medium', 'low'), last_seen_at DESC, id DESC
+      `SELECT a.id, a.rule_code, a.severity, a.status, a.title, a.summary, a.source_event_id,
+              a.source_event_type, a.first_seen_at, a.last_seen_at, a.occurrence_count,
+              a.resolved_at, a.created_at, a.updated_at,
+              (SELECT c.id FROM pro_security_cases c
+                WHERE c.tenant_scope_id = a.tenant_scope_id AND c.source_alert_id = a.id LIMIT 1) AS case_id
+         FROM pro_security_alerts a
+        WHERE ${clause.replace(/tenant_scope_id/g, 'a.tenant_scope_id').replace(/status/g, 'a.status').replace(/severity/g, 'a.severity')}
+        ORDER BY FIELD(a.severity, 'critical', 'high', 'medium', 'low'), a.last_seen_at DESC, a.id DESC
         LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
@@ -155,16 +157,12 @@ router.put('/security-alerts/:id/status', async (req, res, next) => {
       }
       await connection.query(
         `UPDATE pro_security_alerts
-            SET status = ?, resolved_at = ?, resolution_code = ?,
+            SET status = ?,
+                resolved_at = IF(? IN ('resolved', 'dismissed'), UTC_TIMESTAMP(6), NULL),
+                resolution_code = IF(? IN ('resolved', 'dismissed'), COALESCE(?, 'accepted'), NULL),
                 updated_at = UTC_TIMESTAMP(6)
           WHERE id = ? AND tenant_scope_id = ?`,
-        [
-          nextStatus,
-          nextStatus === 'resolved' || nextStatus === 'dismissed' ? new Date() : null,
-          nextStatus === 'resolved' || nextStatus === 'dismissed' ? (resolutionCode || 'accepted') : null,
-          id,
-          scope
-        ]
+        [nextStatus, nextStatus, nextStatus, resolutionCode, id, scope]
       );
       await appendAuditEvent(auditContext(
         req,
@@ -316,13 +314,14 @@ router.put('/security-cases/:id/status', async (req, res, next) => {
       };
       if (!allowedTransitions[current.status]?.includes(nextStatus)) return { conflict: true };
 
-      const resolvedAt = nextStatus === 'resolved' || nextStatus === 'closed' ? new Date() : null;
-      const closedAt = nextStatus === 'closed' ? new Date() : null;
       await connection.query(
         `UPDATE pro_security_cases
-            SET status = ?, resolved_at = ?, closed_at = ?, updated_at = UTC_TIMESTAMP(6)
+            SET status = ?,
+                resolved_at = IF(? IN ('resolved', 'closed'), COALESCE(resolved_at, UTC_TIMESTAMP(6)), NULL),
+                closed_at = IF(? = 'closed', COALESCE(closed_at, UTC_TIMESTAMP(6)), NULL),
+                updated_at = UTC_TIMESTAMP(6)
           WHERE id = ? AND tenant_scope_id = ?`,
-        [nextStatus, resolvedAt, closedAt, caseId, scope]
+        [nextStatus, nextStatus, nextStatus, caseId, scope]
       );
       await connection.query(
         `INSERT INTO pro_security_case_events
@@ -332,15 +331,14 @@ router.put('/security-cases/:id/status', async (req, res, next) => {
       );
       await connection.query(
         `UPDATE pro_security_alerts
-            SET status = ?, resolved_at = ?, resolution_code = ?,
+            SET status = ?,
+                resolved_at = IF(? IN ('resolved', 'closed'), COALESCE(resolved_at, UTC_TIMESTAMP(6)), NULL),
+                resolution_code = NULL,
                 updated_at = UTC_TIMESTAMP(6)
           WHERE id = ? AND tenant_scope_id = ?`,
         [
           nextStatus === 'resolved' || nextStatus === 'closed' ? 'resolved' : 'investigating',
-          nextStatus === 'resolved' || nextStatus === 'closed' ? new Date() : null,
-          nextStatus === 'resolved' || nextStatus === 'closed' ? 'mitigated' : null,
-          current.source_alert_id,
-          scope
+          nextStatus, current.source_alert_id, scope
         ]
       );
       await appendAuditEvent(auditContext(
