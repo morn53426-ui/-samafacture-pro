@@ -19,6 +19,15 @@ function cleanText(value, max, label, required = false) {
   return text || null;
 }
 
+function sanitizeCaseText(value, maxLength = 4000) {
+  return String(value == null ? '' : value).trim()
+    .replace(/\\bBearer\\s+[A-Za-z0-9._~+/=-]+/gi, '[JETON MASQUÉ]')
+    .replace(/\\b[A-Z]{2}\\d{2}[A-Z0-9]{10,30}\\b/gi, '[IBAN MASQUÉ]')
+    .replace(/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/gi, '[EMAIL MASQUÉ]')
+    .replace(/\\b(?:\\d[ -]*?){13,19}\\b/g, '[NUMÉRO DE CARTE MASQUÉ]')
+    .slice(0, maxLength);
+}
+
 function buildFingerprint(tenantId, alertType, entityType, entityId, deduplicationKey) {
   return crypto.createHash('sha256')
     .update([
@@ -60,7 +69,7 @@ async function createOrRefreshSecurityAlert(input, connection = null) {
     throw new TypeError('La gravité doit être low, medium, high ou critical.');
   }
   const title = cleanText(input.title, 190, 'Titre', true);
-  const description = cleanText(input.description, 4000, 'Description');
+  const description = sanitizeCaseText(cleanText(input.description, 4000, 'Description'), 4000) || null;
   const entityType = cleanText(input.entityType, 80, 'Type d’entité');
   const entityId = input.entityId == null ? null : cleanText(input.entityId, 100, 'Identifiant d’entité');
   const sourceEventId = input.sourceEventId == null ? null : positiveId(input.sourceEventId, 'Événement source');
@@ -210,5 +219,6 @@ module.exports = {
   createOrRefreshSecurityAlert,
   detectRepeatedLoginFailures,
   buildFingerprint,
+  sanitizeCaseText,
   SEVERITY_RANK
 };
