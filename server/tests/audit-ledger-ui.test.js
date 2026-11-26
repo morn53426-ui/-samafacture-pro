@@ -42,7 +42,8 @@ test('l’espace professionnel utilise le nouveau registre d’audit avec filtre
 
 test('les événements du registre sont échappés avant insertion dans le DOM', () => {
   assert.match(page, /escapeHtml\(event\.event_type\)/);
-  assert.match(page, /escapeHtml\(event\.entity_type/);
+  assert.match(page, /const entity = \[event\.entity_type, event\.entity_id \? '#' \+ event\.entity_id : ''\]\.filter\(Boolean\)\.join\(' '\);/);
+  assert.match(page, /escapeHtml\(entity \|\| '—'\)/);
   assert.match(page, /escapeHtml\(metadata\)/);
   assert.match(page, /escapeHtml\(event\.ip_address\)/);
 });
