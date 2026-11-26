@@ -102,7 +102,7 @@ function permissionForRequest(req) {
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
   }
   if (base.endsWith('/pro')) {
-    if (path === '/security/assignees' && method === 'GET') return null;
+    if (path === '/security/assignees' && method === 'GET') return 'security.assignees.manage';
     if (path.startsWith('/security/alerts')) return method === 'GET' ? 'security.alerts.read' : 'security.alerts.manage';
     if (path.startsWith('/security/investigations')) return method === 'GET' ? 'security.investigations.read' : 'security.investigations.manage';
     if (path.startsWith('/audit-events/export.')) return method === 'GET' ? 'audit.export' : 'admin.only';
@@ -138,6 +138,10 @@ function permissionForRequest(req) {
 
 function requirePermission(req, res, next) {
   const permission = permissionForRequest(req);
+  if (permission === 'security.assignees.manage' &&
+      (req.permissions.includes('*') ||
+       req.permissions.includes('security.alerts.manage') ||
+       req.permissions.includes('security.investigations.manage'))) return next();
   const writeImpliesRead = {
     'clients.read': 'clients.write',
     'products.read': 'products.write',
