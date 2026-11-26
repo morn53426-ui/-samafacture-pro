@@ -43,6 +43,11 @@ describe('Actions de création et navigation de retour sur mobile', () => {
     assert.match(workspaceCss, /\.workspace-mobile-create-actions>\.btn\{width:100%;min-height:48px/);
   });
 
+  test('la modale de création passe au-dessus de la barre de navigation mobile', () => {
+    assert.match(workspaceCss, /body > \.workspace-create-modal\{z-index:1300!important\}/);
+    assert.match(globalCss, /\.sidebar\s*\{[\s\S]*?z-index:\s*110/);
+  });
+
   test('la modale client/catalogue défile sans couper les actions et évite le zoom iOS sur les champs', () => {
     assert.match(workspaceCss, /\.workspace-create-modal\{overflow-y:auto/);
     assert.match(workspaceCss, /max-height:calc\(100dvh - env\(safe-area-inset-top,0px\) - env\(safe-area-inset-bottom,0px\) - 20px\)/);
