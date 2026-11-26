@@ -16,6 +16,7 @@ const { notifierUtilisateur } = require('../realtime');
 const { enqueuePdfJob, getPdfJob, getPdfPath } = require('../pdf-queue');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
 const { recordInvoiceAccountingTransition } = require('../services/accounting-invoice-lifecycle');
+const { appendAuditEvent } = require('../utils/audit-ledger');
 const { optionalText, optionalIsoDate } = require('../utils/optional-fields');
 
 const router = express.Router();
@@ -666,6 +667,29 @@ router.post('/', async (req, res, next) => {
       await appliquerAjustementsStock(conn, req.tenantId, invoiceWarehouseId, computedLignes.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite })));
     }
 
+    await appendAuditEvent({
+      tenantId: Number(req.tenantId),
+      actorUserId: Number(req.actorId || req.user.id),
+      eventType: docType === 'facture' ? 'invoice.created' : 'quote.created',
+      category: 'billing',
+      severity: 'info',
+      entityType: docType,
+      entityId: String(factureId),
+      outcome: 'success',
+      ipAddress: req.ip || null,
+      userAgent: req.get('user-agent') || null,
+      requestId: req.requestId || null,
+      metadata: {
+        numero,
+        document_type: docType,
+        client_id: Number(client_id),
+        total,
+        currency: documentCurrency,
+        line_count: computedLignes.length,
+        idempotency_key_present: Boolean(idempotencyKey)
+      }
+    }, conn);
+
     await conn.commit();
     // Réutiliser la connexion déjà acquise jusqu'au finally : si 10 requêtes concurrentes
     // gardent chacune une connexion du pool puis en redemandent une pour ce SELECT, le pool
@@ -771,6 +795,27 @@ router.put('/:id/statut', async (req, res, next) => {
         transition: accountingTransition
       });
     }
+
+    await appendAuditEvent({
+      tenantId: Number(req.tenantId),
+      actorUserId: Number(req.actorId || req.user.id),
+      eventType: existing.type === 'facture' ? 'invoice.status_changed' : 'quote.status_changed',
+      category: 'billing',
+      severity: statut === 'annulee' ? 'high' : 'info',
+      entityType: existing.type,
+      entityId: String(existing.id),
+      outcome: 'success',
+      ipAddress: req.ip || null,
+      userAgent: req.get('user-agent') || null,
+      requestId: req.requestId || null,
+      metadata: {
+        numero: existing.numero,
+        document_type: existing.type,
+        previous_status: existing.statut,
+        new_status: statut,
+        accounting_transition: accountingTransition
+      }
+    }, conn);
 
     await conn.commit();
     const [rows] = await pool.query(
@@ -1314,6 +1359,20 @@ router.delete('/:id', async (req, res, next) => {
     }
 
     await conn.query('DELETE FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    await appendAuditEvent({
+      tenantId: Number(req.tenantId),
+      actorUserId: Number(req.actorId || req.user.id),
+      eventType: 'quote.deleted',
+      category: 'billing',
+      severity: 'medium',
+      entityType: 'devis',
+      entityId: String(existing.id),
+      outcome: 'success',
+      ipAddress: req.ip || null,
+      userAgent: req.get('user-agent') || null,
+      requestId: req.requestId || null,
+      metadata: { numero: existing.numero, total: Number(existing.total), currency: existing.devise }
+    }, conn);
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
@@ -1453,7 +1512,7 @@ router.post('/:id/paiements', async (req, res, next) => {
       });
     }
 
-    await conn.query(
+    const [paymentInsert] = await conn.query(
       'INSERT INTO paiements (user_id, facture_id, montant, methode, reference, idempotency_key) VALUES (?, ?, ?, ?, ?, ?)',
       [req.tenantId, facture.id, montantNum, methodeValidee, referenceValidee, idempotencyKey]
     );
@@ -1464,6 +1523,28 @@ router.post('/:id/paiements', async (req, res, next) => {
       'UPDATE factures SET montant_paye = ?, statut = ? WHERE id = ? AND user_id = ?',
       [nouveauMontantPaye, nouveauStatut, facture.id, req.tenantId]
     );
+    await appendAuditEvent({
+      tenantId: Number(req.tenantId),
+      actorUserId: Number(req.actorId || req.user.id),
+      eventType: 'payment.received',
+      category: 'billing',
+      severity: 'info',
+      entityType: 'payment',
+      entityId: String(paymentInsert.insertId),
+      outcome: 'success',
+      ipAddress: req.ip || null,
+      userAgent: req.get('user-agent') || null,
+      requestId: req.requestId || null,
+      metadata: {
+        invoice_id: Number(facture.id),
+        invoice_number: facture.numero,
+        amount: montantNum,
+        currency: facture.devise,
+        method: methodeValidee,
+        new_invoice_status: nouveauStatut,
+        idempotency_key_present: Boolean(idempotencyKey)
+      }
+    }, conn);
     await conn.commit();
 
     queueWebhookEvent(req.tenantId, 'payment.received', {
