@@ -102,6 +102,7 @@ function permissionForRequest(req) {
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
   }
   if (base.endsWith('/pro')) {
+    if (path === '/security/assignees' && method === 'GET') return null;
     if (path.startsWith('/security/alerts')) return method === 'GET' ? 'security.alerts.read' : 'security.alerts.manage';
     if (path.startsWith('/security/investigations')) return method === 'GET' ? 'security.investigations.read' : 'security.investigations.manage';
     if (path.startsWith('/audit-events/export.')) return method === 'GET' ? 'audit.export' : 'admin.only';
