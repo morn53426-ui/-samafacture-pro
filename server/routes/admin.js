@@ -58,6 +58,8 @@ function requirePlatformAdmin(req, res, next) {
 // users.role est un rôle métier d'entreprise, jamais un rôle d'administration plateforme.
 router.use(requireAuth, requirePlatformAdmin);
 
+router.get('/access', (req, res) => res.json({ authorized: true }));
+
 router.get('/overview', async (req, res, next) => {
   try {
     const period = resolvePeriod(req.query || {});

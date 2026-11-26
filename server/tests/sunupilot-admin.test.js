@@ -22,6 +22,7 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
     });
     assert.equal(registration.status, 201, registration.text);
     userId = registration.body.user.id;
+    assert.equal(registration.body.user.role, 'administrateur');
     token = registration.body.token;
   });
 
@@ -40,6 +41,14 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
       .set('Authorization', 'Bearer ' + token);
     assert.equal(response.status, 403);
     assert.equal(response.body.code, 'ADMIN_ACCESS_NOT_CONFIGURED');
+  });
+
+  test('un compte hors liste blanche reçoit un refus explicite', async () => {
+    process.env.SUNUPILOT_ADMIN_USER_IDS = String(Number(userId) + 999999);
+    const response = await request(app).get('/api/admin/access')
+      .set('Authorization', 'Bearer ' + token);
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, 'ADMIN_ACCESS_DENIED');
   });
 
   test('la pageview stocke une empreinte et non le session_id brut', async () => {
