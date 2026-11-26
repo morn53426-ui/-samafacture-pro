@@ -152,6 +152,8 @@ test('une base v8 reçoit les migrations v9 à v24 sans perdre les données exis
   await pool.query('DROP TABLE IF EXISTS saas_subscription_consents');
   await pool.query('DROP TABLE IF EXISTS saas_subscriptions');
   await pool.query('DROP TABLE IF EXISTS saas_subscription_price_versions');
+  // La migration v24 doit recréer la table analytique absente d'une base v8.
+  await pool.query('DROP TABLE IF EXISTS sunupilot_analytics_pageviews');
 
   const [existingDueIndex] = await pool.query(
     `SELECT INDEX_NAME FROM information_schema.STATISTICS
@@ -257,6 +259,10 @@ test('une base v8 reçoit les migrations v9 à v24 sans perdre les données exis
   assert.equal(accountingEventsAfter.length, 1, 'la migration v19 doit créer la table des événements comptables.');
   const [expenseModeAfter] = await pool.query(`SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'depenses' AND COLUMN_NAME = 'mode_reglement'`);
   assert.equal(expenseModeAfter[0]?.COLUMN_DEFAULT, 'caisse', 'la migration v20 doit restaurer le mode par défaut caisse.');
+  const [analyticsTableAfter] = await pool.query(`SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sunupilot_analytics_pageviews'`);
+  assert.equal(analyticsTableAfter.length, 1, 'la migration v24 doit recréer la table analytique sur une base v8.');
+  const [analyticsColumnsAfter] = await pool.query(`SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sunupilot_analytics_pageviews' AND COLUMN_NAME IN ('visitor_hash', 'page_path', 'created_at')`);
+  assert.deepEqual(analyticsColumnsAfter.map(row => row.COLUMN_NAME).sort(), ['created_at', 'page_path', 'visitor_hash'], 'la table analytique v24 doit conserver uniquement les champs attendus.');
 });
 
 
