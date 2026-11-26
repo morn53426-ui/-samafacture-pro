@@ -16,7 +16,10 @@ const formPages = [
   'internationalisation.html',
   'crm.html',
   'clients.html',
-  'depenses.html'
+  'depenses.html',
+  'comptabilite.html',
+  'paiements-professionnels.html',
+  'groupe-entreprise.html'
 ];
 
 describe('Titres des pages métier sur petit écran', () => {
@@ -25,9 +28,10 @@ describe('Titres des pages métier sur petit écran', () => {
       const html = fs.readFileSync(path.join(PUBLIC_DIR, file), 'utf8');
       assert.match(html, /class="[^"]*workspace-page[^"]*"/,
         'La page doit utiliser le shell métier commun.');
-      assert.match(html, /class="[^"]*page-header[^"]*"/,
-        'La page doit déclarer son en-tête principal.');
-      assert.match(html, /<h1\b[^>]*>/,
+      const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] || '';
+      assert.match(main, /<(?:div|header)\b[^>]*class="[^"]*(?:page-header|workspace-page-header)[^"]*"/,
+        'La page doit déclarer un en-tête principal direct.');
+      assert.match(main, /<h1\b[^>]*>/,
         'Le titre principal doit rester un véritable titre H1.');
     });
   }
@@ -40,7 +44,7 @@ describe('Titres des pages métier sur petit écran', () => {
 
   test('à 900 px ou moins, le titre principal passe avant la barre d’outils globale', () => {
     assert.match(styles, /@media \(max-width: 900px\)[\s\S]*?\.main-content\.workspace-page\.workspace-page-has-heading\s*\{[\s\S]*?display:\s*grid/);
-    assert.match(styles, /\.main-content\.workspace-page\.workspace-page-has-heading\s*> \.page-header\s*\{[\s\S]*?grid-row:\s*1/);
+    assert.match(styles, /\.main-content\.workspace-page\.workspace-page-has-heading\s*> \.page-header,[\s\S]*?\.main-content\.workspace-page\.workspace-page-has-heading\s*> \.workspace-page-header\s*\{[\s\S]*?grid-row:\s*1/);
     assert.match(styles, /\.main-content\.workspace-page\.workspace-page-has-heading\s*> #topbar-root,[\s\S]*?\.app-topbar\s*\{[\s\S]*?grid-row:\s*2/);
   });
 
