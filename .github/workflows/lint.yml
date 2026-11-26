@@ -22,6 +22,7 @@ on:
       - 'public/js/theme.js'
       - 'server/routes/admin.js'
       - 'server/routes/analytics.js'
+      - 'server/utils/sunupilot-analytics.js'
       - 'server/tests/sunupilot-admin.test.js'
       - 'server/app.js'
       - 'server/config/monitoring.js'
@@ -112,6 +113,7 @@ jobs:
           public/js/theme.js
           server/routes/admin.js
           server/routes/analytics.js
+          server/utils/sunupilot-analytics.js
           server/tests/sunupilot-admin.test.js
           server/tests/visual/recette-visuelle.js
           server/tests/local-date-format.test.js

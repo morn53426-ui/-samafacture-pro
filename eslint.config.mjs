@@ -84,6 +84,7 @@ export default [
       'server/email-outbox.js',
       'server/routes/admin.js',
       'server/routes/analytics.js',
+      'server/utils/sunupilot-analytics.js',
       'server/routes/professionnel.js',
       'server/routes/depenses.js',
       'server/routes/factures.js',

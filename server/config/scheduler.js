@@ -47,6 +47,24 @@ async function expirerPaiementsAbonnementEnAttente() {
   }
 }
 
+/**
+ * Supprime les vues analytiques plus anciennes que la durée de conservation configurée
+ * (SUNUPILOT_ANALYTICS_RETENTION_DAYS, 395 jours par défaut). Verrou consultatif : un seul
+ * processus purge à la fois lorsque plusieurs instances tournent.
+ */
+async function purgerAnalyticsAnciennes() {
+  try {
+    await withMysqlAdvisoryLock('samafacture:purge-sunupilot-analytics', async () => {
+      const { purgeOldPageviews } = require('../utils/sunupilot-analytics');
+      const deleted = await purgeOldPageviews();
+      if (deleted) console.log(`🧹 ${deleted} vue(s) analytique(s) expirée(s) supprimée(s).`);
+    });
+  } catch (err) {
+    console.error('⚠️  Erreur lors de la purge des statistiques de fréquentation :', err.message);
+    captureException(err);
+  }
+}
+
 async function verifierFacturesRecurrentes() {
   const { genererFactureDepuisModele } = require('../routes/factures-recurrentes');
   const { envoyerFactureParEmail } = require('../routes/factures');
@@ -338,10 +356,12 @@ function startScheduler() {
   expirerPaiementsAbonnementEnAttente();
   executerRelancesAutomatiques();
   livrerWebhooksEnAttente();
+  purgerAnalyticsAnciennes();
   const timer = setInterval(() => {
     verifierFacturesRecurrentes();
     expirerPaiementsAbonnementEnAttente();
     executerRelancesAutomatiques();
+    purgerAnalyticsAnciennes();
   }, intervalMs);
   timer.unref(); // ne bloque pas l'arrêt propre du serveur
 
@@ -352,4 +372,4 @@ function startScheduler() {
   webhookTimer.unref();
 }
 
-module.exports = { startScheduler, verifierFacturesRecurrentes, expirerPaiementsAbonnementEnAttente, executerRelancesAutomatiques, livrerWebhooksEnAttente };
+module.exports = { startScheduler, purgerAnalyticsAnciennes, verifierFacturesRecurrentes, expirerPaiementsAbonnementEnAttente, executerRelancesAutomatiques, livrerWebhooksEnAttente };
