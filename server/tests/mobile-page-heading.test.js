@@ -32,10 +32,16 @@ describe('Titres des pages métier sur petit écran', () => {
     });
   }
 
+  test('le shell identifie les pages ayant un en-tête avant de rendre la barre d’outils', () => {
+    const sidebar = fs.readFileSync(path.join(PUBLIC_DIR, 'js', 'sidebar.js'), 'utf8');
+    assert.match(sidebar, /const hasPageHeading = Array\.from\(main\.children\)\.some\(child =>/);
+    assert.match(sidebar, /main\.classList\.toggle\('workspace-page-has-heading', hasPageHeading\)/);
+  });
+
   test('à 900 px ou moins, le titre principal passe avant la barre d’outils globale', () => {
-    assert.match(styles, /@media \(max-width: 900px\)[\s\S]*?\.main-content\.workspace-page:has\(> \.page-header\)\s*\{[\s\S]*?display:\s*grid/);
-    assert.match(styles, /\.main-content\.workspace-page:has\(> \.page-header\)\s*> \.page-header\s*\{[\s\S]*?grid-row:\s*1/);
-    assert.match(styles, /\.main-content\.workspace-page:has\(> \.page-header\)\s*> #topbar-root,[\s\S]*?\.app-topbar\s*\{[\s\S]*?grid-row:\s*2/);
+    assert.match(styles, /@media \(max-width: 900px\)[\s\S]*?\.main-content\.workspace-page\.workspace-page-has-heading\s*\{[\s\S]*?display:\s*grid/);
+    assert.match(styles, /\.main-content\.workspace-page\.workspace-page-has-heading\s*> \.page-header\s*\{[\s\S]*?grid-row:\s*1/);
+    assert.match(styles, /\.main-content\.workspace-page\.workspace-page-has-heading\s*> #topbar-root,[\s\S]*?\.app-topbar\s*\{[\s\S]*?grid-row:\s*2/);
   });
 
   test('le titre garde une taille lisible et ne peut pas être masqué sur téléphone', () => {
