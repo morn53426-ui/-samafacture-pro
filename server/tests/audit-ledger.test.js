@@ -221,15 +221,20 @@ test('API audit : pagination, filtres, vérification et isolation stricte des te
     .set('X-SF-Company-Owner', String(ownerA));
   assert.equal(memberExportDenied.status, 403, memberExportDenied.text);
 
-  const formulaValues = ['=1+1', ' =2+2', '\t=3+3'];
-  for (const entityId of formulaValues) {
+  const formulaValues = [
+    { entityId: 'formula-first', userAgent: '=1+1' },
+    { entityId: 'formula-space', userAgent: ' =2+2' },
+    { entityId: 'formula-tab', userAgent: '\t=3+3' }
+  ];
+  for (const value of formulaValues) {
     const formulaEvent = await appendAuditEvent({
       tenantId: ownerA,
       actorUserId: ownerA,
       eventType: 'audit.test.export_formula',
       category: 'security',
       entityType: 'spreadsheet_formula_test',
-      entityId,
+      entityId: value.entityId,
+      userAgent: value.userAgent,
       metadata: { note: 'CSV injection check' }
     });
     assert.ok(formulaEvent.id);
