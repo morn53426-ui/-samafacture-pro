@@ -48,11 +48,12 @@ async function expirerPaiementsAbonnementEnAttente() {
 }
 
 /**
- * Supprime les vues analytiques plus anciennes que la durée de conservation configurée
- * (SUNUPILOT_ANALYTICS_RETENTION_DAYS, 395 jours par défaut). Verrou consultatif : un seul
- * processus purge à la fois lorsque plusieurs instances tournent.
+ * Supprime les vues analytiques anciennes uniquement après activation explicite.
+ * Sans SUNUPILOT_ANALYTICS_PURGE_ENABLED=true, aucune connexion ni suppression n'est tentée.
+ * Verrou consultatif : un seul processus purge à la fois lorsque plusieurs instances tournent.
  */
 async function purgerAnalyticsAnciennes() {
+  if (process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED !== 'true') return;
   try {
     await withMysqlAdvisoryLock('samafacture:purge-sunupilot-analytics', async (conn) => {
       const { purgeOldPageviews } = require('../utils/sunupilot-analytics');
