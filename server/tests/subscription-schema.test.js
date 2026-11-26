@@ -40,16 +40,16 @@ test('la migration v15 crée les huit tables du moteur SaaS', async () => {
   assert.deepEqual(actual, [...EXPECTED_TABLES].sort());
 });
 
-test('la base de test annonce la version de schéma 25 après migration', async () => {
+test('la base de test annonce la version de schéma 26 après migration', async () => {
   const [[meta]] = await pool.query(
     'SELECT version FROM _samafacture_schema_meta WHERE id = 1'
   );
   assert.ok(meta);
-  assert.equal(Number(meta.version), 25);
+  assert.equal(Number(meta.version), 26);
 });
 
 
-test('la version 25 expose comptabilité, essai et fréquentation sans activer de paiement ni créer d’essai rétroactif', async () => {
+test('la version 26 expose comptabilité, essai et fréquentation sans activer de paiement ni créer d’essai rétroactif', async () => {
   const [trialColumns] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
