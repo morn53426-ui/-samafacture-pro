@@ -17,6 +17,12 @@ on:
       - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
+      - 'public/js/admin.js'
+      - 'public/js/visitor-analytics.js'
+      - 'public/js/theme.js'
+      - 'server/routes/admin.js'
+      - 'server/routes/analytics.js'
+      - 'server/tests/sunupilot-admin.test.js'
       - 'server/app.js'
       - 'server/config/monitoring.js'
       - 'server/utils/log-sanitizer.js'
@@ -101,6 +107,12 @@ jobs:
           public/js/sidebar.js
           public/js/api.js
           public/js/workspace-modals.js
+          public/js/admin.js
+          public/js/visitor-analytics.js
+          public/js/theme.js
+          server/routes/admin.js
+          server/routes/analytics.js
+          server/tests/sunupilot-admin.test.js
           server/tests/visual/recette-visuelle.js
           server/tests/local-date-format.test.js
           server/tests/optional-fields.test.js

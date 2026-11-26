@@ -8256,3 +8256,6 @@ a.btn .icon {
 .plan-current-badge {
   color: var(--emerald-text);
 }
+
+/* Hidden is explicit even when a component class sets display:inline-flex. */
+#platform-admin-shortcut[hidden] { display: none !important; }
