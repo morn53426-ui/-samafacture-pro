@@ -13,6 +13,7 @@ const { localDateString } = require('../utils/local-date');
 const { formatAmountWithCurrency, normalizeCurrency } = require('../utils/money-format');
 const { isEnterprisePlan } = require('../utils/plans');
 const { encryptEmailPayload, decryptEmailPayload } = require('../utils/email-outbox-crypto');
+const { optionalText, optionalIsoDate } = require('../utils/optional-fields');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -51,18 +52,6 @@ async function safeDateForUser(value, userId) {
   );
   return localDateString(accounts?.[0]?.fuseau_horaire || 'Africa/Dakar');
 }
-function optionalText(value, maxLength) {
-  if (value === undefined || value === null) return null;
-  return String(value).trim().slice(0, maxLength) || null;
-}
-function optionalIsoDate(value) {
-  if (value === undefined || value === null || value === '') return null;
-  const text = String(value).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
-  const date = new Date(text + 'T00:00:00.000Z');
-  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text ? undefined : text;
-}
-
 const randomRef = (prefix) => prefix + '-' + new Date().getFullYear() + '-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 const parseJson = (value, fallback) => {
   if (value && typeof value === 'object') return value;
@@ -181,10 +170,17 @@ router.post('/orders', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Entreprise introuvable.' });
     }
-    const currency = String(req.body.devise || company.devise || 'FCFA').trim().toUpperCase();
+    const baseCurrency = String(company.devise || 'FCFA').trim().toUpperCase();
+    const currency = String(req.body.devise || baseCurrency).trim().toUpperCase();
     if (!SUPPORTED_CURRENCIES.includes(currency)) {
       await conn.rollback();
       return res.status(400).json({ error: 'Devise de commande non prise en charge.' });
+    }
+    if (currency !== baseCurrency) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'La devise du document doit correspondre à la devise de base de l’entreprise. Les conversions multi-devises ne sont pas encore activées.'
+      });
     }
     const [clientRows] = await conn.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [clientId, uid]);
     if (!clientRows.length) {
@@ -693,7 +689,20 @@ router.post('/payment-links', async (req, res, next) => {
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expires = req.body.expire_jours ? new Date(Date.now() + Math.min(90, Math.max(1, Number(req.body.expire_jours))) * 86400000) : null;
-    const devise = String(req.body.devise || 'FCFA').slice(0, 10);
+    const rawCurrency = req.body.devise;
+    const devise = normalizeCurrency(
+      rawCurrency === undefined || rawCurrency === null || String(rawCurrency).trim() === ''
+        ? invoice.devise
+        : rawCurrency
+    );
+    if (!SUPPORTED_CURRENCIES.includes(devise)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise non prise en charge.' });
+    }
+    if (devise !== normalizeCurrency(invoice.devise)) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'La devise du lien doit correspondre à celle de la facture.' });
+    }
     const [result] = await conn.query('INSERT INTO pro_payment_links (user_id, facture_id, token_hash, montant, devise, expire_at) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, tokenHash, amount, devise, expires]);
     await conn.commit();
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
@@ -739,21 +748,62 @@ router.get('/cash/registers', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 router.post('/cash/registers', async (req, res, next) => {
+  let conn;
   try {
+    const uid = owner(req);
     const nom = String(req.body.nom || '').trim().slice(0, 120);
     if (!nom) return res.status(400).json({ error: 'Le nom de la caisse est obligatoire.' });
-    let establishmentId = null;
-    if (req.body.etablissement_id) {
-      const [e] = await pool.query('SELECT id FROM pro_etablissements WHERE id = ? AND user_id = ?', [req.body.etablissement_id, owner(req)]);
-      if (!e.length) return res.status(400).json({ error: 'Établissement invalide.' });
-      establishmentId = e[0].id;
-    }
     const initial = Number(req.body.solde_initial || 0);
     if (!Number.isFinite(initial) || initial < 0) return res.status(400).json({ error: 'Solde initial invalide.' });
-    const [result] = await pool.query('INSERT INTO pro_caisses (user_id, etablissement_id, nom, devise, solde_initial) VALUES (?, ?, ?, ?, ?)', [owner(req), establishmentId, nom, String(req.body.devise || 'FCFA').slice(0, 10), initial]);
-    await audit(req, 'caisse.creee', 'caisse', result.insertId, { nom });
-    res.status(201).json({ id: result.insertId, nom });
-  } catch (err) { next(err); }
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    // Le formulaire ne demande pas de devise : utiliser celle du compte verrouillé
+    // évite de créer silencieusement une caisse FCFA pour une entreprise en EUR.
+    const [[company]] = await conn.query(
+      'SELECT devise FROM users WHERE id = ? FOR UPDATE',
+      [uid]
+    );
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+
+    const baseCurrency = String(company.devise || 'FCFA').trim().toUpperCase();
+    const currency = req.body.devise === undefined || req.body.devise === null || String(req.body.devise).trim() === ''
+      ? baseCurrency
+      : String(req.body.devise).trim().toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(currency)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise de caisse non prise en charge.' });
+    }
+
+    let establishmentId = null;
+    if (req.body.etablissement_id) {
+      const [establishments] = await conn.query(
+        'SELECT id FROM pro_etablissements WHERE id = ? AND user_id = ?',
+        [req.body.etablissement_id, uid]
+      );
+      if (!establishments.length) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Établissement invalide.' });
+      }
+      establishmentId = establishments[0].id;
+    }
+
+    const [result] = await conn.query(
+      'INSERT INTO pro_caisses (user_id, etablissement_id, nom, devise, solde_initial) VALUES (?, ?, ?, ?, ?)',
+      [uid, establishmentId, nom, currency, initial]
+    );
+    await conn.commit();
+    await audit(req, 'caisse.creee', 'caisse', result.insertId, { nom, devise: currency });
+    res.status(201).json({ id: result.insertId, nom, devise: currency });
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 router.post('/cash/registers/:id/operations', async (req, res, next) => {
   let conn;
