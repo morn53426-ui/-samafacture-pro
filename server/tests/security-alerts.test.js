@@ -236,6 +236,18 @@ test('dossier d’investigation : création idempotente, transitions et historiq
   const alertResolved = await request(app).get('/api/pro/security-alerts').set(auth(ownerAToken));
   assert.equal(alertResolved.body.alerts[0].status, 'resolved');
 
+  const missingResolutionCode = await request(app)
+    .put('/api/pro/security-alerts/' + alertId + '/status')
+    .set(auth(ownerAToken))
+    .send({ status: 'dismissed' });
+  assert.equal(missingResolutionCode.status, 400, missingResolutionCode.text);
+
+  const manualReopen = await request(app)
+    .put('/api/pro/security-alerts/' + alertId + '/status')
+    .set(auth(ownerAToken))
+    .send({ status: 'open' });
+  assert.equal(manualReopen.status, 409, manualReopen.text);
+
   const [historyRows] = await pool.query(
     'SELECT id FROM pro_security_case_events WHERE tenant_scope_id = ? AND case_id = ?',
     [ownerA, caseId]
