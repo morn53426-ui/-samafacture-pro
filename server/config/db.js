@@ -547,9 +547,9 @@ async function runMigrations(conn) {
   const auditLedgerPath = path.join(__dirname, '..', 'database', 'migrations', '014_audit_ledger.sql');
   const auditLedgerSql = fs.readFileSync(auditLedgerPath, 'utf8');
   const auditLedgerStatements = auditLedgerSql
-    .split(/\\r?\\n/)
+    .split(/\r?\n/)
     .filter(line => !line.trim().startsWith('--'))
-    .join('\\n')
+    .join('\n')
     .split(';')
     .map(statement => statement.trim())
     .filter(Boolean);
