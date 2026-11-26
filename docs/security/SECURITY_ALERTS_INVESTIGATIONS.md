@@ -20,7 +20,7 @@ Aucun service KYC/AML tiers, registre externe, fournisseur de paiement ou servic
 
 Le détecteur ne s'appuie pas sur l'adresse email, le mot de passe ni sur le texte d'une requête. Les tentatives visant des comptes inexistants ne sont pas rattachées à un tenant : elles restent journalisées dans le registre global mais ne produisent pas, dans cette première règle, d'alerte tenant-scoped.
 
-Les tentatives qui suivent la création mettent à jour l'alerte existante. Une alerte résolue ou écartée est rouverte si une nouvelle série atteint de nouveau le seuil. Le déclenchement est exécuté dans la même transaction que l'événement d'audit source.
+Les tentatives qui suivent la création mettent à jour l'alerte existante. Une alerte résolue ou écartée est rouverte si une nouvelle série atteint de nouveau le seuil. Le déclenchement est exécuté dans la même transaction que l'événement d'audit source. Si un dossier existant est résolu ou clôturé, il est lui aussi rouvert à l'état `open` ; un événement `case.reopened` est ajouté à son historique append-only, et l'identifiant du dossier est inclus dans l'événement `security.alert.reopened` du registre signé.
 
 ## Cycle de traitement
 
