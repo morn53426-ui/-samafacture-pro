@@ -104,6 +104,9 @@ function permissionForRequest(req) {
   if (base.endsWith('/pro')) {
     if (path.startsWith('/audit-events/export.')) return method === 'GET' ? 'audit.export' : 'admin.only';
     if (path.startsWith('/audit-events')) return method === 'GET' ? 'audit.read' : 'admin.only';
+    if (path.startsWith('/security-alerts') || path.startsWith('/security-cases')) {
+      return method === 'GET' ? 'security.read' : 'security.manage';
+    }
     // Expose uniquement le code devise du tenant actif aux membres qui doivent
     // afficher les montants, sans leur ouvrir les autres paramètres internationaux.
     if (path === '/company-context') return null;
@@ -151,7 +154,8 @@ function requirePermission(req, res, next) {
     'inventory.read': 'inventory.write',
     'accounting.read': 'accounting.write',
     'crm.read': 'crm.write',
-    'localization.read': 'localization.write'
+    'localization.read': 'localization.write',
+    'security.read': 'security.manage'
   };
   if (!permission || req.permissions.includes('*') || req.permissions.includes(permission) ||
       (writeImpliesRead[permission] && req.permissions.includes(writeImpliesRead[permission]))) return next();
