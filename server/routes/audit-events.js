@@ -109,13 +109,13 @@ router.get('/audit-events', requireAuth, resolveTenant, requirePermission, async
       params
     );
     const [rows] = await pool.query(
-      \`SELECT id, actor_user_id, actor_kind, event_type, category, severity, entity_type,
+      `SELECT id, actor_user_id, actor_kind, event_type, category, severity, entity_type,
               entity_id, outcome, ip_address, user_agent, request_id, metadata_json,
               chain_sequence, previous_hash, event_hash, key_version, created_at
          FROM pro_audit_events
-        WHERE \${where}
+        WHERE ${where}
         ORDER BY created_at DESC, id DESC
-        LIMIT ? OFFSET ?\`,
+        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
 
