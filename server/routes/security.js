@@ -145,6 +145,23 @@ function mapActivity(row) {
   return { ...row, details: readJson(row.details_json) };
 }
 
+router.get('/security/assignees', async (req, res, next) => {
+  noStore(res);
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, nom FROM users WHERE id = ?
+       UNION
+       SELECT u.id, u.nom
+         FROM pro_team_members m
+         JOIN users u ON u.id = m.member_user_id
+        WHERE m.owner_user_id = ? AND m.active = 1
+       ORDER BY nom, id`,
+      [tenant(req), tenant(req)]
+    );
+    res.json({ assignees: rows.map(row => ({ id: Number(row.id), nom: row.nom })) });
+  } catch (err) { next(err); }
+});
+
 router.get('/security/alerts/summary', async (req, res, next) => {
   noStore(res);
   try {
@@ -302,7 +319,7 @@ router.post('/security/alerts/:id/assign', async (req, res, next) => {
 async function finalizeAlert(req, res, next, finalStatus) {
   const alertId = positiveId(req.params.id);
   const note = safeCaseNote(req.body.resolution_note);
-  if (!alertId || note.length < 10 || note.length > 1000) {
+  if (!alertId || !note || note.length < 10 || note.length > 1000) {
     return res.status(400).json({ error: 'Identifiant invalide et décision de clôture de 10 à 1 000 caractères obligatoire.' });
   }
   try {
