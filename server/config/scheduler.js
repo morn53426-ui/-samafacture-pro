@@ -18,7 +18,7 @@ async function withMysqlAdvisoryLock(lockName, task) {
     const [[row]] = await conn.query('SELECT GET_LOCK(?, 0) AS acquired', [lockName]);
     if (row.acquired !== 1) return false;
     try {
-      await task();
+      await task(conn);
       return true;
     } finally {
       await conn.query('SELECT RELEASE_LOCK(?)', [lockName]).catch(() => {});
@@ -54,9 +54,9 @@ async function expirerPaiementsAbonnementEnAttente() {
  */
 async function purgerAnalyticsAnciennes() {
   try {
-    await withMysqlAdvisoryLock('samafacture:purge-sunupilot-analytics', async () => {
+    await withMysqlAdvisoryLock('samafacture:purge-sunupilot-analytics', async (conn) => {
       const { purgeOldPageviews } = require('../utils/sunupilot-analytics');
-      const deleted = await purgeOldPageviews();
+      const deleted = await purgeOldPageviews(conn);
       if (deleted) console.log(`🧹 ${deleted} vue(s) analytique(s) expirée(s) supprimée(s).`);
     });
   } catch (err) {
