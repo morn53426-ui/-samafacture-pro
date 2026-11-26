@@ -29,6 +29,7 @@ Toutes les routes sont sous `/api/pro`, requièrent une session authentifiée et
 
 | Route | Permission | Fonction |
 |---|---|---|
+| `GET /security/assignees` | Toute permission de lecture/gestion des alertes ou investigations | Liste minimale des responsables actifs du tenant |
 | `GET /security/alerts/summary` | `security.alerts.read` | Compteurs par statut et gravité |
 | `GET /security/alerts` | `security.alerts.read` | Liste paginée et filtres par statut/gravité |
 | `GET /security/alerts/:id` | `security.alerts.read` | Détail, activité et dossiers liés |
@@ -42,7 +43,7 @@ Toutes les routes sont sous `/api/pro`, requièrent une session authentifiée et
 | `PATCH /security/investigations/:id` | `security.investigations.manage` | Changer statut, priorité, affectation ou décision |
 | `POST /security/investigations/:id/notes` | `security.investigations.manage` | Ajouter une note au fil append-only |
 
-Les assignations sont validées contre les membres actifs du tenant. Un dossier actif unique est autorisé par alerte. La clôture d'une investigation liée fait passer l'alerte associée à l'état résolu. Les résolutions et faux positifs exigent une justification.
+La liste des responsables est également protégée : seuls les utilisateurs ayant au moins une permission de lecture/gestion des alertes ou investigations peuvent la consulter. Les assignations sont validées contre les membres actifs du tenant. Un dossier actif unique est autorisé par alerte. La clôture d'une investigation liée fait passer l'alerte associée à l'état résolu. Les résolutions et faux positifs exigent une justification.
 
 ## Rôles
 
