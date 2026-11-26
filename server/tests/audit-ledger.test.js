@@ -258,6 +258,47 @@ test('API audit : pagination, filtres, vérification et isolation stricte des te
   assert.equal(tenantBIntegrity.valid, true, JSON.stringify(tenantBIntegrity));
 });
 
+test('création, modification et suppression d’un client sont journalisées atomiquement', async () => {
+  const created = await request(app)
+    .post('/api/clients')
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({
+      nom: 'Client cycle audit',
+      email: 'contact-client-audit@example.test',
+      telephone: '+221770000000'
+    });
+  assert.equal(created.status, 201, created.text);
+  const clientId = Number(created.body.client.id);
+
+  const updated = await request(app)
+    .put('/api/clients/' + clientId)
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .send({ telephone: '+221780000000', notes: 'Mise à jour tracée' });
+  assert.equal(updated.status, 200, updated.text);
+  assert.equal(updated.body.client.telephone, '+221780000000');
+
+  const deleted = await request(app)
+    .delete('/api/clients/' + clientId)
+    .set('Authorization', 'Bearer ' + ownerAToken);
+  assert.equal(deleted.status, 200, deleted.text);
+
+  const [events] = await pool.query(
+    `SELECT event_type, entity_id, metadata_json
+       FROM pro_audit_events
+      WHERE tenant_scope_id = ? AND entity_type = 'client' AND entity_id = ?
+      ORDER BY chain_sequence ASC`,
+    [ownerA, String(clientId)]
+  );
+  assert.deepEqual(events.map(event => event.event_type), [
+    'client.created', 'client.updated', 'client.deleted'
+  ]);
+  const updateMetadata = typeof events[1].metadata_json === 'string'
+    ? JSON.parse(events[1].metadata_json)
+    : events[1].metadata_json;
+  assert.deepEqual(updateMetadata.changed_fields, ['telephone', 'notes']);
+  assert.equal((await verifyAuditChain(ownerA)).valid, true);
+});
+
 test('création de facture et encaissement : audit atomique avec les opérations métier', async () => {
   const client = await request(app)
     .post('/api/clients')
