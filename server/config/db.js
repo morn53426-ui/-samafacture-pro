@@ -571,9 +571,9 @@ async function runMigrations(conn) {
   const securityCasesPath = path.join(__dirname, '..', 'database', 'migrations', '015_security_alerts_investigations.sql');
   const securityCasesSql = fs.readFileSync(securityCasesPath, 'utf8');
   const securityCasesStatements = securityCasesSql
-    .split(/\\r?\\n/)
+    .split(/\r?\n/)
     .filter(line => !line.trim().startsWith('--'))
-    .join('\\n')
+    .join('\n')
     .split(';')
     .map(statement => statement.trim())
     .filter(Boolean);
