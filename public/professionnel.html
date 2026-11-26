@@ -377,6 +377,30 @@
           </div>
         </div>
       </section>
+
+      <section class="card pro-module" id="pro-security">
+        <div class="pro-module-heading"><span class="pro-module-icon"><i class="ic" data-icon="shield-alert"></i></span><div><h2>Centre de sécurité</h2><p>Alertes de sécurité et dossiers d’investigation de votre entreprise.</p></div></div>
+        <div class="pro-subsection" id="security-section">
+          <form id="security-alert-filters" class="pro-inline-fields">
+            <div class="field"><label for="security-alert-status">Statut des alertes</label>
+              <select id="security-alert-status">
+                <option value="">Tous les statuts</option>
+                <option value="open">Nouvelles</option>
+                <option value="investigating">En analyse</option>
+                <option value="resolved">Résolues</option>
+                <option value="dismissed">Écartées</option>
+              </select>
+            </div>
+            <button class="btn btn-outline" type="submit">Filtrer</button>
+            <button class="btn btn-outline" id="security-refresh" type="button">Actualiser</button>
+          </form>
+          <p id="security-status" class="pro-muted" role="status" aria-live="polite">Les alertes seront chargées après vérification des droits.</p>
+          <h3>Alertes détectées</h3>
+          <div id="security-alerts-list" class="pro-list" aria-live="polite"></div>
+          <h3>Dossiers d’investigation</h3>
+          <div id="security-cases-list" class="pro-list" aria-live="polite"></div>
+        </div>
+      </section>
     </div>
   </main>
 </div>
@@ -582,6 +606,87 @@ async function optionalApiGet(path) {
     throw err;
   }
 }
+let securityRequestSequence = 0;
+async function loadSecurityCentre() {
+  if (!can('security.read')) return;
+  const requestSequence = ++securityRequestSequence;
+  const status = el('security-alert-status').value;
+  const params = new URLSearchParams({ page: '1', limit: '20' });
+  if (status) params.set('status', status);
+  el('security-status').textContent = 'Chargement des alertes et dossiers…';
+  try {
+    const [alertResponse, caseResponse] = await Promise.all([
+      Api.get('/pro/security-alerts?' + params.toString()),
+      Api.get('/pro/security-cases?page=1&limit=20')
+    ]);
+    if (requestSequence !== securityRequestSequence) return;
+    const statusLabels = { open: 'Nouvelle', investigating: 'En analyse', resolved: 'Résolue', dismissed: 'Écartée', closed: 'Clôturé' };
+    const severityLabels = { low: 'Faible', medium: 'Modérée', high: 'Élevée', critical: 'Critique' };
+    setList('security-alerts-list', (alertResponse.alerts || []).map(alert => {
+      const alertId = Number(alert.id);
+      const canCreateCase = can('security.manage') && !alert.case_id && !['resolved', 'dismissed'].includes(alert.status);
+      const canDismiss = can('security.manage') && !['resolved', 'dismissed'].includes(alert.status) && !alert.case_id;
+      return '<div class="pro-list-row"><div><strong>' + escapeHtml(alert.title) + '</strong>' +
+        '<small>' + escapeHtml(alert.summary) + '</small><small>' +
+        escapeHtml(severityLabels[alert.severity] || alert.severity) + ' · ' +
+        escapeHtml(statusLabels[alert.status] || alert.status) + ' · ' +
+        Number(alert.occurrence_count || 0) + ' occurrence(s) · ' + formatDate(alert.last_seen_at) + '</small></div><div>' +
+        (canCreateCase ? '<button class="btn btn-sm btn-primary" type="button" data-security-action="create-case" data-alert-id="' + alertId + '">Ouvrir un dossier</button>' : '') +
+        (canDismiss ? '<button class="btn btn-sm btn-outline" type="button" data-security-action="dismiss-alert" data-alert-id="' + alertId + '">Écarter</button>' : '') +
+        '</div></div>';
+    }).join(''));
+    setList('security-cases-list', (caseResponse.cases || []).map(item => {
+      const caseId = Number(item.id);
+      const actions = {
+        open: [['investigating', 'Prendre en charge'], ['resolved', 'Résoudre'], ['closed', 'Clôturer']],
+        investigating: [['open', 'Remettre en attente'], ['resolved', 'Résoudre'], ['closed', 'Clôturer']],
+        resolved: [['investigating', 'Rouvrir l’analyse'], ['closed', 'Clôturer']],
+        closed: []
+      };
+      const buttons = can('security.manage') ? (actions[item.status] || []).map(action =>
+        '<button class="btn btn-sm btn-outline" type="button" data-security-action="case-status" data-case-id="' + caseId + '" data-status="' + action[0] + '">' + escapeHtml(action[1]) + '</button>'
+      ).join('') : '';
+      return '<div class="pro-list-row"><div><strong>Dossier #' + caseId + ' · ' + escapeHtml(item.title) + '</strong>' +
+        '<small>' + escapeHtml(item.alert_summary || '') + '</small><small>' +
+        escapeHtml(severityLabels[item.severity] || item.severity) + ' · ' +
+        escapeHtml(statusLabels[item.status] || item.status) + ' · ' + formatDate(item.updated_at) + '</small></div><div>' + buttons + '</div></div>';
+    }).join(''));
+    const alertCount = (alertResponse.alerts || []).length;
+    const caseCount = (caseResponse.cases || []).length;
+    el('security-status').textContent = alertCount + ' alerte(s) affichée(s) · ' + caseCount + ' dossier(s) affiché(s). Ces signaux nécessitent une vérification humaine.';
+  } catch (error) {
+    if (requestSequence !== securityRequestSequence) return;
+    el('security-status').textContent = 'Chargement impossible : ' + (error.message || 'erreur inconnue');
+  }
+}
+
+async function handleSecurityAction(event) {
+  const button = event.target.closest('button[data-security-action]');
+  if (!button || !can('security.manage')) return;
+  const action = button.dataset.securityAction;
+  button.disabled = true;
+  try {
+    if (action === 'create-case') {
+      await Api.post('/pro/security-cases', { alert_id: Number(button.dataset.alertId) });
+      showToast('Dossier d’investigation ouvert.', 'success');
+    } else if (action === 'dismiss-alert') {
+      await Api.put('/pro/security-alerts/' + Number(button.dataset.alertId) + '/status', { status: 'dismissed', resolution_code: 'false_positive' });
+      showToast('Alerte écartée.', 'success');
+    } else if (action === 'case-status') {
+      await Api.put('/pro/security-cases/' + Number(button.dataset.caseId) + '/status', { status: button.dataset.status });
+      showToast('Statut du dossier mis à jour.', 'success');
+    }
+    await loadSecurityCentre();
+  } catch (error) {
+    button.disabled = false;
+    alert(error.message || 'Action impossible.');
+  }
+}
+
+el('security-alert-filters').addEventListener('submit', event => { event.preventDefault(); loadSecurityCentre(); });
+el('security-refresh').addEventListener('click', loadSecurityCentre);
+el('security-alerts-list').addEventListener('click', handleSecurityAction);
+el('security-cases-list').addEventListener('click', handleSecurityAction);
 function applyModulePermissions() {
   const setHidden = (id, hidden) => { const node = el(id); if (node) node.hidden = !!hidden; };
   setHidden('pro-sales', !can('sales.read') && !can('sales.write') && !can('invoices.write'));
@@ -609,6 +714,7 @@ function applyModulePermissions() {
   setHidden('api-key-form', !can('integrations.manage'));
   setHidden('webhook-form', !can('integrations.manage'));
   setHidden('pro-audit', !can('audit.read'));
+  setHidden('pro-security', !can('security.read'));
   setHidden('audit-section', !can('audit.read'));
   setHidden('audit-export-csv', !can('audit.export'));
   setHidden('audit-export-pdf', !can('audit.export'));
@@ -680,6 +786,7 @@ async function loadWorkspace() {
     setList('api-keys-list', (keys.cles || []).map(k => '<div class="pro-list-row"><div><strong>' + escapeHtml(k.nom) + '</strong><small>' + escapeHtml((k.scopes || []).join(', ')) + ' · ' + formatDate(k.created_at) + '</small></div>' + statusPill(k.revoked_at ? 'Révoquée' : 'Active') + (!k.revoked_at ? '<button class="btn btn-sm btn-outline" onclick="revokeKey(' + k.id + ')">Révoquer</button>' : '') + '</div>').join(''));
     setList('webhooks-list', (webhooks.webhooks || []).map(w => '<div class="pro-list-row"><div><strong>' + escapeHtml(w.url) + '</strong><small>' + escapeHtml((w.evenements || []).join(', ')) + '</small></div><button class="btn btn-sm btn-outline" onclick="testWebhook(' + w.id + ')">Tester</button><button class="btn btn-sm btn-outline" onclick="deleteWebhook(' + w.id + ')">Supprimer</button></div>').join(''));
     if (can('audit.read')) await loadAuditEvents(1);
+    if (can('security.read')) await loadSecurityCentre();
 
     const select = el('company-select');
     const previous = localStorage.getItem('sf_company_owner') || '';
