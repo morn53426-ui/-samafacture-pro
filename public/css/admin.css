@@ -36,6 +36,9 @@
 :root[data-theme="dark"] .admin-eyebrow {
   color: #6EE7AE;
 }
+:root[data-theme="dark"] .admin-panel-tag {
+  color: #A7F3D0;
+}
 :root[data-theme="dark"] .admin-caution {
   color: #F4DCA8;
   background: #3A2E15;
