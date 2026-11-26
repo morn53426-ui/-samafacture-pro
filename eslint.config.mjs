@@ -1,5 +1,5 @@
 const browserGlobals = Object.fromEntries([
-  'AbortController', 'Api', 'Audio', 'Blob', 'CSS', 'CanvasRenderingContext2D',
+  'AbortController', 'Api', 'Audio', 'Blob', 'CSS', 'CanvasRenderingContext2D', 'Chart',
   'CustomEvent', 'DOMParser', 'Document', 'Element', 'Event', 'EventTarget', 'File',
   'FileReader', 'FormData', 'HTMLButtonElement', 'HTMLImageElement',
   'HTMLInputElement', 'HTMLElement', 'Image', 'Icon', 'IntersectionObserver',
