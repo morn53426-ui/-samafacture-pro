@@ -38,6 +38,10 @@ const PAGES = [
   { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
   { name: 'parametres', file: 'parametres.html', ready: '[data-template-card="classique"]' },
   { name: 'professionnel', file: 'professionnel.html', ready: '#pro-sales' },
+  { name: 'confidentialite-info', file: 'confidentialite.html?from=workspace', ready: '.lp-back-link', public: true, infoPage: true },
+  { name: 'support-info', file: 'support.html?from=workspace', ready: '.lp-back-link', public: true, infoPage: true },
+  { name: 'conditions-info', file: 'conditions.html?from=workspace', ready: '.lp-back-link', public: true, infoPage: true },
+  { name: 'aide-info', file: 'aide.html?from=workspace', ready: '.lp-back-link', public: true, infoPage: true },
   { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' },
   { name: 'crm', file: 'crm.html', ready: '#activity-form' },
   { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
@@ -850,6 +854,35 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.equal(skipLink.firstTabStop, true, 'Le lien d’évitement doit être le premier arrêt clavier.');
   }
 
+  if (pageDefinition.infoPage) {
+    const returnNavigation = await page.evaluate(() => {
+      const link = document.querySelector('.lp-back-link[data-smart-back]');
+      const header = document.querySelector('body.info-page .lp-header');
+      if (!link || !header) return { found: false };
+      const rect = link.getBoundingClientRect();
+      const linkStyle = getComputedStyle(link);
+      const headerStyle = getComputedStyle(header);
+      return {
+        found: true,
+        visible: linkStyle.display !== 'none' && linkStyle.visibility !== 'hidden' &&
+          rect.width > 0 && rect.height >= 40 && rect.left >= -1 && rect.right <= window.innerWidth + 1,
+        stickyHeader: headerStyle.position === 'sticky',
+        fallback: link.getAttribute('href'),
+        hasWorkspaceContext: new URLSearchParams(location.search).get('from') === 'workspace'
+      };
+    });
+    assert.equal(returnNavigation.found, true,
+      pageDefinition.name + ' doit afficher le bouton Retour.');
+    assert.equal(returnNavigation.visible, true,
+      pageDefinition.name + ' : le bouton Retour doit rester visible dans la largeur de l’écran : ' + JSON.stringify(returnNavigation));
+    assert.equal(returnNavigation.stickyHeader, true,
+      pageDefinition.name + ' : la barre de navigation doit rester accessible pendant le défilement.');
+    assert.equal(returnNavigation.fallback, 'dashboard.html',
+      pageDefinition.name + ' : une arrivée directe depuis l’espace doit revenir au tableau de bord.');
+    assert.equal(returnNavigation.hasWorkspaceContext, true,
+      pageDefinition.name + ' doit conserver le contexte de l’espace de travail.');
+  }
+
   if (pageDefinition.name === 'produits') {
     const catalogue = await page.evaluate(() => [...document.querySelectorAll('#produits-body tr')].map(row => ({
       type: row.querySelector('[data-label="Type"]')?.textContent.trim() || '',
@@ -859,6 +892,75 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'La recette du catalogue doit couvrir les trois types de fiche.');
     assert.ok(catalogue.filter(row => row.type === 'Service').every(row => row.stock === '—'),
       'Un service ne doit jamais afficher de quantité de stock physique.');
+  }
+
+  if (['clients', 'produits'].includes(pageDefinition.name) && viewport.width <= 640) {
+    const createAction = await page.evaluate(() => {
+      const action = document.querySelector('.workspace-mobile-create-actions > button');
+      if (!action) return { found: false };
+      const rect = action.getBoundingClientRect();
+      const style = getComputedStyle(action);
+      return {
+        found: true,
+        visible: style.display !== 'none' && style.visibility !== 'hidden' &&
+          rect.width > 0 && rect.height >= 44 && rect.top >= -1 && rect.bottom <= window.innerHeight + 1,
+        text: action.textContent.trim(),
+        target: action.getAttribute('aria-controls'),
+        horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
+      };
+    });
+    assert.equal(createAction.found, true,
+      pageDefinition.name + ' doit proposer une action de création mobile.');
+    assert.equal(createAction.visible, true,
+      pageDefinition.name + ' : le bouton de création doit être visible sans défilement horizontal : ' + JSON.stringify(createAction));
+    assert.equal(createAction.target, 'modal',
+      pageDefinition.name + ' : le bouton doit ouvrir la fenêtre de création existante.');
+    assert.equal(createAction.horizontalOverflow, false,
+      pageDefinition.name + ' ne doit pas déborder horizontalement à ' + viewport.width + 'px.');
+
+    await page.click('.workspace-mobile-create-actions > button');
+    await page.waitForFunction(() => {
+      const dialog = document.getElementById('modal');
+      return dialog && getComputedStyle(dialog).display !== 'none' &&
+        dialog.getAttribute('aria-hidden') === 'false';
+    }, { timeout: 5000 });
+    const dialogMetrics = await page.evaluate(() => {
+      const dialog = document.getElementById('modal');
+      const panel = dialog?.querySelector('.workspace-modal-panel');
+      const actions = dialog?.querySelector('.workspace-modal-actions');
+      const save = actions?.querySelector('button[type="submit"]');
+      const panelRect = panel?.getBoundingClientRect();
+      const actionsRect = actions?.getBoundingClientRect();
+      return {
+        visible: Boolean(dialog && getComputedStyle(dialog).display !== 'none'),
+        focusManaged: Boolean(dialog?.contains(document.activeElement)),
+        panelFound: Boolean(panel && panelRect),
+        panelWithinViewport: Boolean(panelRect && panelRect.top >= -1 &&
+          panelRect.bottom <= window.innerHeight + 1 && panelRect.width <= window.innerWidth + 1),
+        panelScrolls: Boolean(panel && ['auto', 'scroll'].includes(getComputedStyle(panel).overflowY)),
+        actionsFound: Boolean(actions && save),
+        actionsVisible: Boolean(actionsRect && actionsRect.height >= 40 &&
+          actionsRect.top >= panelRect.top - 1 && actionsRect.bottom <= panelRect.bottom + 1),
+        actionsPosition: actions ? getComputedStyle(actions).position : '',
+        requiredName: Boolean(document.querySelector('#nom[required]'))
+      };
+    });
+    assert.equal(dialogMetrics.visible, true, pageDefinition.name + ' : la fenêtre doit s’ouvrir.');
+    assert.equal(dialogMetrics.focusManaged, true, pageDefinition.name + ' : le focus doit rester dans la fenêtre.');
+    assert.equal(dialogMetrics.panelFound, true, pageDefinition.name + ' : le panneau du formulaire doit exister.');
+    assert.equal(dialogMetrics.panelWithinViewport, true,
+      pageDefinition.name + ' : le panneau doit rester dans le viewport : ' + JSON.stringify(dialogMetrics));
+    assert.equal(dialogMetrics.panelScrolls, true, pageDefinition.name + ' : le formulaire doit pouvoir défiler.');
+    assert.equal(dialogMetrics.actionsFound, true, pageDefinition.name + ' : les actions du formulaire doivent exister.');
+    assert.equal(dialogMetrics.actionsVisible, true,
+      pageDefinition.name + ' : les actions doivent rester accessibles dans le panneau : ' + JSON.stringify(dialogMetrics));
+    assert.equal(dialogMetrics.requiredName, true, pageDefinition.name + ' : le champ principal doit rester accessible.');
+    if (viewport.width <= 560) {
+      assert.equal(dialogMetrics.actionsPosition, 'sticky',
+        pageDefinition.name + ' : les boutons doivent rester ancrés au bas du formulaire sur téléphone.');
+    }
+    await page.click('#modal [data-modal-close]');
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('modal')).display === 'none');
   }
   if (pageDefinition.name === 'groupe-entreprise') {
     const groupUi = await page.evaluate(() => {
