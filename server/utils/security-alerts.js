@@ -74,7 +74,7 @@ async function createOrRefreshSecurityAlert(input, connection = null) {
   );
 
   return inTransaction(async conn => {
-    await conn.query(
+    const [insertResult] = await conn.query(
       `INSERT IGNORE INTO pro_security_alerts
         (tenant_scope_id, fingerprint, alert_type, category, severity, status, title, description,
          source_event_id, entity_type, entity_id, occurrences, first_seen_at, last_seen_at, details_json)
@@ -90,9 +90,7 @@ async function createOrRefreshSecurityAlert(input, connection = null) {
     );
     if (!current) throw new Error('Alerte de sécurité introuvable après écriture.');
 
-    const created = Number(current.occurrences) === 1 &&
-      current.source_event_id != null &&
-      Number(current.source_event_id) === Number(sourceEventId);
+    const created = Number(insertResult.affectedRows) === 1;
     const previousStatus = created ? null : current.status;
     const reopened = !created && ['resolved', 'false_positive', 'closed'].includes(current.status);
     const nextStatus = reopened ? 'open' : current.status;
@@ -128,7 +126,6 @@ async function createOrRefreshSecurityAlert(input, connection = null) {
       );
     }
 
-    const repeated = !created;
     const activityType = created ? 'alert.created' : (reopened ? 'alert.reopened' : 'alert.repeated');
     const auditEventType = created ? 'security.alert.created' : (reopened ? 'security.alert.reopened' : 'security.alert.repeated');
     await conn.query(
