@@ -6,6 +6,7 @@ const { pool } = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const { resolveTenant, requirePermission } = require('../middleware/tenant');
 const { appendAuditEvent, normalizeMetadata } = require('../utils/audit-ledger');
+const { sanitizeCaseText } = require('../utils/security-alerts');
 
 const router = express.Router();
 const ALERT_STATUSES = new Set(['open', 'acknowledged', 'investigating', 'resolved', 'false_positive']);
@@ -95,15 +96,9 @@ async function assigneeBelongsToTenant(conn, tenantId, userId) {
 }
 
 function safeCaseNote(value) {
-  const note = String(value == null ? '' : value).trim();
-  if (note.length < 3 || note.length > 4000) return null;
-  // Les notes de dossier ne doivent pas devenir un dépôt de secrets ou d'identifiants directs.
-  return note
-    .replace(/\\bBearer\\s+[A-Za-z0-9._~+/=-]+/gi, '[JETON MASQUÉ]')
-    .replace(/\\b[A-Z]{2}\\d{2}[A-Z0-9]{10,30}\\b/gi, '[IBAN MASQUÉ]')
-    .replace(/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/gi, '[EMAIL MASQUÉ]')
-    .replace(/\\b(?:\\d[ -]*?){13,19}\\b/g, '[NUMÉRO DE CARTE MASQUÉ]')
-    .slice(0, 4000);
+  const note = sanitizeCaseText(value, 4000);
+  if (note.length < 3) return null;
+  return note;
 }
 
 async function recordActivity(conn, req, entry) {
@@ -306,7 +301,7 @@ router.post('/security/alerts/:id/assign', async (req, res, next) => {
 
 async function finalizeAlert(req, res, next, finalStatus) {
   const alertId = positiveId(req.params.id);
-  const note = String(req.body.resolution_note || '').trim();
+  const note = safeCaseNote(req.body.resolution_note);
   if (!alertId || note.length < 10 || note.length > 1000) {
     return res.status(400).json({ error: 'Identifiant invalide et décision de clôture de 10 à 1 000 caractères obligatoire.' });
   }
@@ -405,7 +400,8 @@ router.get('/security/investigations/:id', async (req, res, next) => {
 
 router.post('/security/investigations', async (req, res, next) => {
   const title = String(req.body.title || '').trim();
-  const description = String(req.body.description || '').trim();
+  const descriptionRaw = String(req.body.description || '').trim();
+  const description = sanitizeCaseText(descriptionRaw, 4000);
   const alertId = req.body.alert_id == null || req.body.alert_id === '' ? null : positiveId(req.body.alert_id);
   const priority = String(req.body.priority || 'medium').toLowerCase();
   const assignedId = req.body.assigned_to_user_id == null || req.body.assigned_to_user_id === ''
@@ -413,6 +409,7 @@ router.post('/security/investigations', async (req, res, next) => {
     : positiveId(req.body.assigned_to_user_id);
   if (!title || title.length > 190 || description.length > 4000 ||
       (req.body.alert_id != null && req.body.alert_id !== '' && !alertId) ||
+      (descriptionRaw.length > 4000) ||
       !PRIORITIES.has(priority) || (req.body.assigned_to_user_id != null && req.body.assigned_to_user_id !== '' && !assignedId)) {
     return res.status(400).json({ error: 'Les données du dossier d’investigation sont invalides.' });
   }
@@ -498,11 +495,12 @@ router.patch('/security/investigations/:id', async (req, res, next) => {
   const assignedId = req.body.assigned_to_user_id === undefined
     ? undefined
     : (req.body.assigned_to_user_id === null || req.body.assigned_to_user_id === '' ? null : positiveId(req.body.assigned_to_user_id));
-  const resolutionNote = req.body.resolution_note === undefined ? undefined : String(req.body.resolution_note).trim();
+  const resolutionRaw = req.body.resolution_note === undefined ? undefined : String(req.body.resolution_note).trim();
+  const resolutionNote = resolutionRaw === undefined ? undefined : safeCaseNote(resolutionRaw);
   if ((status !== undefined && !INVESTIGATION_STATUSES.has(status)) ||
       (priority !== undefined && !PRIORITIES.has(priority)) ||
       (req.body.assigned_to_user_id !== undefined && assignedId === undefined) ||
-      (resolutionNote !== undefined && resolutionNote.length > 2000) ||
+      (resolutionRaw !== undefined && (resolutionRaw.length > 2000 || !resolutionNote)) ||
       (status !== undefined && ['resolved', 'closed'].includes(status) && (!resolutionNote || resolutionNote.length < 10))) {
     return res.status(400).json({ error: 'Mise à jour du dossier invalide. Une note de décision est requise pour clôturer.' });
   }
