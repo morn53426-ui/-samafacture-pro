@@ -205,6 +205,63 @@ test('API audit : pagination, filtres, vérification et isolation stricte des te
     .set('X-SF-Company-Owner', String(ownerA));
   assert.equal(memberForbidden.status, 403, memberForbidden.text);
 
+  // Un membre doté uniquement de audit.read peut consulter le registre mais ne peut pas exporter les données.
+  await pool.query(
+    'UPDATE pro_team_members SET permissions_json = ? WHERE owner_user_id = ? AND member_user_id = ?',
+    [JSON.stringify(['audit.read']), ownerA, memberA]
+  );
+  const memberRead = await request(app)
+    .get('/api/pro/audit-events')
+    .set('Authorization', 'Bearer ' + memberAToken)
+    .set('X-SF-Company-Owner', String(ownerA));
+  assert.equal(memberRead.status, 200, memberRead.text);
+  const memberExportDenied = await request(app)
+    .get('/api/pro/audit-events/export.csv')
+    .set('Authorization', 'Bearer ' + memberAToken)
+    .set('X-SF-Company-Owner', String(ownerA));
+  assert.equal(memberExportDenied.status, 403, memberExportDenied.text);
+
+  const formulaEvent = await appendAuditEvent({
+    tenantId: ownerA,
+    actorUserId: ownerA,
+    eventType: 'audit.test.export_formula',
+    category: 'security',
+    entityType: 'spreadsheet_formula_test',
+    entityId: '=1+1',
+    metadata: { note: 'CSV injection check' }
+  });
+  assert.ok(formulaEvent.id);
+
+  const csvExport = await request(app)
+    .get('/api/pro/audit-events/export.csv?event_type=audit.test.export_formula')
+    .set('Authorization', 'Bearer ' + ownerAToken);
+  assert.equal(csvExport.status, 200, csvExport.text);
+  assert.match(csvExport.headers['content-type'], /text\/csv/);
+  assert.match(csvExport.headers['content-disposition'], /samafacture-registre-audit\.csv/);
+  assert.equal(csvExport.headers['x-export-row-count'], '1');
+  assert.match(csvExport.text, /"'=1\+1"/, 'les cellules commençant par une formule doivent être neutralisées');
+
+  const pdfExport = await request(app)
+    .get('/api/pro/audit-events/export.pdf?event_type=audit.test.export_formula')
+    .set('Authorization', 'Bearer ' + ownerAToken)
+    .buffer(true)
+    .parse((response, callback) => {
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => callback(null, Buffer.concat(chunks)));
+    });
+  assert.equal(pdfExport.status, 200, String(pdfExport.body || ''));
+  assert.match(pdfExport.headers['content-type'], /application\/pdf/);
+  assert.ok(Buffer.isBuffer(pdfExport.body));
+  assert.equal(pdfExport.body.subarray(0, 5).toString('ascii'), '%PDF-');
+
+  const [exportEvents] = await pool.query(
+    "SELECT event_type, metadata_json FROM pro_audit_events WHERE tenant_scope_id = ? AND event_type = 'audit.events.exported'",
+    [ownerA]
+  );
+  assert.ok(exportEvents.length >= 2, 'chaque export réussi doit être tracé');
+  assert.equal(memberExportDenied.headers['content-disposition'], undefined);
+
   const memberLogout = await request(app)
     .post('/api/auth/logout')
     .set('Authorization', 'Bearer ' + memberAToken);
