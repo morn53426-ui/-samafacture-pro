@@ -546,8 +546,8 @@ router.post('/logout', (req, res, next) => {
     // Invalide aussi les anciens jetons Bearer conservés sur les autres appareils.
     await incrementerTokenVersion(null, req.user.id);
     await journaliserEvenementAuth(req, {
-      tenantId: Number(req.user.id),
-      actorUserId: Number(req.user.id),
+      tenantId: Number(req.tenantId || req.user.id),
+      actorUserId: Number(req.actorId || req.user.id),
       eventType: 'auth.logout',
       category: 'security',
       entityType: 'account',
