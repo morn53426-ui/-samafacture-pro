@@ -42,6 +42,8 @@ test('le centre de sécurité expose les alertes et dossiers selon les permissio
   assert.match(page, /securityRequest\('PATCH', '\/pro\/security\/investigations\//);
   assert.match(page, /X-SF-Company-Owner/);
   assert.match(page, /data-security-action="ack"/);
+  assert.match(page, /data-security-action="resolve-alert"/);
+  assert.match(page, /data-security-action="false-positive"/);
   assert.match(page, /data-security-action="note"/);
   assert.match(page, /data-security-action="assign-alert"/);
   assert.match(page, /data-security-action="assign-investigation"/);
