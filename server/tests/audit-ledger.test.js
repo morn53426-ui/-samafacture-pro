@@ -221,16 +221,19 @@ test('API audit : pagination, filtres, vérification et isolation stricte des te
     .set('X-SF-Company-Owner', String(ownerA));
   assert.equal(memberExportDenied.status, 403, memberExportDenied.text);
 
-  const formulaEvent = await appendAuditEvent({
-    tenantId: ownerA,
-    actorUserId: ownerA,
-    eventType: 'audit.test.export_formula',
-    category: 'security',
-    entityType: 'spreadsheet_formula_test',
-    entityId: '=1+1',
-    metadata: { note: 'CSV injection check' }
-  });
-  assert.ok(formulaEvent.id);
+  const formulaValues = ['=1+1', ' =2+2', '\t=3+3'];
+  for (const entityId of formulaValues) {
+    const formulaEvent = await appendAuditEvent({
+      tenantId: ownerA,
+      actorUserId: ownerA,
+      eventType: 'audit.test.export_formula',
+      category: 'security',
+      entityType: 'spreadsheet_formula_test',
+      entityId,
+      metadata: { note: 'CSV injection check' }
+    });
+    assert.ok(formulaEvent.id);
+  }
 
   const csvExport = await request(app)
     .get('/api/pro/audit-events/export.csv?event_type=audit.test.export_formula')
@@ -238,9 +241,10 @@ test('API audit : pagination, filtres, vérification et isolation stricte des te
   assert.equal(csvExport.status, 200, csvExport.text);
   assert.match(csvExport.headers['content-type'], /text\/csv/);
   assert.match(csvExport.headers['content-disposition'], /samafacture-registre-audit\.csv/);
-  assert.equal(csvExport.headers['x-export-row-count'], '1');
-  assert.match(csvExport.text, /"'=1\+1"/, 'les cellules commençant par une formule doivent être neutralisées');
-
+  assert.equal(csvExport.headers['x-export-row-count'], '3');
+  assert.ok(csvExport.text.includes("\"'=1+1\""), 'une formule en début de cellule doit être neutralisée');
+  assert.ok(csvExport.text.includes("\"' =2+2\""), 'une formule précédée d’espaces doit être neutralisée');
+  assert.ok(csvExport.text.includes("\"'\t=3+3\""), 'une formule précédée d’une tabulation doit être neutralisée');
   const allTenantExport = await request(app)
     .get('/api/pro/audit-events/export.csv')
     .set('Authorization', 'Bearer ' + ownerAToken);
