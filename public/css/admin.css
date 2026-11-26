@@ -23,3 +23,36 @@
 .admin-revenue-chart-card h3{margin:0 0 12px;color:var(--brand-indigo);font-size:.9rem}
 .admin-revenue-chart-wrap{height:190px;position:relative}
 .admin-plan-revenue{margin-top:20px}.admin-plan-revenue h3{margin:0 0 10px;color:var(--brand-indigo);font-size:.9rem}
+
+/* Contraste du centre admin en thème sombre : les accents indigo/or restent adaptés au thème clair. */
+:root[data-theme="dark"] .admin-brand strong,
+:root[data-theme="dark"] .admin-exit-link,
+:root[data-theme="dark"] .admin-kpi strong,
+:root[data-theme="dark"] .admin-revenue-card strong,
+:root[data-theme="dark"] .admin-revenue-chart-card h3,
+:root[data-theme="dark"] .admin-plan-revenue h3 {
+  color: var(--ink);
+}
+:root[data-theme="dark"] .admin-eyebrow {
+  color: #6EE7AE;
+}
+:root[data-theme="dark"] .admin-caution {
+  color: #F4DCA8;
+  background: #3A2E15;
+  border-left-color: #DDA53F;
+}
+:root[data-theme="dark"] .admin-state.is-error {
+  color: #FFADB4;
+  background: #2A1C28;
+  border-color: #6B3338;
+}
+:root[data-theme="dark"] .admin-button {
+  background: #4D5BC7;
+  color: #FFFFFF;
+}
+:root[data-theme="dark"] .admin-button:hover {
+  background: #6472D6;
+}
+:root[data-theme="dark"] .admin-exit-link:hover {
+  text-decoration: underline;
+}
