@@ -74,7 +74,7 @@ router.get('/overview', async (req, res, next) => {
 
     const results = await Promise.all([
       pool.query('SELECT COUNT(*) AS page_views, COUNT(DISTINCT visitor_hash) AS estimated_sessions FROM sunupilot_analytics_pageviews WHERE created_at >= ? AND created_at < ?', dates),
-      pool.query("SELECT COUNT(*) AS registered_accounts, SUM(created_at >= ? AND created_at < ?) AS new_accounts, SUM(trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP()) AS active_trials, SUM(plan IN ('starter', 'pro', 'entreprise')) AS accounts_with_paid_plan FROM users", dates),
+      pool.query("SELECT COUNT(*) AS registered_accounts, SUM(created_at >= ? AND created_at < ?) AS new_accounts, SUM(trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP()) AS active_trials, SUM(plan IN ('starter', 'standard', 'pro', 'entreprise')) AS accounts_with_paid_plan FROM users", dates),
       pool.query("SELECT plan, COUNT(*) AS accounts FROM users GROUP BY plan ORDER BY FIELD(plan, 'gratuit', 'starter', 'pro', 'entreprise'), plan"),
       pool.query("SELECT COUNT(*) AS active_saas_subscriptions FROM saas_subscriptions WHERE statut = 'active' AND (current_period_end IS NULL OR current_period_end >= UTC_DATE())"),
       pool.query("SELECT plan, COUNT(*) AS subscriptions FROM saas_subscriptions WHERE statut = 'active' AND (current_period_end IS NULL OR current_period_end >= UTC_DATE()) GROUP BY plan ORDER BY plan"),
