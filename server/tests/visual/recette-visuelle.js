@@ -824,6 +824,24 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'Le centre administrateur ne doit pas déborder horizontalement à ' + viewport.width + 'px : ' + JSON.stringify(adminUi));
   }
 
+  if (pageDefinition.name === 'admin') {
+    const skipLink = await page.evaluate(() => {
+      const link = document.querySelector('.admin-skip-link');
+      const main = document.getElementById('main-content');
+      return {
+        exists: Boolean(link),
+        targetExists: Boolean(link && main && link.getAttribute('href') === '#main-content'),
+        targetIsMain: Boolean(main && main.tagName === 'MAIN'),
+        firstTabStop: Boolean(link && link.tabIndex === 0 &&
+          document.querySelector('body')?.firstElementChild === link)
+      };
+    });
+    assert.equal(skipLink.exists, true, 'Le centre admin doit proposer un lien d’évitement clavier.');
+    assert.equal(skipLink.targetExists, true, 'Le lien d’évitement doit cibler le contenu principal.');
+    assert.equal(skipLink.targetIsMain, true, 'La cible du lien d’évitement doit être le repère principal.');
+    assert.equal(skipLink.firstTabStop, true, 'Le lien d’évitement doit être le premier arrêt clavier.');
+  }
+
   if (pageDefinition.name === 'produits') {
     const catalogue = await page.evaluate(() => [...document.querySelectorAll('#produits-body tr')].map(row => ({
       type: row.querySelector('[data-label="Type"]')?.textContent.trim() || '',
