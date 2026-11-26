@@ -15,6 +15,7 @@ const { linkGoogleIdentity, findGoogleUserAfterInsertConflict } = require('../ut
 const { SUPPORTED_CURRENCIES } = require('../config/localization');
 const { escapeHtmlEmail } = require('../utils/email-escape');
 const { appendAuditEvent } = require('../utils/audit-ledger');
+const { detectRepeatedLoginFailures } = require('../utils/security-alerts');
 
 
 const router = express.Router();
@@ -344,6 +345,15 @@ router.post('/login', loginLimiter, async (req, res, next) => {
         outcome: 'failure',
         metadata: { auth_method: 'password', reason: user ? 'invalid_credentials' : 'account_not_found' }
       });
+      if (user) {
+        try {
+          await detectRepeatedLoginFailures({ tenantId: Number(user.id), accountId: String(user.id) });
+        } catch (alertError) {
+          // La détection ne doit jamais révéler un incident de surveillance à l'utilisateur
+          // ni transformer une authentification refusée en erreur 500.
+          console.error('Détection des échecs de connexion répétitifs indisponible :', alertError.message);
+        }
+      }
       return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
     }
 
