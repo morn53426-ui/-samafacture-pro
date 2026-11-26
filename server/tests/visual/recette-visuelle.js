@@ -959,6 +959,12 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       assert.equal(dialogMetrics.actionsPosition, 'sticky',
         pageDefinition.name + ' : les boutons doivent rester ancrés au bas du formulaire sur téléphone.');
     }
+    // Conserver une preuve visuelle de l'état de création, pas seulement de la page
+    // de liste. Une capture par largeur mobile documente le formulaire réellement ouvert.
+    await page.screenshot({
+      path: path.join(screenshots, pageDefinition.name + '-create-modal-' + viewport.name + '-' + DATASET + '.png'),
+      fullPage: false
+    });
     await page.click('#modal [data-modal-close]');
     await page.waitForFunction(() => getComputedStyle(document.getElementById('modal')).display === 'none');
   }
