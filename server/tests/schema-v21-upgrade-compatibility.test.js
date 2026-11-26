@@ -208,7 +208,7 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   assert.equal(repeatedMigration.status, 0,
     repeatedMigration.stderr || repeatedMigration.stdout || 'La migration répétée v20 → v26 a échoué.');
   const [[repeatedMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(repeatedMeta.version), 25);
+  assert.equal(Number(repeatedMeta.version), 26);
   const [[repeatedExpense]] = await pool.query(
     'SELECT mode_reglement FROM depenses WHERE user_id = ? AND libelle = ?',
     [userId, 'Dépense banque conservée pendant upgrade v20']
@@ -225,7 +225,7 @@ test('une base v20 conserve les règlements bancaires et reçoit un essai neutre
   await removeTestUser(userId);
 });
 
-test('une base v21 protège les événements comptables contre la suppression en cascade et atteint le schéma v25', async () => {
+test('une base v21 protège les événements comptables contre la suppression en cascade et atteint le schéma v26', async () => {
   const userId = await addUser('from-v21', false);
   let clientId = null;
   let invoiceId = null;
@@ -307,7 +307,7 @@ test('une base v21 protège les événements comptables contre la suppression en
     assert.equal(repeated.error, undefined, repeated.error?.message);
     assert.equal(repeated.status, 0, repeated.stderr || repeated.stdout || 'La migration v21 → v26 rejouée a échoué.');
     const [[repeatMeta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-    assert.equal(Number(repeatMeta.version), 25);
+    assert.equal(Number(repeatMeta.version), 26);
     const [[repeatEvent]] = await pool.query(
       'SELECT id, facture_id, transition FROM pro_compta_facture_events WHERE user_id = ? AND facture_id = ?',
       [userId, invoiceId]
