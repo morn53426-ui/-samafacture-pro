@@ -39,6 +39,10 @@ function hashVisitor(sessionId) {
   return crypto.createHmac('sha256', key).update(sessionId).digest('hex');
 }
 
+function purgeEnabled() {
+  return process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED === 'true';
+}
+
 function retentionDays() {
   const parsed = Number.parseInt(process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS, 10);
   if (!Number.isFinite(parsed)) return DEFAULT_RETENTION_DAYS;
@@ -48,6 +52,8 @@ function retentionDays() {
 // Supprime par lots les vues plus anciennes que la durée de conservation, sans verrouiller
 // longuement la table. Retourne le nombre total de lignes supprimées.
 async function purgeOldPageviews(connection = pool) {
+  // Préservation par défaut : aucune donnée analytique n'est supprimée sans activation explicite.
+  if (!purgeEnabled()) return 0;
   const days = retentionDays();
   let total = 0;
   for (let batch = 0; batch < PURGE_MAX_BATCHES; batch += 1) {
@@ -61,4 +67,4 @@ async function purgeOldPageviews(connection = pool) {
   return total;
 }
 
-module.exports = { PAGE_PATHS, hashVisitor, retentionDays, purgeOldPageviews };
+module.exports = { PAGE_PATHS, hashVisitor, purgeEnabled, retentionDays, purgeOldPageviews };
