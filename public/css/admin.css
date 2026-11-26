@@ -17,3 +17,9 @@
 @media(max-width:900px){.admin-main{width:min(100% - 32px,760px);padding-top:26px}.admin-intro{align-items:start;flex-direction:column}.admin-period-form{width:100%}.admin-period-form label{flex:1 1 130px}.admin-period-form input{width:100%;box-sizing:border-box}.admin-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-panel-grid,.admin-bottom-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:520px){.admin-header{padding:12px 16px;align-items:flex-start}.admin-brand img{width:36px;height:36px}.admin-security-note{display:none}.admin-exit-link{font-size:.76rem;text-align:right}.admin-main{width:calc(100% - 28px);padding-top:22px}.admin-period-form{display:grid;grid-template-columns:1fr 1fr}.admin-period-form button{grid-column:1/-1}.admin-kpi-grid{gap:9px}.admin-kpi{padding:14px 13px}.admin-kpi strong{font-size:1.4rem}.admin-panel{padding:16px 13px}.admin-panel-heading{flex-direction:column;gap:8px}.admin-chart-wrap{height:220px}.admin-table{font-size:.76rem}.admin-table th,.admin-table td{padding:10px 7px}}
 @media(prefers-reduced-motion:reduce){.admin-loader{animation:none}}
+
+.admin-revenue-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:0 0 18px}
+.admin-revenue-chart-card{min-width:0;border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px;background:var(--cream)}
+.admin-revenue-chart-card h3{margin:0 0 12px;color:var(--brand-indigo);font-size:.9rem}
+.admin-revenue-chart-wrap{height:190px;position:relative}
+.admin-plan-revenue{margin-top:20px}.admin-plan-revenue h3{margin:0 0 10px;color:var(--brand-indigo);font-size:.9rem}

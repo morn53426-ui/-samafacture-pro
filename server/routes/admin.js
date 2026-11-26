@@ -86,7 +86,8 @@ router.get('/overview', async (req, res, next) => {
       pool.query(trafficSql, dates),
       pool.query(signupSql, dates),
       pool.query(revenueSql, dates),
-      pool.query("SELECT page_path, COUNT(*) AS page_views, COUNT(DISTINCT visitor_hash) AS estimated_sessions FROM sunupilot_analytics_pageviews WHERE created_at >= ? AND created_at < ? GROUP BY page_path ORDER BY page_views DESC, page_path LIMIT 10", dates)
+      pool.query("SELECT page_path, COUNT(*) AS page_views, COUNT(DISTINCT visitor_hash) AS estimated_sessions FROM sunupilot_analytics_pageviews WHERE created_at >= ? AND created_at < ? GROUP BY page_path ORDER BY page_views DESC, page_path LIMIT 10", dates),
+      pool.query("SELECT plan, devise AS currency, COUNT(*) AS confirmed_payments, SUM(montant) AS amount FROM abonnement_paiements WHERE statut = 'payee' AND COALESCE(paid_at, created_at) >= ? AND COALESCE(paid_at, created_at) < ? GROUP BY plan, devise ORDER BY devise, plan", dates)
     ]);
     const rows = results.map(result => result[0]);
     const traffic = rows[0][0] || {};
@@ -113,6 +114,7 @@ router.get('/overview', async (req, res, next) => {
         period_by_currency: rows[6],
         all_time_by_currency: rows[7],
         trend: rows[10],
+        by_plan_by_currency: rows[12],
         recurring_metrics_available: false,
         recurring_metrics_note: "MRR et ARR ne sont pas calculés : aucun catalogue de prix approuvé ni cycle de renouvellement SaaS actif n'est actuellement confirmé."
       },

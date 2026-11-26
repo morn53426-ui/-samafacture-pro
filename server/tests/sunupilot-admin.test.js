@@ -81,6 +81,7 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
     assert.equal(response.status, 200, response.text);
     assert.ok(response.body.summary);
     assert.ok(response.body.revenue);
+    assert.ok(Array.isArray(response.body.revenue.by_plan_by_currency));
     assert.equal(response.body.revenue.recurring_metrics_available, false);
     assert.equal(JSON.stringify(response.body).includes(registeredEmail), false);
     assert.ok(response.body.summary.registered_accounts >= 1);
