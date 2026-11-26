@@ -960,8 +960,8 @@ function createFactureTemplates(helpers) {
       user.entreprise_banque ? ['Banque', escapeHtml(user.entreprise_banque)] : null,
       user.entreprise_rib ? ['RIB / IBAN / compte', escapeHtml(user.entreprise_rib)] : null
     ].filter(Boolean);
-    // SVG intégrés pour garantir le rendu des pictogrammes dans Chromium, les PDF
-    // et l'impression, sans dépendre d'un chargement asynchrone d'icônes.
+    // SVG inline : rendu fiable dans l’aperçu, Chromium, le PDF et l'impression
+    // sans dépendance au chargement d'une bibliothèque d'icônes.
     const legalContactIcon = (type) => {
       const drawing = type === 'mail'
         ? '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/>'

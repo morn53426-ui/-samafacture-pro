@@ -254,6 +254,10 @@ describe('Modèles de facture (public/js/facture-templates.js)', () => {
       assert.doesNotMatch(html, /Non payée/, template + ' ne doit pas qualifier de non payée une facture avec acompte');
       assert.match(html, /Reste à payer/, template + ' doit afficher le solde dû');
       assert.match(html, /Coordonnées de règlement/, template + ' doit présenter les informations bancaires configurées');
+      assert.match(html, /<span class="sf-doc-legal-item sf-doc-legal-item-phone"[^>]*><svg[^>]*data-icon="phone"/,
+        template + ' doit afficher l’icône téléphone avant le numéro dans le pied de page');
+      assert.match(html, /<span class="sf-doc-legal-item sf-doc-legal-item-mail"[^>]*><svg[^>]*data-icon="mail"/,
+        template + ' doit afficher l’icône email avant l’adresse dans le pied de page');
       assert.doesNotMatch(html, /undefined|NaN/);
     }
   });

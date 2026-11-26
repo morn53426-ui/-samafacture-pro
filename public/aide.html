@@ -7,7 +7,7 @@
 <meta charset="UTF-8" />
 <title>Centre d'aide — Sunupilot</title>
 <meta name="description" content="Questions fréquentes sur Sunupilot : créer une facture, encaisser un paiement, exporter en PDF, gérer vos dépenses et bien plus." />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="canonical" href="https://votredomaine.com/aide.html" />
 <meta name="robots" content="index, follow" />
 <link rel="stylesheet" href="css/style.css" />
@@ -73,10 +73,11 @@
 }
 </script>
 </head>
-<body>
+<body class="info-page">
 
 <header class="lp-header">
   <div class="brand"><img src="images/icon-192.png" alt="Logo Sunupilot" /> Sunupilot</div>
+  <a class="lp-back-link" href="index.html" data-smart-back aria-label="Retourner à la page précédente" title="Retourner à la page précédente"><span aria-hidden="true">←</span> Retour</a>
   <nav>
     <a href="index.html">Accueil</a>
     <a href="login.html">Connexion</a>
@@ -177,5 +178,6 @@
 
   render(faq);
 </script>
+  <script src="js/info-page-navigation.js"></script>
 </body>
 </html>

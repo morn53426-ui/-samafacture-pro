@@ -4809,7 +4809,7 @@ input:focus, select:focus, textarea:focus {
 @media (max-width: 900px) {
   .main-content, body .main-content, body .main-content.workspace-page {
     margin-left: 0 !important;
-    padding: calc(84px + env(safe-area-inset-top)) 18px 48px !important;
+    padding: calc(116px + env(safe-area-inset-top)) 18px 48px !important;
   }
   body .main-content.workspace-page > :not(.app-topbar):not(#topbar-root) {
     margin-left: 0 !important;
@@ -4824,9 +4824,52 @@ input:focus, select:focus, textarea:focus {
 }
 @media (max-width: 640px) {
   .main-content, body .main-content, body .main-content.workspace-page {
-    padding: calc(84px + env(safe-area-inset-top)) 12px calc(36px + env(safe-area-inset-bottom)) !important;
+    padding: calc(108px + env(safe-area-inset-top)) 12px calc(36px + env(safe-area-inset-bottom)) !important;
   }
   .app-topbar { gap: 10px; margin-bottom: 18px; padding: 10px; border-radius: 8px; }
+}
+
+/* Sur petit écran, le titre métier précède la barre de recherche globale.
+   Le bandeau fixe de navigation reste au-dessus du contenu sans masquer les titres. */
+@media (max-width: 900px) {
+  body .main-content.workspace-page.workspace-page-has-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+  body .main-content.workspace-page.workspace-page-has-heading > .page-header,
+  body .main-content.workspace-page.workspace-page-has-heading > .workspace-page-header {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+  body .main-content.workspace-page.workspace-page-has-heading > #topbar-root,
+  body .main-content.workspace-page.workspace-page-has-heading > .app-topbar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  body .main-content.workspace-page > .page-header > div:first-child,
+  body .main-content.workspace-page > .workspace-page-header > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+  body .main-content.workspace-page > .page-header h1,
+  body .main-content.workspace-page > .workspace-page-header h1 {
+    display: block;
+    visibility: visible;
+    max-width: 100%;
+    font-size: clamp(1.55rem, 6.5vw, 1.9rem);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 380px) {
+  body .main-content.workspace-page > .page-header h1,
+  body .main-content.workspace-page > .workspace-page-header h1 {
+    font-size: 1.5rem;
+  }
 }
 
 /* Surfaces : papier, bordures fines et ombres discrètes. */
@@ -8282,3 +8325,39 @@ a.btn .icon {
 
 /* Hidden is explicit even when a component class sets display:inline-flex. */
 #platform-admin-shortcut[hidden] { display: none !important; }
+
+
+/* Navigation de retour persistante pour les pages d'information ouvertes
+   depuis l'espace de travail, y compris sur les petits écrans. */
+body.info-page .lp-header{
+  position:sticky;top:0;z-index:100;width:100%;box-sizing:border-box;
+  padding-top:max(14px,env(safe-area-inset-top,0px));
+  padding-left:max(18px,env(safe-area-inset-left,0px));
+  padding-right:max(18px,env(safe-area-inset-right,0px));
+  background:var(--paper);border-bottom:1px solid var(--line);
+}
+body.info-page .lp-back-link{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  flex:0 0 auto;min-height:44px;padding:9px 14px;
+  border:1px solid var(--line);border-radius:9px;
+  background:var(--cream);color:var(--ink);font-size:.88rem;font-weight:650;
+  text-decoration:none;touch-action:manipulation
+}
+body.info-page .lp-back-link:hover,
+body.info-page .lp-back-link:focus-visible{background:var(--emerald-light);border-color:var(--emerald);color:var(--emerald)}
+body.info-page .lp-back-link:focus-visible{outline:2px solid var(--emerald);outline-offset:2px}
+body.info-page .lp-back-link span{font-size:1.2rem;line-height:1}
+body.info-page .lp-content{scroll-margin-top:100px}
+@media(max-width:860px){
+  body.info-page .lp-header{
+    gap:10px;justify-content:space-between;flex-wrap:nowrap;
+    padding: max(10px,env(safe-area-inset-top,0px)) 14px 10px;
+  }
+  body.info-page .lp-header .brand{gap:8px;min-width:0;flex:1 1 auto;font-size:.96rem;white-space:nowrap}
+  body.info-page .lp-header .brand img{width:34px;height:34px;flex:0 0 34px}
+  body.info-page .lp-back-link{min-width:88px;padding:8px 12px;font-size:.84rem}
+}
+@media(max-width:360px){
+  body.info-page .lp-header .brand{font-size:.9rem}
+  body.info-page .lp-back-link{min-width:80px;padding:8px 10px}
+}
