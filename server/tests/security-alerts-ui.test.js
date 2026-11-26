@@ -30,6 +30,7 @@ test('le centre de sécurité est indépendant des intégrations et réservé à
   assert.ok(page.indexOf('</section>', integrationsStart) < securityStart,
     'le centre de sécurité doit être indépendant des droits d’intégration');
   assert.match(page, /setHidden\('pro-security', !can\('security\.read'\)\)/);
+  assert.match(page, /'security\.read':'security\.manage'/);
   assert.match(page, /if \(can\('security\.read'\)\) await loadSecurityCentre\(\)/);
 });
 
