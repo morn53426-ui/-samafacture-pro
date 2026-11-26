@@ -2,7 +2,7 @@ const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
-const { hashVisitor, purgeOldPageviews, retentionDays } = require('../utils/sunupilot-analytics');
+const { hashVisitor, purgeEnabled, purgeOldPageviews, retentionDays } = require('../utils/sunupilot-analytics');
 
 describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
   let userId;
@@ -136,9 +136,31 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
     assert.notEqual(hash, hashVisitor(changedSessionId));
   });
 
-  test('la purge supprime les vues expirées et conserve les vues récentes', async () => {
+  test('la purge est désactivée par défaut et ne supprime aucune vue', async () => {
+    const previous = process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED;
+    delete process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED;
+    const calls = [];
+    const connection = {
+      async query(sql, values) {
+        calls.push({ sql, values });
+        return [{ affectedRows: 1 }];
+      }
+    };
+    try {
+      assert.equal(purgeEnabled(), false);
+      assert.equal(await purgeOldPageviews(connection), 0);
+      assert.equal(calls.length, 0, 'aucune requête DELETE ne doit être exécutée par défaut.');
+    } finally {
+      if (previous === undefined) delete process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED;
+      else process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED = previous;
+    }
+  });
+
+  test('la purge supprime les vues expirées et conserve les vues récentes quand elle est explicitement activée', async () => {
     const previous = process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS;
+    const previousEnabled = process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED;
     process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS = '30';
+    process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED = 'true';
     const oldHash = 'a'.repeat(63) + '1';
     const freshHash = 'b'.repeat(63) + '2';
     try {
@@ -156,12 +178,16 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
       await pool.query('DELETE FROM sunupilot_analytics_pageviews WHERE visitor_hash IN (?, ?)', [oldHash, freshHash]);
       if (previous === undefined) delete process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS;
       else process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS = previous;
+      if (previousEnabled === undefined) delete process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED;
+      else process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED = previousEnabled;
     }
   });
 
   test('la purge peut réutiliser la connexion déjà verrouillée sans reprendre le pool', async () => {
     const previous = process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS;
+    const previousEnabled = process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED;
     process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS = '30';
+    process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED = 'true';
     const calls = [];
     const connection = {
       async query(sql, values) {
@@ -177,6 +203,8 @@ describe('Centre administrateur et mesure de fréquentation Sunupilot', () => {
     } finally {
       if (previous === undefined) delete process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS;
       else process.env.SUNUPILOT_ANALYTICS_RETENTION_DAYS = previous;
+      if (previousEnabled === undefined) delete process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED;
+      else process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED = previousEnabled;
     }
   });
 
