@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 24;
+const CURRENT_SCHEMA_VERSION = 25;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -539,6 +539,21 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of analyticsStatements) {
+    await conn.query(statement);
+  }
+
+  // v25 : registre d'audit signé, append-only et sans FK vers users pour conserver
+  // les éléments de preuve au-delà du cycle de vie d'un compte.
+  const auditLedgerPath = path.join(__dirname, '..', 'database', 'migrations', '014_audit_ledger.sql');
+  const auditLedgerSql = fs.readFileSync(auditLedgerPath, 'utf8');
+  const auditLedgerStatements = auditLedgerSql
+    .split(/\\r?\\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of auditLedgerStatements) {
     await conn.query(statement);
   }
 
