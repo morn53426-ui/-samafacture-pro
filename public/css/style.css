@@ -4809,7 +4809,7 @@ input:focus, select:focus, textarea:focus {
 @media (max-width: 900px) {
   .main-content, body .main-content, body .main-content.workspace-page {
     margin-left: 0 !important;
-    padding: calc(84px + env(safe-area-inset-top)) 18px 48px !important;
+    padding: calc(116px + env(safe-area-inset-top)) 18px 48px !important;
   }
   body .main-content.workspace-page > :not(.app-topbar):not(#topbar-root) {
     margin-left: 0 !important;
@@ -4824,9 +4824,52 @@ input:focus, select:focus, textarea:focus {
 }
 @media (max-width: 640px) {
   .main-content, body .main-content, body .main-content.workspace-page {
-    padding: calc(84px + env(safe-area-inset-top)) 12px calc(36px + env(safe-area-inset-bottom)) !important;
+    padding: calc(108px + env(safe-area-inset-top)) 12px calc(36px + env(safe-area-inset-bottom)) !important;
   }
   .app-topbar { gap: 10px; margin-bottom: 18px; padding: 10px; border-radius: 8px; }
+}
+
+/* Sur petit écran, le titre métier précède la barre de recherche globale.
+   Le bandeau fixe de navigation reste au-dessus du contenu sans masquer les titres. */
+@media (max-width: 900px) {
+  body .main-content.workspace-page.workspace-page-has-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+  body .main-content.workspace-page.workspace-page-has-heading > .page-header,
+  body .main-content.workspace-page.workspace-page-has-heading > .workspace-page-header {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+  body .main-content.workspace-page.workspace-page-has-heading > #topbar-root,
+  body .main-content.workspace-page.workspace-page-has-heading > .app-topbar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  body .main-content.workspace-page > .page-header > div:first-child,
+  body .main-content.workspace-page > .workspace-page-header > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+  body .main-content.workspace-page > .page-header h1,
+  body .main-content.workspace-page > .workspace-page-header h1 {
+    display: block;
+    visibility: visible;
+    max-width: 100%;
+    font-size: clamp(1.55rem, 6.5vw, 1.9rem);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 380px) {
+  body .main-content.workspace-page > .page-header h1,
+  body .main-content.workspace-page > .workspace-page-header h1 {
+    font-size: 1.5rem;
+  }
 }
 
 /* Surfaces : papier, bordures fines et ombres discrètes. */
