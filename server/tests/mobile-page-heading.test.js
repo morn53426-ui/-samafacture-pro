@@ -1,0 +1,50 @@
+'use strict';
+
+const { test, describe } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const PUBLIC_DIR = path.resolve(__dirname, '../../public');
+const styles = fs.readFileSync(path.join(PUBLIC_DIR, 'css', 'style.css'), 'utf8');
+
+const formPages = [
+  'nouvelle-facture.html',
+  'parametres.html',
+  'achats.html',
+  'automatisations.html',
+  'internationalisation.html',
+  'crm.html',
+  'clients.html',
+  'depenses.html'
+];
+
+describe('Titres des pages métier sur petit écran', () => {
+  for (const file of formPages) {
+    test(file + ' conserve un titre principal dans l’en-tête de page', () => {
+      const html = fs.readFileSync(path.join(PUBLIC_DIR, file), 'utf8');
+      assert.match(html, /class="[^"]*workspace-page[^"]*"/,
+        'La page doit utiliser le shell métier commun.');
+      assert.match(html, /class="[^"]*page-header[^"]*"/,
+        'La page doit déclarer son en-tête principal.');
+      assert.match(html, /<h1\b[^>]*>/,
+        'Le titre principal doit rester un véritable titre H1.');
+    });
+  }
+
+  test('à 900 px ou moins, le titre principal passe avant la barre d’outils globale', () => {
+    assert.match(styles, /@media \(max-width: 900px\)[\s\S]*?\.main-content\.workspace-page:has\(> \.page-header\)\s*\{[\s\S]*?display:\s*grid/);
+    assert.match(styles, /\.main-content\.workspace-page:has\(> \.page-header\)\s*> \.page-header\s*\{[\s\S]*?grid-row:\s*1/);
+    assert.match(styles, /\.main-content\.workspace-page:has\(> \.page-header\)\s*> #topbar-root,[\s\S]*?\.app-topbar\s*\{[\s\S]*?grid-row:\s*2/);
+  });
+
+  test('le titre garde une taille lisible et ne peut pas être masqué sur téléphone', () => {
+    assert.match(styles, /body \.main-content\.workspace-page > \.page-header h1\s*\{[\s\S]*?display:\s*block[\s\S]*?visibility:\s*visible[\s\S]*?font-size:\s*clamp\(1\.55rem, 6\.5vw, 1\.9rem\)/);
+    assert.match(styles, /@media \(max-width: 380px\)[\s\S]*?font-size:\s*1\.5rem/);
+  });
+
+  test('la zone de contenu commence après la hauteur du menu mobile et ses encoches', () => {
+    assert.match(styles, /padding: calc\(116px \+ env\(safe-area-inset-top\)\) 18px 48px !important/);
+    assert.match(styles, /padding: calc\(108px \+ env\(safe-area-inset-top\)\) 12px calc\(36px \+ env\(safe-area-inset-bottom\)\) !important/);
+  });
+});
