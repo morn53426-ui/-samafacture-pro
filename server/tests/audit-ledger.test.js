@@ -241,6 +241,19 @@ test('API audit : pagination, filtres, vérification et isolation stricte des te
   assert.equal(csvExport.headers['x-export-row-count'], '1');
   assert.match(csvExport.text, /"'=1\+1"/, 'les cellules commençant par une formule doivent être neutralisées');
 
+  const allTenantExport = await request(app)
+    .get('/api/pro/audit-events/export.csv')
+    .set('Authorization', 'Bearer ' + ownerAToken);
+  assert.equal(allTenantExport.status, 200, allTenantExport.text);
+  assert.match(allTenantExport.text, /audit\.test\.export_formula/);
+  assert.doesNotMatch(allTenantExport.text, /audit\.test\.tenant_b/,
+    'l’export ne doit jamais inclure les événements d’une autre entreprise');
+
+  const reversedDates = await request(app)
+    .get('/api/pro/audit-events/export.csv?from=2026-11-27&to=2026-11-01')
+    .set('Authorization', 'Bearer ' + ownerAToken);
+  assert.equal(reversedDates.status, 400);
+
   const pdfExport = await request(app)
     .get('/api/pro/audit-events/export.pdf?event_type=audit.test.export_formula')
     .set('Authorization', 'Bearer ' + ownerAToken)
