@@ -402,7 +402,7 @@
                 <option value="false_positive">Faux positif</option>
               </select>
             </div>
-            <div class="field"><label for="security-alert-assignee">Responsable des alertes</label><select id="security-alert-assignee"><option value="">Choisir un membre actif</option></select></div>
+            <div class="field" id="security-alert-assignee-wrap"><label for="security-alert-assignee">Responsable des alertes</label><select id="security-alert-assignee"><option value="">Choisir un membre actif</option></select></div>
             <button class="btn btn-outline" id="security-refresh" type="button">Actualiser</button>
           </div>
           <div id="security-alerts-list" class="pro-list" aria-live="polite"></div>
@@ -684,6 +684,7 @@ async function loadSecurityCenter() {
   );
 
   const manageAlerts = can('security.alerts.manage');
+  el('security-alert-assignee-wrap').hidden = !manageAlerts;
   const memberOptions = securityTeamMembersCache.map(member =>
     '<option value="' + Number(member.member_user_id) + '">' + escapeHtml(member.nom || ('Membre #' + member.member_user_id)) + '</option>'
   ).join('');
