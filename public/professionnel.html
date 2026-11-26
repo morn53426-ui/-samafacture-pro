@@ -359,6 +359,8 @@
               <button class="btn btn-outline" type="submit">Appliquer les filtres</button>
               <button class="btn btn-outline" id="audit-reset" type="button">Réinitialiser</button>
               <button class="btn btn-outline" id="audit-integrity-check" type="button">Vérifier l'intégrité</button>
+              <button class="btn btn-outline" id="audit-export-csv" type="button" hidden>Exporter CSV</button>
+              <button class="btn btn-outline" id="audit-export-pdf" type="button" hidden>Exporter PDF</button>
             </div>
           </form>
           <p id="audit-integrity-status" class="pro-muted" role="status" aria-live="polite">L'intégrité n'a pas encore été vérifiée.</p>
@@ -507,6 +509,57 @@ el('audit-next').addEventListener('click', () => {
   if (auditPage < auditTotalPages) loadAuditEvents(auditPage + 1);
 });
 el('audit-integrity-check').addEventListener('click', verifyAuditIntegrity);
+
+async function downloadAuditExport(format) {
+  if (!can('audit.export')) return;
+  const button = el(format === 'pdf' ? 'audit-export-pdf' : 'audit-export-csv');
+  const params = new URLSearchParams();
+  const filters = {
+    q: el('audit-search').value.trim(),
+    category: el('audit-category').value,
+    severity: el('audit-severity').value,
+    from: el('audit-from').value,
+    to: el('audit-to').value,
+    event_type: el('audit-event-type').value.trim()
+  };
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+
+  const headers = { Authorization: 'Bearer ' + Api.token() };
+  const selectedOwner = localStorage.getItem('sf_company_owner');
+  if (selectedOwner) headers['X-SF-Company-Owner'] = selectedOwner;
+
+  button.disabled = true;
+  try {
+    const response = await fetch('/api/pro/audit-events/export.' + format + '?' + params.toString(), {
+      method: 'GET',
+      headers,
+      cache: 'no-store'
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Export du registre impossible.');
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = format === 'pdf' ? 'samafacture-registre-audit.pdf' : 'samafacture-registre-audit.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    showToast('Export du registre généré.', 'success');
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+el('audit-export-csv').addEventListener('click', () => downloadAuditExport('csv'));
+el('audit-export-pdf').addEventListener('click', () => downloadAuditExport('pdf'));
 function can(permission) {
   const implied = {
     'clients.read':'clients.write', 'products.read':'products.write',
@@ -553,6 +606,8 @@ function applyModulePermissions() {
   setHidden('api-key-form', !can('integrations.manage'));
   setHidden('webhook-form', !can('integrations.manage'));
   setHidden('audit-section', !can('audit.read'));
+  setHidden('audit-export-csv', !can('audit.export'));
+  setHidden('audit-export-pdf', !can('audit.export'));
   if (!can('sales.write')) document.querySelectorAll('#orders-list button').forEach(button => { button.hidden = true; });
   if (!can('invoices.write')) document.querySelectorAll('#credits-list button').forEach(button => { button.hidden = true; });
   if (!can('payments.write')) document.querySelectorAll('#payments-list button, #refunds-list button, #deposits-list button').forEach(button => { button.hidden = true; });
