@@ -578,7 +578,7 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of securityCasesStatements) {
-    const triggerMatch = /^CREATE TRIGGER\\s+([a-zA-Z0-9_]+)/i.exec(statement);
+    const triggerMatch = /^CREATE TRIGGER\s+([a-zA-Z0-9_]+)/i.exec(statement);
     if (triggerMatch) {
       const [existingTriggers] = await conn.query(
         'SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = ? LIMIT 1',
