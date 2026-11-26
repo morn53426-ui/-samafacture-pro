@@ -197,7 +197,7 @@ test('une base v8 reçoit les migrations v9 à v25 sans perdre les données exis
   assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v25 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 25, 'la version doit inclure les migrations v19 à v25 après le socle v18.');
+  assert.equal(Number(meta.version), 26, 'la version doit inclure les migrations v19 à v26 après le socle v18.');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
