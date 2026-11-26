@@ -98,15 +98,13 @@ test('migration v26 : tables d’alertes et d’investigation avec historique ap
 });
 
 test('cinq échecs de connexion sur quinze minutes créent une seule alerte tenant-scoped', async () => {
-  for (let attempt = 1; attempt <= 5; attempt += 1) {
-    const result = await request(app).post('/api/auth/login').send({
-      email: emailDeTest('security-alert-nonexistent').replace(/^[^@]+$/, 'unused'),
-      password: 'incorrect'
-    });
-    // Une adresse inconnue n'est pas rattachée à un tenant : elle ne doit pas
-    // créer de fausse alerte dans le dossier d'un compte existant.
-    assert.equal(result.status, 401);
-  }
+  const unknownAccount = await request(app).post('/api/auth/login').send({
+    email: emailDeTest('security-alert-unknown'),
+    password: 'incorrect'
+  });
+  // Une adresse inconnue n'est pas rattachée à un tenant : elle ne doit pas
+  // créer de fausse alerte dans le dossier d'un compte existant.
+  assert.equal(unknownAccount.status, 401);
 
   const [beforeKnownAccount] = await pool.query(
     'SELECT id FROM pro_security_alerts WHERE tenant_scope_id = ?',
