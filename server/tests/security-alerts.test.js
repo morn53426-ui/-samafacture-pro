@@ -218,6 +218,12 @@ test('dossier d’investigation : création idempotente, transitions et historiq
     .send({ status: 'resolved' });
   assert.equal(resolved.status, 200, resolved.text);
   assert.equal(resolved.body.status, 'resolved');
+  const [[resolvedAlertRecord]] = await pool.query(
+    'SELECT status, resolution_code FROM pro_security_alerts WHERE id = ? AND tenant_scope_id = ?',
+    [alertId, ownerA]
+  );
+  assert.equal(resolvedAlertRecord.status, 'resolved');
+  assert.equal(resolvedAlertRecord.resolution_code, 'mitigated');
 
   const cases = await request(app).get('/api/pro/security-cases').set(auth(ownerAToken));
   assert.equal(cases.status, 200, cases.text);
