@@ -14,9 +14,28 @@ const { normalizeTrialPlan } = require('../utils/free-trial');
 const { linkGoogleIdentity, findGoogleUserAfterInsertConflict } = require('../utils/google-account');
 const { SUPPORTED_CURRENCIES } = require('../config/localization');
 const { escapeHtmlEmail } = require('../utils/email-escape');
+const { appendAuditEvent } = require('../utils/audit-ledger');
 
 
 const router = express.Router();
+
+async function journaliserEvenementAuth(req, event) {
+  return appendAuditEvent({
+    tenantId: event.tenantId === undefined ? null : event.tenantId,
+    actorUserId: event.actorUserId === undefined ? null : event.actorUserId,
+    actorKind: event.actorKind || (event.actorUserId ? 'user' : 'anonymous'),
+    eventType: event.eventType,
+    category: event.category || 'security',
+    severity: event.severity || 'info',
+    entityType: event.entityType || 'authentication',
+    entityId: event.entityId == null ? null : String(event.entityId),
+    outcome: event.outcome || 'success',
+    ipAddress: req.ip || null,
+    userAgent: req.get('user-agent') || null,
+    requestId: req.requestId || null,
+    metadata: event.metadata || null
+  });
+}
 
 // Incrémenter ces versions à chaque modification substantielle des documents publics.
 const TERMS_VERSION = '2026-11-13';
@@ -258,6 +277,16 @@ router.post('/register', registerLimiter, async (req, res, next) => {
 
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
     const user = rows[0];
+    await journaliserEvenementAuth(req, {
+      tenantId: Number(user.id),
+      actorUserId: Number(user.id),
+      eventType: 'auth.account.registered',
+      category: 'identity',
+      entityType: 'account',
+      entityId: user.id,
+      outcome: 'success',
+      metadata: { auth_method: 'password', trial_plan: user.trial_plan || null }
+    });
     const token = signToken(user);
     definirCookieSession(res, token);
     res.status(201).json({ token, user: sanitizeUser(user) });
@@ -303,6 +332,18 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
     const user = rows[0];
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      await journaliserEvenementAuth(req, {
+        tenantId: user ? Number(user.id) : null,
+        actorUserId: null,
+        actorKind: 'anonymous',
+        eventType: 'auth.login.failed',
+        category: 'security',
+        severity: user ? 'medium' : 'low',
+        entityType: 'account',
+        entityId: user ? user.id : null,
+        outcome: 'failure',
+        metadata: { auth_method: 'password', reason: user ? 'invalid_credentials' : 'account_not_found' }
+      });
       return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
     }
 
@@ -314,6 +355,16 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     );
     const [currentRows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
     const currentUser = currentRows[0];
+    await journaliserEvenementAuth(req, {
+      tenantId: Number(currentUser.id),
+      actorUserId: Number(currentUser.id),
+      eventType: 'auth.login.succeeded',
+      category: 'security',
+      entityType: 'account',
+      entityId: currentUser.id,
+      outcome: 'success',
+      metadata: { auth_method: 'password' }
+    });
     const token = signToken(currentUser);
     definirCookieSession(res, token);
     res.json({ token, user: sanitizeUser(currentUser) });
@@ -459,6 +510,16 @@ router.post('/google', async (req, res, next) => {
     [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
     user = rows[0];
 
+    await journaliserEvenementAuth(req, {
+      tenantId: Number(user.id),
+      actorUserId: Number(user.id),
+      eventType: 'auth.login.succeeded',
+      category: 'security',
+      entityType: 'account',
+      entityId: user.id,
+      outcome: 'success',
+      metadata: { auth_method: 'google' }
+    });
     const token = signToken(user);
     definirCookieSession(res, token);
     res.json({ token, user: sanitizeUser(user) });
@@ -484,6 +545,15 @@ router.post('/logout', (req, res, next) => {
   try {
     // Invalide aussi les anciens jetons Bearer conservés sur les autres appareils.
     await incrementerTokenVersion(null, req.user.id);
+    await journaliserEvenementAuth(req, {
+      tenantId: Number(req.user.id),
+      actorUserId: Number(req.user.id),
+      eventType: 'auth.logout',
+      category: 'security',
+      entityType: 'account',
+      entityId: req.user.id,
+      outcome: 'success'
+    });
     res.status(204).end();
   } catch (err) {
     next(err);
