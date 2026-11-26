@@ -192,6 +192,50 @@ async function genererPdfFacture(factureId, user) {
   }
 }
 
+/**
+ * Génère un PDF à partir d'un HTML construit exclusivement côté serveur.
+ * Aucun accès réseau externe n'est autorisé pour ce document de rapport.
+ * Le HTML doit déjà échapper toutes les valeurs provenant de la base.
+ */
+async function genererPdfDepuisHtml(html) {
+  if (typeof html !== 'string' || Buffer.byteLength(html, 'utf8') > 1200000) {
+    throw new TypeError('Le contenu HTML du rapport PDF est invalide ou trop volumineux.');
+  }
+  await acquireSlot();
+  let page;
+  try {
+    const browser = await getBrowser();
+    page = await browser.newPage();
+    await page.setRequestInterception(true);
+    page.on('request', request => {
+      const url = request.url();
+      if (url === 'about:blank' || url.startsWith('data:') || url.startsWith('blob:')) {
+        request.continue();
+      } else {
+        request.abort('blockedbyclient');
+      }
+    });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.emulateMediaType('print');
+    await page.evaluate(async () => {
+      if (document.fonts) await document.fonts.ready;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    const pdfData = await page.pdf({
+      format: 'A4',
+      landscape: true,
+      preferCSSPageSize: true,
+      printBackground: true,
+      scale: 1,
+      margin: { top: '10mm', right: '9mm', bottom: '10mm', left: '9mm' }
+    });
+    return Buffer.from(pdfData);
+  } finally {
+    if (page) await page.close().catch(() => {});
+    releaseSlot();
+  }
+}
+
 // Ferme proprement le navigateur Chromium partagé (s'il a été lancé). À appeler lors de
 // l'arrêt propre du serveur/worker, et dans le teardown des tests : sans cet appel, le
 // process Chromium reste ouvert indéfiniment (aucun `browser.close()` n'existait avant),
@@ -209,4 +253,4 @@ async function closeBrowser() {
   }
 }
 
-module.exports = { genererPdfFacture, closeBrowser, urlPdfAutorisee };
+module.exports = { genererPdfFacture, genererPdfDepuisHtml, closeBrowser, urlPdfAutorisee };
