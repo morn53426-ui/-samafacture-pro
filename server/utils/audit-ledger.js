@@ -242,7 +242,28 @@ function parseMetadata(value) {
   try { return JSON.parse(value); } catch (_) { return null; }
 }
 
-async function verifyAuditChain(tenantId, connection = pool) {
+async function withConsistentReadSnapshot(task) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+    await conn.beginTransaction();
+    const result = await task(conn);
+    await conn.commit();
+    return result;
+  } catch (err) {
+    await conn.rollback().catch(() => {});
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+async function verifyAuditChain(tenantId, connection = null) {
+  // Tous les lots de 500 lignes et la tête de chaîne sont lus dans le même
+  // snapshot cohérent pour éviter un faux chain_head_mismatch pendant une écriture concurrente.
+  if (connection === null) {
+    return withConsistentReadSnapshot(conn => verifyAuditChain(tenantId, conn));
+  }
   const normalizedTenant = tenantId === null || tenantId === undefined ? null : Number(tenantId);
   if (normalizedTenant !== null && (!Number.isSafeInteger(normalizedTenant) || normalizedTenant <= 0)) {
     throw new TypeError('Identifiant de tenant invalide.');
