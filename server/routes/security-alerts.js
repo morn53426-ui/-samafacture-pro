@@ -10,6 +10,12 @@ const router = express.Router();
 const ALERT_STATUSES = new Set(['open', 'investigating', 'resolved', 'dismissed']);
 const CASE_STATUSES = new Set(['open', 'investigating', 'resolved', 'closed']);
 const RESOLUTION_CODES = new Set(['mitigated', 'false_positive', 'accepted', 'not_applicable']);
+const ALERT_TRANSITIONS = Object.freeze({
+  open: new Set(['investigating', 'resolved', 'dismissed']),
+  investigating: new Set(['open', 'resolved', 'dismissed']),
+  resolved: new Set(),
+  dismissed: new Set()
+});
 
 router.use(requireAuth, resolveTenant, requirePermission);
 
@@ -75,27 +81,27 @@ router.get('/security-alerts', async (req, res, next) => {
     const page = safePage(req.query.page, 1, 100000);
     const limit = safePage(req.query.limit, 25, 100);
     const offset = (page - 1) * limit;
-    const where = ['tenant_scope_id = ?'];
+    const where = ['a.tenant_scope_id = ?'];
     const params = [scope];
 
     if (req.query.status) {
       if (!ALERT_STATUSES.has(String(req.query.status))) {
         return res.status(400).json({ error: 'Statut d’alerte invalide.' });
       }
-      where.push('status = ?');
+      where.push('a.status = ?');
       params.push(String(req.query.status));
     }
     if (req.query.severity) {
       if (!['low', 'medium', 'high', 'critical'].includes(String(req.query.severity))) {
         return res.status(400).json({ error: 'Niveau de gravité invalide.' });
       }
-      where.push('severity = ?');
+      where.push('a.severity = ?');
       params.push(String(req.query.severity));
     }
 
     const clause = where.join(' AND ');
     const [[count]] = await pool.query(
-      'SELECT COUNT(*) AS total FROM pro_security_alerts WHERE ' + clause,
+      'SELECT COUNT(*) AS total FROM pro_security_alerts a WHERE ' + clause,
       params
     );
     const [alerts] = await pool.query(
@@ -105,7 +111,7 @@ router.get('/security-alerts', async (req, res, next) => {
               (SELECT c.id FROM pro_security_cases c
                 WHERE c.tenant_scope_id = a.tenant_scope_id AND c.source_alert_id = a.id LIMIT 1) AS case_id
          FROM pro_security_alerts a
-        WHERE ${clause.replace(/tenant_scope_id/g, 'a.tenant_scope_id').replace(/status/g, 'a.status').replace(/severity/g, 'a.severity')}
+        WHERE ${clause}
         ORDER BY FIELD(a.severity, 'critical', 'high', 'medium', 'low'), a.last_seen_at DESC, a.id DESC
         LIMIT ? OFFSET ?`,
       [...params, limit, offset]
@@ -149,6 +155,9 @@ router.put('/security-alerts/:id/status', async (req, res, next) => {
       if (!rows.length) return { missing: true };
       const previous = rows[0].status;
       if (previous === nextStatus) return { unchanged: true, status: previous };
+      if (!ALERT_TRANSITIONS[previous]?.has(nextStatus)) {
+        return { conflict: true, reason: 'invalid_transition' };
+      }
       if (nextStatus === 'dismissed' || nextStatus === 'resolved') {
         const [activeCases] = await connection.query(
           `SELECT id FROM pro_security_cases
@@ -156,7 +165,7 @@ router.put('/security-alerts/:id/status', async (req, res, next) => {
             LIMIT 1`,
           [scope, id]
         );
-        if (activeCases.length) return { conflict: true };
+        if (activeCases.length) return { conflict: true, reason: 'active_case' };
       }
       await connection.query(
         `UPDATE pro_security_alerts
@@ -177,7 +186,8 @@ router.put('/security-alerts/:id/status', async (req, res, next) => {
       return { status: nextStatus };
     });
     if (updated.missing) return res.status(404).json({ error: 'Alerte introuvable pour ce tenant.' });
-    if (updated.conflict) return res.status(409).json({ error: 'Clôturez d’abord le dossier d’investigation lié à cette alerte.' });
+    if (updated.conflict && updated.reason === 'active_case') return res.status(409).json({ error: 'Clôturez d’abord le dossier d’investigation lié à cette alerte.' });
+    if (updated.conflict) return res.status(409).json({ error: 'Transition de statut impossible pour cette alerte.' });
     return res.json({ id, ...updated });
   } catch (error) {
     return next(error);
