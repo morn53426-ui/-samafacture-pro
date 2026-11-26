@@ -324,7 +324,53 @@
           </form>
           <div id="webhooks-list" class="pro-list"></div>
         </div>
-        <div class="pro-subsection"><h3>Journal d'audit</h3><div id="audit-list" class="pro-list"></div></div>
+        <div class="pro-subsection" id="audit-section">
+          <h3>Journal d'audit sécurisé</h3>
+          <form id="audit-filters" class="pro-form">
+            <div class="pro-inline-fields">
+              <div class="field"><label for="audit-search">Recherche</label><input id="audit-search" type="search" maxlength="100" placeholder="Action, entité, référence..." /></div>
+              <div class="field"><label for="audit-category">Catégorie</label>
+                <select id="audit-category">
+                  <option value="">Toutes les catégories</option>
+                  <option value="security">Sécurité</option>
+                  <option value="identity">Identité</option>
+                  <option value="billing">Facturation</option>
+                  <option value="compliance">Conformité</option>
+                  <option value="admin">Administration</option>
+                </select>
+              </div>
+              <div class="field"><label for="audit-severity">Niveau de risque</label>
+                <select id="audit-severity">
+                  <option value="">Tous les niveaux</option>
+                  <option value="info">Information</option>
+                  <option value="low">Faible</option>
+                  <option value="medium">Modéré</option>
+                  <option value="high">Élevé</option>
+                  <option value="critical">Critique</option>
+                </select>
+              </div>
+            </div>
+            <div class="pro-inline-fields">
+              <div class="field"><label for="audit-from">Du (UTC)</label><input id="audit-from" type="date" /></div>
+              <div class="field"><label for="audit-to">Au (UTC)</label><input id="audit-to" type="date" /></div>
+              <div class="field"><label for="audit-event-type">Type d'événement</label><input id="audit-event-type" maxlength="120" placeholder="invoice.created" /></div>
+            </div>
+            <div class="pro-inline-fields">
+              <button class="btn btn-outline" type="submit">Appliquer les filtres</button>
+              <button class="btn btn-outline" id="audit-reset" type="button">Réinitialiser</button>
+              <button class="btn btn-outline" id="audit-integrity-check" type="button">Vérifier l'intégrité</button>
+            </div>
+          </form>
+          <p id="audit-integrity-status" class="pro-muted" role="status" aria-live="polite">L'intégrité n'a pas encore été vérifiée.</p>
+          <div id="audit-list" class="pro-list" aria-live="polite"></div>
+          <div class="pro-inline-fields" style="align-items:center;justify-content:space-between">
+            <small id="audit-pagination-info" aria-live="polite">Aucun événement chargé</small>
+            <div class="pro-inline-fields">
+              <button class="btn btn-sm btn-outline" id="audit-prev" type="button" disabled>Précédent</button>
+              <button class="btn btn-sm btn-outline" id="audit-next" type="button" disabled>Suivant</button>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   </main>
