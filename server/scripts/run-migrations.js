@@ -10,7 +10,7 @@ if (process.env.DB_SKIP_MIGRATIONS === 'true') {
 
 initDatabase()
   .then(result => {
-    console.log('Migrations MySQL terminées. Schéma courant : v' + Number(result?.version || 25) + '.');
+    console.log('Migrations MySQL terminées.');
   })
   .catch(err => {
     console.error('Échec des migrations MySQL :', err);
