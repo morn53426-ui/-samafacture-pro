@@ -2,9 +2,11 @@ name: ESLint — JavaScript modifié
 
 on:
   pull_request:
-    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape']
+    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'fix/webhook-local-timezone-dynamic-currency-20261123', 'fix/pro-orders-tenant-currency-main-20261123']
     paths:
       - 'eslint.config.mjs'
+      - '.github/workflows/lint.yml'
+      - 'server/tests/setup.js'
       - 'public/js/sidebar.js'
       - 'public/js/api.js'
       - 'public/js/workspace-modals.js'
@@ -16,6 +18,11 @@ on:
       - 'server/tests/sidebar-mobile-keyboard.test.js'
       - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
+      - 'server/tests/auth-currency.test.js'
+      - 'server/tests/money-format.test.js'
+      - 'server/tests/professional-tenant.test.js'
+      - 'server/tests/public-api-currency.test.js'
+      - 'server/tests/tenant-currency-ui.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - 'public/js/admin.js'
       - 'public/js/visitor-analytics.js'
@@ -105,6 +112,7 @@ jobs:
         run: >-
           npx --yes --package=eslint@10.15.0 eslint
           eslint.config.mjs
+          server/tests/setup.js
           public/js/sidebar.js
           public/js/api.js
           public/js/workspace-modals.js
@@ -123,6 +131,11 @@ jobs:
           server/tests/dashboard-ui.test.js
           server/tests/sidebar-mobile-keyboard.test.js
           server/tests/accounting-expense-mappings.test.js
+          server/tests/auth-currency.test.js
+          server/tests/money-format.test.js
+          server/tests/professional-tenant.test.js
+          server/tests/public-api-currency.test.js
+          server/tests/tenant-currency-ui.test.js
           server/tests/workspace-modal-accessibility.test.js
           server/app.js
           server/config/monitoring.js

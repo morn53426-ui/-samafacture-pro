@@ -2,7 +2,7 @@ name: Tests automatisés
 
 on:
   pull_request:
-    branches: [main, feat/enterprise-multi-company-foundation-20261116, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape']
+    branches: [main, feat/enterprise-multi-company-foundation-20261116, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'fix/webhook-local-timezone-dynamic-currency-20261123', 'fix/pro-orders-tenant-currency-main-20261123']
   push:
     branches: [main]
 
