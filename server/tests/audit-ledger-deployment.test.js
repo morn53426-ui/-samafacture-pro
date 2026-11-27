@@ -17,12 +17,12 @@ const provisioner = fs.readFileSync(path.join(root, 'deploy', 'provision-db-user
 const restore = fs.readFileSync(path.join(root, 'server', 'restore-backup.js'), 'utf8');
 
 function serviceBlock(name) {
-  const lines = compose.split('\\n');
+  const lines = compose.split('\n');
   const start = lines.findIndex(line => line === '  ' + name + ':');
   assert.ok(start >= 0, 'service Compose absent : ' + name);
   let end = lines.findIndex((line, index) => index > start && /^  [A-Za-z0-9_-]+:$/.test(line));
   if (end < 0) end = lines.length;
-  return lines.slice(start, end).join('\\n');
+  return lines.slice(start, end).join('\n');
 }
 
 test('le processus HTTP ne reçoit aucun compte DDL ou de sauvegarde', () => {
