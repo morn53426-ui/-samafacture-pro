@@ -118,7 +118,6 @@ services:
       APP_URL: ${APP_URL}
       JWT_SECRET: ${JWT_SECRET}
       PDF_JOBS_DIR: /app/server/pdf-jobs
-      BACKUP_DIR: /app/server/backups
     volumes:
       - pdf_jobs:/app/server/pdf-jobs
     networks: [samafacture_net]
