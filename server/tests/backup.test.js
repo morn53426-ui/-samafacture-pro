@@ -195,5 +195,36 @@ describe('Sauvegardes automatiques', () => {
     }
   });
 
+
+  test('la sauvegarde production refuse de réutiliser le compte runtime', async () => {
+    const keys = [
+      'NODE_ENV', 'DB_USER', 'DB_PASSWORD', 'DB_MIGRATION_USER', 'DB_MIGRATION_PASSWORD',
+      'DB_BACKUP_USER', 'DB_BACKUP_PASSWORD', 'BACKUP_ENCRYPTION_KEY', 'MYSQLDUMP_PATH'
+    ];
+    const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+    try {
+      process.env.NODE_ENV = 'production';
+      process.env.DB_USER = 'runtime_user';
+      process.env.DB_PASSWORD = 'runtime-password-not-used';
+      process.env.DB_MIGRATION_USER = 'migration_user';
+      process.env.DB_MIGRATION_PASSWORD = 'migration-password-not-used';
+      delete process.env.DB_BACKUP_USER;
+      delete process.env.DB_BACKUP_PASSWORD;
+      process.env.BACKUP_ENCRYPTION_KEY = 'cd'.repeat(32);
+      ecrireFauxDump(0);
+      process.env.MYSQLDUMP_PATH = fakeDump;
+
+      const before = await fs.promises.readdir(BACKUP_DIR);
+      await assert.rejects(effectuerSauvegarde(), /DB_BACKUP_USER\/DB_BACKUP_PASSWORD/);
+      assert.deepEqual(await fs.promises.readdir(BACKUP_DIR), before,
+        'aucun fichier de sauvegarde ne doit être créé avec le compte SQL runtime');
+    } finally {
+      for (const [key, value] of Object.entries(original)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
 });
 
