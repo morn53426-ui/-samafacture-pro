@@ -50,7 +50,7 @@ describe('Vérification du schéma append-only du registre d’audit', () => {
       'trg_pro_audit_events_block_delete'
     ]);
     assert.equal(connection.calls.length, 2);
-    assert.ok(connection.calls.every(call => /^\\s*SELECT/i.test(call.sql)));
+    assert.ok(connection.calls.every(call => call.sql.trimStart().startsWith('SELECT')));
   });
 
   test('détecte une table de preuve absente', async () => {
