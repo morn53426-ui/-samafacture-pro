@@ -1,5 +1,5 @@
 const browserGlobals = Object.fromEntries([
-  'AbortController', 'Api', 'Audio', 'Blob', 'CSS', 'CanvasRenderingContext2D',
+  'AbortController', 'Api', 'Audio', 'Blob', 'CSS', 'CanvasRenderingContext2D', 'Chart',
   'CustomEvent', 'DOMParser', 'Document', 'Element', 'Event', 'EventTarget', 'File',
   'FileReader', 'FormData', 'HTMLButtonElement', 'HTMLImageElement',
   'HTMLInputElement', 'HTMLElement', 'Image', 'Icon', 'IntersectionObserver',
@@ -17,7 +17,7 @@ const browserGlobals = Object.fromEntries([
 ].map((name) => [name, 'readonly']));
 
 const nodeGlobals = Object.fromEntries([
-  '__dirname', '__filename', 'Buffer', 'clearImmediate', 'clearInterval',
+  '__dirname', '__filename', 'Buffer', 'URL', 'clearImmediate', 'clearInterval',
   'clearTimeout', 'console', 'exports', 'global', 'module', 'process', 'require',
   'setImmediate', 'setInterval', 'setTimeout'
 ].map((name) => [name, 'readonly']));
@@ -52,7 +52,7 @@ export default [
     rules: correctnessRules
   },
   {
-    files: ['public/js/sidebar.js', 'public/js/workspace-modals.js'],
+    files: ['public/js/sidebar.js', 'public/js/workspace-modals.js', 'public/js/admin.js', 'public/js/visitor-analytics.js', 'public/js/theme.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'script',
@@ -76,8 +76,15 @@ export default [
 
   {
     files: [
+      'server/app.js',
+      'server/config/monitoring.js',
+      'server/utils/log-sanitizer.js',
+      'server/tests/log-sanitizer.test.js',
       'server/config/db.js',
       'server/email-outbox.js',
+      'server/routes/admin.js',
+      'server/routes/analytics.js',
+      'server/utils/sunupilot-analytics.js',
       'server/routes/professionnel.js',
       'server/routes/depenses.js',
       'server/routes/factures.js',
@@ -98,7 +105,12 @@ export default [
       'server/tests/invoice-quota-migration-v8.test.js',
       'server/tests/subscription-schema.test.js',
       'server/tests/schema-v21-upgrade-compatibility.test.js',
-      'server/tests/paiements.test.js'
+      'server/tests/optional-fields.test.js',
+      'server/tests/paiements.test.js',
+      'server/utils/google-account.js',
+      'server/tests/google-account-concurrency.test.js',
+      'server/tests/register-concurrency.test.js',
+      'server/tests/sunupilot-admin.test.js'
     ],
     languageOptions: {
       ecmaVersion: 'latest',

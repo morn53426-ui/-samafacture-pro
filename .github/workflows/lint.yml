@@ -10,12 +10,24 @@ on:
       - 'public/js/workspace-modals.js'
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/local-date-format.test.js'
+      - 'server/tests/optional-fields.test.js'
       - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/parametres-accessibility.test.js'
       - 'server/tests/sidebar-mobile-keyboard.test.js'
       - 'server/tests/dashboard-ui.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
-      - 'server/tests/parametres-accessibility.test.js'
+      - 'public/js/admin.js'
+      - 'public/js/visitor-analytics.js'
+      - 'public/js/theme.js'
+      - 'server/routes/admin.js'
+      - 'server/routes/analytics.js'
+      - 'server/utils/sunupilot-analytics.js'
+      - 'server/tests/sunupilot-admin.test.js'
+      - 'server/app.js'
+      - 'server/config/monitoring.js'
+      - 'server/utils/log-sanitizer.js'
+      - 'server/tests/log-sanitizer.test.js'
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
@@ -43,8 +55,14 @@ on:
       - 'server/config/backup.js'
       - 'server/tests/restore-backup-roundtrip.test.js'
       - 'server/tests/auth.test.js'
+      - 'server/utils/google-account.js'
+      - 'server/tests/google-account-concurrency.test.js'
+      - 'server/tests/register-concurrency.test.js'
       - 'server/tests/paiements.test.js'
       - 'server/tests/backup.test.js'
+      - 'server/app.js'
+      - 'server/utils/log-sanitizer.js'
+      - 'server/tests/log-sanitizer.test.js'
       - 'server/tests/mobile-config.test.js'
       - 'mobile/scripts/check-capacitor-config.js'
       - '.github/workflows/lint.yml'
@@ -61,7 +79,6 @@ on:
       - 'server/tests/workspace-navigation.test.js'
       - 'server/tests/sidebar-mobile-keyboard.test.js'
       - 'server/tests/accounting-expense-mappings.test.js'
-      - 'server/tests/parametres-accessibility.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
 
@@ -91,14 +108,26 @@ jobs:
           public/js/sidebar.js
           public/js/api.js
           public/js/workspace-modals.js
+          public/js/admin.js
+          public/js/visitor-analytics.js
+          public/js/theme.js
+          server/routes/admin.js
+          server/routes/analytics.js
+          server/utils/sunupilot-analytics.js
+          server/tests/sunupilot-admin.test.js
           server/tests/visual/recette-visuelle.js
           server/tests/local-date-format.test.js
+          server/tests/optional-fields.test.js
           server/tests/workspace-navigation.test.js
+          server/tests/parametres-accessibility.test.js
           server/tests/dashboard-ui.test.js
           server/tests/sidebar-mobile-keyboard.test.js
           server/tests/accounting-expense-mappings.test.js
           server/tests/workspace-modal-accessibility.test.js
-          server/tests/parametres-accessibility.test.js
+          server/app.js
+          server/config/monitoring.js
+          server/utils/log-sanitizer.js
+          server/tests/log-sanitizer.test.js
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
@@ -126,7 +155,13 @@ jobs:
           server/config/backup.js
           server/tests/restore-backup-roundtrip.test.js
           server/tests/auth.test.js
+          server/utils/google-account.js
+          server/tests/google-account-concurrency.test.js
+          server/tests/register-concurrency.test.js
           server/tests/paiements.test.js
           server/tests/backup.test.js
+          server/app.js
+          server/utils/log-sanitizer.js
+          server/tests/log-sanitizer.test.js
           server/tests/mobile-config.test.js
           mobile/scripts/check-capacitor-config.js

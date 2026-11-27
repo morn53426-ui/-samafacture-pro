@@ -7,7 +7,7 @@
 <meta charset="UTF-8" />
 <title>Politique de confidentialité — Sunupilot</title>
 <meta name="description" content="Politique de confidentialité de Sunupilot : quelles données sont collectées, comment elles sont stockées et protégées, et vos droits." />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="index, follow" />
 <link rel="stylesheet" href="css/style.css" />
 <link rel="manifest" href="manifest.json" />
@@ -15,10 +15,11 @@
 <link rel="icon" type="image/png" href="images/icon-192.png" />
 <link rel="apple-touch-icon" href="images/icon-192.png" />
 </head>
-<body>
+<body class="info-page">
 
 <header class="lp-header">
   <div class="brand"><img src="images/icon-192.png" alt="Logo Sunupilot" /> Sunupilot</div>
+  <a class="lp-back-link" href="index.html" data-smart-back aria-label="Retourner à la page précédente" title="Retourner à la page précédente"><span aria-hidden="true">←</span> Retour</a>
   <nav>
     <a href="index.html">Accueil</a>
     <a href="login.html">Connexion</a>
@@ -84,7 +85,8 @@
 
     <h3>6. Cookies et stockage local</h3>
     <p style="color:var(--ink-soft); margin-bottom:0;">
-      L'application utilise le stockage local du navigateur pour conserver des informations de session et de profil. Le serveur peut également déposer un cookie de session HttpOnly, inaccessible aux scripts de la page. La version installable (PWA) peut mettre en cache certaines ressources nécessaires à son fonctionnement hors ligne. Les traceurs et services tiers éventuellement activés doivent être décrits dans cette politique après inventaire de la configuration réelle. À ce stade, cette page ne constitue pas un inventaire exhaustif des stockages et traceurs.
+      L'application utilise le stockage local du navigateur pour conserver des informations de session et de profil. Le serveur peut également déposer un cookie de session HttpOnly, inaccessible aux scripts de la page. La version installable (PWA) peut mettre en cache certaines ressources nécessaires à son fonctionnement hors ligne.
+      Pour mesurer la fréquentation du service, certaines pages transmettent un identifiant aléatoire limité à l'onglet courant (sessionStorage) et le chemin de la page consultée, sans les paramètres d'URL. Le serveur transforme cet identifiant en empreinte HMAC avant stockage ; l'identifiant brut, l'adresse IP, l'adresse email et l'agent utilisateur ne sont pas enregistrés dans cette table analytique. Les sessions sont des estimations par onglet et non un décompte certifié de personnes physiques. La page d'administration est exclue de cette mesure. Cette collecte doit être validée au regard des obligations applicables et de la durée de conservation retenue avant mise en production.
     </p>
   </div>
 </main>
@@ -102,5 +104,6 @@
   <div class="lp-footer-bottom">© 2026 Sunupilot. Tous droits réservés.</div>
 </footer>
 
+  <script src="js/info-page-navigation.js"></script>
 </body>
 </html>

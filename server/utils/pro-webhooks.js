@@ -201,4 +201,4 @@ async function deliverPendingWebhooks() {
   }
 }
 
-module.exports = { encryptSecret, decryptSecret, queueWebhookEvent, deliverPendingWebhooks, isPrivateAddress, resolvePublicWebhookTarget, createPinnedLookup, sendWebhookRequest };
+module.exports = { encryptSecret, decryptSecret, queueWebhookEvent, deliverPendingWebhooks, isPrivateAddress, resolvePublicWebhookTarget, createPinnedLookup };
