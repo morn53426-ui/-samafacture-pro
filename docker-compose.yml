@@ -49,8 +49,6 @@ services:
         condition: service_healthy
       db-provision:
         condition: service_completed_successfully
-    env_file:
-      - ./server/.env
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
@@ -62,8 +60,9 @@ services:
       DB_BACKUP_USER: ""
       DB_BACKUP_PASSWORD: ""
       DB_NAME: ${DB_NAME}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_QUEUE_LIMIT: ${DB_QUEUE_LIMIT:-200}
       BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
-      DATA_ENCRYPTION_KEY: ""
       NODE_ENV: development
     command: ["node", "scripts/run-migrations.js"]
     volumes:
@@ -139,8 +138,6 @@ services:
         condition: service_healthy
       db-migrate:
         condition: service_completed_successfully
-    env_file:
-      - ./server/.env
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
@@ -152,6 +149,8 @@ services:
       DB_BACKUP_USER: ${DB_BACKUP_USER:-${DB_USER}}
       DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD:-${DB_PASSWORD}}
       DB_NAME: ${DB_NAME}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_QUEUE_LIMIT: ${DB_QUEUE_LIMIT:-200}
       NODE_ENV: development
       BACKUP_DIR: /app/server/backups
       BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
@@ -159,6 +158,8 @@ services:
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
       BACKUP_ON_STARTUP: ${BACKUP_ON_STARTUP:-false}
       BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+      MYSQLDUMP_PATH: ${MYSQLDUMP_PATH:-mysqldump}
+      SENTRY_DSN: ${SENTRY_DSN:-}
     volumes:
       - app_backups:/app/server/backups
     command: ["node", "workers/backup-worker.js"]
