@@ -16,18 +16,20 @@
 <script src="js/chart-loader.js"></script>
 </head>
 <body>
+<a class="workspace-skip-link" href="#dashboard-content">Aller au contenu principal</a>
 <div class="app-shell">
   <div id="sidebar-root"></div>
-  <main class="main-content workspace-page page-dashboard">
+  <main class="main-content workspace-page page-dashboard" id="main-content">
     <div id="topbar-root"></div>
 
-    <section class="dashboard-welcome">
+    <section class="dashboard-welcome" id="dashboard-content" tabindex="-1">
       <div>
         <div class="workspace-page-kicker">Activité</div>
         <h1 id="dashboard-greeting">Tableau de bord</h1>
         <p>Voici la synthèse de votre activité sur Sunupilot.</p>
       </div>
       <div class="dashboard-context"><i class="ic" data-icon="calendar"></i><span id="dashboard-period-label">Vue d'ensemble de votre activité</span></div>
+      <a class="dashboard-chip" id="platform-admin-shortcut" href="admin.html" hidden>Administration plateforme <i class="ic" data-icon="arrow-up-right"></i></a>
     </section>
 
     <section class="dashboard-kpis" id="stats-grid" aria-label="Indicateurs clés">
@@ -81,11 +83,11 @@
           <i class="ic" data-icon="clipboard-list"></i>
           <div>
             <h2 id="dashboard-modules-title">Modules Sunupilot</h2>
-            <p class="dashboard-panel-subtitle">Accédez directement à vos outils de gestion</p>
+            <p class="dashboard-panel-subtitle">Accédez directement à vos outils de gestion. Sur mobile, faites défiler horizontalement pour parcourir les modules.</p>
           </div>
         </div>
       </header>
-      <nav class="dashboard-modules" aria-label="Modules Sunupilot">
+      <nav class="dashboard-modules" aria-label="Modules Sunupilot" tabindex="0">
         <a class="dashboard-module-card is-green" href="crm.html">
           <span class="dashboard-module-icon"><i class="ic" data-icon="contact-round"></i></span>
           <span class="dashboard-module-copy"><strong>CRM &amp; suivi client</strong><small>Gérez vos clients et opportunités</small></span>
@@ -169,6 +171,12 @@
   requireAuthPage();
   renderSidebar('dashboard');
   renderTopbar('Tableau de bord', "Vue d'ensemble de votre activité");
+  Api.get('/admin/access').then(() => {
+    const shortcut = document.getElementById('platform-admin-shortcut');
+    if (shortcut) shortcut.hidden = false;
+  }).catch(() => {
+    // Un compte sans autorisation ne voit pas le raccourci administrateur.
+  });
 
   let chart;
   let salesChart;

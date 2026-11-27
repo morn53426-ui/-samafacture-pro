@@ -101,7 +101,7 @@
     border-radius: var(--radius-sm);
   }
   .logo-feedback.error { background: var(--clay-light); color: var(--clay); }
-  .logo-feedback.success { background: var(--emerald-light); color: var(--emerald); }
+  .logo-feedback.success { background: var(--emerald-light); color: var(--emerald-text); }
 
   /* Aperçu en direct sur un mini en-tête de facture */
   .logo-live-preview {
@@ -304,8 +304,21 @@
     background: var(--gold-light); color: var(--gold-text);
   }
   .invoice-template-tier.tier-enterprise {
-    border-color: color-mix(in srgb, var(--emerald) 30%, var(--line));
-    background: var(--emerald-light); color: var(--emerald);
+    border-color: #A7DCC5;
+    background: #D1FAE5;
+    color: #066144;
+  }
+  :root[data-theme="dark"] .invoice-template-tier.tier-enterprise {
+    border-color: #316A4B;
+    background: #173D2B;
+    color: #9DE7BC;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .invoice-template-tier.tier-enterprise {
+      border-color: #316A4B;
+      background: #173D2B;
+      color: #9DE7BC;
+    }
   }
   .invoice-template-preview-window {
     position: relative; width: 100%; min-height: 300px; overflow: hidden;
@@ -350,8 +363,24 @@
   .invoice-template-preview-watermark {
     position: absolute; right: 8px; bottom: 7px; z-index: 2;
     padding: 4px 7px; border: 1px solid rgba(15, 27, 51, .08);
-    border-radius: 5px; background: rgba(255,255,255,.91); color: #7b8491;
+    border-radius: 5px; background: #FFFFFF; color: #1F2937;
     font-size: .52rem; font-weight: 850; letter-spacing: .1em; pointer-events: none;
+  }
+  /* Les badges doivent rester lisibles dans les deux thèmes, indépendamment
+     des accents décoratifs et des variables de palette. */
+  .invoice-template-tier.tier-enterprise {
+    background: #D1FAE5;
+    color: #066144;
+  }
+  :root[data-theme="dark"] .invoice-template-tier.tier-enterprise {
+    background: #173D2B;
+    color: #9DE7BC;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .invoice-template-tier.tier-enterprise {
+      background: #173D2B;
+      color: #9DE7BC;
+    }
   }
   .invoice-template-card-footer { display: flex; margin-top: 12px; }
   .invoice-template-choice {
@@ -494,6 +523,35 @@
     .invoice-template-preview-trigger span { transition: none; }
   }
 
+
+  /* Navigation détaillée des paramètres : les champs restent dans le formulaire unique. */
+  .settings-section-nav { margin: 4px 0 18px; }
+  .settings-section-title {
+    margin: 28px 0 14px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--line);
+    color: var(--navy-950);
+    font: 750 clamp(1rem, 1.4vw, 1.16rem) var(--font-display);
+    line-height: 1.35;
+    scroll-margin-top: 20px;
+  }
+  .settings-section-title:focus { outline: 2px solid var(--emerald); outline-offset: 5px; border-radius: 3px; }
+  .settings-outside-title { width: min(100%, 1460px); margin-inline: auto; }
+
+/* Coordonnées de l'entreprise : deux colonnes lisibles, une colonne sur mobile. */
+  .settings-company-fields-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 18px;
+    align-items: start;
+  }
+  .settings-company-fields-grid .field { min-width: 0; }
+  .settings-company-fields-grid .settings-field-wide { grid-column: 1 / -1; }
+  @media (max-width: 700px) {
+    .settings-company-fields-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    .settings-company-fields-grid .settings-field-wide { grid-column: auto; }
+  }
+
 </style>
 </head>
 <body>
@@ -505,9 +563,22 @@
       <div><div class="workspace-page-kicker">CONFIGURATION DE L’ESPACE</div><h1>Paramètres</h1><p>Identité de l’entreprise, informations légales et préférences de facturation.</p></div>
     </div>
 
+    <nav class="workspace-section-nav settings-section-nav" aria-label="Navigation des paramètres">
+      <a href="#settings-company">Entreprise</a>
+      <a href="#settings-invoicing">Facturation</a>
+      <a href="#settings-appearance">Personnalisation</a>
+      <a href="#settings-subscription">Abonnement</a>
+      <a href="#settings-reset">Données &amp; réinitialisation</a>
+    </nav>
+
     <div class="card settings-main-card" style="max-width:none;">
       <div id="msg"></div>
       <form id="entreprise-form">
+        <section class="settings-section" id="settings-company" aria-labelledby="settings-company-title">
+          <div class="settings-section-heading">
+            <h2 id="settings-company-title">Identité de l’entreprise</h2>
+            <p>Logo, signature, coordonnées professionnelles et informations légales.</p>
+          </div>
         <div class="field">
           <label>Logo de l'entreprise</label>
           <div class="logo-studio">
@@ -575,6 +646,7 @@
             </div>
           </div>
         </div>
+        <div class="settings-company-fields-grid">
         <div class="field"><label for="entreprise_nom">Nom de l'entreprise</label><input type="text" id="entreprise_nom" /></div>
         <div class="field"><label for="entreprise_adresse">Adresse</label><input type="text" id="entreprise_adresse" /></div>
         <div class="field"><label for="entreprise_telephone">Téléphone</label><input type="tel" id="entreprise_telephone" /></div>
@@ -583,9 +655,17 @@
         <div class="field"><label for="entreprise_rccm">RCCM</label><input type="text" id="entreprise_rccm" maxlength="80" placeholder="Numéro du registre de commerce" /></div>
         <div class="field"><label for="entreprise_site_web">Site web</label><input type="url" id="entreprise_site_web" maxlength="190" placeholder="https://www.votre-entreprise.com" /></div>
         <div class="field"><label for="entreprise_banque">Banque de règlement</label><input type="text" id="entreprise_banque" maxlength="120" placeholder="Nom de la banque" /></div>
-        <div class="field"><label for="entreprise_rib">RIB / IBAN / compte de règlement</label><input type="text" id="entreprise_rib" maxlength="100" /></div>
+        <div class="field settings-field-wide"><label for="entreprise_rib">RIB / IBAN / compte de règlement</label><input type="text" id="entreprise_rib" maxlength="100" /></div>
+        </div>
         <div class="field"><label for="entreprise_conditions_reglement">Conditions de règlement par défaut</label><textarea id="entreprise_conditions_reglement" rows="3" maxlength="5000" placeholder="Ex. Paiement à 30 jours. Acompte de 50 % à la commande."></textarea><div class="helper">Ces conditions apparaissent sur les factures et devis, sauf si vous les remplacez sur un document.</div></div>
         <div class="field"><label for="entreprise_mentions_legales">Mentions légales / pied de page</label><textarea id="entreprise_mentions_legales" rows="3" maxlength="2000" placeholder="Informations légales ou commerciales à afficher en bas des documents."></textarea></div>
+        </section>
+
+        <section class="settings-section" id="settings-documents" aria-labelledby="settings-invoicing">
+          <div class="settings-section-heading">
+            <h2 id="settings-invoicing" tabindex="-1">Facturation et documents</h2>
+            <p>Devise par défaut, modèle de facture et présentation des documents imprimés.</p>
+          </div>
         <div class="field">
           <label for="devise">Devise</label>
           <select id="devise">
@@ -640,6 +720,7 @@
           <div id="invoice-template-help" class="helper invoice-template-help">Le modèle choisi s’applique à toutes vos factures et à vos devis imprimés. Les modèles Pro et Entreprise restent visibles pour vous permettre de les comparer ; leur activation dépend de votre formule.</div>
         </div>
 
+        <h2 class="settings-section-title" id="settings-appearance" tabindex="-1">Personnalisation et lisibilité</h2>
         <div class="perso-section">
           <div class="perso-title">Personnalisation du modèle</div>
           <div class="helper">Facultatif — laissez chaque option désactivée pour garder l'apparence d'origine du modèle choisi ci-dessus.</div>
@@ -710,12 +791,14 @@
             </div>
           </div>
         </div>
+        </section>
 
         <button type="submit" class="btn btn-primary" id="entreprise-save-button">Enregistrer</button>
       </form>
     </div>
 
-    <div class="card" style="max-width:560px; margin-top:22px;">
+    <h2 class="settings-section-title settings-outside-title" id="settings-subscription" tabindex="-1">Abonnement et formule</h2>
+    <div class="card settings-support-card" style="max-width:560px; margin-top:12px;">
       <h3 style="margin-top:0;">Mon abonnement</h3>
       <p style="color:var(--ink-soft);">
         Plan actuel : <strong id="plan-actuel-label">—</strong>
@@ -723,8 +806,9 @@
       <a href="abonnement.html" class="btn btn-outline">Voir les offres et gérer mon abonnement</a>
     </div>
 
-    <div class="card" style="max-width:560px; margin-top:22px; border-color:var(--clay);">
-      <h3 style="color:var(--clay);">Zone dangereuse</h3>
+    <h2 class="settings-section-title settings-outside-title" id="settings-reset" tabindex="-1">Données et réinitialisation</h2>
+    <div class="card settings-support-card" id="settings-data" style="max-width:560px; margin-top:12px; border-color:var(--clay);">
+      <h3 style="color:var(--clay-text);">Zone dangereuse</h3>
       <p style="color:var(--ink-soft);">
         Réinitialise le tableau de bord : supprime définitivement tous vos clients, produits, factures, devis et dépenses.
         Vos identifiants et les informations de votre entreprise sont conservés.
@@ -1467,7 +1551,7 @@
       closeResetModal();
       document.getElementById('reset-msg').innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin:12px 0; font-size:0.85rem;">Le tableau de bord a été réinitialisé ✓</div>`;
     } catch (err) {
-      document.getElementById('reset-modal-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('reset-modal-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     }
   }
 </script>

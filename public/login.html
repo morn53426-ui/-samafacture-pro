@@ -85,7 +85,7 @@
       Api.setSession(token, user);
       redirectAfterLogin();
     } catch (err) {
-      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+      errorBox.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
       restore();
     }
   });

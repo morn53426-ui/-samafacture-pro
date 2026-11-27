@@ -89,8 +89,8 @@
         <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="addLigne()">+ Ajouter une ligne</button>
 
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-top:20px;">
-          <div class="field"><label for="remise">Remise (montant)</label><input type="number" id="remise" value="0" /></div>
-          <div class="field"><label for="frais_livraison">Frais de livraison</label><input type="number" id="frais_livraison" value="0" /></div>
+          <div class="field"><label for="remise">Remise (montant)</label><input type="number" id="remise" value="0" step="0.01" /></div>
+          <div class="field"><label for="frais_livraison">Frais de livraison</label><input type="number" id="frais_livraison" value="0" step="0.01" /></div>
         </div>
         <div class="field"><label for="commentaires">Commentaires</label><textarea id="commentaires" placeholder="Merci pour votre confiance."></textarea></div>
       </div>
@@ -98,19 +98,19 @@
       <div class="card invoice-summary-card" style="align-self:start;">
         <div class="invoice-section-heading"><span class="ic"><i class="ic" data-icon="receipt"></i></span><div><h3>Récapitulatif</h3><p>Vérifiez les montants avant de créer le document.</p></div></div>
         <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
-          <span>Sous-total HT</span><span class="mono" id="rec-sous-total">0 FCFA</span>
+          <span>Sous-total HT</span><span class="mono" id="rec-sous-total">0</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
-          <span>TVA</span><span class="mono" id="rec-tva">0 FCFA</span>
+          <span>TVA</span><span class="mono" id="rec-tva">0</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
-          <span>Remise</span><span class="mono" id="rec-remise">- 0 FCFA</span>
+          <span>Remise</span><span class="mono" id="rec-remise">- 0</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);">
-          <span>Livraison</span><span class="mono" id="rec-livraison">0 FCFA</span>
+          <span>Livraison</span><span class="mono" id="rec-livraison">0</span>
         </div>
         <div style="display:flex; justify-content:space-between; padding:14px 0; font-weight:700; font-size:1.15rem;">
-          <span>Total</span><span class="mono" id="rec-total" style="color:var(--emerald);">0 FCFA</span>
+          <span>Total</span><span class="mono" id="rec-total" style="color:var(--emerald);">0</span>
         </div>
         <button id="submit-facture-btn" class="btn btn-primary invoice-submit-button" style="width:100%; padding:12px;" onclick="submitFacture()"><i class="ic" data-icon="file-check"></i> Créer le document</button>
       </div>
@@ -128,6 +128,11 @@
   let clients = [];
   let produits = [];
   let ligneCount = 0;
+  let companyCurrency = (Api.currentUser() || {}).devise || 'FCFA';
+  const ZERO_DECIMAL_CURRENCIES = new Set(['FCFA','XOF','XAF','BIF','CDF','DJF','KMF','GNF','RWF','UGX','JPY']);
+  function currencyStep() {
+    return ZERO_DECIMAL_CURRENCIES.has(String(companyCurrency || 'FCFA').toUpperCase()) ? '1' : '0.01';
+  }
 
   document.getElementById('date_emission').value = dateCivileAujourdhui();
 
@@ -156,8 +161,6 @@
       document.getElementById('invoice-warehouse-help').textContent =
         'Le service des entrepôts est momentanément indisponible. Vous pouvez toujours créer un devis ; une facture nécessite un entrepôt actif.';
     }
-    addLigne();
-
     const syncDocumentType = () => {
       const isQuote = document.querySelector('input[name=doc_type]:checked').value === 'devis';
       document.getElementById('page-title').textContent = isQuote ? 'Nouveau devis' : 'Nouvelle facture';
@@ -169,6 +172,19 @@
     document.querySelectorAll('input[name=doc_type]').forEach(r => r.addEventListener('change', syncDocumentType));
     syncDocumentType();
     const { user } = await Api.get('/auth/me');
+    try {
+      const context = await Api.get('/pro/company-context');
+      companyCurrency = context?.devise || user?.devise || companyCurrency;
+      if (context?.fuseau_horaire) {
+        document.getElementById('date_emission').value = dateCivileAujourdhui(context.fuseau_horaire);
+      }
+    } catch (_) {
+      companyCurrency = user?.devise || companyCurrency;
+    }
+    document.getElementById('remise').step = currencyStep();
+    document.getElementById('frais_livraison').step = currencyStep();
+    addLigne();
+    recalc();
     if (user?.entreprise_conditions_reglement) {
       document.getElementById('conditions_reglement').value = user.entreprise_conditions_reglement;
     }
@@ -205,8 +221,8 @@
       </td>
       <td data-label="Prix unitaire">
         <div class="ligne-mobile-field">
-          <label class="ligne-mobile-label" for="${id}-prix">Prix unitaire en FCFA</label>
-          <input id="${id}-prix" type="number" class="ligne-pu ligne-input-sm" value="0" min="0" step="1" inputmode="decimal" oninput="recalc()" />
+          <label class="ligne-mobile-label" for="${id}-prix">Prix unitaire en ${companyCurrency}</label>
+          <input id="${id}-prix" type="number" class="ligne-pu ligne-input-sm" value="0" min="0" step="${currencyStep()}" inputmode="decimal" oninput="recalc()" />
         </div>
       </td>
       <td data-label="TVA (%)">
@@ -249,7 +265,7 @@
       const designation = row.querySelector('.ligne-designation').value;
       const produitId = row.querySelector('.ligne-produit').value;
       const total = round2(qte * pu * (1 + tva / 100));
-      row.querySelector('.ligne-total').textContent = formatMontant(total);
+      row.querySelector('.ligne-total').textContent = formatMontant(total, companyCurrency);
       return { produit_id: produitId ? Number(produitId) : null, designation, quantite: qte, prix_unitaire: pu, tva, total_ligne: total };
     });
   }
@@ -271,11 +287,11 @@
 
     const total = round2(sousTotal - remise + totalTva + livraison);
 
-    document.getElementById('rec-sous-total').textContent = formatMontant(sousTotal);
-    document.getElementById('rec-tva').textContent = formatMontant(totalTva);
-    document.getElementById('rec-remise').textContent = '- ' + formatMontant(remise);
-    document.getElementById('rec-livraison').textContent = formatMontant(livraison);
-    document.getElementById('rec-total').textContent = formatMontant(total);
+    document.getElementById('rec-sous-total').textContent = formatMontant(sousTotal, companyCurrency);
+    document.getElementById('rec-tva').textContent = formatMontant(totalTva, companyCurrency);
+    document.getElementById('rec-remise').textContent = '- ' + formatMontant(remise, companyCurrency);
+    document.getElementById('rec-livraison').textContent = formatMontant(livraison, companyCurrency);
+    document.getElementById('rec-total').textContent = formatMontant(total, companyCurrency);
   }
 
   document.getElementById('remise').addEventListener('input', recalc);
@@ -318,7 +334,7 @@
       const { facture } = await Api.post('/factures', payload);
       location.href = `factures.html?highlight=${facture.id}`;
     } catch (err) {
-      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+      errorBox.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
       restore();
     }
   }

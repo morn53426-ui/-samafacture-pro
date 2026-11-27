@@ -206,6 +206,8 @@ npm run backup
 ```
 En développement, le fichier est `.sql.gz`. En production, il doit se terminer par `.sql.gz.enc` et la clé `BACKUP_ENCRYPTION_KEY` doit être configurée. Une sauvegarde manuelle qui échoue renvoie un code de sortie non nul.
 
+Sur MySQL 8, le dump utilise `--no-tablespaces` pour éviter d'exiger le privilège global `PROCESS`. L'application ne déclare actuellement aucune procédure ni fonction SQL ; `--routines` est donc volontairement omis, car il demanderait un privilège global `SELECT`. Le compte de l'application doit disposer des droits nécessaires uniquement sur sa base (notamment `SELECT`, `SHOW VIEW`, `TRIGGER` et `EVENT`), jamais de droits globaux pour le seul besoin des sauvegardes. Si des routines stockées sont ajoutées au schéma à l'avenir, la stratégie devra être réévaluée avec un compte de sauvegarde distinct et strictement contrôlé.
+
 ### Restaurer une sauvegarde
 
 Restaurez dans une base cible vide, après avoir remis la même `BACKUP_ENCRYPTION_KEY` que celle utilisée lors de la sauvegarde :

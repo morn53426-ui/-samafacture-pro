@@ -93,6 +93,7 @@ router.get('/', async (req, res, next) => {
  *       400: { description: Nom manquant., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/', async (req, res, next) => {
+  let conn;
   try {
     const { nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image } = req.body;
     if (!nom) return res.status(400).json({ error: 'Le nom du produit est obligatoire.' });
@@ -110,19 +111,33 @@ router.post('/', async (req, res, next) => {
     const quantity = stockManaged ? nonNegativeQuantity(stock) : 0;
     const minimumQuantity = stockManaged ? nonNegativeQuantity(stock_minimum) : 0;
 
-    const [result] = await pool.query(
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [[account]] = await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.tenantId]);
+    if (!account) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+    const [result] = await conn.query(
       `INSERT INTO produits (user_id, nom, type_catalogue, reference, prix_ht, prix_achat, tva, stock, stock_minimum, categorie, description, image)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.tenantId, nom, catalogueType, reference || null, positiveNumber(prix_ht), positiveNumber(prix_achat), percentage(tva), quantity, minimumQuantity, categorie || null, description || null, image || null]
     );
 
-    // Un service n'entre pas dans les stocks physiques ni dans les entrepôts.
+    // Créer produit et stock initial dans la même transaction : un échec du
+    // stockage physique ne doit pas laisser un produit partiellement initialisé.
     if (stockManaged) {
-      await initialiserStockEntrepotPrincipal(pool, req.tenantId, result.insertId, quantity);
+      await initialiserStockEntrepotPrincipal(conn, req.tenantId, result.insertId, quantity);
     }
-    const [rows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
+    const [rows] = await conn.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [result.insertId, req.tenantId]);
+    await conn.commit();
     res.status(201).json({ produit: rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 /**
@@ -278,7 +293,7 @@ router.put('/:id', async (req, res, next) => {
  * @openapi
  * /produits/{id}:
  *   delete:
- *     summary: Supprime un produit du catalogue (les lignes de facture existantes le référençant sont conservées, mais détachées)
+ *     summary: Supprime un produit sans stock ni historique lié
  *     tags: [Produits]
  *     parameters:
  *       - in: path
@@ -291,28 +306,60 @@ router.put('/:id', async (req, res, next) => {
  *       409: { description: Suppression bloquée par une contrainte de la base., content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.delete('/:id', async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
-    const [existingRows] = await pool.query('SELECT * FROM produits WHERE id = ? AND user_id = ?', [req.params.id, req.tenantId]);
-    if (!existingRows.length) return res.status(404).json({ error: 'Produit introuvable.' });
-
+    conn = await pool.getConnection();
     await conn.beginTransaction();
-    // Détache d'abord le produit des lignes de facture existantes (au lieu de compter uniquement
-    // sur la contrainte ON DELETE SET NULL de la base, qui peut différer si les tables ont été
-    // créées avec une ancienne version du schéma).
-    await conn.query('UPDATE facture_lignes fl JOIN factures f ON f.id = fl.facture_id SET fl.produit_id = NULL WHERE fl.produit_id = ? AND f.user_id = ?', [existingRows[0].id, req.tenantId]);
-    await conn.query('DELETE FROM produits WHERE id = ? AND user_id = ?', [existingRows[0].id, req.tenantId]);
-    await conn.commit();
+    const [existingRows] = await conn.query(
+      'SELECT * FROM produits WHERE id = ? AND user_id = ? FOR UPDATE',
+      [req.params.id, req.tenantId]
+    );
+    const existing = existingRows[0];
+    if (!existing) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Produit introuvable.' });
+    }
 
+    // Ne pas agréger : des soldes entrepôts opposés (données historiques/anormales)
+    // pourraient s'annuler et masquer un stock non nul. Verrouiller la ligne détectée.
+    const [warehouseStockRows] = await conn.query(
+      'SELECT id FROM pro_stocks_entrepots WHERE produit_id = ? AND (quantite <> 0 OR user_id <> ?) LIMIT 1 FOR UPDATE',
+      [existing.id, req.tenantId]
+    );
+    const [invoiceLines] = await conn.query(
+      'SELECT id FROM facture_lignes WHERE produit_id = ? LIMIT 1 FOR UPDATE',
+      [existing.id]
+    );
+    const [movements] = await conn.query(
+      'SELECT id FROM pro_mouvements_stock WHERE produit_id = ? LIMIT 1 FOR UPDATE',
+      [existing.id]
+    );
+    // Les lignes d'achats et de réception gardent leur document mais la FK produit
+    // est ON DELETE SET NULL : bloquer pour conserver la traçabilité du catalogue.
+    const [purchaseLines] = await conn.query(
+      'SELECT id FROM pro_commandes_fournisseurs_lignes WHERE produit_id = ? LIMIT 1 FOR UPDATE',
+      [existing.id]
+    );
+    if (Number(existing.stock) !== 0 || warehouseStockRows.length ||
+        invoiceLines.length || movements.length || purchaseLines.length) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Ce produit possède du stock, des mouvements ou des lignes de vente/achat liées. Ajustez le stock et archivez le produit plutôt que de le supprimer.',
+        code: 'PRODUIT_HISTORIQUE_PROTEGE'
+      });
+    }
+
+    await conn.query('DELETE FROM produits WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
+    await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
     if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED') {
       return res.status(409).json({ error: 'Impossible de supprimer ce produit : il est encore lié à des données existantes.' });
     }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 

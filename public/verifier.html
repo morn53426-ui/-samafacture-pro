@@ -75,7 +75,7 @@
         </div>
       `;
     } catch (err) {
-      card.innerHTML = `${stampHtml(false)}<h3>Document introuvable</h3><p style="color:var(--ink-soft);">${err.message}</p>`;
+      card.innerHTML = `${stampHtml(false)}<h3>Document introuvable</h3><p style="color:var(--ink-soft);">${escapeHtml(err.message)}</p>`;
     }
   }
   verifier();

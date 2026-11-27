@@ -135,7 +135,7 @@ async function buildDashboard(userId) {
   ] = await Promise.all([
     pool.query(
       `SELECT p.*, f.numero, c.nom as client_nom FROM paiements p
-       JOIN factures f ON f.id = p.facture_id JOIN clients c ON c.id = f.client_id
+       JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id
        WHERE p.user_id = ? ORDER BY p.date_paiement DESC LIMIT 5`,
       [userId]
     ),
@@ -150,7 +150,7 @@ async function buildDashboard(userId) {
     ),
     pool.query(
       `SELECT c.id, c.nom, COUNT(f.id) as nb_factures, COALESCE(SUM(f.total),0) as total
-       FROM clients c JOIN factures f ON f.client_id = c.id
+       FROM clients c JOIN factures f ON f.client_id = c.id AND f.user_id = c.user_id
        WHERE c.user_id = ? AND f.type = 'facture'
        GROUP BY c.id, c.nom ORDER BY total DESC LIMIT 5`,
       [userId]

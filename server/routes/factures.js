@@ -9,11 +9,14 @@ const { localDateString } = require('../utils/local-date');
 const { SUPPORTED_CURRENCIES } = require('../config/localization');
 const { sendMail, isSmtpConfigured } = require('../config/mailer');
 const { escapeHtmlEmail, sanitizeEmailHeader } = require('../utils/email-escape');
+const { formatAmountWithCurrency } = require('../utils/money-format');
 const { getPagination, buildPaginationMeta } = require('../utils/pagination');
 const { genererPdfFacture } = require('../utils/pdf');
 const { notifierUtilisateur } = require('../realtime');
 const { enqueuePdfJob, getPdfJob, getPdfPath } = require('../pdf-queue');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
+const { recordInvoiceAccountingTransition } = require('../services/accounting-invoice-lifecycle');
+const { optionalText, optionalIsoDate } = require('../utils/optional-fields');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -38,19 +41,6 @@ async function nextNumero(conn, userId, type, year = new Date().getFullYear()) {
 
 function round2(n) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
-}
-
-function optionalText(value, maxLength) {
-  if (value === undefined || value === null) return null;
-  return String(value).trim().slice(0, maxLength) || null;
-}
-
-function optionalIsoDate(value) {
-  if (value === undefined || value === null || value === '') return null;
-  const text = String(value).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
-  const date = new Date(text + 'T00:00:00.000Z');
-  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text ? undefined : text;
 }
 
 /**
@@ -391,15 +381,24 @@ router.get('/', async (req, res, next) => {
     if (statut) { whereSql += ' AND f.statut = ?'; params.push(statut); }
     if (client_id) { whereSql += ' AND f.client_id = ?'; params.push(client_id); }
 
-    const [[{ total }]] = await pool.query(`SELECT COUNT(*) as total FROM factures f${whereSql}`, params);
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) as total FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id${whereSql}`,
+      params
+    );
     const [rows] = await pool.query(
       `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone,
               c.whatsapp as client_whatsapp, NULL as client_pays_code
-       FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id${whereSql}
+       FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id JOIN users u ON u.id = f.user_id${whereSql}
        ORDER BY f.date_emission DESC, f.id DESC LIMIT ? OFFSET ?`,
       [...params, limite, offset]
     );
-    res.json({ factures: rows, pagination: buildPaginationMeta(page, limite, total) });
+    // Le code protège les liens publics; la liste n'en a pas besoin, contrairement au détail.
+    const factures = rows.map((row) => {
+      const safeRow = { ...row };
+      delete safeRow.verification_code;
+      return safeRow;
+    });
+    res.json({ factures, pagination: buildPaginationMeta(page, limite, total) });
   } catch (err) { next(err); }
 });
 
@@ -434,7 +433,7 @@ router.get('/:id', async (req, res, next) => {
     const [rows] = await pool.query(
       `SELECT f.*, c.nom as client_nom, c.email as client_email, c.telephone as client_telephone,
               c.whatsapp as client_whatsapp, c.adresse as client_adresse, NULL as client_pays_code
-       FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
+       FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id JOIN users u ON u.id = f.user_id
        WHERE f.id = ? AND f.user_id = ?`,
       [req.params.id, req.tenantId]
     );
@@ -450,7 +449,7 @@ router.get('/:id', async (req, res, next) => {
 
     const [[lignes], [paiements]] = await Promise.all([
       pool.query('SELECT * FROM facture_lignes WHERE facture_id = ?', [facture.id]),
-      pool.query('SELECT * FROM paiements WHERE facture_id = ? ORDER BY date_paiement DESC', [facture.id])
+      pool.query('SELECT * FROM paiements WHERE facture_id = ? AND user_id = ? ORDER BY date_paiement DESC', [facture.id, req.tenantId])
     ]);
 
     const verifyUrl = `${(process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '')}/verifier.html?id=${facture.id}&code=${facture.verification_code}`;
@@ -570,14 +569,6 @@ router.post('/', async (req, res, next) => {
       }
     }
 
-    const [companyRows] = await pool.query('SELECT devise, fuseau_horaire FROM users WHERE id = ?', [req.tenantId]);
-    const companyCurrency = String(companyRows[0]?.devise || 'FCFA').toUpperCase();
-    const companyLocalDate = localDateString(companyRows[0]?.fuseau_horaire || 'Africa/Dakar');
-    const documentCurrency = String(devise || companyCurrency).toUpperCase();
-    if (!SUPPORTED_CURRENCIES.includes(documentCurrency)) return res.status(400).json({ error: 'Devise de document non prise en charge.' });
-    if (documentCurrency !== companyCurrency) {
-      return res.status(409).json({ error: 'La devise du document doit correspondre à la devise de base de l’entreprise. Les conversions multi-devises ne sont pas encore activées.' });
-    }
     const docType = type === 'devis' ? 'devis' : 'facture';
     const dateValidite = docType === 'devis' ? optionalIsoDate(date_validite) : null;
     if (dateValidite === undefined) {
@@ -603,6 +594,29 @@ router.post('/', async (req, res, next) => {
 
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    // Factures et devis doivent tous deux figer la devise au premier document.
+    // Le quota facture utilise déjà ce verrou ; le prendre ici aussi pour les devis
+    // et relire la devise après le verrou évite toute valeur devenue obsolète.
+    const [[company]] = await conn.query(
+      'SELECT devise, fuseau_horaire FROM users WHERE id = ? FOR UPDATE',
+      [req.tenantId]
+    );
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+    const companyCurrency = String(company.devise || 'FCFA').toUpperCase();
+    const companyLocalDate = localDateString(company.fuseau_horaire || 'Africa/Dakar');
+    const documentCurrency = String(devise || companyCurrency).toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(documentCurrency)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise de document non prise en charge.' });
+    }
+    if (documentCurrency !== companyCurrency) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'La devise du document doit correspondre à la devise de base de l’entreprise. Les conversions multi-devises ne sont pas encore activées.' });
+    }
+
     let invoiceWarehouseId = null;
     if (docType === 'facture') {
       // Toutes les créations verrouillent d'abord le compte via le registre de quota.
@@ -737,10 +751,25 @@ router.put('/:id/statut', async (req, res, next) => {
       [statut, existing.id, req.tenantId]
     );
 
+    let accountingTransition = null;
     if (existing.type === 'facture' && existing.statut !== 'annulee' && statut === 'annulee') {
       await ajusterStockFacture(conn, existing.id, req.tenantId, +1, existing.entrepot_id);
+      accountingTransition = 'annulation';
     } else if (existing.type === 'facture' && existing.statut === 'annulee' && statut !== 'annulee') {
       await ajusterStockFacture(conn, existing.id, req.tenantId, -1, existing.entrepot_id);
+      accountingTransition = 'reactivation';
+    }
+
+    // Une facture déjà comptabilisée est contre-passée dans la même transaction que
+    // son changement de statut et la restitution/redéduction du stock. Les devis et les
+    // factures jamais comptabilisées ne créent aucune écriture comptable automatique.
+    if (accountingTransition) {
+      await recordInvoiceAccountingTransition(conn, {
+        userId: req.tenantId,
+        actorUserId: req.actorId || req.user?.id || req.tenantId,
+        invoice: existing,
+        transition: accountingTransition
+      });
     }
 
     await conn.commit();
@@ -1052,7 +1081,7 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
   const [rows] = await pool.query(
     `SELECT f.*, c.nom as client_nom, c.email as client_email,
             u.entreprise_nom, u.nom as user_nom, u.email as user_email, u.role as user_role
-     FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
+     FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id JOIN users u ON u.id = f.user_id
      WHERE f.id = ? AND f.user_id = ?`,
     [factureId, userId]
   );
@@ -1080,6 +1109,8 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
   const safeEmetteur = escapeHtmlEmail(emetteur);
   const safeNumero = escapeHtmlEmail(facture.numero);
   const safeConsultUrl = escapeHtmlEmail(consultUrl);
+  const montantFormate = formatAmountWithCurrency(facture.total, facture.devise);
+  const safeMontantFormate = escapeHtmlEmail(montantFormate);
 
   let attachments;
   try {
@@ -1097,8 +1128,8 @@ async function envoyerFactureParEmail(factureId, userId, baseUrl, destinataireFo
   const mailResult = await sendMail({
     to: destinataire,
     subject: sanitizeEmailHeader(`${emetteur} vous a envoyé un ${label} — ${facture.numero}`),
-    text: `Bonjour ${facture.client_nom},\n\n${emetteur} vous a envoyé un ${label} d'un montant de ${facture.total} FCFA.\n\nConsultez-le en ligne : ${consultUrl}\n\nMerci de votre confiance.`,
-    html: `<p>Bonjour ${safeClientNom},</p><p><strong>${safeEmetteur}</strong> vous a envoyé un ${label} (${safeNumero}) d'un montant de <strong>${facture.total} FCFA</strong>.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#0FA980;color:#fff;border-radius:8px;text-decoration:none;">Consulter le ${label}</a></p><p>Ou copiez ce lien : ${safeConsultUrl}</p>`,
+    text: `Bonjour ${facture.client_nom},\n\n${emetteur} vous a envoyé un ${label} d'un montant de ${montantFormate}.\n\nConsultez-le en ligne : ${consultUrl}\n\nMerci de votre confiance.`,
+    html: `<p>Bonjour ${safeClientNom},</p><p><strong>${safeEmetteur}</strong> vous a envoyé un ${label} (${safeNumero}) d'un montant de <strong>${safeMontantFormate}</strong>.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#0FA980;color:#fff;border-radius:8px;text-decoration:none;">Consulter le ${label}</a></p><p>Ou copiez ce lien : ${safeConsultUrl}</p>`,
     attachments
   });
   if (!mailResult?.sent) {
@@ -1153,7 +1184,7 @@ router.post('/:id/relancer', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
       `SELECT f.*, c.nom as client_nom, c.email as client_email, u.entreprise_nom, u.nom as user_nom
-       FROM factures f JOIN clients c ON c.id = f.client_id JOIN users u ON u.id = f.user_id
+       FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id JOIN users u ON u.id = f.user_id
        WHERE f.id = ? AND f.user_id = ? AND f.type = 'facture'`,
       [req.params.id, req.tenantId]
     );
@@ -1167,13 +1198,15 @@ router.post('/:id/relancer', async (req, res, next) => {
 
     if (!facture.verification_code) {
       facture.verification_code = crypto.randomBytes(5).toString('hex');
-      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ?', [facture.verification_code, facture.id]);
+      await pool.query('UPDATE factures SET verification_code = ? WHERE id = ? AND user_id = ?', [facture.verification_code, facture.id, req.tenantId]);
     }
 
     const baseUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
     const consultUrl = `${baseUrl}/consulter.html?id=${facture.id}&code=${facture.verification_code}`;
     const emetteur = facture.entreprise_nom || facture.user_nom;
     const resteAPayer = Number(facture.total) - Number(facture.montant_paye);
+    const resteAPayerFormate = formatAmountWithCurrency(resteAPayer, facture.devise);
+    const safeResteAPayer = escapeHtmlEmail(resteAPayerFormate);
 
     const safeClientNom = escapeHtmlEmail(facture.client_nom);
     const safeEmetteur = escapeHtmlEmail(emetteur);
@@ -1190,8 +1223,8 @@ router.post('/:id/relancer', async (req, res, next) => {
     const mailResult = await sendMail({
       to: destinataire,
       subject: sanitizeEmailHeader(`Rappel : facture ${facture.numero} en attente de paiement`),
-      text: `Bonjour ${facture.client_nom},\n\nNous vous rappelons que la facture ${facture.numero} d'un montant de ${resteAPayer} FCFA est toujours en attente de règlement.\n\nConsultez-la ici : ${consultUrl}\n\nMerci de régulariser dans les meilleurs délais.`,
-      html: `<p>Bonjour ${safeClientNom},</p><p>Nous vous rappelons que la facture <strong>${safeNumero}</strong> d'un montant restant dû de <strong>${resteAPayer} FCFA</strong> est toujours en attente de règlement par ${safeEmetteur}.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#E8A33D;color:#0F1B33;border-radius:8px;text-decoration:none;font-weight:600;">Consulter la facture</a></p><p>Merci de régulariser dans les meilleurs délais.</p>`,
+      text: `Bonjour ${facture.client_nom},\n\nNous vous rappelons que la facture ${facture.numero} d'un montant de ${resteAPayerFormate} est toujours en attente de règlement.\n\nConsultez-la ici : ${consultUrl}\n\nMerci de régulariser dans les meilleurs délais.`,
+      html: `<p>Bonjour ${safeClientNom},</p><p>Nous vous rappelons que la facture <strong>${safeNumero}</strong> d'un montant restant dû de <strong>${safeResteAPayer}</strong> est toujours en attente de règlement par ${safeEmetteur}.</p><p><a href="${safeConsultUrl}" style="display:inline-block;padding:10px 18px;background:#E8A33D;color:#0F1B33;border-radius:8px;text-decoration:none;font-weight:600;">Consulter la facture</a></p><p>Merci de régulariser dans les meilleurs délais.</p>`,
       attachments
     });
     if (!mailResult?.sent) return res.status(503).json({ error: 'SMTP non configuré : email non envoyé.' });
@@ -1207,7 +1240,7 @@ router.post('/:id/relancer', async (req, res, next) => {
  * @openapi
  * /factures/{id}:
  *   delete:
- *     summary: Supprime une facture/devis (et ses lignes/paiements associés)
+ *     summary: Supprime uniquement un devis sans historique (les factures émises sont conservées)
  *     tags: [Factures]
  *     parameters:
  *       - in: path
@@ -1215,14 +1248,16 @@ router.post('/:id/relancer', async (req, res, next) => {
  *         required: true
  *         schema: { type: integer }
  *     responses:
- *       200: { description: "Supprimé." }
+ *       200: { description: "Devis supprimé." }
  *       404: { description: "Document introuvable.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Document émis ou avec historique protégé.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.delete('/:id', async (req, res, next) => {
-  const conn = await pool.getConnection();
+  let conn;
   try {
+    conn = await pool.getConnection();
     await conn.beginTransaction();
-    // Sérialiser suppression, annulation et réactivation sur la facture elle-même.
+    // Sérialiser la suppression avec les annulations, réactivations et postings comptables.
     const [existingRows] = await conn.query(
       'SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE',
       [req.params.id, req.tenantId]
@@ -1232,20 +1267,60 @@ router.delete('/:id', async (req, res, next) => {
       await conn.rollback();
       return res.status(404).json({ error: 'Facture introuvable.' });
     }
-    // Restitue le stock déjà décompté avant de supprimer, sauf si la facture était déjà
-    // annulée (son stock avait alors déjà été restitué par PUT /:id/statut — le restituer
-    // une seconde fois créerait un stock fantôme supérieur à la réalité).
-    if (existing.type === 'facture' && existing.statut !== 'annulee') {
-      await ajusterStockFacture(conn, existing.id, req.tenantId, +1, existing.entrepot_id);
+
+    // Une facture émise est un document final et ne se supprime jamais, même avant paiement
+    // ou comptabilisation. Utiliser l'annulation et les contrepassations pour garder la piste
+    // d'audit, les mouvements de stock et les liens aux règlements.
+    if (existing.type === 'facture') {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Une facture émise ne peut pas être supprimée. Utilisez son annulation ou une contrepassation pour conserver la traçabilité.',
+        code: 'DOCUMENT_HISTORIQUE_PROTEGE'
+      });
     }
+
+    // Un devis ne peut être supprimé que s'il est réellement sans historique lié.
+    const historySql = "SELECT\n"+
+      "(SELECT COUNT(*) FROM paiements WHERE user_id = ? AND facture_id = ?) AS paiements,\n"+
+      "(SELECT COUNT(*) FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id AND p.user_id = r.user_id WHERE r.user_id = ? AND p.facture_id = ?) AS remboursements,\n"+
+      "(SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ? AND source_type = 'facture' AND source_id = ?) AS ecritures_facture,\n"+
+      "(SELECT COUNT(*) FROM pro_compta_lignes WHERE user_id = ? AND facture_id = ?) AS lignes_comptables,\n"+
+      "(SELECT COUNT(*) FROM pro_avoirs WHERE user_id = ? AND facture_id = ?) AS avoirs,\n"+
+      "(SELECT COUNT(*) FROM pro_acomptes WHERE user_id = ? AND facture_id = ?) AS acomptes,\n"+
+      "(SELECT COUNT(*) FROM pro_payment_links WHERE user_id = ? AND facture_id = ?) AS liens_paiement,\n"+
+      "(SELECT COUNT(*) FROM pro_invoice_checkouts WHERE user_id = ? AND facture_id = ?) AS checkouts,\n"+
+      "(SELECT COUNT(*) FROM pro_bons_livraison WHERE user_id = ? AND facture_id = ?) AS bons_livraison,\n"+
+      "(SELECT COUNT(*) FROM pro_documents WHERE user_id = ? AND facture_id = ?) AS documents,\n"+
+      "(SELECT COUNT(*) FROM pro_portal_quote_decisions WHERE user_id = ? AND facture_id = ?) AS decisions_portail";
+    const [historyRows] = await conn.query(historySql, [
+      req.tenantId, existing.id,
+      req.tenantId, existing.id,
+      req.tenantId, existing.id,
+      req.tenantId, existing.id,
+      req.tenantId, existing.id,
+      req.tenantId, existing.id,
+      req.tenantId, existing.id,
+      req.tenantId, existing.id,
+      req.tenantId, existing.id,
+      req.tenantId, existing.id,
+      req.tenantId, existing.id
+    ]);
+    if (Object.values(historyRows[0] || {}).some(count => Number(count) > 0)) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Ce document possède un historique financier, comptable, commercial ou documentaire et ne peut pas être supprimé.',
+        code: 'DOCUMENT_HISTORIQUE_PROTEGE'
+      });
+    }
+
     await conn.query('DELETE FROM factures WHERE id = ? AND user_id = ?', [existing.id, req.tenantId]);
     await conn.commit();
     res.json({ success: true });
   } catch (err) {
-    await conn.rollback();
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
@@ -1280,6 +1355,37 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/paiements', async (req, res, next) => {
   let conn;
   let idempotencyKey = null;
+  let montantNum = null;
+  let methodeValidee = null;
+  let referenceValidee = null;
+
+  const respondWithExistingPayment = async existingPayment => {
+    if (Number(existingPayment.facture_id) !== Number(req.params.id)) {
+      return res.status(409).json({
+        error: 'Cette Idempotency-Key est déjà utilisée pour une autre facture.',
+        code: 'IDEMPOTENCY_KEY_REUTILISEE'
+      });
+    }
+
+    const sameRequest =
+      round2(Number(existingPayment.montant)) === montantNum &&
+      existingPayment.methode === methodeValidee &&
+      (existingPayment.reference ?? null) === (referenceValidee ?? null);
+    if (!sameRequest) {
+      return res.status(409).json({
+        error: 'Cette Idempotency-Key a déjà été utilisée avec des paramètres différents.',
+        code: 'IDEMPOTENCY_KEY_CONFLIT_REQUETE'
+      });
+    }
+
+    const [existingFacture] = await pool.query(
+      'SELECT * FROM factures WHERE id = ? AND user_id = ?',
+      [existingPayment.facture_id, req.tenantId]
+    );
+    if (!existingFacture.length) return res.status(404).json({ error: 'Facture introuvable.' });
+    return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
+  };
+
   try {
     idempotencyKey = req.get('Idempotency-Key')?.trim() || null;
     if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 100)) {
@@ -1287,9 +1393,9 @@ router.post('/:id/paiements', async (req, res, next) => {
     }
 
     const { montant, methode, reference } = req.body;
-    const montantNum = round2(Number(montant));
-    const methodeValidee = typeof methode === 'string' ? methode.trim().slice(0, 50) : '';
-    const referenceValidee = optionalText(reference, 100);
+    montantNum = round2(Number(montant));
+    methodeValidee = typeof methode === 'string' ? methode.trim().slice(0, 50) : '';
+    referenceValidee = optionalText(reference, 100);
     if (!Number.isFinite(montantNum) || montantNum <= 0 ||
         montantNum > 999999999999.99 || !methodeValidee) {
       return res.status(400).json({ error: 'Montant positif (au centime) et méthode de paiement valides requis.' });
@@ -1298,22 +1404,11 @@ router.post('/:id/paiements', async (req, res, next) => {
     // Rejeu optimiste : la connexion transactionnelle n'existe pas encore, utiliser le pool.
     if (idempotencyKey) {
       const [existingPayments] = await pool.query(
-        'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
+        'SELECT facture_id, montant, methode, reference FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
         [req.tenantId, idempotencyKey]
       );
       if (existingPayments.length) {
-        if (Number(existingPayments[0].facture_id) !== Number(req.params.id)) {
-          return res.status(409).json({
-            error: 'Cette Idempotency-Key est déjà utilisée pour une autre facture.',
-            code: 'IDEMPOTENCY_KEY_REUTILISEE'
-          });
-        }
-        const [existingFacture] = await pool.query(
-          'SELECT * FROM factures WHERE id = ? AND user_id = ?',
-          [existingPayments[0].facture_id, req.tenantId]
-        );
-        if (!existingFacture.length) return res.status(404).json({ error: 'Facture introuvable.' });
-        return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
+        return respondWithExistingPayment(existingPayments[0]);
       }
     }
 
@@ -1333,23 +1428,12 @@ router.post('/:id/paiements', async (req, res, next) => {
     // le contrôle optimiste avant l'insertion du premier règlement.
     if (idempotencyKey) {
       const [paymentRows] = await conn.query(
-        'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
+        'SELECT facture_id, montant, methode, reference FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
         [req.tenantId, idempotencyKey]
       );
       if (paymentRows.length) {
         await conn.rollback();
-        if (Number(paymentRows[0].facture_id) !== Number(req.params.id)) {
-          return res.status(409).json({
-            error: 'Cette Idempotency-Key est déjà utilisée pour une autre facture.',
-            code: 'IDEMPOTENCY_KEY_REUTILISEE'
-          });
-        }
-        const [existingFacture] = await pool.query(
-          'SELECT * FROM factures WHERE id = ? AND user_id = ?',
-          [paymentRows[0].facture_id, req.tenantId]
-        );
-        if (!existingFacture.length) return res.status(404).json({ error: 'Facture introuvable.' });
-        return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
+        return respondWithExistingPayment(paymentRows[0]);
       }
     }
 
@@ -1365,7 +1449,7 @@ router.post('/:id/paiements', async (req, res, next) => {
     if (montantNum > resteAPayerAvant) {
       await conn.rollback();
       return res.status(400).json({
-        error: `Le montant dépasse le solde restant dû (${resteAPayerAvant} FCFA).`
+        error: `Le montant dépasse le solde restant dû (${formatAmountWithCurrency(resteAPayerAvant, facture.devise)}).`
       });
     }
 
@@ -1399,23 +1483,11 @@ router.post('/:id/paiements', async (req, res, next) => {
     if (err?.code === 'ER_DUP_ENTRY' && idempotencyKey) {
       try {
         const [existingPayments] = await pool.query(
-          'SELECT facture_id FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
+          'SELECT facture_id, montant, methode, reference FROM paiements WHERE user_id = ? AND idempotency_key = ? LIMIT 1',
           [req.tenantId, idempotencyKey]
         );
         if (existingPayments.length) {
-          if (Number(existingPayments[0].facture_id) !== Number(req.params.id)) {
-            return res.status(409).json({
-              error: 'Cette Idempotency-Key est déjà utilisée pour une autre facture.',
-              code: 'IDEMPOTENCY_KEY_REUTILISEE'
-            });
-          }
-          const [existingFacture] = await pool.query(
-            'SELECT * FROM factures WHERE id = ? AND user_id = ?',
-            [existingPayments[0].facture_id, req.tenantId]
-          );
-          if (existingFacture.length) {
-            return res.status(200).json({ facture: existingFacture[0], idempotent_replay: true });
-          }
+          return respondWithExistingPayment(existingPayments[0]);
         }
       } catch (replayErr) {
         return next(replayErr);

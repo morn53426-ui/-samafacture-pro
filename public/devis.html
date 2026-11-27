@@ -182,7 +182,7 @@
       closeSendModal();
       showSuccessNotice(`Email envoyé à ${sent_to} ✓`);
     } catch (err) {
-      document.getElementById('send-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('send-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }
