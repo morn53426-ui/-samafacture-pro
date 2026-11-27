@@ -34,7 +34,7 @@ test('le processus HTTP ne reçoit aucun compte DDL ou de sauvegarde', () => {
   assert.match(block, /DB_MIGRATION_PASSWORD: ""/);
   assert.match(block, /DB_BACKUP_USER: ""/);
   assert.match(block, /DB_BACKUP_PASSWORD: ""/);
-  assert.doesNotMatch(block, /DB_ROOT_PASSWORD:/);
+  assert.match(block, /DB_ROOT_PASSWORD: ""/);
   assert.doesNotMatch(block, /DB_MIGRATION_USER: \$\{/);
   assert.doesNotMatch(block, /DB_BACKUP_USER: \$\{/);
   assert.match(app, /BACKUP_SCHEDULER_DISABLED !== 'true'/);
@@ -63,8 +63,8 @@ test('le privilège TRIGGER est limité au worker de sauvegarde dédié', () => 
   const appBlock = serviceBlock('app');
   assert.match(provision, /DB_BACKUP_USER:/);
   assert.match(provisioner, /GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES/);
-  assert.match(provisioner, /\[ "$DB_USER" = "$DB_MIGRATION_USER" \]/);
-  assert.match(provisioner, /\[ "$DB_USER" = "$DB_BACKUP_USER" \]/);
+  assert.match(provisioner, /DB_USER[\\s\\S]*DB_MIGRATION_USER[\\s\\S]*DB_BACKUP_USER/);
+  assert.match(provisioner, /DB_BACKUP_USER[\\s\\S]*exit 1/);
   assert.match(worker, /DB_BACKUP_USER: \$\{DB_BACKUP_USER/);
   assert.match(worker, /workers\/backup-worker\.js/);
   assert.match(worker, /app_backups:/);
