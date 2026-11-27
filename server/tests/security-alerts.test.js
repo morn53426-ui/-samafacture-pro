@@ -178,22 +178,23 @@ test('une facture très supérieure à l’historique comparable déclenche un s
     });
   }
 
-  // Dix-neuf observations comparables ne suffisent pas à établir une référence.
+  // Dix-neuf observations XOF et une facture EUR ne suffisent pas à établir une référence XOF.
   for (let index = 0; index < 19; index += 1) {
-    await recordInvoiceAudit(index, 10000);
+    await recordInvoiceAudit(index, 10000, 'XOF');
   }
+  await recordInvoiceAudit(19, 1000000, 'EUR');
   const [[beforeMinimum]] = await pool.query(
     'SELECT COUNT(*) AS total FROM pro_security_alerts WHERE tenant_scope_id = ?',
     [ownerC]
   );
   assert.equal(Number(beforeMinimum.total), 0);
 
-  // La vingtième facture complète l'échantillon et reste elle-même dans la plage normale.
-  await recordInvoiceAudit(19, 10000);
-  // Un devis n'entre pas dans la référence des factures.
-  await recordInvoiceAudit(20, 250000, 'XOF', 'devis');
+  // La vingtième facture XOF complète l'échantillon comparable.
+  await recordInvoiceAudit(20, 10000, 'XOF');
+  // Un devis très élevé n'entre pas dans la référence des factures.
+  await recordInvoiceAudit(21, 250000, 'XOF', 'devis');
 
-  const unusual = await recordInvoiceAudit(21, 75000);
+  const unusual = await recordInvoiceAudit(22, 75000, 'XOF');
   assert.ok(unusual.id);
 
   const [alerts] = await pool.query(
