@@ -62,7 +62,7 @@
     <div id="pay-error" role="alert" aria-live="assertive"></div>
     <form id="pay-form">
       <input type="hidden" id="pay-facture-id" />
-      <div class="field"><label for="pay-montant">Montant du règlement *</label><div class="payment-amount-input"><input type="number" id="pay-montant" min="0.01" step="0.01" required /><span>FCFA</span></div><small class="field-hint" id="pay-remaining-hint"></small></div>
+      <div class="field"><label for="pay-montant">Montant du règlement *</label><div class="payment-amount-input"><input type="number" id="pay-montant" min="0.01" step="0.01" required /><span id="pay-currency">FCFA</span></div><small class="field-hint" id="pay-remaining-hint"></small></div>
       <div class="field">
         <label for="pay-methode">Méthode *</label>
         <select id="pay-methode" required>
@@ -136,8 +136,9 @@
     const amount = document.getElementById('pay-montant');
     const hint = document.getElementById('pay-remaining-hint');
     if (facture) {
-      const restant = Math.max(0, Number(facture.total || 0) - Number(facture.montant_paye || 0));
-      context.innerHTML = '<span>Facture <strong>' + escapeHtml(facture.numero) + '</strong></span><span>Client : ' + escapeHtml(facture.client_nom || '—') + '</span><span class="payment-context-balance">Solde restant : <strong>' + formatMontant(restant) + '</strong></span>';
+      const restant = Math.max(0, Math.round((Number(facture.total || 0) - Number(facture.montant_paye || 0) + Number.EPSILON) * 100) / 100);
+      document.getElementById('pay-currency').textContent = facture.devise || 'FCFA';
+      context.innerHTML = '<span>Facture <strong>' + escapeHtml(facture.numero) + '</strong></span><span>Client : ' + escapeHtml(facture.client_nom || '—') + '</span><span class="payment-context-balance">Solde restant : <strong>' + formatMontant(restant, facture.devise) + '</strong></span>';
       amount.max = String(restant);
       amount.value = restant > 0 ? String(restant) : '';
       hint.textContent = restant > 0 ? 'Vous pouvez enregistrer un règlement partiel ou total.' : '';
@@ -163,7 +164,7 @@
       closePayModal();
       load().catch(err => alert(err.message));
     } catch (err) {
-      document.getElementById('pay-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('pay-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }
@@ -194,7 +195,7 @@
       closeSendModal();
       showSuccessNotice(`Email envoyé à ${sent_to} ✓`);
     } catch (err) {
-      document.getElementById('send-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('send-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }

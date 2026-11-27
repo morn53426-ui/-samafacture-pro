@@ -99,12 +99,57 @@ describe('Navigation et structure des pages métier', () => {
     }
   });
 
+  test('l’espace professionnel relie les six domaines aux modules OHADA et Achats existants', () => {
+    const html = readPage('professionnel.html');
+    const navStart = html.indexOf('<nav class="pro-workspace-guide"');
+    const navEnd = html.indexOf('</nav>', navStart);
+    assert.ok(navStart >= 0 && navEnd > navStart, 'Le guide des domaines doit être présent.');
+    const navHtml = html.slice(navStart, navEnd);
+    const groups = [...navHtml.matchAll(/class="pro-workspace-guide-group"/g)];
+    assert.equal(groups.length, 6, 'Les six domaines de gestion doivent être visibles.');
+    const links = [...navHtml.matchAll(/href="([^"]+)"/g)].map(match => match[1]);
+    assert.equal(links.length, 11, 'Les onze accès directs doivent être présents.');
+    for (const destination of ['comptabilite.html', 'achats.html']) {
+      assert.ok(links.includes(destination), 'La destination ' + destination + ' doit être accessible.');
+      assert.ok(fs.existsSync(path.join(PUBLIC_DIR, destination)), 'La page ' + destination + ' doit exister.');
+    }
+    for (const destination of links.filter(value => value.startsWith('#'))) {
+      assert.ok(html.includes('id="' + destination.slice(1) + '"'),
+        'Le raccourci ' + destination + ' doit pointer vers un module existant.');
+    }
+  });
+
+  test('la navigation des domaines professionnels est défilable au clavier sur mobile', () => {
+    const html = readPage('professionnel.html');
+    const grid = html.match(/<div class="pro-workspace-guide-grid"([^>]*)>/);
+    assert.ok(grid, 'Le rail des domaines professionnels doit être présent.');
+    assert.match(grid[1], /role="region"/);
+    assert.match(grid[1], /tabindex="0"/);
+    assert.match(grid[1], /aria-label=/);
+    assert.match(html, /Sur mobile, faites défiler les domaines horizontalement/);
+    assert.ok(enterpriseStyles.includes('@media (max-width: 560px)'));
+    assert.ok(enterpriseStyles.includes('grid-auto-flow: column'));
+    assert.ok(enterpriseStyles.includes('grid-auto-columns: min(84vw, 300px)'));
+    assert.ok(enterpriseStyles.includes('overflow-x: auto'));
+    assert.ok(enterpriseStyles.includes('scroll-snap-type: x proximity'));
+    assert.ok(enterpriseStyles.includes('.pro-workspace-guide-grid:focus-visible'));
+  });
+
+  test('le plan de comptes OHADA peut être consulté et complété depuis son écran', () => {
+    const html = readPage('comptabilite.html');
+    assert.match(html, /id="accounting-accounts"/);
+    assert.match(html, /id="accounts-list"/);
+    assert.match(html, /id="account-form"/);
+    assert.match(html, /Api\.post\('\/pro\/accounting\/accounts'/);
+    assert.match(html, /plan préchargé est un socle de démarrage simplifié/i);
+  });
+
   test('Comptabilité OHADA permet de rejoindre chaque zone comptable', () => {
     const html = readPage('comptabilite.html');
     const nav = html.match(/<nav class="workspace-section-nav"[^>]*>([\s\S]*?)<\/nav>/);
     assert.ok(nav, 'La navigation rapide OHADA doit être présente.');
     const links = [...nav[1].matchAll(/href="#([^"]+)"/g)].map(match => match[1]);
-    assert.equal(links.length, 4, 'Les quatre zones comptables doivent être accessibles.');
+    assert.equal(links.length, 5, 'Les cinq zones comptables doivent être accessibles.');
     for (const id of links) {
       assert.match(html, new RegExp('\\bid="' + id + '"'),
         'Le raccourci #' + id + ' doit cibler une section existante.');

@@ -50,6 +50,15 @@
             <label for="password">Mot de passe</label>
             <input type="password" id="password" name="password" autocomplete="new-password" minlength="8" required placeholder="8 caractères minimum" />
           </div>
+          <div class="field">
+            <label for="trial-plan">Formule à essayer gratuitement</label>
+            <select id="trial-plan" name="plan" required>
+              <option value="starter" selected>Standard — 15 jours offerts</option>
+              <option value="pro">Pro — 15 jours offerts</option>
+              <option value="entreprise">Entreprise — 15 jours offerts</option>
+            </select>
+            <p class="helper">Aucune carte bancaire et aucun prélèvement automatique. À la fin des 15 jours, le compte revient au plan Gratuit ; vos données restent conservées. Standard correspond au palier Starter déjà utilisé par le système.</p>
+          </div>
           <div class="field" style="margin:16px 0;">
             <label style="display:flex; align-items:flex-start; gap:10px; font-weight:500; line-height:1.5;">
               <input type="checkbox" id="accept-terms" required style="width:18px; height:18px; flex:0 0 18px; margin-top:3px;" />
@@ -88,13 +97,14 @@
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
     const acceptTerms = document.getElementById('accept-terms').checked;
+    const plan = document.getElementById('trial-plan').value;
     const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Création du compte…');
     try {
-      const { token, user } = await Api.post('/auth/register', { nom, email, password, entreprise_nom, acceptTerms });
+      const { token, user } = await Api.post('/auth/register', { nom, email, password, entreprise_nom, acceptTerms, plan });
       Api.setSession(token, user);
       redirectAfterLogin();
     } catch (err) {
-      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+      errorBox.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
       restore();
     }
   });
