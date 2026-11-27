@@ -45,6 +45,12 @@ test('le centre de sécurité utilise les routes dédiées et contrôle les acti
   assert.match(page, /if \(!button \|\| !can\('security\.manage'\)\) return/);
   assert.match(page, /escapeHtml\(alert\.title\)/);
   assert.match(page, /escapeHtml\(alert\.summary\)/);
+  assert.match(page, /alert\.evidence/);
+  assert.match(page, /attempts_in_window/);
+  assert.match(page, /historical_median/);
+  assert.match(page, /sample_size/);
+  assert.match(page, /escapeHtml\(formatMontant\(observed, currency\)\)/);
+  assert.match(page, /escapeHtml\(formatMontant\(historicalMedian, currency\)\)/);
   assert.match(page, /escapeHtml\(item\.title\)/);
   assert.match(page, /securityRequestSequence/);
 });
