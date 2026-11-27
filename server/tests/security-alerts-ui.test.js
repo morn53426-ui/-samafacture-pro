@@ -11,6 +11,8 @@ const page = fs.readFileSync(
 );
 
 test('le centre de sécurité est indépendant des intégrations et réservé à security.read', () => {
+  assert.match(page, /data-icon="shield-check"/);
+
   for (const id of [
     'pro-security',
     'security-section',
