@@ -241,14 +241,15 @@ async function appendAuditEvent(input, connection = null) {
         actorKind: 'system',
         eventType: securitySignal.action === 'created' ? 'security.alert.created' : 'security.alert.reopened',
         category: 'security',
-        severity: 'high',
+        severity: securitySignal.severity || 'high',
         entityType: 'security_alert',
         entityId: securitySignal.alertId,
         outcome: 'success',
         metadata: {
           rule_code: securitySignal.ruleCode,
           source_event_id: Number(insertResult.insertId),
-          attempts_in_window: securitySignal.attempts,
+          ...(securitySignal.attempts === undefined ? {} : { attempts_in_window: securitySignal.attempts }),
+          ...(securitySignal.evidence || {}),
           case_id: securitySignal.caseId || null
         }
       }, conn);
