@@ -56,6 +56,8 @@ jobs:
           DB_PASSWORD=ci-app-password-not-used
           DB_MIGRATION_USER=samafacture_migrator
           DB_MIGRATION_PASSWORD=ci-migration-password-not-used
+          DB_BACKUP_USER=samafacture_backup
+          DB_BACKUP_PASSWORD=ci-backup-password-not-used
           DB_ROOT_PASSWORD=ci-root-password-not-used
           JWT_SECRET=ci-secret-ne-pas-utiliser-en-production
           APP_URL=https://example.invalid
