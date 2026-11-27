@@ -102,7 +102,7 @@ describe('Dashboard — régression et scalabilité', () => {
     const dbSource = fs.readFileSync(path.join(__dirname, '..', 'config', 'db.js'), 'utf8');
     const professionalSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'professionnel.js'), 'utf8');
     const schemaSource = fs.readFileSync(path.join(__dirname, '..', 'database', 'schema.sql'), 'utf8');
-    assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 25/);
+    assert.match(dbSource, /CURRENT_SCHEMA_VERSION = 26/);
     assert.match(dbSource, /v19 : historique des contrepassations/);
     assert.match(dbSource, /v20 : mode de règlement des dépenses/);
     assert.match(dbSource, /v21 : état et dates UTC de l'essai gratuit/);

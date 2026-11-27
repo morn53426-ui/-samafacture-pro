@@ -2,6 +2,7 @@
 
 const crypto = require('node:crypto');
 const { pool } = require('../config/db');
+const { evaluateSecuritySignal } = require('./security-alert-engine');
 
 const GENESIS_HASH = '0'.repeat(64);
 const SENSITIVE_KEY = /(password|passwd|pwd|passphrase|secret|token|authorization|cookie|api.?key|private.?key|cvv|cvc|card.?number|otp|one.?time|verification.?code|reset.?token|signature|email|e.?mail|phone|telephone|mobile|iban|rib|bank.?account|account.?number|identity.?number|document.?number|ninea|rccm|birth|address)/i;
@@ -229,6 +230,30 @@ async function appendAuditEvent(input, connection = null) {
       'UPDATE pro_audit_chain_heads SET last_sequence = ?, last_hash = ? WHERE tenant_scope_id = ?',
       [sequence, eventHash, event.tenantScopeId]
     );
+
+    // Détection transactionnelle : un signal et son alerte sont persistés avec l'événement source.
+    // Les tentatives de comptes inconnus restent hors de cette règle tenant-scoped.
+    const securitySignal = await evaluateSecuritySignal(conn, event, Number(insertResult.insertId));
+    if (securitySignal && (securitySignal.action === 'created' || securitySignal.action === 'reopened')) {
+      await appendAuditEvent({
+        tenantId: event.tenantId,
+        actorUserId: null,
+        actorKind: 'system',
+        eventType: securitySignal.action === 'created' ? 'security.alert.created' : 'security.alert.reopened',
+        category: 'security',
+        severity: securitySignal.severity || 'high',
+        entityType: 'security_alert',
+        entityId: securitySignal.alertId,
+        outcome: 'success',
+        metadata: {
+          rule_code: securitySignal.ruleCode,
+          source_event_id: Number(insertResult.insertId),
+          ...(securitySignal.attempts === undefined ? {} : { attempts_in_window: securitySignal.attempts }),
+          ...(securitySignal.evidence || {}),
+          case_id: securitySignal.caseId || null
+        }
+      }, conn);
+    }
     return {
       id: Number(insertResult.insertId), tenantId: event.tenantId, sequence,
       previousHash, eventHash, keyVersion, createdAt

@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 25;
+const CURRENT_SCHEMA_VERSION = 26;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -566,6 +566,27 @@ async function runMigrations(conn) {
     await conn.query(statement);
   }
 
+  // v26 : alertes tenant-aware et suivi append-only des décisions d'investigation.
+  const securityAlertsPath = path.join(__dirname, '..', 'database', 'migrations', '015_security_alerts_cases.sql');
+  const securityAlertsSql = fs.readFileSync(securityAlertsPath, 'utf8');
+  const securityAlertStatements = securityAlertsSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of securityAlertStatements) {
+    const triggerMatch = /^CREATE TRIGGER\s+([a-zA-Z0-9_]+)/i.exec(statement);
+    if (triggerMatch) {
+      const [existingTriggers] = await conn.query(
+        'SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = ? LIMIT 1',
+        [triggerMatch[1]]
+      );
+      if (existingTriggers.length) continue;
+    }
+    await conn.query(statement);
+  }
 }
 
 module.exports = { pool, initDatabase };

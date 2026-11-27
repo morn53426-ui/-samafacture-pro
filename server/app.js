@@ -42,6 +42,7 @@ const abonnementRoutes = require('./routes/abonnement');
 const assistantRoutes = require('./routes/assistant');
 const professionnelRoutes = require('./routes/professionnel');
 const auditEventsRoutes = require('./routes/audit-events');
+const securityAlertsRoutes = require('./routes/security-alerts');
 const publicApiRoutes = require('./routes/public-api');
 const paymentWebhooksRoutes = require('./routes/payment-webhooks');
 const customerPortalRoutes = require('./routes/portal');
@@ -288,6 +289,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/abonnement', abonnementRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/pro', auditEventsRoutes);
+app.use('/api/pro', securityAlertsRoutes);
 app.use('/api/pro', professionnelRoutes);
 app.use('/api/v1', publicApiRoutes);
 // Prestataire callbacks : signature/hash contrôlés dans chaque endpoint avant tout mouvement financier.
