@@ -10,8 +10,10 @@ const { waveConfigured, paydunyaConfigured, creerSessionWave, creerFacturePaydun
 const net = require('net');
 const { SUPPORTED_COUNTRIES, SUPPORTED_CURRENCIES, SUPPORTED_TIMEZONES } = require('../config/localization');
 const { localDateString } = require('../utils/local-date');
+const { formatAmountWithCurrency, normalizeCurrency } = require('../utils/money-format');
 const { isEnterprisePlan } = require('../utils/plans');
 const { encryptEmailPayload, decryptEmailPayload } = require('../utils/email-outbox-crypto');
+const { optionalText, optionalIsoDate } = require('../utils/optional-fields');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -50,18 +52,6 @@ async function safeDateForUser(value, userId) {
   );
   return localDateString(accounts?.[0]?.fuseau_horaire || 'Africa/Dakar');
 }
-function optionalText(value, maxLength) {
-  if (value === undefined || value === null) return null;
-  return String(value).trim().slice(0, maxLength) || null;
-}
-function optionalIsoDate(value) {
-  if (value === undefined || value === null || value === '') return null;
-  const text = String(value).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
-  const date = new Date(text + 'T00:00:00.000Z');
-  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text ? undefined : text;
-}
-
 const randomRef = (prefix) => prefix + '-' + new Date().getFullYear() + '-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 const parseJson = (value, fallback) => {
   if (value && typeof value === 'object') return value;
@@ -140,7 +130,7 @@ async function assertEnterpriseGroupOwner(req, res) {
 router.get('/orders', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT o.*, c.nom AS client_nom FROM pro_commandes o JOIN clients c ON c.id = o.client_id WHERE o.user_id = ? ORDER BY o.date_commande DESC, o.id DESC LIMIT 250',
+      'SELECT o.*, c.nom AS client_nom FROM pro_commandes o JOIN clients c ON c.id = o.client_id AND c.user_id = o.user_id WHERE o.user_id = ? ORDER BY o.date_commande DESC, o.id DESC LIMIT 250',
       [owner(req)]
     );
     res.json({ commandes: rows.map(r => ({ ...r, lignes: parseJson(r.lignes_json, []) })) });
@@ -148,13 +138,13 @@ router.get('/orders', async (req, res, next) => {
 });
 
 router.post('/orders', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req);
     const clientId = Number(req.body.client_id);
-    const client = await clientOwned(uid, clientId);
-    if (!client) return res.status(400).json({ error: 'Client invalide pour cette entreprise.' });
     const lignes = Array.isArray(req.body.lignes) ? req.body.lignes : [];
     if (!lignes.length || lignes.length > 100) return res.status(400).json({ error: 'Une commande doit contenir entre 1 et 100 lignes.' });
+
     let total = 0;
     const normalized = [];
     for (const line of lignes) {
@@ -169,14 +159,49 @@ router.post('/orders', async (req, res, next) => {
       normalized.push({ designation, quantite, prix_unitaire: prix, total: ligneTotal, produit_id: idOk(line.produit_id) ? Number(line.produit_id) : null });
     }
     total = Math.round(total * 100) / 100;
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    // Même verrou de compte que les réglages de devise et le quota des factures.
+    // L'ordre est alors sérialisé avec un changement de devise : soit l'ordre est
+    // enregistré avant (et bloque le changement), soit il lit la nouvelle devise.
+    const [[company]] = await conn.query('SELECT devise FROM users WHERE id = ? FOR UPDATE', [uid]);
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+    const baseCurrency = String(company.devise || 'FCFA').trim().toUpperCase();
+    const currency = String(req.body.devise || baseCurrency).trim().toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(currency)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise de commande non prise en charge.' });
+    }
+    if (currency !== baseCurrency) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'La devise du document doit correspondre à la devise de base de l’entreprise. Les conversions multi-devises ne sont pas encore activées.'
+      });
+    }
+    const [clientRows] = await conn.query('SELECT id FROM clients WHERE id = ? AND user_id = ?', [clientId, uid]);
+    if (!clientRows.length) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Client invalide pour cette entreprise.' });
+    }
+
     const orderNumber = randomRef('CMD');
-    const [result] = await pool.query(
+    const [result] = await conn.query(
       'INSERT INTO pro_commandes (user_id, client_id, numero, statut, date_commande, date_livraison_prevue, devise, total, lignes_json, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [uid, clientId, orderNumber, 'confirmee', await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, String(req.body.devise || 'FCFA').slice(0, 10), total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
+      [uid, clientId, orderNumber, 'confirmee', await safeDateForUser(req.body.date_commande, uid), req.body.date_livraison_prevue || null, currency, total, JSON.stringify(normalized), String(req.body.notes || '').slice(0, 2000) || null]
     );
+    await conn.commit();
     await audit(req, 'commande.creee', 'commande', result.insertId, { numero: orderNumber });
-    res.status(201).json({ id: result.insertId, total, lignes: normalized });
-  } catch (err) { next(err); }
+    res.status(201).json({ id: result.insertId, total, devise: currency, lignes: normalized });
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 router.put('/orders/:id/status', async (req, res, next) => {
@@ -210,14 +235,14 @@ router.post('/orders/:id/delivery-note', async (req, res, next) => {
 
 router.get('/delivery-notes', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT b.*, c.nom AS client_nom FROM pro_bons_livraison b LEFT JOIN pro_commandes o ON o.id = b.commande_id LEFT JOIN clients c ON c.id = o.client_id WHERE b.user_id = ? ORDER BY b.date_livraison DESC, b.id DESC LIMIT 250', [owner(req)]);
+    const [rows] = await pool.query('SELECT b.*, c.nom AS client_nom FROM pro_bons_livraison b LEFT JOIN pro_commandes o ON o.id = b.commande_id AND o.user_id = b.user_id LEFT JOIN clients c ON c.id = o.client_id AND c.user_id = o.user_id WHERE b.user_id = ? ORDER BY b.date_livraison DESC, b.id DESC LIMIT 250', [owner(req)]);
     res.json({ bons_livraison: rows.map(r => ({ ...r, lignes: parseJson(r.lignes_json, []) })) });
   } catch (err) { next(err); }
 });
 
 router.get('/credit-notes', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT a.*, f.numero AS facture_numero FROM pro_avoirs a JOIN factures f ON f.id = a.facture_id WHERE a.user_id = ? ORDER BY a.date_emission DESC, a.id DESC LIMIT 250', [owner(req)]);
+    const [rows] = await pool.query('SELECT a.*, f.numero AS facture_numero FROM pro_avoirs a JOIN factures f ON f.id = a.facture_id AND f.user_id = a.user_id WHERE a.user_id = ? ORDER BY a.date_emission DESC, a.id DESC LIMIT 250', [owner(req)]);
     res.json({ avoirs: rows });
   } catch (err) { next(err); }
 });
@@ -267,7 +292,7 @@ router.put('/credit-notes/:id/status', async (req, res, next) => {
 router.get('/deposits', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT a.*, f.numero AS facture_numero, c.nom AS client_nom FROM pro_acomptes a JOIN factures f ON f.id = a.facture_id JOIN clients c ON c.id = f.client_id WHERE a.user_id = ? ORDER BY a.date_emission DESC, a.id DESC LIMIT 250',
+      'SELECT a.*, f.numero AS facture_numero, c.nom AS client_nom FROM pro_acomptes a JOIN factures f ON f.id = a.facture_id AND f.user_id = a.user_id JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id WHERE a.user_id = ? ORDER BY a.date_emission DESC, a.id DESC LIMIT 250',
       [owner(req)]
     );
     res.json({ acomptes: rows });
@@ -362,7 +387,7 @@ router.get('/clients/:id/statement', async (req, res, next) => {
       [uid, uid, clientId]
     );
     const [remboursements] = await pool.query(
-      "SELECT r.id, r.paiement_id, r.montant, r.motif, r.reference_prestataire, r.traite_le, f.numero FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id JOIN factures f ON f.id = p.facture_id WHERE r.user_id = ? AND f.user_id = ? AND r.statut = 'rembourse' AND f.client_id = ? AND f.type = 'facture' ORDER BY r.traite_le DESC",
+      "SELECT r.id, r.paiement_id, r.montant, r.motif, r.reference_prestataire, r.traite_le, f.numero FROM pro_refund_requests r JOIN paiements p ON p.id = r.paiement_id AND p.user_id = r.user_id JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id WHERE r.user_id = ? AND f.user_id = ? AND r.statut = 'rembourse' AND f.client_id = ? AND f.type = 'facture' ORDER BY r.traite_le DESC",
       [uid, uid, clientId]
     );
     const totalFacture = factures.filter(f => f.type === 'facture' && f.statut !== 'annulee').reduce((s, f) => s + Number(f.total), 0);
@@ -377,12 +402,23 @@ router.post('/clients/:id/remind', async (req, res, next) => {
     const uid = owner(req), clientId = Number(req.params.id), canal = req.body.canal || 'email';
     const client = await clientOwned(uid, clientId);
     if (!client) return res.status(404).json({ error: 'Client introuvable.' });
-    const [rows] = await pool.query("SELECT numero, total, montant_paye, date_echeance FROM factures WHERE user_id = ? AND client_id = ? AND type = 'facture' AND statut IN ('en_attente','en_retard') ORDER BY date_echeance ASC", [uid, clientId]);
+    const [rows] = await pool.query("SELECT numero, total, montant_paye, date_echeance, devise FROM factures WHERE user_id = ? AND client_id = ? AND type = 'facture' AND statut IN ('en_attente','en_retard') ORDER BY date_echeance ASC", [uid, clientId]);
     const dues = rows.filter(f => Number(f.total) > Number(f.montant_paye));
     if (!dues.length) return res.status(400).json({ error: 'Aucune facture impayée pour ce client.' });
-    const total = dues.reduce((s, f) => s + Number(f.total) - Number(f.montant_paye), 0);
-    const list = dues.map(f => f.numero + ' : ' + (Number(f.total) - Number(f.montant_paye)).toLocaleString('fr-FR') + ' FCFA').join('\n');
-    const message = 'Bonjour ' + client.nom + ', petit rappel concernant vos factures en attente :\n' + list + '\nSolde total : ' + total.toLocaleString('fr-FR') + ' FCFA. Merci.';
+    const byCurrency = new Map();
+    for (const facture of dues) {
+      const devise = normalizeCurrency(facture.devise);
+      const groupe = byCurrency.get(devise) || { lignes: [], solde: 0 };
+      const reste = Number(facture.total) - Number(facture.montant_paye);
+      groupe.lignes.push(facture.numero + ' : ' + formatAmountWithCurrency(reste, devise));
+      groupe.solde += reste;
+      byCurrency.set(devise, groupe);
+    }
+    const details = Array.from(byCurrency.entries()).map(([devise, groupe]) =>
+      'Factures en ' + devise + ' :\n' + groupe.lignes.join('\n') +
+      '\nSolde total : ' + formatAmountWithCurrency(groupe.solde, devise)
+    ).join('\n\n');
+    const message = 'Bonjour ' + client.nom + ', petit rappel concernant vos factures en attente :\n' + details + '\n\nMerci.';
     if (canal === 'whatsapp') {
       const phone = String(client.whatsapp || client.telephone || '').replace(/[^0-9]/g, '');
       if (!phone) return res.status(400).json({ error: 'Aucun numéro WhatsApp disponible pour ce client.' });
@@ -401,7 +437,7 @@ router.post('/clients/:id/remind', async (req, res, next) => {
 /* -------------------------- PAIEMENTS ---------------------------------- */
 router.get('/payments', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT p.id, p.facture_id, p.montant, p.methode, p.reference, p.date_paiement, f.numero, c.nom AS client_nom FROM paiements p JOIN factures f ON f.id = p.facture_id JOIN clients c ON c.id = f.client_id WHERE p.user_id = ? ORDER BY p.date_paiement DESC LIMIT 300', [owner(req)]);
+    const [rows] = await pool.query('SELECT p.id, p.facture_id, p.montant, p.methode, p.reference, p.date_paiement, f.numero, c.nom AS client_nom FROM paiements p JOIN factures f ON f.id = p.facture_id AND f.user_id = p.user_id JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id WHERE p.user_id = ? ORDER BY p.date_paiement DESC LIMIT 300', [owner(req)]);
     const [refunds] = await pool.query('SELECT id, paiement_id, montant, motif, statut, created_at FROM pro_refund_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 100', [owner(req)]);
     res.json({ paiements: rows, remboursements: refunds });
   } catch (err) { next(err); }
@@ -630,7 +666,7 @@ router.put('/refunds/:id/status', async (req, res, next) => {
 
 router.get('/payment-links', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT l.id, l.facture_id, l.montant, l.devise, l.statut, l.expire_at, l.created_at, f.numero FROM pro_payment_links l JOIN factures f ON f.id = l.facture_id WHERE l.user_id = ? ORDER BY l.created_at DESC LIMIT 100', [owner(req)]);
+    const [rows] = await pool.query('SELECT l.id, l.facture_id, l.montant, l.devise, l.statut, l.expire_at, l.created_at, f.numero FROM pro_payment_links l JOIN factures f ON f.id = l.facture_id AND f.user_id = l.user_id WHERE l.user_id = ? ORDER BY l.created_at DESC LIMIT 100', [owner(req)]);
     res.json({ liens: rows });
   } catch (err) { next(err); }
 });
@@ -653,7 +689,20 @@ router.post('/payment-links', async (req, res, next) => {
     const token = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
     const expires = req.body.expire_jours ? new Date(Date.now() + Math.min(90, Math.max(1, Number(req.body.expire_jours))) * 86400000) : null;
-    const devise = String(req.body.devise || 'FCFA').slice(0, 10);
+    const rawCurrency = req.body.devise;
+    const devise = normalizeCurrency(
+      rawCurrency === undefined || rawCurrency === null || String(rawCurrency).trim() === ''
+        ? invoice.devise
+        : rawCurrency
+    );
+    if (!SUPPORTED_CURRENCIES.includes(devise)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise non prise en charge.' });
+    }
+    if (devise !== normalizeCurrency(invoice.devise)) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'La devise du lien doit correspondre à celle de la facture.' });
+    }
     const [result] = await conn.query('INSERT INTO pro_payment_links (user_id, facture_id, token_hash, montant, devise, expire_at) VALUES (?, ?, ?, ?, ?, ?)', [uid, invoiceId, tokenHash, amount, devise, expires]);
     await conn.commit();
     const base = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
@@ -692,28 +741,69 @@ router.post('/establishments', async (req, res, next) => {
 router.get('/cash/registers', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT c.*, e.nom AS etablissement_nom, c.solde_initial + COALESCE(SUM(CASE WHEN o.type = ? THEN o.montant WHEN o.type = ? THEN -o.montant ELSE 0 END),0) AS solde_actuel FROM pro_caisses c LEFT JOIN pro_etablissements e ON e.id = c.etablissement_id LEFT JOIN pro_caisse_operations o ON o.caisse_id = c.id AND o.user_id = c.user_id WHERE c.user_id = ? GROUP BY c.id ORDER BY c.nom',
+      'SELECT c.*, e.nom AS etablissement_nom, c.solde_initial + COALESCE(SUM(CASE WHEN o.type = ? THEN o.montant WHEN o.type = ? THEN -o.montant ELSE 0 END),0) AS solde_actuel FROM pro_caisses c LEFT JOIN pro_etablissements e ON e.id = c.etablissement_id AND e.user_id = c.user_id LEFT JOIN pro_caisse_operations o ON o.caisse_id = c.id AND o.user_id = c.user_id WHERE c.user_id = ? GROUP BY c.id ORDER BY c.nom',
       ['entree', 'sortie', owner(req)]
     );
     res.json({ caisses: rows });
   } catch (err) { next(err); }
 });
 router.post('/cash/registers', async (req, res, next) => {
+  let conn;
   try {
+    const uid = owner(req);
     const nom = String(req.body.nom || '').trim().slice(0, 120);
     if (!nom) return res.status(400).json({ error: 'Le nom de la caisse est obligatoire.' });
-    let establishmentId = null;
-    if (req.body.etablissement_id) {
-      const [e] = await pool.query('SELECT id FROM pro_etablissements WHERE id = ? AND user_id = ?', [req.body.etablissement_id, owner(req)]);
-      if (!e.length) return res.status(400).json({ error: 'Établissement invalide.' });
-      establishmentId = e[0].id;
-    }
     const initial = Number(req.body.solde_initial || 0);
     if (!Number.isFinite(initial) || initial < 0) return res.status(400).json({ error: 'Solde initial invalide.' });
-    const [result] = await pool.query('INSERT INTO pro_caisses (user_id, etablissement_id, nom, devise, solde_initial) VALUES (?, ?, ?, ?, ?)', [owner(req), establishmentId, nom, String(req.body.devise || 'FCFA').slice(0, 10), initial]);
-    await audit(req, 'caisse.creee', 'caisse', result.insertId, { nom });
-    res.status(201).json({ id: result.insertId, nom });
-  } catch (err) { next(err); }
+
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    // Le formulaire ne demande pas de devise : utiliser celle du compte verrouillé
+    // évite de créer silencieusement une caisse FCFA pour une entreprise en EUR.
+    const [[company]] = await conn.query(
+      'SELECT devise FROM users WHERE id = ? FOR UPDATE',
+      [uid]
+    );
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+
+    const baseCurrency = String(company.devise || 'FCFA').trim().toUpperCase();
+    const currency = req.body.devise === undefined || req.body.devise === null || String(req.body.devise).trim() === ''
+      ? baseCurrency
+      : String(req.body.devise).trim().toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(currency)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise de caisse non prise en charge.' });
+    }
+
+    let establishmentId = null;
+    if (req.body.etablissement_id) {
+      const [establishments] = await conn.query(
+        'SELECT id FROM pro_etablissements WHERE id = ? AND user_id = ?',
+        [req.body.etablissement_id, uid]
+      );
+      if (!establishments.length) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Établissement invalide.' });
+      }
+      establishmentId = establishments[0].id;
+    }
+
+    const [result] = await conn.query(
+      'INSERT INTO pro_caisses (user_id, etablissement_id, nom, devise, solde_initial) VALUES (?, ?, ?, ?, ?)',
+      [uid, establishmentId, nom, currency, initial]
+    );
+    await conn.commit();
+    await audit(req, 'caisse.creee', 'caisse', result.insertId, { nom, devise: currency });
+    res.status(201).json({ id: result.insertId, nom, devise: currency });
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 router.post('/cash/registers/:id/operations', async (req, res, next) => {
   let conn;
@@ -746,7 +836,7 @@ router.post('/cash/registers/:id/operations', async (req, res, next) => {
 });
 router.get('/cash/operations', async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT o.*, c.nom AS caisse_nom FROM pro_caisse_operations o JOIN pro_caisses c ON c.id = o.caisse_id WHERE o.user_id = ? ORDER BY o.operation_date DESC LIMIT 300', [owner(req)]);
+    const [rows] = await pool.query('SELECT o.*, c.nom AS caisse_nom FROM pro_caisse_operations o JOIN pro_caisses c ON c.id = o.caisse_id AND c.user_id = o.user_id WHERE o.user_id = ? ORDER BY o.operation_date DESC LIMIT 300', [owner(req)]);
     res.json({ operations: rows });
   } catch (err) { next(err); }
 });
@@ -1033,8 +1123,8 @@ router.post('/team/invitations/accept/verify', async (req, res, next) => {
       [invite.user_id, actor(req), invite.role, permissionsJson]
     );
     const [accepted] = await conn.query(
-      "UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ? AND statut = 'envoyee'",
-      [actor(req), invite.id]
+      "UPDATE pro_team_invitations SET statut = 'acceptee', accepted_user_id = ?, accepted_at = NOW() WHERE id = ? AND user_id = ? AND statut = 'envoyee'",
+      [actor(req), invite.id, invite.user_id]
     );
     if (accepted.affectedRows !== 1) {
       await conn.rollback();
@@ -1042,8 +1132,8 @@ router.post('/team/invitations/accept/verify', async (req, res, next) => {
     }
     await conn.query(
       "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_accepted', updated_at = NOW() " +
-      "WHERE ((entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
-      [invite.id, proof.id]
+      "WHERE owner_user_id = ? AND ((entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
+      [invite.user_id, invite.id, proof.id]
     );
     await conn.query(
       'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -1442,8 +1532,8 @@ router.post('/company-group/invitations/:invitationId/retry-email', async (req, 
        SET statut = 'queued', tentatives = 0, prochaine_tentative = NOW(),
            verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = NULL,
            updated_at = NOW()
-       WHERE id = ? AND statut = 'failed'`,
-      [invitation.email_id]
+       WHERE id = ? AND owner_user_id = ? AND statut = 'failed'`,
+      [invitation.email_id, actor(req)]
     );
     if (updated.affectedRows !== 1) {
       await conn.rollback();
@@ -1684,16 +1774,16 @@ router.post('/company-group/invitations/accept/verify', async (req, res, next) =
       [invite.group_id, actor(req)]
     );
     await conn.query(
-      "UPDATE pro_company_group_invitations SET statut = 'acceptee', accepted_company_owner_id = ?, accepted_at = NOW() WHERE id = ? AND statut = 'envoyee'",
-      [actor(req), invite.id]
+      "UPDATE pro_company_group_invitations SET statut = 'acceptee', accepted_company_owner_id = ?, accepted_at = NOW() WHERE id = ? AND group_id = ? AND statut = 'envoyee'",
+      [actor(req), invite.id, invite.group_id]
     );
     await conn.query(
       "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, " +
       "dernier_code_erreur = 'invitation_accepted', updated_at = NOW() " +
-      "WHERE entity_type IN ('company_group_invitation', 'company_group_invitation_verification') " +
+      "WHERE owner_user_id = ? AND entity_type IN ('company_group_invitation', 'company_group_invitation_verification') " +
       "AND ((entity_type = 'company_group_invitation' AND entity_id = ?) " +
       "OR (entity_type = 'company_group_invitation_verification' AND entity_id = ?)) AND statut IN ('queued', 'retry')",
-      [invite.id, proof.id]
+      [invite.owner_user_id, invite.id, proof.id]
     );
     await conn.query(
       'INSERT INTO pro_audit_logs (user_id, acteur_user_id, action, entite, entite_id, details_json, adresse_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -1806,8 +1896,8 @@ router.delete('/company-group/invitations/:invitationId', async (req, res, next)
     // Annule seulement les messages qui n'ont pas encore été réclamés.
     // Un message déjà en cours de remise SMTP peut être impossible à rappeler.
     const [cancelled] = await conn.query(
-      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_revoked', updated_at = NOW() WHERE entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry')",
-      [invitation.id]
+      "UPDATE email_outbox SET statut = 'cancelled', verrouille_le = NULL, lock_token = NULL, dernier_code_erreur = 'invitation_revoked', updated_at = NOW() WHERE owner_user_id = ? AND entity_type = 'company_group_invitation' AND entity_id = ? AND statut IN ('queued', 'retry')",
+      [actor(req), invitation.id]
     );
     const [[emailState]] = await conn.query(
       "SELECT statut FROM email_outbox WHERE entity_type = 'company_group_invitation' AND entity_id = ? LIMIT 1",
@@ -2180,7 +2270,7 @@ router.get('/reports/custom', async (req, res, next) => {
     if (req.query.from && /^\d{4}-\d{2}-\d{2}$/.test(req.query.from)) { where += ' AND f.date_emission >= ?'; params.push(req.query.from); }
     if (req.query.to && /^\d{4}-\d{2}-\d{2}$/.test(req.query.to)) { where += ' AND f.date_emission <= ?'; params.push(req.query.to); }
     if (idOk(req.query.client_id)) { where += ' AND f.client_id = ?'; params.push(Number(req.query.client_id)); }
-    const [rows] = await pool.query('SELECT ' + dateExpr + ' AS label, COUNT(*) AS nb_factures, SUM(f.total) AS total, SUM(f.montant_paye) AS encaisse FROM factures f JOIN clients c ON c.id = f.client_id WHERE f.user_id = ? AND f.type = ? AND f.statut != ?' + where + ' GROUP BY label ORDER BY label', [params[0], params[1], 'annulee', ...params.slice(2)]);
+    const [rows] = await pool.query('SELECT ' + dateExpr + ' AS label, COUNT(*) AS nb_factures, SUM(f.total) AS total, SUM(f.montant_paye) AS encaisse FROM factures f JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id WHERE f.user_id = ? AND f.type = ? AND f.statut != ?' + where + ' GROUP BY label ORDER BY label', [params[0], params[1], 'annulee', ...params.slice(2)]);
     res.json({ groupe: group, rows });
   } catch (err) { next(err); }
 });
@@ -2478,7 +2568,7 @@ router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
 router.get('/checkouts/:reference/status', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT c.statut, c.montant, c.devise, c.fournisseur, c.created_at, c.paid_at, f.numero AS facture_numero FROM pro_invoice_checkouts c JOIN factures f ON f.id = c.facture_id WHERE c.reference_interne = ? AND c.user_id = ? LIMIT 1',
+      'SELECT c.statut, c.montant, c.devise, c.fournisseur, c.created_at, c.paid_at, f.numero AS facture_numero FROM pro_invoice_checkouts c JOIN factures f ON f.id = c.facture_id AND f.user_id = c.user_id WHERE c.reference_interne = ? AND c.user_id = ? LIMIT 1',
       [req.params.reference, owner(req)]
     );
     if (!rows.length) return res.status(404).json({ error: 'Session de paiement introuvable.' });
@@ -2626,7 +2716,7 @@ router.post('/warehouses', async (req, res, next) => {
 router.get('/purchase-orders', async (req, res, next) => {
   try {
     const [rows] = await pool.query(
-      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id WHERE o.user_id = ? ORDER BY o.date_commande DESC, o.id DESC LIMIT 250',
+      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id AND s.user_id = o.user_id WHERE o.user_id = ? ORDER BY o.date_commande DESC, o.id DESC LIMIT 250',
       [owner(req)]
     );
     res.json({ commandes: rows });
@@ -2636,7 +2726,7 @@ router.get('/purchase-orders', async (req, res, next) => {
 router.get('/purchase-orders/:id', async (req, res, next) => {
   try {
     const [orders] = await pool.query(
-      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id WHERE o.id = ? AND o.user_id = ?',
+      'SELECT o.*, s.nom AS fournisseur_nom FROM pro_commandes_fournisseurs o JOIN pro_fournisseurs s ON s.id = o.fournisseur_id AND s.user_id = o.user_id WHERE o.id = ? AND o.user_id = ?',
       [req.params.id, owner(req)]
     );
     if (!orders.length) return res.status(404).json({ error: 'Commande fournisseur introuvable.' });
@@ -2649,14 +2739,7 @@ router.post('/purchase-orders', async (req, res, next) => {
   let conn;
   try {
     const uid = owner(req), supplierId = Number(req.body.fournisseur_id), lines = Array.isArray(req.body.lignes) ? req.body.lignes : [];
-    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [uid]);
-    const companyCurrency = String(company?.devise || 'FCFA').toUpperCase();
-    const orderCurrency = String(req.body.devise || companyCurrency).toUpperCase();
-    if (!SUPPORTED_CURRENCIES.includes(orderCurrency)) return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
-    if (orderCurrency !== companyCurrency) return res.status(409).json({ error: 'La devise de la commande doit correspondre à la devise de base de l’entreprise. Les conversions ne sont pas encore activées.' });
     if (!idOk(supplierId) || !lines.length || lines.length > 100) return res.status(400).json({ error: 'Fournisseur et 1 à 100 lignes obligatoires.' });
-    const [[supplier]] = await pool.query('SELECT id FROM pro_fournisseurs WHERE id = ? AND user_id = ? AND actif = 1', [supplierId, uid]);
-    if (!supplier) return res.status(400).json({ error: 'Fournisseur inconnu ou inactif.' });
     let totalHt = 0, totalTax = 0;
     const normalized = [];
     const productIds = [];
@@ -2683,6 +2766,28 @@ router.post('/purchase-orders', async (req, res, next) => {
     const numero = randomRef('ACH');
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    // Verrou partagé avec les paramètres de devise : un changement de devise ne
+    // peut pas passer entre la lecture du compte et l'insertion de l'achat.
+    const [[company]] = await conn.query('SELECT devise FROM users WHERE id = ? FOR UPDATE', [uid]);
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+    const companyCurrency = String(company.devise || 'FCFA').toUpperCase();
+    const orderCurrency = String(req.body.devise || companyCurrency).toUpperCase();
+    if (!SUPPORTED_CURRENCIES.includes(orderCurrency)) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Devise de commande fournisseur non prise en charge.' });
+    }
+    if (orderCurrency !== companyCurrency) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'La devise de la commande doit correspondre à la devise de base de l’entreprise. Les conversions ne sont pas encore activées.' });
+    }
+    const [[supplier]] = await conn.query('SELECT id FROM pro_fournisseurs WHERE id = ? AND user_id = ? AND actif = 1', [supplierId, uid]);
+    if (!supplier) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Fournisseur inconnu ou inactif.' });
+    }
     if (uniqueProductIds.length) {
       const [owned] = await conn.query(
         `SELECT id, type_catalogue FROM produits
@@ -3546,6 +3651,9 @@ router.post('/accounting/entries', async (req, res, next) => {
     if (Math.abs(debit - credit) > 0.01) return res.status(400).json({ error: 'Écriture déséquilibrée : total débit et crédit doivent être identiques.' });
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    // Les écritures manuelles sont elles aussi un historique qui fige la devise.
+    const [[account]] = await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [uid]);
+    if (!account) { await conn.rollback(); return res.status(404).json({ error: 'Entreprise introuvable.' }); }
     const [journalRows] = await conn.query('SELECT id FROM pro_compta_journaux WHERE id = ? AND user_id = ? AND actif = 1', [req.body.journal_id, uid]);
     if (!journalRows.length) { await conn.rollback(); return res.status(400).json({ error: 'Journal invalide.' }); }
     const ids = [...new Set(clean.map(line => line.account))];
@@ -3997,6 +4105,19 @@ router.put('/crm/activities/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+/* ---------------------- CONTEXTE ENTREPRISE ---------------------------- */
+router.get('/company-context', async (req, res, next) => {
+  try {
+    const [[company]] = await pool.query(
+      'SELECT devise, fuseau_horaire FROM users WHERE id = ? LIMIT 1',
+      [owner(req)]
+    );
+    if (!company) return res.status(404).json({ error: 'Entreprise introuvable.' });
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ devise: String(company.devise || 'FCFA').toUpperCase(), fuseau_horaire: company.fuseau_horaire || 'Africa/Dakar' });
+  } catch (err) { next(err); }
+});
+
 /* ---------------------- PARAMÈTRES INTERNATIONAUX ---------------------- */
 router.get('/localization', async (req, res, next) => {
   try {
@@ -4013,40 +4134,69 @@ router.get('/localization', async (req, res, next) => {
 });
 
 router.put('/localization', async (req, res, next) => {
+  let conn;
   try {
-    const country = String(req.body.pays_code || 'SN').toUpperCase();
-    const language = String(req.body.langue || 'fr').toLowerCase();
-    const currency = String(req.body.devise || 'FCFA').toUpperCase();
-    const timezone = String(req.body.fuseau_horaire || 'Africa/Dakar');
-    const dateFormat = String(req.body.format_date || 'dd/MM/yyyy');
-    const taxRegime = String(req.body.regime_fiscal || 'standard');
+    const uid = owner(req);
+    const body = req.body || {};
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // Le changement de devise partage le verrou de compte utilisé par les
+    // créations de commandes, d'achats et de factures.
+    const [[company]] = await conn.query(
+      'SELECT devise FROM users WHERE id = ? FOR UPDATE',
+      [uid]
+    );
+    if (!company) {
+      await conn.rollback();
+      return res.status(404).json({ error: 'Entreprise introuvable.' });
+    }
+
+    const currentCurrency = String(company.devise || 'FCFA').toUpperCase();
+    const country = String(body.pays_code || 'SN').toUpperCase();
+    const language = String(body.langue || 'fr').toLowerCase();
+    const currency = body.devise === undefined || body.devise === null || String(body.devise).trim() === ''
+      ? currentCurrency
+      : String(body.devise).trim().toUpperCase();
+    const timezone = String(body.fuseau_horaire || 'Africa/Dakar');
+    const dateFormat = String(body.format_date || 'dd/MM/yyyy');
+    const taxRegime = String(body.regime_fiscal || 'standard');
     if (!SUPPORTED_COUNTRIES.includes(country) || !['fr','en'].includes(language) ||
         !SUPPORTED_CURRENCIES.includes(currency) || !SUPPORTED_TIMEZONES.includes(timezone) ||
         !['dd/MM/yyyy','yyyy-MM-dd','MM/dd/yyyy'].includes(dateFormat) ||
         !['standard','simplifie','franchise','autre'].includes(taxRegime)) {
+      await conn.rollback();
       return res.status(400).json({ error: 'Un paramètre pays, langue, devise, fuseau horaire ou fiscalité est invalide.' });
     }
     const locale = language + '-' + country;
-    const [[company]] = await pool.query('SELECT devise FROM users WHERE id = ? LIMIT 1', [owner(req)]);
-    const currentCurrency = String(company?.devise || 'FCFA').toUpperCase();
+
     if (currency !== currentCurrency) {
-      const [[history]] = await pool.query(
-        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
-        [owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req), owner(req)]
+      const [[history]] = await conn.query(
+        'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_commandes WHERE user_id = ?) AS commandes, (SELECT COUNT(*) FROM pro_bons_livraison WHERE user_id = ?) AS livraisons, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
+        [uid, uid, uid, uid, uid, uid, uid, uid, uid, uid]
       );
-      if (Number(history.factures) + Number(history.depenses) + Number(history.paiements) + Number(history.achats) + Number(history.mouvements_stock) + Number(history.ecritures) + Number(history.produits) + Number(history.modeles_recurrents) > 0) {
+      const hasBusinessHistory = Object.values(history || {}).some(value => Number(value) > 0);
+      if (hasBusinessHistory) {
+        await conn.rollback();
         return res.status(409).json({
           error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents, produits tarifés, modèles récurrents ou mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
         });
       }
     }
-    await pool.query(
+
+    await conn.query(
       'UPDATE users SET pays_code = ?, langue = ?, locale = ?, devise = ?, fuseau_horaire = ?, format_date = ?, regime_fiscal = ? WHERE id = ?',
-      [country, language, locale, currency, timezone, dateFormat, taxRegime, owner(req)]
+      [country, language, locale, currency, timezone, dateFormat, taxRegime, uid]
     );
-    await audit(req, 'entreprise.localisation_modifiee', 'entreprise', owner(req), { country, language, currency, timezone, dateFormat, taxRegime });
+    await conn.commit();
+    await audit(req, 'entreprise.localisation_modifiee', 'entreprise', uid, { country, language, currency, timezone, dateFormat, taxRegime });
     res.json({ success: true, parametres: { pays_code: country, langue: language, locale, devise: currency, fuseau_horaire: timezone, format_date: dateFormat, regime_fiscal: taxRegime } });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    next(err);
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 module.exports = router;

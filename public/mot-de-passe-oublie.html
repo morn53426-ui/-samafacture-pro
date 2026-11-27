@@ -55,10 +55,10 @@
     const restore = setButtonLoading(form.querySelector('button[type=submit]'), 'Envoi en cours…');
     try {
       const { message } = await Api.post('/auth/mot-de-passe-oublie', { email });
-      successBox.innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:0.85rem;">${message}</div>`;
+      successBox.innerHTML = `<div style="background:var(--emerald-light); color:var(--emerald); padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:0.85rem;">${escapeHtml(message)}</div>`;
       form.reset();
     } catch (err) {
-      errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+      errorBox.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }

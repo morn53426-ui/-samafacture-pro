@@ -17,7 +17,9 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
   const suffix = crypto.randomBytes(8).toString('hex');
   const sourceDb = 'sf_restore_source_' + suffix;
   const targetDb = 'sf_restore_target_' + suffix;
-  const keys = ['DB_NAME', 'BACKUP_DIR', 'BACKUP_ENCRYPTION_KEY', 'MYSQLDUMP_PATH', 'MYSQL_PATH'];
+  const backupUser = 'sf_backup_' + suffix;
+  const backupPassword = crypto.randomBytes(24).toString('hex');
+  const keys = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'BACKUP_DIR', 'BACKUP_ENCRYPTION_KEY', 'MYSQLDUMP_PATH', 'MYSQL_PATH'];
   const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST || '127.0.0.1',
@@ -30,6 +32,22 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
     await fs.mkdir(tempRoot, { recursive: true, mode: 0o700 });
     await connection.query('CREATE DATABASE ??', [sourceDb]);
     await connection.query('CREATE DATABASE ??', [targetDb]);
+    // Simule le compte applicatif Docker : accès limité à la base source, sans
+    // PROCESS ni SELECT global. Une sauvegarde doit réussir avec ce profil minimal.
+    await connection.query(
+      `CREATE USER '${backupUser}'@'%' IDENTIFIED BY '${backupPassword}'`
+    );
+    await connection.query(
+      `GRANT SELECT, SHOW VIEW, TRIGGER, EVENT ON ${sourceDb}.* TO '${backupUser}'@'%'`
+    );
+    const [backupGrants] = await connection.query(`SHOW GRANTS FOR '${backupUser}'@'%'`);
+    const globalGrants = backupGrants
+      .map(row => Object.values(row).join(' '))
+      .filter(grant => /ON \*\.\*/i.test(grant));
+    assert.equal(globalGrants.length, 1,
+      'le compte de sauvegarde ne doit avoir qu’une seule entrée globale USAGE');
+    assert.match(globalGrants[0], /^GRANT USAGE ON \*\.\*/i,
+      'aucun privilège global ne doit être accordé au compte de sauvegarde');
     await connection.query(
       'CREATE TABLE ?? (id INT PRIMARY KEY, label VARCHAR(120) NOT NULL, amount DECIMAL(14,2) NOT NULL)',
       [sourceDb + '.restore_roundtrip_fixture']
@@ -40,6 +58,8 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
     );
 
     process.env.DB_NAME = sourceDb;
+    process.env.DB_USER = backupUser;
+    process.env.DB_PASSWORD = backupPassword;
     process.env.BACKUP_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
     process.env.MYSQLDUMP_PATH = process.env.MYSQLDUMP_PATH || 'mysqldump';
     process.env.MYSQL_PATH = process.env.MYSQL_PATH || 'mysql';
@@ -48,7 +68,10 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
     assert.ok(backup.path.endsWith('.sql.gz.enc'), 'la sauvegarde de recette doit être chiffrée');
     assert.ok(backup.size > 0, 'la sauvegarde chiffrée ne doit pas être vide');
 
+    // La restauration reste effectuée avec les identifiants administrateur du smoke test.
     process.env.DB_NAME = targetDb;
+    process.env.DB_USER = original.DB_USER || 'root';
+    process.env.DB_PASSWORD = original.DB_PASSWORD || '';
     await restaurer(backup.path);
 
     const [rows] = await connection.query(
@@ -65,6 +88,7 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+    await connection.query(`DROP USER IF EXISTS '${backupUser}'@'%'`).catch(() => {});
     await connection.query('DROP DATABASE IF EXISTS ??', [sourceDb]).catch(() => {});
     await connection.query('DROP DATABASE IF EXISTS ??', [targetDb]).catch(() => {});
     await connection.end();

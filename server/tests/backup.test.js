@@ -34,6 +34,41 @@ describe('Sauvegardes automatiques', () => {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
+  test('protège le répertoire et les fichiers de sauvegarde par des permissions privées', async (t) => {
+    if (process.platform === 'win32') {
+      t.skip('Les bits POSIX de permission ne sont pas disponibles sous Windows.');
+      return;
+    }
+    const savedMode = process.env.NODE_ENV;
+    const savedKey = process.env.BACKUP_ENCRYPTION_KEY;
+    const savedDump = process.env.MYSQLDUMP_PATH;
+    let generatedPath = null;
+    try {
+      process.env.NODE_ENV = 'test';
+      delete process.env.BACKUP_ENCRYPTION_KEY;
+      ecrireFauxDump(0);
+      process.env.MYSQLDUMP_PATH = fakeDump;
+      await fs.promises.chmod(BACKUP_DIR, 0o755);
+
+      const result = await effectuerSauvegarde();
+      generatedPath = result.path;
+      const dirStat = await fs.promises.stat(BACKUP_DIR);
+      const fileStat = await fs.promises.stat(result.path);
+      assert.equal(dirStat.mode & 0o777, 0o700,
+        'le dossier des sauvegardes doit être privé au compte applicatif');
+      assert.equal(fileStat.mode & 0o777, 0o600,
+        'l’archive doit rester lisible uniquement par le compte applicatif');
+    } finally {
+      if (generatedPath) await fs.promises.unlink(generatedPath).catch(() => {});
+      if (savedMode === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = savedMode;
+      if (savedKey === undefined) delete process.env.BACKUP_ENCRYPTION_KEY;
+      else process.env.BACKUP_ENCRYPTION_KEY = savedKey;
+      if (savedDump === undefined) delete process.env.MYSQLDUMP_PATH;
+      else process.env.MYSQLDUMP_PATH = savedDump;
+    }
+  });
+
   test('un échec de mysqldump ne marque pas la journée comme sauvegardée et permet une nouvelle tentative', async () => {
     const hier = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const aujourdHui = new Date().toISOString().slice(0, 10);

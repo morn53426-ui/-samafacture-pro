@@ -46,6 +46,6 @@ async function handleGoogleCredential(response) {
     Api.setSession(token, user);
     location.href = 'dashboard.html';
   } catch (err) {
-    if (errorBox) errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+    if (errorBox) errorBox.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
   }
 }

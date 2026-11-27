@@ -102,6 +102,9 @@ function permissionForRequest(req) {
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
   }
   if (base.endsWith('/pro')) {
+    // Expose uniquement le code devise du tenant actif aux membres qui doivent
+    // afficher les montants, sans leur ouvrir les autres paramètres internationaux.
+    if (path === '/company-context') return null;
     if (path.startsWith('/team/invitations/accept') || path.startsWith('/team/companies')) return null;
     if (path.startsWith('/team')) return method === 'GET' ? 'team.read' : 'team.manage';
     if (/^\/invoices\/\d+\/checkout(?:\/|$)/.test(path)) return 'payments.write';
@@ -153,4 +156,4 @@ function requirePermission(req, res, next) {
   return res.status(403).json({ error: 'Cette action n’est pas autorisée pour votre rôle.' });
 }
 
-module.exports = { resolveTenant, requirePermission, ROLE_PERMISSIONS, parsePermissions };
+module.exports = { resolveTenant, requirePermission, ROLE_PERMISSIONS };

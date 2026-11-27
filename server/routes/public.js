@@ -127,7 +127,7 @@ router.get('/consulter/:id/:code', verifyLimiter, async (req, res, next) => {
               u.entreprise_conditions_reglement, u.entreprise_mentions_legales,
               u.signature_default, u.facture_template, u.facture_personnalisation
        FROM factures f
-       JOIN clients c ON c.id = f.client_id
+       JOIN clients c ON c.id = f.client_id AND c.user_id = f.user_id
        JOIN users u ON u.id = f.user_id
        WHERE f.id = ? AND f.verification_code = ?`,
       [req.params.id, req.params.code]
@@ -159,7 +159,7 @@ router.get('/consulter/:id/:code', verifyLimiter, async (req, res, next) => {
      if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(404).json({ error: 'Lien de paiement introuvable ou expiré.' });
      const hash = crypto.createHash('sha256').update(token).digest('hex');
      const [rows] = await pool.query(
-       'SELECT l.id, l.montant, l.devise, l.statut, l.expire_at, f.numero, f.total, f.montant_paye, u.entreprise_nom, u.nom AS user_nom, u.entreprise_telephone, u.entreprise_email, u.entreprise_adresse FROM pro_payment_links l JOIN factures f ON f.id = l.facture_id JOIN users u ON u.id = l.user_id WHERE l.token_hash = ? AND l.statut = ? AND (l.expire_at IS NULL OR l.expire_at > NOW()) LIMIT 1',
+       'SELECT l.id, l.montant, l.devise, l.statut, l.expire_at, f.numero, f.total, f.montant_paye, u.entreprise_nom, u.nom AS user_nom, u.entreprise_telephone, u.entreprise_email, u.entreprise_adresse FROM pro_payment_links l JOIN factures f ON f.id = l.facture_id AND f.user_id = l.user_id JOIN users u ON u.id = l.user_id WHERE l.token_hash = ? AND l.statut = ? AND (l.expire_at IS NULL OR l.expire_at > NOW()) LIMIT 1',
        [hash, 'actif']
      );
      if (!rows.length) return res.status(404).json({ error: 'Lien de paiement introuvable ou expiré.' });

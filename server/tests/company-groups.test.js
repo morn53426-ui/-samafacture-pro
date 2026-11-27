@@ -26,6 +26,8 @@ let starterToken;
 let subsidiaryClientId;
 let teamRecipientId;
 let teamConcurrentRecipientId;
+let teamExpiryRecipientId;
+let teamChangedRecipientId;
 
 function getVerificationTokens(verificationUrl) {
   const url = new URL(verificationUrl);
@@ -36,6 +38,24 @@ function getVerificationTokens(verificationUrl) {
     token: fragment.get('token'),
     verificationToken: fragment.get('verification_token')
   };
+}
+
+async function deferTeamInvitationOutbox(entityType, entityId) {
+  const [[message]] = await pool.query(
+    'SELECT statut FROM email_outbox WHERE entity_type = ? AND entity_id = ? LIMIT 1',
+    [entityType, entityId]
+  );
+  assert.ok(message, 'le message email de test doit exister dans l’outbox');
+  if (['queued', 'retry', 'processing'].includes(message.statut)) {
+    await pool.query(
+      `UPDATE email_outbox
+       SET statut = CASE WHEN statut = 'processing' THEN 'retry' ELSE statut END,
+           prochaine_tentative = DATE_ADD(NOW(), INTERVAL 1 HOUR),
+           verrouille_le = NULL, lock_token = NULL, updated_at = NOW()
+       WHERE entity_type = ? AND entity_id = ? AND statut IN ('queued', 'retry', 'processing')`,
+      [entityType, entityId]
+    );
+  }
 }
 
 async function register(prefix, companyName) {
@@ -101,7 +121,7 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v23 sans perdre les données existantes', async () => {
+test('une base v8 reçoit les migrations v9 à v24 sans perdre les données existantes', async () => {
   // Simule strictement une base v8 : schéma v8 sans les migrations v9-v22
   // (échéances récurrentes, multi-sociétés, outbox, preuves email, abonnements, catalogue, entrepôts, comptabilité et essai).
   const [[trialRows]] = await pool.query("SELECT COUNT(*) AS total FROM users WHERE trial_status = 'trialing' OR trial_started_at IS NOT NULL OR trial_ends_at IS NOT NULL");
@@ -132,6 +152,8 @@ test('une base v8 reçoit les migrations v9 à v23 sans perdre les données exis
   await pool.query('DROP TABLE IF EXISTS saas_subscription_consents');
   await pool.query('DROP TABLE IF EXISTS saas_subscriptions');
   await pool.query('DROP TABLE IF EXISTS saas_subscription_price_versions');
+  // La migration v24 doit recréer la table analytique absente d'une base v8.
+  await pool.query('DROP TABLE IF EXISTS sunupilot_analytics_pageviews');
 
   const [existingDueIndex] = await pool.query(
     `SELECT INDEX_NAME FROM information_schema.STATISTICS
@@ -172,10 +194,10 @@ test('une base v8 reçoit les migrations v9 à v23 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v23 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v24 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 23, 'la version doit inclure les migrations v19 à v22 après le socle v18.');
+  assert.equal(Number(meta.version), 24, 'la version doit inclure les migrations v19 à v24 après le socle v18.');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -237,6 +259,10 @@ test('une base v8 reçoit les migrations v9 à v23 sans perdre les données exis
   assert.equal(accountingEventsAfter.length, 1, 'la migration v19 doit créer la table des événements comptables.');
   const [expenseModeAfter] = await pool.query(`SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'depenses' AND COLUMN_NAME = 'mode_reglement'`);
   assert.equal(expenseModeAfter[0]?.COLUMN_DEFAULT, 'caisse', 'la migration v20 doit restaurer le mode par défaut caisse.');
+  const [analyticsTableAfter] = await pool.query(`SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sunupilot_analytics_pageviews'`);
+  assert.equal(analyticsTableAfter.length, 1, 'la migration v24 doit recréer la table analytique sur une base v8.');
+  const [analyticsColumnsAfter] = await pool.query(`SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sunupilot_analytics_pageviews' AND COLUMN_NAME IN ('visitor_hash', 'page_path', 'created_at')`);
+  assert.deepEqual(analyticsColumnsAfter.map(row => row.COLUMN_NAME).sort(), ['created_at', 'page_path', 'visitor_hash'], 'la table analytique v24 doit conserver uniquement les champs attendus.');
 });
 
 
@@ -409,6 +435,99 @@ test('les invitations classiques exigent une preuve email, un envoi outbox et un
     [groupOwnerId, teamConcurrentRecipientId]
   );
   assert.equal(Number(secondMembership.total), 1);
+
+  // Une preuve expirée ne doit jamais rattacher un membre d'équipe.
+  const expiryRecipient = await register('team-expiry', 'Compte preuve expirée');
+  teamExpiryRecipientId = expiryRecipient.user.id;
+  const expiryInvitation = await request(app)
+    .post('/api/pro/team/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: expiryRecipient.user.email, role: 'employe' });
+  assert.equal(expiryInvitation.status, 201, expiryInvitation.text);
+  await deferTeamInvitationOutbox('team_invitation', expiryInvitation.body.id);
+  const [[expiryInviteOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation' AND entity_id = ?",
+    [expiryInvitation.body.id]
+  );
+  const expiryToken = getVerificationTokens(decryptEmailPayload(expiryInviteOutbox.payload_enc).invitation_url).token;
+  const expiryChallenge = await request(app)
+    .post('/api/pro/team/invitations/accept')
+    .set('Authorization', 'Bearer ' + expiryRecipient.token)
+    .send({ token: expiryToken });
+  assert.equal(expiryChallenge.status, 202, expiryChallenge.text);
+  const [[expiryProof]] = await pool.query(
+    'SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ?',
+    [expiryInvitation.body.id]
+  );
+  await deferTeamInvitationOutbox('team_invitation_verification', expiryProof.id);
+  const [[expiryProofOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = ?",
+    [expiryProof.id]
+  );
+  const expiryVerificationToken = getVerificationTokens(
+    decryptEmailPayload(expiryProofOutbox.payload_enc).verification_url
+  ).verificationToken;
+  await pool.query(
+    'UPDATE pro_team_invitation_verifications SET expires_at = DATE_SUB(NOW(), INTERVAL 1 SECOND) WHERE id = ?',
+    [expiryProof.id]
+  );
+  const expiredProof = await request(app)
+    .post('/api/pro/team/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + expiryRecipient.token)
+    .send({ token: expiryToken, verification_token: expiryVerificationToken });
+  assert.equal(expiredProof.status, 404, 'une preuve email expirée ne doit pas créer le membre');
+  const [[expiredMembership]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_team_members WHERE owner_user_id = ? AND member_user_id = ? AND active = 1',
+    [groupOwnerId, teamExpiryRecipientId]
+  );
+  assert.equal(Number(expiredMembership.total), 0);
+
+  // Un changement d'adresse après émission de la preuve doit invalider le lien reçu auparavant.
+  const changedRecipient = await register('team-email-changed', 'Compte adresse modifiée');
+  teamChangedRecipientId = changedRecipient.user.id;
+  const changedInvitation = await request(app)
+    .post('/api/pro/team/invitations')
+    .set('Authorization', 'Bearer ' + groupOwnerToken)
+    .send({ email: changedRecipient.user.email, role: 'employe' });
+  assert.equal(changedInvitation.status, 201, changedInvitation.text);
+  await deferTeamInvitationOutbox('team_invitation', changedInvitation.body.id);
+  const [[changedInviteOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation' AND entity_id = ?",
+    [changedInvitation.body.id]
+  );
+  const changedToken = getVerificationTokens(decryptEmailPayload(changedInviteOutbox.payload_enc).invitation_url).token;
+  const changedChallenge = await request(app)
+    .post('/api/pro/team/invitations/accept')
+    .set('Authorization', 'Bearer ' + changedRecipient.token)
+    .send({ token: changedToken });
+  assert.equal(changedChallenge.status, 202, changedChallenge.text);
+  const [[changedProof]] = await pool.query(
+    'SELECT id FROM pro_team_invitation_verifications WHERE invitation_id = ?',
+    [changedInvitation.body.id]
+  );
+  await deferTeamInvitationOutbox('team_invitation_verification', changedProof.id);
+  const [[changedProofOutbox]] = await pool.query(
+    "SELECT payload_enc FROM email_outbox WHERE entity_type = 'team_invitation_verification' AND entity_id = ?",
+    [changedProof.id]
+  );
+  const changedVerificationToken = getVerificationTokens(
+    decryptEmailPayload(changedProofOutbox.payload_enc).verification_url
+  ).verificationToken;
+  const replacementEmail = emailDeTest('team-email-replacement');
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [replacementEmail, teamChangedRecipientId]);
+  const staleAddressProof = await request(app)
+    .post('/api/pro/team/invitations/accept/verify')
+    .set('Authorization', 'Bearer ' + changedRecipient.token)
+    .send({ token: changedToken, verification_token: changedVerificationToken });
+  assert.equal(staleAddressProof.status, 403,
+    'une preuve envoyée à l’ancienne adresse ne doit plus être valable après changement du compte');
+  const [[changedMembership]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_team_members WHERE owner_user_id = ? AND member_user_id = ? AND active = 1',
+    [groupOwnerId, teamChangedRecipientId]
+  );
+  assert.equal(Number(changedMembership.total), 0);
+  await pool.query('UPDATE users SET email = ? WHERE id = ?', [changedRecipient.user.email, teamChangedRecipientId]);
+
   const [cancelledEmails] = await pool.query(
     "SELECT entity_type, statut FROM email_outbox WHERE (entity_type = 'team_invitation' AND entity_id = ?) OR (entity_type = 'team_invitation_verification' AND entity_id = ?)",
     [secondInvitation.body.id, secondProof.id]
@@ -1264,6 +1383,8 @@ after(async () => {
     await nettoyerUtilisateur(starterId);
     await nettoyerUtilisateur(teamRecipientId);
     await nettoyerUtilisateur(teamConcurrentRecipientId);
+    await nettoyerUtilisateur(teamExpiryRecipientId);
+    await nettoyerUtilisateur(teamChangedRecipientId);
   } finally {
     await teardownTestEnvironment();
   }

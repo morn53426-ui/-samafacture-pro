@@ -2,7 +2,7 @@ name: ESLint — JavaScript modifié
 
 on:
   pull_request:
-    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121']
+    branches: [main, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape']
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'
@@ -10,21 +10,63 @@ on:
       - 'public/js/workspace-modals.js'
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/local-date-format.test.js'
+      - 'server/tests/optional-fields.test.js'
       - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/parametres-accessibility.test.js'
+      - 'server/tests/sidebar-mobile-keyboard.test.js'
+      - 'server/tests/dashboard-ui.test.js'
+      - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
+      - 'public/js/admin.js'
+      - 'public/js/visitor-analytics.js'
+      - 'public/js/theme.js'
+      - 'server/routes/admin.js'
+      - 'server/routes/analytics.js'
+      - 'server/utils/sunupilot-analytics.js'
+      - 'server/tests/sunupilot-admin.test.js'
+      - 'server/app.js'
+      - 'server/config/monitoring.js'
+      - 'server/utils/log-sanitizer.js'
+      - 'server/tests/log-sanitizer.test.js'
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
+      - 'server/tests/factures.test.js'
+      - 'server/routes/clients.js'
+      - 'server/tests/client-history-protection.test.js'
+      - 'server/tests/stock.test.js'
+      - 'server/tests/produits-delete.test.js'
+      - 'server/routes/public.js'
+      - 'server/routes/assistant.js'
+      - 'server/routes/dashboard.js'
+      - 'server/routes/rapports.js'
+      - 'server/tests/professional-tenant.test.js'
+      - 'server/routes/auth.js'
+      - 'server/routes/depenses.js'
+      - 'server/routes/factures-recurrentes.js'
+      - 'server/routes/factures.js'
+      - 'server/routes/produits.js'
+      - 'server/routes/public-api.js'
+      - 'server/tests/auth-currency.test.js'
+      - 'server/tests/currency-lock-concurrency.test.js'
+      - 'server/tests/setup.js'
       - 'server/tests/company-group-ui.test.js'
       - 'server/tests/company-groups.test.js'
       - 'server/tests/invoice-quota-migration-v8.test.js'
       - 'server/tests/facture-pdf.test.js'
+      - 'server/config/backup.js'
+      - 'server/tests/restore-backup-roundtrip.test.js'
+      - 'server/tests/auth.test.js'
+      - 'server/utils/google-account.js'
+      - 'server/tests/google-account-concurrency.test.js'
+      - 'server/tests/register-concurrency.test.js'
       - 'server/tests/paiements.test.js'
-      - 'server/routes/clients.js'
-      - 'server/routes/produits.js'
-      - 'server/tests/client-history-protection.test.js'
-      - 'server/tests/stock.test.js'
-      - 'server/tests/produits-delete.test.js'
+      - 'server/tests/backup.test.js'
+      - 'server/app.js'
+      - 'server/utils/log-sanitizer.js'
+      - 'server/tests/log-sanitizer.test.js'
+      - 'server/tests/mobile-config.test.js'
+      - 'mobile/scripts/check-capacitor-config.js'
       - '.github/workflows/lint.yml'
   push:
     branches:
@@ -37,6 +79,8 @@ on:
       - 'server/tests/visual/recette-visuelle.js'
       - 'server/tests/local-date-format.test.js'
       - 'server/tests/workspace-navigation.test.js'
+      - 'server/tests/sidebar-mobile-keyboard.test.js'
+      - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
 
@@ -66,20 +110,62 @@ jobs:
           public/js/sidebar.js
           public/js/api.js
           public/js/workspace-modals.js
+          public/js/admin.js
+          public/js/visitor-analytics.js
+          public/js/theme.js
+          server/routes/admin.js
+          server/routes/analytics.js
+          server/utils/sunupilot-analytics.js
+          server/tests/sunupilot-admin.test.js
           server/tests/visual/recette-visuelle.js
           server/tests/local-date-format.test.js
+          server/tests/optional-fields.test.js
           server/tests/workspace-navigation.test.js
+          server/tests/parametres-accessibility.test.js
+          server/tests/dashboard-ui.test.js
+          server/tests/sidebar-mobile-keyboard.test.js
+          server/tests/accounting-expense-mappings.test.js
           server/tests/workspace-modal-accessibility.test.js
+          server/app.js
+          server/config/monitoring.js
+          server/utils/log-sanitizer.js
+          server/tests/log-sanitizer.test.js
           server/config/db.js
           server/email-outbox.js
           server/routes/professionnel.js
+          server/tests/factures.test.js
+          server/routes/clients.js
+          server/tests/client-history-protection.test.js
+          server/tests/stock.test.js
+          server/tests/produits-delete.test.js
+          server/routes/public.js
+          server/routes/assistant.js
+          server/routes/dashboard.js
+          server/routes/rapports.js
+          server/tests/professional-tenant.test.js
+          server/routes/auth.js
+          server/routes/depenses.js
+          server/routes/factures-recurrentes.js
+          server/routes/factures.js
+          server/routes/produits.js
+          server/routes/public-api.js
+          server/tests/auth-currency.test.js
+          server/tests/currency-lock-concurrency.test.js
+          server/tests/setup.js
           server/tests/company-group-ui.test.js
           server/tests/company-groups.test.js
           server/tests/invoice-quota-migration-v8.test.js
           server/tests/facture-pdf.test.js
+          server/config/backup.js
+          server/tests/restore-backup-roundtrip.test.js
+          server/tests/auth.test.js
+          server/utils/google-account.js
+          server/tests/google-account-concurrency.test.js
+          server/tests/register-concurrency.test.js
           server/tests/paiements.test.js
-          server/routes/clients.js
-          server/routes/produits.js
-          server/tests/stock.test.js
-          server/tests/produits-delete.test.js
-          $(test -f server/tests/client-history-protection.test.js && echo server/tests/client-history-protection.test.js)
+          server/tests/backup.test.js
+          server/app.js
+          server/utils/log-sanitizer.js
+          server/tests/log-sanitizer.test.js
+          server/tests/mobile-config.test.js
+          mobile/scripts/check-capacitor-config.js
