@@ -1919,3 +1919,13 @@ body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localizatio
     border-radius: 10px;
   }
 }
+
+
+/* Contraste WCAG AA du badge de résumé dans l'espace professionnel. */
+.pro-workspace-guide-head .pro-status { color: #066144; }
+:root[data-theme="dark"] .pro-workspace-guide-head .pro-status { color: #9DE7BC; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .pro-workspace-guide-head .pro-status {
+    color: #9DE7BC;
+  }
+}
