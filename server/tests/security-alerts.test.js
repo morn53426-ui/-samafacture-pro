@@ -183,18 +183,20 @@ test('une facture très supérieure à l’historique comparable déclenche un s
     await recordInvoiceAudit(index, 10000, 'XOF');
   }
   await recordInvoiceAudit(19, 1000000, 'EUR');
+  // Un montant élevé en XOF ne doit pas utiliser la facture EUR pour compléter l'échantillon.
+  await recordInvoiceAudit(20, 75000, 'XOF');
   const [[beforeMinimum]] = await pool.query(
     'SELECT COUNT(*) AS total FROM pro_security_alerts WHERE tenant_scope_id = ?',
     [ownerC]
   );
   assert.equal(Number(beforeMinimum.total), 0);
 
-  // La vingtième facture XOF complète l'échantillon comparable.
-  await recordInvoiceAudit(20, 10000, 'XOF');
+  // La vingtième facture XOF complète la référence, sans alerte sur un montant normal.
+  await recordInvoiceAudit(21, 10000, 'XOF');
   // Un devis très élevé n'entre pas dans la référence des factures.
-  await recordInvoiceAudit(21, 250000, 'XOF', 'devis');
+  await recordInvoiceAudit(22, 250000, 'XOF', 'devis');
 
-  const unusual = await recordInvoiceAudit(22, 75000, 'XOF');
+  const unusual = await recordInvoiceAudit(23, 75000, 'XOF');
   assert.ok(unusual.id);
 
   const [alerts] = await pool.query(
@@ -221,7 +223,7 @@ test('une facture très supérieure à l’historique comparable déclenche un s
   assert.equal(Number(evidence.observed_amount), 75000);
   assert.equal(Number(evidence.historical_median), 10000);
   assert.equal(evidence.currency, 'XOF');
-  assert.equal(Number(evidence.sample_size), 20);
+  assert.equal(Number(evidence.sample_size), 21);
   assert.equal(Number(evidence.multiplier), 5);
 
   const createdCase = await request(app)
