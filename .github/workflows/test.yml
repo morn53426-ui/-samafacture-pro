@@ -217,7 +217,14 @@ jobs:
               pool.query('CREATE TABLE ci_runtime_must_not_create (id INT PRIMARY KEY)'),
               error => error && error.code === 'ER_TABLEACCESS_DENIED_ERROR'
             );
-            console.log('Compte runtime : DML autorisé, DDL permanent refusé.');
+            const [visibleTriggers] = await pool.query(
+              `SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
+                WHERE TRIGGER_SCHEMA = DATABASE()
+                  AND TRIGGER_NAME IN ('trg_pro_audit_events_block_update', 'trg_pro_audit_events_block_delete')`
+            );
+            assert.equal(visibleTriggers.length, 0,
+              'le compte runtime ne doit pas obtenir le privilège TRIGGER nécessaire à la lecture des définitions');
+            console.log('Compte runtime : DML autorisé, DDL permanent et visibilité TRIGGER refusés.');
           })().catch(error => {
             console.error(error);
             process.exitCode = 1;
