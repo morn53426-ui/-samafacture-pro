@@ -224,6 +224,23 @@ test('une facture très supérieure à l’historique comparable déclenche un s
   assert.equal(Number(evidence.sample_size), 20);
   assert.equal(Number(evidence.multiplier), 5);
 
+  const createdCase = await request(app)
+    .post('/api/pro/security-cases')
+    .set(auth(ownerCToken))
+    .send({ alert_id: Number(alerts[0].id) });
+  assert.equal(createdCase.status, 201, createdCase.text);
+  const [caseAuditRows] = await pool.query(
+    `SELECT metadata_json FROM pro_audit_events
+      WHERE tenant_scope_id = ? AND event_type = 'security.case.created' AND entity_id = ?`,
+    [ownerC, String(createdCase.body.id)]
+  );
+  assert.equal(caseAuditRows.length, 1);
+  const caseMetadata = typeof caseAuditRows[0].metadata_json === 'string'
+    ? JSON.parse(caseAuditRows[0].metadata_json)
+    : caseAuditRows[0].metadata_json;
+  assert.equal(caseMetadata.source_event_type, 'invoice.created');
+  assert.equal(caseMetadata.rule_code, 'billing.invoice.amount_outlier');
+
   const visible = await request(app).get('/api/pro/security-alerts').set(auth(ownerCToken));
   assert.equal(visible.status, 200, visible.text);
   assert.equal(visible.body.alerts.length, 1);
