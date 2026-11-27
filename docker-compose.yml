@@ -36,6 +36,30 @@ services:
       - ./deploy/provision-db-users.sh:/usr/local/bin/provision-db-users.sh:ro
     networks: [samafacture_net]
 
+  db-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: "no"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      db-provision:
+        condition: service_completed_successfully
+    env_file:
+      - ./server/.env
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_MIGRATION_USER: ${DB_MIGRATION_USER:-${DB_USER}}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-${DB_PASSWORD}}
+      DB_NAME: ${DB_NAME}
+      NODE_ENV: development
+    command: ["node", "scripts/run-migrations.js"]
+    networks: [samafacture_net]
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -58,7 +82,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      db-provision:
+      db-migrate:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -69,9 +93,8 @@ services:
       DB_PORT: "3306"
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_MIGRATION_USER: ${DB_MIGRATION_USER:-${DB_USER}}
-      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-${DB_PASSWORD}}
       DB_NAME: ${DB_NAME}
+      DB_SKIP_MIGRATIONS: "true"
       # LOCAL UNIQUEMENT : ne jamais déployer ce fichier seul sur un serveur public (pas de validation
       # de config production, cookie non « secure », Swagger actif). Production : ajouter
       # -f docker-compose.production.yml, qui force NODE_ENV=production.
