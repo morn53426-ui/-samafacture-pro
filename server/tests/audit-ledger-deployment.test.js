@@ -65,8 +65,8 @@ test('le privilège TRIGGER est limité au worker de sauvegarde dédié', () => 
   assert.match(provision, /network_mode: "service:mysql"/);
   assert.match(provision, /DB_HOST: 127\\.0\\.0\\.1/);
   assert.match(provisioner, /GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES/);
-  assert.match(provisioner, /DB_USER[\\s\\S]*DB_MIGRATION_USER[\\s\\S]*DB_BACKUP_USER/);
-  assert.match(provisioner, /DB_BACKUP_USER[\\s\\S]*exit 1/);
+  assert.match(provisioner, /DB_USER[\s\S]*DB_MIGRATION_USER[\s\S]*DB_BACKUP_USER/);
+  assert.match(provisioner, /DB_BACKUP_USER[\s\S]*exit 1/);
   assert.match(worker, /DB_BACKUP_USER: \$\{DB_BACKUP_USER/);
   assert.match(worker, /workers\/backup-worker\.js/);
   assert.match(worker, /app_backups:/);
