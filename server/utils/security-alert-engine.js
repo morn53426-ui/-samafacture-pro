@@ -11,19 +11,117 @@ const FAILED_LOGIN_RULE = Object.freeze({
   summary: 'Au moins cinq tentatives de connexion échouées ont été enregistrées pour un même compte sur une période de quinze minutes.'
 });
 
+const INVOICE_OUTLIER_RULE = Object.freeze({
+  code: 'billing.invoice.amount_outlier',
+  lookbackDays: 90,
+  minimumSamples: 20,
+  comparisonLimit: 50,
+  multiplier: 5,
+  severity: 'medium',
+  title: 'Montant de facture inhabituel',
+  summary: 'Le montant de cette facture dépasse au moins cinq fois la médiane des factures comparables de la même entreprise et de la même devise sur les 90 derniers jours. Ce signal nécessite une vérification humaine.'
+});
+
 function alertFingerprint(tenantScopeId, accountId) {
   return crypto.createHash('sha256')
     .update(['SamaFacturePro', FAILED_LOGIN_RULE.code, tenantScopeId, accountId].join(':'), 'utf8')
     .digest('hex');
 }
 
+function ruleFingerprint(tenantScopeId, ruleCode, entityId) {
+  return crypto.createHash('sha256')
+    .update(['SamaFacturePro', ruleCode, tenantScopeId, entityId].join(':'), 'utf8')
+    .digest('hex');
+}
+
+function median(values) {
+  const sorted = values.slice().sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
+async function evaluateInvoiceAmountOutlier(connection, event, sourceEventId) {
+  if (event.eventType !== 'invoice.created' || event.entityType !== 'facture') return null;
+  if (event.tenantId === null || !/^\\d+$/.test(String(event.entityId || ''))) return null;
+
+  const metadata = event.metadata || {};
+  if (metadata.document_type !== 'facture') return null;
+  const amount = Number(metadata.total);
+  const currency = String(metadata.currency || '').trim().toUpperCase();
+  if (!Number.isFinite(amount) || amount <= 0 || !/^[A-Z]{3,8}$/.test(currency)) return null;
+
+  const [history] = await connection.query(
+    `SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.total')) AS DECIMAL(24, 2)) AS amount
+       FROM pro_audit_events
+      WHERE tenant_scope_id = ?
+        AND tenant_id = ?
+        AND event_type = 'invoice.created'
+        AND entity_type = 'facture'
+        AND outcome = 'success'
+        AND id < ?
+        AND created_at >= DATE_SUB(UTC_TIMESTAMP(6), INTERVAL ${INVOICE_OUTLIER_RULE.lookbackDays} DAY)
+        AND JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.document_type')) = 'facture'
+        AND UPPER(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.currency'))) = ?
+        AND CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.total')) AS DECIMAL(24, 2)) > 0
+      ORDER BY created_at DESC, id DESC
+      LIMIT ${INVOICE_OUTLIER_RULE.comparisonLimit}`
+    , [event.tenantScopeId, event.tenantId, sourceEventId, currency]
+  );
+  const historicalAmounts = history.map(row => Number(row.amount)).filter(value => Number.isFinite(value) && value > 0);
+  if (historicalAmounts.length < INVOICE_OUTLIER_RULE.minimumSamples) return null;
+
+  const historicalMedian = median(historicalAmounts);
+  if (!historicalMedian || amount < historicalMedian * INVOICE_OUTLIER_RULE.multiplier) return null;
+
+  const fingerprint = ruleFingerprint(event.tenantScopeId, INVOICE_OUTLIER_RULE.code, event.entityId);
+  const [existingRows] = await connection.query(
+    `SELECT id FROM pro_security_alerts
+      WHERE tenant_scope_id = ? AND fingerprint = ?
+      LIMIT 1 FOR UPDATE`,
+    [event.tenantScopeId, fingerprint]
+  );
+  if (existingRows.length) return null;
+
+  const [insert] = await connection.query(
+    `INSERT INTO pro_security_alerts
+      (tenant_scope_id, tenant_id, rule_code, fingerprint, severity, status, title, summary,
+       source_event_id, source_event_type, first_seen_at, last_seen_at, occurrence_count)
+     VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, 'invoice.created',
+             UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), 1)`,
+    [
+      event.tenantScopeId, event.tenantId, INVOICE_OUTLIER_RULE.code, fingerprint,
+      INVOICE_OUTLIER_RULE.severity, INVOICE_OUTLIER_RULE.title, INVOICE_OUTLIER_RULE.summary,
+      sourceEventId
+    ]
+  );
+  return {
+    action: 'created',
+    alertId: Number(insert.insertId),
+    ruleCode: INVOICE_OUTLIER_RULE.code,
+    severity: INVOICE_OUTLIER_RULE.severity,
+    evidence: {
+      observed_amount: amount,
+      historical_median: historicalMedian,
+      currency,
+      sample_size: historicalAmounts.length,
+      multiplier: INVOICE_OUTLIER_RULE.multiplier
+    }
+  };
+}
 /**
  * Détecte uniquement les signaux dérivés des événements d'authentification déjà
  * présents dans le registre. Cette fonction ne contacte aucun prestataire externe.
  * Elle doit être appelée avec la même connexion/transaction que l'événement source.
  */
 async function evaluateSecuritySignal(connection, event, sourceEventId) {
-  if (!connection || !event || event.eventType !== 'auth.login.failed') return null;
+  if (!connection || !event) return null;
+  if (event.eventType === 'invoice.created') {
+    return evaluateInvoiceAmountOutlier(connection, event, sourceEventId);
+  }
+  if (event.eventType !== 'auth.login.failed') return null;
   if (event.tenantId === null || !event.entityId || event.entityType !== 'account') return null;
 
   const accountId = String(event.entityId);
@@ -128,4 +226,4 @@ async function evaluateSecuritySignal(connection, event, sourceEventId) {
   };
 }
 
-module.exports = { FAILED_LOGIN_RULE, alertFingerprint, evaluateSecuritySignal };
+module.exports = { FAILED_LOGIN_RULE, INVOICE_OUTLIER_RULE, alertFingerprint, evaluateSecuritySignal, median };
