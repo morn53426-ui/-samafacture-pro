@@ -22,6 +22,8 @@ let ownerA;
 let ownerAToken;
 let ownerB;
 let ownerBToken;
+let ownerC;
+let ownerCToken;
 let memberA;
 let memberAToken;
 let alertId;
@@ -50,11 +52,14 @@ before(async () => {
   await setupTestDatabase();
   const a = await createAccount('security-alert-owner-a');
   const b = await createAccount('security-alert-owner-b');
+  const c = await createAccount('security-alert-owner-c');
   const member = await createAccount('security-alert-member-a');
   ownerA = a.id;
   ownerAToken = a.token;
   ownerB = b.id;
   ownerBToken = b.token;
+  ownerC = c.id;
+  ownerCToken = c.token;
   memberA = member.id;
   memberAToken = member.token;
   await pool.query(
@@ -150,6 +155,78 @@ test('cinq échecs de connexion sur quinze minutes créent une seule alerte tena
     [alertId, ownerA]
   );
   assert.equal(Number(updated.occurrence_count), 6, 'les nouvelles tentatives enrichissent l’alerte existante');
+});
+
+test('une facture très supérieure à l’historique comparable déclenche un signal explicable', async () => {
+  async function recordInvoiceAudit(index, total, currency = 'XOF', documentType = 'facture') {
+    return appendAuditEvent({
+      tenantId: ownerC,
+      actorUserId: ownerC,
+      eventType: documentType === 'facture' ? 'invoice.created' : 'quote.created',
+      category: 'billing',
+      severity: 'info',
+      entityType: documentType,
+      entityId: String(20000 + index),
+      outcome: 'success',
+      metadata: {
+        invoice_id: 20000 + index,
+        document_type: documentType,
+        total,
+        currency,
+        line_count: 1
+      }
+    });
+  }
+
+  // Dix-neuf observations comparables ne suffisent pas à établir une référence.
+  for (let index = 0; index < 19; index += 1) {
+    await recordInvoiceAudit(index, 10000);
+  }
+  const [[beforeMinimum]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_security_alerts WHERE tenant_scope_id = ?',
+    [ownerC]
+  );
+  assert.equal(Number(beforeMinimum.total), 0);
+
+  // La vingtième facture complète l'échantillon et reste elle-même dans la plage normale.
+  await recordInvoiceAudit(19, 10000);
+  // Un devis n'entre pas dans la référence des factures.
+  await recordInvoiceAudit(20, 250000, 'XOF', 'devis');
+
+  const unusual = await recordInvoiceAudit(21, 75000);
+  assert.ok(unusual.id);
+
+  const [alerts] = await pool.query(
+    'SELECT id, rule_code, severity, status, source_event_id, occurrence_count FROM pro_security_alerts WHERE tenant_scope_id = ?',
+    [ownerC]
+  );
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].rule_code, 'billing.invoice.amount_outlier');
+  assert.equal(alerts[0].severity, 'medium');
+  assert.equal(alerts[0].status, 'open');
+  assert.equal(Number(alerts[0].source_event_id), unusual.id);
+  assert.equal(Number(alerts[0].occurrence_count), 1);
+
+  const [signedAlerts] = await pool.query(
+    `SELECT metadata_json FROM pro_audit_events
+      WHERE tenant_scope_id = ? AND event_type = 'security.alert.created' AND entity_id = ?`,
+    [ownerC, String(alerts[0].id)]
+  );
+  assert.equal(signedAlerts.length, 1);
+  const evidence = typeof signedAlerts[0].metadata_json === 'string'
+    ? JSON.parse(signedAlerts[0].metadata_json)
+    : signedAlerts[0].metadata_json;
+  assert.equal(evidence.rule_code, 'billing.invoice.amount_outlier');
+  assert.equal(Number(evidence.observed_amount), 75000);
+  assert.equal(Number(evidence.historical_median), 10000);
+  assert.equal(evidence.currency, 'XOF');
+  assert.equal(Number(evidence.sample_size), 20);
+  assert.equal(Number(evidence.multiplier), 5);
+
+  const visible = await request(app).get('/api/pro/security-alerts').set(auth(ownerCToken));
+  assert.equal(visible.status, 200, visible.text);
+  assert.equal(visible.body.alerts.length, 1);
+  assert.equal(visible.body.alerts[0].rule_code, 'billing.invoice.amount_outlier');
 });
 
 test('API des alertes : permissions, cache et isolation stricte des tenants', async () => {
