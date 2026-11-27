@@ -132,7 +132,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: unless-stopped
+    restart: on-failure
     depends_on:
       mysql:
         condition: service_healthy
