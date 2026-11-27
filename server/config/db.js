@@ -50,7 +50,9 @@ pool.on('error', (err) => {
 async function initDatabase() {
   if (initializationPromise) return initializationPromise;
 
-  initializationPromise = initializeDatabaseOnce();
+  initializationPromise = process.env.DB_SKIP_MIGRATIONS === 'true'
+    ? verifyDatabaseSchemaVersion()
+    : initializeDatabaseOnce();
   try {
     return await initializationPromise;
   } catch (err) {
@@ -59,6 +61,21 @@ async function initDatabase() {
     initializationPromise = null;
     throw err;
   }
+}
+
+async function verifyDatabaseSchemaVersion() {
+  const [[meta]] = await pool.query(
+    'SELECT version FROM _samafacture_schema_meta WHERE id = 1 LIMIT 1'
+  );
+  const currentVersion = Number(meta?.version || 0);
+  if (currentVersion < CURRENT_SCHEMA_VERSION) {
+    throw new Error(
+      'Le schéma MySQL est en version ' + currentVersion +
+      ', mais la version ' + CURRENT_SCHEMA_VERSION + ' est requise. ' +
+      'Exécutez le service de migration avant de démarrer l’API.'
+    );
+  }
+  return { version: currentVersion, migrationsSkipped: true };
 }
 
 async function initializeDatabaseOnce() {
