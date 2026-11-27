@@ -114,3 +114,11 @@ Les événements de facture, paiement et cycle de vie client sont ajoutés dans 
 L'espace professionnel possède désormais une interface de consultation avec filtres, recherche, pagination et vérification d'intégrité. Les exports PDF/CSV, l'attribution d'alertes, les dossiers d'investigation, le traitement des événements de factures récurrentes, d'abonnements et des paiements fournisseurs/webhooks restent à compléter.
 
 Aucun moteur de détection de fraude, aucun module AML/KYC ni aucun tableau de bord central conformité n'est encore livré. Ce premier lot ne doit pas être présenté comme une solution complète ou une certification de conformité.
+
+## Contrôle de dérive des protections SQL
+
+Le service isolé `backup-worker` utilise `DB_BACKUP_USER` pour vérifier les deux tables du registre et les définitions exactes des triggers `BEFORE UPDATE` et `BEFORE DELETE`. Le contrôle est exécuté au démarrage, toutes les cinq minutes et juste avant chaque sauvegarde. Il est en lecture seule : aucune réparation DDL automatique n'est tentée.
+
+En cas de table absente, de trigger manquant ou de définition modifiée, le worker écrit une erreur `AUDIT_LEDGER_SCHEMA_DRIFT`, s'arrête avec un code d'échec et ne produit pas de nouvelle sauvegarde. Avec la politique Docker `restart: on-failure`, il retente le démarrage ; tant que l'écart persiste, le service reste en échec. Examiner les logs du worker, conserver les sauvegardes existantes, diagnostiquer l'origine de l'écart, puis restaurer les définitions canoniques depuis la migration `014_audit_ledger.sql` via le compte de migration. Ne pas désactiver le contrôle pour contourner une alerte.
+
+Le privilège MySQL `TRIGGER` permet aussi de créer et supprimer des triggers. Il reste donc limité au compte de sauvegarde dédié, hors API HTTP et worker PDF. Le compte runtime ne peut pas consulter `information_schema.TRIGGERS` ; le contrôle ne doit pas être déplacé dans l'API.
