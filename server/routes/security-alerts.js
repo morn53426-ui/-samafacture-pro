@@ -58,6 +58,32 @@ async function withTransaction(task) {
   }
 }
 
+function safeEvidence(value) {
+  let source = value;
+  if (typeof source === 'string') {
+    try { source = JSON.parse(source); } catch (_) { return null; }
+  }
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
+  const evidence = {};
+  const attempts = Number(source.attempts_in_window);
+  if (Number.isSafeInteger(attempts) && attempts > 0) evidence.attempts_in_window = attempts;
+  const observed = Number(source.observed_amount);
+  if (source.observed_amount !== undefined && Number.isFinite(observed) && observed > 0) {
+    evidence.observed_amount = observed;
+  }
+  const historicalMedian = Number(source.historical_median);
+  if (source.historical_median !== undefined && Number.isFinite(historicalMedian) && historicalMedian > 0) {
+    evidence.historical_median = historicalMedian;
+  }
+  const currency = String(source.currency || '').toUpperCase();
+  if (/^[A-Z]{3,8}$/.test(currency)) evidence.currency = currency;
+  const sampleSize = Number(source.sample_size);
+  if (Number.isSafeInteger(sampleSize) && sampleSize > 0) evidence.sample_size = sampleSize;
+  const multiplier = Number(source.multiplier);
+  if (Number.isFinite(multiplier) && multiplier > 0) evidence.multiplier = multiplier;
+  return Object.keys(evidence).length ? evidence : null;
+}
+
 function auditContext(req, eventType, entityType, entityId, metadata) {
   return {
     tenantId: tenantId(req),
@@ -109,15 +135,25 @@ router.get('/security-alerts', async (req, res, next) => {
               a.source_event_type, a.first_seen_at, a.last_seen_at, a.occurrence_count,
               a.resolved_at, a.created_at, a.updated_at,
               (SELECT c.id FROM pro_security_cases c
-                WHERE c.tenant_scope_id = a.tenant_scope_id AND c.source_alert_id = a.id LIMIT 1) AS case_id
+                WHERE c.tenant_scope_id = a.tenant_scope_id AND c.source_alert_id = a.id LIMIT 1) AS case_id,
+              (SELECT e.metadata_json FROM pro_audit_events e
+                WHERE e.tenant_scope_id = a.tenant_scope_id
+                  AND e.entity_type = 'security_alert'
+                  AND e.entity_id = CAST(a.id AS CHAR)
+                  AND e.event_type IN ('security.alert.created', 'security.alert.reopened')
+                ORDER BY e.chain_sequence DESC LIMIT 1) AS evidence_json
          FROM pro_security_alerts a
         WHERE ${clause}
         ORDER BY FIELD(a.severity, 'critical', 'high', 'medium', 'low'), a.last_seen_at DESC, a.id DESC
         LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
+    const visibleAlerts = alerts.map(({ evidence_json, ...alert }) => ({
+      ...alert,
+      evidence: safeEvidence(evidence_json)
+    }));
     return res.json({
-      alerts,
+      alerts: visibleAlerts,
       pagination: {
         page,
         limit,
