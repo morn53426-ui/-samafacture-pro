@@ -21,7 +21,7 @@ const EXPECTED_TRIGGERS = Object.freeze([
 
 function normalizeActionStatement(statement) {
   return String(statement || '')
-    .replace(/\\s+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
     .replace(/;$/, '')
     .trim()
