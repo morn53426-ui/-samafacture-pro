@@ -56,7 +56,7 @@ else
 CREATE USER IF NOT EXISTS $app_user@'%' IDENTIFIED BY $app_password;
 ALTER USER $app_user@'%' IDENTIFIED BY $app_password;
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM $app_user@'%';
-GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE, CREATE TEMPORARY TABLES, LOCK TABLES, SHOW VIEW
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE, CREATE TEMPORARY TABLES, SHOW VIEW
   ON $database.* TO $app_user@'%';
 SQL
   echo "Compte applicatif provisionné avec droits DML uniquement ; DDL réservé au compte de migration."
