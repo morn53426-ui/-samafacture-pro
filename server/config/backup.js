@@ -210,10 +210,10 @@ async function executerSauvegardeQuotidienne() {
   }
 }
 
-function startBackupScheduler() {
+function startBackupScheduler(options = {}) {
   if (!isBackupEnabled()) {
     console.log('💾 Sauvegarde automatique désactivée (BACKUP_ENABLED=false).');
-    return;
+    return null;
   }
 
   const parsedHour = Number(process.env.BACKUP_HOUR ?? 2);
@@ -235,7 +235,8 @@ function startBackupScheduler() {
   const auDemarrage = process.env.BACKUP_ON_STARTUP === 'true';
   verifier(auDemarrage);
   const timer = setInterval(() => verifier(false), 60 * 60 * 1000);
-  timer.unref();
+  if (options.keepAlive !== true) timer.unref();
+  return timer;
 }
 
 module.exports = {
