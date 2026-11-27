@@ -19,7 +19,7 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
   const targetDb = 'sf_restore_target_' + suffix;
   const backupUser = 'sf_backup_' + suffix;
   const backupPassword = crypto.randomBytes(24).toString('hex');
-  const keys = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'BACKUP_DIR', 'BACKUP_ENCRYPTION_KEY', 'MYSQLDUMP_PATH', 'MYSQL_PATH'];
+  const keys = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_MIGRATION_USER', 'DB_MIGRATION_PASSWORD', 'DB_BACKUP_USER', 'DB_BACKUP_PASSWORD', 'BACKUP_DIR', 'BACKUP_ENCRYPTION_KEY', 'MYSQLDUMP_PATH', 'MYSQL_PATH'];
   const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST || '127.0.0.1',
@@ -60,6 +60,8 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
     process.env.DB_NAME = sourceDb;
     process.env.DB_USER = backupUser;
     process.env.DB_PASSWORD = backupPassword;
+    process.env.DB_BACKUP_USER = backupUser;
+    process.env.DB_BACKUP_PASSWORD = backupPassword;
     process.env.BACKUP_ENCRYPTION_KEY = crypto.randomBytes(32).toString('hex');
     process.env.MYSQLDUMP_PATH = process.env.MYSQLDUMP_PATH || 'mysqldump';
     process.env.MYSQL_PATH = process.env.MYSQL_PATH || 'mysql';
@@ -72,6 +74,10 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
     process.env.DB_NAME = targetDb;
     process.env.DB_USER = original.DB_USER || 'root';
     process.env.DB_PASSWORD = original.DB_PASSWORD || '';
+    // Le smoke test utilise le compte administrateur existant pour la base cible éphémère ;
+    // les comptes provisionnés par Compose ne reçoivent que des droits sur le schéma métier.
+    delete process.env.DB_MIGRATION_USER;
+    delete process.env.DB_MIGRATION_PASSWORD;
     await restaurer(backup.path);
 
     const [rows] = await connection.query(

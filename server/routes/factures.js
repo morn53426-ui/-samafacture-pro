@@ -904,6 +904,27 @@ router.post('/:id/transformer-en-facture', async (req, res, next) => {
       conn, req.tenantId, invoiceWarehouseId,
       lignesDevis.map((l) => ({ produit_id: l.produit_id, delta: -l.quantite }))
     );
+    await appendAuditEvent({
+      tenantId: Number(req.tenantId),
+      actorUserId: Number(req.actorId || req.user.id),
+      eventType: 'invoice.converted_from_quote',
+      category: 'billing',
+      severity: 'info',
+      entityType: 'facture',
+      entityId: String(devis.id),
+      outcome: 'success',
+      ipAddress: req.ip || null,
+      userAgent: req.get('user-agent') || null,
+      requestId: req.requestId || null,
+      metadata: {
+        source_document_id: Number(devis.id),
+        source_document_number: devis.numero,
+        invoice_number: numero,
+        previous_document_type: 'devis',
+        new_document_type: 'facture',
+        line_count: lignesDevis.length
+      }
+    }, conn);
 
     await conn.commit();
     const [rows] = await pool.query(
@@ -998,6 +1019,28 @@ router.post('/:id/dupliquer', async (req, res, next) => {
       await appliquerAjustementsStock(conn, req.tenantId, duplicatedWarehouseId,
         lignesSource.map(ligne => ({ produit_id: ligne.produit_id, delta: -Number(ligne.quantite) })));
     }
+    await appendAuditEvent({
+      tenantId: Number(req.tenantId),
+      actorUserId: Number(req.actorId || req.user.id),
+      eventType: source.type === 'facture' ? 'invoice.duplicated' : 'quote.duplicated',
+      category: 'billing',
+      severity: 'info',
+      entityType: source.type,
+      entityId: String(nouvelId),
+      outcome: 'success',
+      ipAddress: req.ip || null,
+      userAgent: req.get('user-agent') || null,
+      requestId: req.requestId || null,
+      metadata: {
+        source_document_id: Number(source.id),
+        source_document_number: source.numero,
+        duplicated_document_number: numero,
+        document_type: source.type,
+        amount: Number(source.total),
+        currency: source.devise || 'FCFA',
+        line_count: lignesSource.length
+      }
+    }, conn);
     await conn.commit();
 
     const [rows] = await pool.query(

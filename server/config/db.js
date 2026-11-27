@@ -50,7 +50,9 @@ pool.on('error', (err) => {
 async function initDatabase() {
   if (initializationPromise) return initializationPromise;
 
-  initializationPromise = initializeDatabaseOnce();
+  initializationPromise = process.env.DB_SKIP_MIGRATIONS === 'true'
+    ? verifyDatabaseSchemaVersion()
+    : initializeDatabaseOnce();
   try {
     return await initializationPromise;
   } catch (err) {
@@ -61,15 +63,71 @@ async function initDatabase() {
   }
 }
 
+async function verifyDatabaseSchemaVersion() {
+  const [[meta]] = await pool.query(
+    'SELECT version FROM _samafacture_schema_meta WHERE id = 1 LIMIT 1'
+  );
+  const currentVersion = Number(meta?.version || 0);
+  if (currentVersion < CURRENT_SCHEMA_VERSION) {
+    throw new Error(
+      'Le schéma MySQL est en version ' + currentVersion +
+      ', mais la version ' + CURRENT_SCHEMA_VERSION + ' est requise. ' +
+      'Exécutez le service de migration avant de démarrer l’API.'
+    );
+  }
+  return { version: currentVersion, migrationsSkipped: true };
+}
+
 async function initializeDatabaseOnce() {
+  const appUser = process.env.DB_USER || 'root';
+  const migrationUser = process.env.DB_MIGRATION_USER || appUser;
+  const migrationPassword = process.env.DB_MIGRATION_PASSWORD || process.env.DB_PASSWORD || '';
+  const hasDedicatedMigrationUser = Boolean(
+    process.env.DB_MIGRATION_USER &&
+    process.env.DB_MIGRATION_PASSWORD &&
+    migrationUser !== appUser
+  );
+
+  if (process.env.NODE_ENV === 'production' && !hasDedicatedMigrationUser) {
+    throw new Error(
+      'En production, DB_MIGRATION_USER/DB_MIGRATION_PASSWORD doivent identifier un compte distinct de DB_USER. ' +
+      'Le compte applicatif ne doit pas recevoir les privilèges DDL nécessaires aux migrations.'
+    );
+  }
+
+  const migrationPool = hasDedicatedMigrationUser
+    ? mysql.createPool({
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 3306,
+      user: migrationUser,
+      password: migrationPassword,
+      database: process.env.DB_NAME || 'samafacture',
+      waitForConnections: true,
+      connectionLimit: 2,
+      queueLimit: 10,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
+      dateStrings: true,
+      decimalNumbers: true
+    })
+    : pool;
+
+  try {
+    return await initializeDatabaseWithPool(migrationPool, migrationUser, migrationPassword);
+  } finally {
+    if (migrationPool !== pool) await migrationPool.end();
+  }
+}
+
+async function initializeDatabaseWithPool(migrationPool, migrationUser, migrationPassword) {
   const dbName = process.env.DB_NAME || 'samafacture';
 
   // Connexion sans base sélectionnée, pour pouvoir la créer si besoin.
   const rootConn = await mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || ''
+    user: migrationUser,
+    password: migrationPassword
   });
   try {
     await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
@@ -94,7 +152,7 @@ async function initializeDatabaseOnce() {
     .map(s => s.trim())
     .filter(s => s.length > 0);
 
-  const conn = await pool.getConnection();
+  const conn = await migrationPool.getConnection();
   let lockAcquired = false;
   try {
     // GET_LOCK est la synchronisation inter-processus. L'appel en mémoire ci-dessus
