@@ -25,7 +25,11 @@ test('login video exposes native controls, inline playback and French captions',
 
 test('login video layout has a bounded 16:9 frame and responsive safe-area spacing', () => {
   assert.match(stylesheet, /\.auth-login-video-frame\s*\{[^}]*aspect-ratio:\s*16\s*\/\s*9/s);
-  assert.match(stylesheet, /@media\s*\(max-width:\s*900px\)\s*\{[^}]*\.auth-login-video-side/s);
+  const loginVideoStyles = stylesheet.slice(
+    stylesheet.indexOf('/* ---------- Connexion : présentation vidéo Sunupilot ---------- */')
+  );
+  assert.match(loginVideoStyles, /@media\\s*\\(max-width:\\s*900px\\)/);
+  assert.match(loginVideoStyles, /\\.auth-login-video-side\\s*\\{/);
   assert.match(stylesheet, /env\(safe-area-inset-bottom/);
 });
 
