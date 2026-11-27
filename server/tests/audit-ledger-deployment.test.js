@@ -69,10 +69,10 @@ test('le privilège TRIGGER est limité au worker de sauvegarde dédié', () => 
   assert.ok(provision.includes('DB_HOST: 127.0.0.1'));
   assert.ok(provisioner.includes('GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES'));
   assert.match(backup, /async function verifierSchemaRegistreAudit/);
-  assert.match(backup, /verifyAuditLedgerSchema\\(connection\\)/);
-  assert.match(backupWorker, /await verifierSchemaRegistreAudit\\(\\)/);
-  assert.match(backupWorker, /AUDIT_LEDGER_SCHEMA_CHECK_INTERVAL_MS/);
-  assert.match(backupWorker, /DB_BACKUP_USER/);
+  assert.ok(backup.includes('verifyAuditLedgerSchema(connection)'));
+  assert.ok(backupWorker.includes('await verifierSchemaRegistreAudit();'));
+  assert.ok(backupWorker.includes('AUDIT_LEDGER_SCHEMA_CHECK_INTERVAL_MS'));
+  assert.ok(backupWorker.includes('DB_BACKUP_USER'));
   assert.ok(provisioner.includes('[ "$DB_USER" = "$DB_MIGRATION_USER" ]'));
   assert.ok(provisioner.includes('[ "$DB_USER" = "$DB_BACKUP_USER" ]'));
   assert.match(worker, /DB_BACKUP_USER: \$\{DB_BACKUP_USER/);
