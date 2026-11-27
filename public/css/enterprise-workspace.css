@@ -1603,7 +1603,21 @@ body.enterprise-console-shell .enterprise-collection-donut::before {
   background: var(--enterprise-surface) !important;
 }
 body.enterprise-console-shell .enterprise-collection-donut span {
+  /* Le pourcentage est posé sur le disque central : fournir un fond solide
+     pour que le contrôle de contraste évalue la surface réelle du texte. */
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--enterprise-surface) !important;
   color: var(--enterprise-text-strong) !important;
+}
+@media (max-width: 640px) {
+  body.enterprise-console-shell .enterprise-collection-donut span {
+    width: 38px;
+    height: 38px;
+  }
 }
 body.enterprise-console-shell .enterprise-stock-cash-row,
 body.enterprise-console-shell .enterprise-dashboard-card-link,
@@ -1819,19 +1833,91 @@ body.enterprise-console-shell #app-sidebar.sidebar.is-collapsed .nav-item.active
   }
 }
 
-/* Accessibilité : les commandes du bandeau Entreprise ont une surface claire.
-   Utiliser un texte et des icônes navy sur ces boutons, pas le bleu pâle réservé
-   au texte placé directement sur le fond navy du bandeau. */
+/* Accessibilité WCAG : commandes sur surfaces claires en thème light,
+   surfaces sombres en thème dark. Le texte suit la surface du bouton,
+   pas la couleur du bandeau qui se trouve derrière. */
+body.enterprise-console-shell {
+  --enterprise-topbar-control-text: #082B50;
+  --enterprise-topbar-control-hover-text: #066144;
+  --enterprise-topbar-control-hover-bg: var(--emerald-light);
+}
+:root[data-theme="dark"] body.enterprise-console-shell {
+  --enterprise-topbar-control-text: #E8F1FB;
+  --enterprise-topbar-control-hover-text: #91CDB0;
+  --enterprise-topbar-control-hover-bg: rgba(8,122,87,.2);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body.enterprise-console-shell {
+    --enterprise-topbar-control-text: #E8F1FB;
+    --enterprise-topbar-control-hover-text: #91CDB0;
+    --enterprise-topbar-control-hover-bg: rgba(8,122,87,.2);
+  }
+}
 body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle,
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout,
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization {
-  color: #082B50;
+  color: var(--enterprise-topbar-control-text);
 }
 body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle .icon,
 body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle svg,
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout .icon,
 body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization .icon {
-  color: #082B50;
+  color: var(--enterprise-topbar-control-text);
+}
+@media (hover: hover) and (pointer: fine) {
+  body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle:hover,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout:hover,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization:hover {
+    background: var(--enterprise-topbar-control-hover-bg);
+    color: var(--enterprise-topbar-control-hover-text);
+  }
+  body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle:hover .icon,
+  body.enterprise-console-shell .enterprise-console-topbar .app-notification-toggle:hover svg,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-logout:hover .icon,
+  body.enterprise-console-shell .enterprise-console-topbar .app-topbar-localization:hover .icon {
+    color: var(--enterprise-topbar-control-hover-text);
+  }
+}
+
+
+/* Contraste WCAG AA du badge de résumé dans l'espace professionnel. */
+.pro-workspace-guide-head .pro-status { color: #066144; }
+:root[data-theme="dark"] .pro-workspace-guide-head .pro-status { color: #9DE7BC; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .pro-workspace-guide-head .pro-status {
+    color: #9DE7BC;
+  }
+}
+
+/* Espace professionnel : six domaines équilibrés, sans modifier les modules métier. */
+.pro-workspace .pro-workspace-guide-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 1100px) {
+  .pro-workspace .pro-workspace-guide-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* Espace professionnel mobile : six domaines en rail horizontal compact. */
+@media (max-width: 560px) {
+  .pro-workspace .pro-workspace-guide-grid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: min(84vw, 300px);
+    gap: 10px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    padding: 2px 2px 10px;
+  }
+  .pro-workspace .pro-workspace-guide-group { scroll-snap-align: start; }
+  .pro-workspace .pro-workspace-guide-grid:focus-visible {
+    outline: 2px solid var(--emerald);
+    outline-offset: 3px;
+    border-radius: 10px;
+  }
 }
 
 /* Espace professionnel : six domaines équilibrés, sans modifier les modules métier. */

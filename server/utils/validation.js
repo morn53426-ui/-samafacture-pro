@@ -16,13 +16,6 @@ function percentage(value, fallback = 0) {
   return n;
 }
 
-/** Entier positif ou nul (ex: stock). */
-function positiveInt(value, fallback = 0) {
-  const n = Math.trunc(Number(value));
-  if (!Number.isFinite(n) || n < 0) return fallback;
-  return n;
-}
-
 /** Quantité de stock non négative, jusqu'à trois décimales (kg, litres, mètres, etc.). */
 function nonNegativeQuantity(value, fallback = 0) {
   const n = Number(value);
@@ -35,4 +28,4 @@ function isValidImageDataUrl(value) {
   return /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/]+=*$/.test(value);
 }
 
-module.exports = { positiveNumber, percentage, positiveInt, nonNegativeQuantity, isValidImageDataUrl };
+module.exports = { positiveNumber, percentage, nonNegativeQuantity, isValidImageDataUrl };

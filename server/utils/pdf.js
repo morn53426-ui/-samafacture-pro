@@ -125,7 +125,10 @@ async function genererPdfFacture(factureId, user) {
       window.SAMAFACTURE_API_URL = apiUrl;
     }, token, apiBaseUrl);
 
-    await page.goto(`${baseUrl}/facture-detail.html?id=${factureId}`, { waitUntil: 'networkidle0', timeout: 20000 });
+    // Ne pas attendre networkidle0 : le document émet une mesure analytique asynchrone.
+    // Le signal __docReady ci-dessous, puis le décodage explicite des polices et images,
+    // constituent les vrais critères de disponibilité du PDF.
+    await page.goto(`${baseUrl}/facture-detail.html?id=${factureId}`, { waitUntil: 'domcontentloaded', timeout: 20000 });
 
     // La facture est chargée en JS après la navigation (appel à /api/factures/:id) :
     // on attend le signal explicite window.__docReady plutôt qu'un délai fixe ou un

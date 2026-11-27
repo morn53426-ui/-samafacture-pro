@@ -10,10 +10,11 @@ const { isValidImageDataUrl } = require('../utils/validation');
 const { isProPlan, isEnterprisePlan, PRO_TEMPLATES, ENTERPRISE_TEMPLATES } = require('../utils/plans');
 const { sendMail } = require('../config/mailer');
 const { incrementerTokenVersion, invaliderCacheVersion } = require('../utils/session');
+const { normalizeTrialPlan } = require('../utils/free-trial');
+const { linkGoogleIdentity, findGoogleUserAfterInsertConflict } = require('../utils/google-account');
+const { SUPPORTED_CURRENCIES } = require('../config/localization');
+const { escapeHtmlEmail } = require('../utils/email-escape');
 
-function echapperHtml(valeur) {
-  return String(valeur == null ? '' : valeur).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
 
 const router = express.Router();
 
@@ -21,6 +22,23 @@ const router = express.Router();
 const TERMS_VERSION = '2026-11-13';
 const PRIVACY_VERSION = '2026-11-13';
 const googleClient = process.env.GOOGLE_CLIENT_ID ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
+
+// Un compte créé pour rejoindre une équipe ou un groupe de sociétés ne reçoit pas
+// un essai individuel concurrent : l'accès métier vient de l'entreprise invitante.
+async function hasPendingWorkspaceInvitation(email) {
+  const [rows] = await pool.query(
+    `SELECT 1 AS pending
+       FROM pro_team_invitations
+      WHERE LOWER(email) = ? AND statut = 'envoyee' AND expire_at > UTC_TIMESTAMP()
+     UNION ALL
+     SELECT 1 AS pending
+       FROM pro_company_group_invitations
+      WHERE LOWER(invited_email) = ? AND statut = 'envoyee' AND expire_at > UTC_TIMESTAMP()
+     LIMIT 1`,
+    [email, email]
+  );
+  return rows.length > 0;
+}
 
 // Personnalisation des modèles de facture (couleurs / logo / police) — voir la même liste de clés
 // et la même logique de validation côté client dans public/js/facture-templates.js
@@ -179,10 +197,11 @@ function definirCookieSession(res, token) {
  *                 token: { type: string }
  *                 user: { $ref: '#/components/schemas/Utilisateur' }
  *       400: { description: "Champs manquants ou email déjà utilisé.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
+ *       409: { description: "Un compte existe déjà avec cet email.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/register', registerLimiter, async (req, res, next) => {
   try {
-    const { nom, email, password, entreprise_nom, acceptTerms } = req.body;
+    const { nom, email, password, entreprise_nom, acceptTerms, plan } = req.body;
 
     if (!nom || !email || !password) {
       return res.status(400).json({ error: 'Nom, email et mot de passe sont obligatoires.' });
@@ -194,17 +213,48 @@ router.post('/register', registerLimiter, async (req, res, next) => {
       return res.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' });
     }
 
-    const emailLower = email.toLowerCase();
+    const emailLower = email.trim().toLowerCase();
+    const requestedTrialPlan = plan === undefined ? null : normalizeTrialPlan(plan);
+    if (plan !== undefined && !requestedTrialPlan) {
+      return res.status(400).json({ error: 'Formule d’essai invalide. Choisissez Standard, Pro ou Entreprise.' });
+    }
+    const trialPlan = requestedTrialPlan && !(await hasPendingWorkspaceInvitation(emailLower))
+      ? requestedTrialPlan
+      : null;
     const [existingRows] = await pool.query('SELECT id FROM users WHERE email = ?', [emailLower]);
     if (existingRows.length) {
       return res.status(409).json({ error: 'Un compte existe déjà avec cet email.' });
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      `INSERT INTO users (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version) VALUES (?, ?, ?, ?, NOW(), ?, ?)`,
-      [nom, emailLower, hash, entreprise_nom || nom, TERMS_VERSION, PRIVACY_VERSION]
-    );
+    let result;
+    try {
+      if (trialPlan) {
+        [result] = await pool.query(
+          `INSERT INTO users
+            (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version,
+             plan, trial_plan, trial_started_at, trial_ends_at, trial_status)
+           VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 DAY), 'trialing')`,
+          [nom, emailLower, hash, entreprise_nom || nom, TERMS_VERSION, PRIVACY_VERSION, trialPlan, trialPlan]
+        );
+      } else {
+        // Rétrocompatibilité API : les anciens clients qui n'envoient pas de plan
+        // restent sur Gratuit. L'inscription web propose toujours un plan d'essai.
+        [result] = await pool.query(
+          `INSERT INTO users (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version)
+           VALUES (?, ?, ?, ?, NOW(), ?, ?)`,
+          [nom, emailLower, hash, entreprise_nom || nom, TERMS_VERSION, PRIVACY_VERSION]
+        );
+      }
+    } catch (err) {
+      // Deux inscriptions simultanées avec le même email passent toutes deux le SELECT ci-dessus :
+      // l'index unique uk_users_email départage (un seul compte, un seul essai). Les perdants
+      // doivent recevoir le même 409 qu'une inscription séquentielle, pas une erreur 500.
+      if (err && err.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ error: 'Un compte existe déjà avec cet email.' });
+      }
+      throw err;
+    }
 
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
     const user = rows[0];
@@ -256,9 +306,17 @@ router.post('/login', loginLimiter, async (req, res, next) => {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect.' });
     }
 
-    const token = signToken(user);
+    await pool.query(
+      `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
+       WHERE id = ? AND trial_status = 'trialing'
+         AND (trial_ends_at IS NULL OR trial_ends_at <= UTC_TIMESTAMP())`,
+      [user.id]
+    );
+    const [currentRows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
+    const currentUser = currentRows[0];
+    const token = signToken(currentUser);
     definirCookieSession(res, token);
-    res.json({ token, user: sanitizeUser(user) });
+    res.json({ token, user: sanitizeUser(currentUser) });
   } catch (err) { next(err); }
 });
 
@@ -292,6 +350,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
  *               properties:
  *                 token: { type: string }
  *                 user: { $ref: '#/components/schemas/Utilisateur' }
+ *       409: { description: "Le compte est déjà associé à une autre identité Google.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  *       503: { description: "Connexion Google non configurée sur ce serveur.", content: { application/json: { schema: { $ref: '#/components/schemas/Erreur' } } } }
  */
 router.post('/google', async (req, res, next) => {
@@ -299,7 +358,7 @@ router.post('/google', async (req, res, next) => {
     if (!googleClient) {
       return res.status(503).json({ error: "La connexion Google n'est pas configurée sur ce serveur." });
     }
-    const { credential, acceptTerms } = req.body;
+    const { credential, acceptTerms, plan } = req.body;
     if (!credential) return res.status(400).json({ error: 'Jeton Google manquant.' });
 
     let payload;
@@ -319,8 +378,9 @@ router.post('/google', async (req, res, next) => {
     }
     const emailLower = email.toLowerCase();
 
-    // Cherche d'abord un compte déjà lié à ce Google ID, puis un compte existant avec le
-    // même email (on le lie alors automatiquement à Google pour la prochaine connexion).
+    // Cherche d'abord l'identité Google, puis un compte existant par email.
+    // La liaison compare et met à jour google_id de façon conditionnelle afin qu'une
+    // requête concurrente ne puisse pas écraser l'identité liée par une autre requête.
     let [rows] = await pool.query('SELECT * FROM users WHERE google_id = ?', [googleId]);
     let user = rows[0];
 
@@ -328,15 +388,12 @@ router.post('/google', async (req, res, next) => {
       [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [emailLower]);
       user = rows[0];
       if (user) {
-        // Liaison d'un compte existant par email : le mot de passe existant est neutralisé et les
-        // sessions déjà ouvertes sont révoquées. Cela empêche un compte créé d'avance par un tiers
-        // avec l'email de la victime (« pre-hijacking ») de rester accessible après la liaison.
-        // L'utilisateur peut redéfinir un mot de passe via « Mot de passe oublié ».
-        const motDePasseInutilisable = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-        await pool.query('UPDATE users SET google_id = ?, password_hash = ?, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ?', [googleId, motDePasseInutilisable, user.id]);
-        await incrementerTokenVersion(null, user.id);
-        [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
-        user = rows[0];
+        user = await linkGoogleIdentity(pool, user, googleId, () =>
+          bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10)
+        );
+        if (!user) {
+          return res.status(409).json({ error: 'Ce compte est déjà associé à une autre identité Google.' });
+        }
       }
     }
 
@@ -344,15 +401,63 @@ router.post('/google', async (req, res, next) => {
       if (acceptTerms !== true) {
         return res.status(400).json({ error: 'Pour créer un compte avec Google, acceptez d’abord les conditions d’utilisation et confirmez avoir pris connaissance de la politique de confidentialité.' });
       }
-      // Nouveau compte : mot de passe aléatoire inutilisable (la connexion se fera via Google)
+      // Nouveau compte : mot de passe aléatoire inutilisable (la connexion se fera via Google).
+      // Le compte existant ou les invitations en cours ne réinitialisent jamais un essai.
+      const requestedTrialPlan = plan === undefined ? null : normalizeTrialPlan(plan);
+      if (plan !== undefined && !requestedTrialPlan) {
+        return res.status(400).json({ error: 'Formule d’essai invalide. Choisissez Standard, Pro ou Entreprise.' });
+      }
+      const trialPlan = requestedTrialPlan && !(await hasPendingWorkspaceInvitation(emailLower))
+        ? requestedTrialPlan
+        : null;
       const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-      const [result] = await pool.query(
-        `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)`,
-        [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION]
-      );
-      [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-      user = rows[0];
+      let result;
+      const insertSql = trialPlan
+        ? `INSERT INTO users
+            (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version,
+             plan, trial_plan, trial_started_at, trial_ends_at, trial_status)
+           VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL 15 DAY), 'trialing')`
+        : `INSERT INTO users (nom, email, password_hash, entreprise_nom, google_id, terms_accepted_at, terms_version, privacy_version)
+           VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)`;
+      const insertParams = trialPlan
+        ? [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION, trialPlan, trialPlan]
+        : [name || emailLower, emailLower, randomPassword, name || emailLower, googleId, TERMS_VERSION, PRIVACY_VERSION];
+
+      try {
+        [result] = await pool.query(insertSql, insertParams);
+      } catch (insertErr) {
+        if (!insertErr || insertErr.code !== 'ER_DUP_ENTRY') throw insertErr;
+        // Une autre requête a pu créer la même identité ou le même email après nos SELECT.
+        // Relecture par google_id en premier permet de rejouer proprement une connexion identique.
+        const conflict = await findGoogleUserAfterInsertConflict(pool, googleId, emailLower);
+        if (conflict.source === 'google') {
+          user = conflict.user;
+        } else if (conflict.source === 'email') {
+          user = await linkGoogleIdentity(pool, conflict.user, googleId, () =>
+            bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10)
+          );
+          if (!user) {
+            return res.status(409).json({ error: 'Cette adresse email est déjà associée à une autre identité Google.' });
+          }
+        } else {
+          throw insertErr;
+        }
+      }
+
+      if (!user && result && result.insertId) {
+        [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+        user = rows[0];
+      }
     }
+
+    await pool.query(
+      `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
+       WHERE id = ? AND trial_status = 'trialing'
+         AND (trial_ends_at IS NULL OR trial_ends_at <= UTC_TIMESTAMP())`,
+      [user.id]
+    );
+    [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.id]);
+    user = rows[0];
 
     const token = signToken(user);
     definirCookieSession(res, token);
@@ -426,7 +531,7 @@ router.post('/mot-de-passe-oublie', resetLimiter, async (req, res, next) => {
         to: user.email,
         subject: 'Réinitialisation de votre mot de passe SamaFacture Pro',
         text: `Bonjour ${user.nom},\n\nVous avez demandé à réinitialiser votre mot de passe. Cliquez sur ce lien (valable 30 minutes) :\n${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`,
-        html: `<p>Bonjour ${echapperHtml(user.nom)},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
+        html: `<p>Bonjour ${escapeHtmlEmail(user.nom)},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Ce lien est valable 30 minutes :</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>`
       });
     }
 
@@ -577,13 +682,13 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
       }
     }
 
-    const [[userRow]] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
-    const proActif = isProPlan(userRow?.plan);
-
+    // Valider la valeur explicite tôt ; la devise effective sera relue sous verrou
+    // juste avant l'écriture afin de ne pas utiliser un état devenu obsolète.
+    if (devise !== undefined && devise !== null && String(devise).trim() !== '' &&
+        !SUPPORTED_CURRENCIES.includes(String(devise).trim().toUpperCase())) {
+      return res.status(400).json({ error: 'Devise de base non prise en charge.' });
+    }
     if (signature_default) {
-      if (!proActif) {
-        return res.status(403).json({ error: 'La signature électronique est réservée au plan Pro. Passez à un plan payant dans Paramètres.', code: 'FONCTIONNALITE_PRO' });
-      }
       if (signature_default.length > 2 * 1024 * 1024) {
         return res.status(400).json({ error: 'Signature trop volumineuse.' });
       }
@@ -603,53 +708,106 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
       'eclipse', 'saphir', 'conseil', 'imperial', 'panorama', 'groupe', 'majeste'
     ];
     let template = templatesValides.includes(facture_template) ? facture_template : 'classique';
-    if (PRO_TEMPLATES.includes(template) && !proActif) {
-      return res.status(403).json({ error: 'Ce modèle de facture est réservé au plan Pro. Passez à un plan payant dans Paramètres.', code: 'FONCTIONNALITE_PRO' });
-    }
-    if (ENTERPRISE_TEMPLATES.includes(template) && !isEnterprisePlan(userRow?.plan)) {
-      return res.status(403).json({ error: 'Ce modèle de facture est réservé au plan Entreprise. Passez au plan Entreprise dans Paramètres.', code: 'FONCTIONNALITE_ENTREPRISE' });
-    }
-
     const texteOptionnel = (value, fallback, max) => {
       if (value === undefined) return fallback ?? null;
       if (value === null) return null;
       return String(value).trim().slice(0, max) || null;
     };
-    await pool.query(
-      `UPDATE users SET
-        entreprise_nom = ?, entreprise_logo = ?, entreprise_adresse = ?, entreprise_telephone = ?,
-        entreprise_email = ?, entreprise_ninea = ?, entreprise_rccm = ?, entreprise_site_web = ?,
-        entreprise_banque = ?, entreprise_rib = ?, entreprise_conditions_reglement = ?,
-        entreprise_mentions_legales = ?, devise = ?, facture_template = ?, signature_default = ?,
-        facture_personnalisation = ?
-       WHERE id = ?`,
-      [
-        entreprise_nom, entreprise_logo || null, entreprise_adresse, entreprise_telephone, entreprise_email,
-        entreprise_ninea,
-        texteOptionnel(entreprise_rccm, userRow.entreprise_rccm, 80),
-        texteOptionnel(entreprise_site_web, userRow.entreprise_site_web, 190),
-        texteOptionnel(entreprise_banque, userRow.entreprise_banque, 120),
-        texteOptionnel(entreprise_rib, userRow.entreprise_rib, 100),
-        texteOptionnel(entreprise_conditions_reglement, userRow.entreprise_conditions_reglement, 5000),
-        texteOptionnel(entreprise_mentions_legales, userRow.entreprise_mentions_legales, 2000),
-        devise || 'FCFA', template, signature_default || null,
-        personnalisationValidee ? JSON.stringify(personnalisationValidee) : null, req.user.id
-      ]
-    );
+    let conn;
+    try {
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+      // Le même verrou de ligne users est pris par les écritures métier qui
+      // initialisent l'historique (factures, commandes et achats).
+      const [[lockedUser]] = await conn.query(
+        'SELECT * FROM users WHERE id = ? FOR UPDATE',
+        [req.user.id]
+      );
+      if (!lockedUser) {
+        await conn.rollback();
+        return res.status(404).json({ error: 'Utilisateur introuvable.' });
+      }
+
+      // Le plan et les champs de repli doivent provenir de la même lecture verrouillée :
+      // une mise à jour concurrente du compte ne peut ni contourner les droits, ni être écrasée.
+      const proActif = isProPlan(lockedUser.plan);
+      if (signature_default && !proActif) {
+        await conn.rollback();
+        return res.status(403).json({ error: 'La signature électronique est réservée au plan Pro. Passez à un plan payant dans Paramètres.', code: 'FONCTIONNALITE_PRO' });
+      }
+      if (PRO_TEMPLATES.includes(template) && !proActif) {
+        await conn.rollback();
+        return res.status(403).json({ error: 'Ce modèle de facture est réservé au plan Pro. Passez à un plan payant dans Paramètres.', code: 'FONCTIONNALITE_PRO' });
+      }
+      if (ENTERPRISE_TEMPLATES.includes(template) && !isEnterprisePlan(lockedUser.plan)) {
+        await conn.rollback();
+        return res.status(403).json({ error: 'Ce modèle de facture est réservé au plan Entreprise. Passez au plan Entreprise dans Paramètres.', code: 'FONCTIONNALITE_ENTREPRISE' });
+      }
+
+      const currentCurrency = String(lockedUser.devise || 'FCFA').toUpperCase();
+      const requestedCurrency = devise === undefined || devise === null || String(devise).trim() === ''
+        ? currentCurrency
+        : String(devise).trim().toUpperCase();
+      if (!SUPPORTED_CURRENCIES.includes(requestedCurrency)) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Devise de base non prise en charge.' });
+      }
+
+      if (requestedCurrency !== currentCurrency) {
+        const [[history]] = await conn.query(
+          'SELECT (SELECT COUNT(*) FROM factures WHERE user_id = ?) AS factures, (SELECT COUNT(*) FROM depenses WHERE user_id = ?) AS depenses, (SELECT COUNT(*) FROM paiements WHERE user_id = ?) AS paiements, (SELECT COUNT(*) FROM pro_commandes_fournisseurs WHERE user_id = ?) AS achats, (SELECT COUNT(*) FROM pro_commandes WHERE user_id = ?) AS commandes, (SELECT COUNT(*) FROM pro_bons_livraison WHERE user_id = ?) AS livraisons, (SELECT COUNT(*) FROM pro_mouvements_stock WHERE user_id = ?) AS mouvements_stock, (SELECT COUNT(*) FROM pro_compta_ecritures WHERE user_id = ?) AS ecritures, (SELECT COUNT(*) FROM produits WHERE user_id = ?) AS produits, (SELECT COUNT(*) FROM factures_recurrentes WHERE user_id = ?) AS modeles_recurrents',
+          [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id]
+        );
+        const hasBusinessHistory = Object.values(history || {}).some(value => Number(value) > 0);
+        if (hasBusinessHistory) {
+          await conn.rollback();
+          return res.status(409).json({
+            error: 'La devise de base ne peut plus être modifiée après l’enregistrement de documents, produits tarifés, modèles récurrents ou mouvements financiers. Les anciennes écritures ne sont pas converties automatiquement.'
+          });
+        }
+      }
+
+      await conn.query(
+        `UPDATE users SET
+          entreprise_nom = ?, entreprise_logo = ?, entreprise_adresse = ?, entreprise_telephone = ?,
+          entreprise_email = ?, entreprise_ninea = ?, entreprise_rccm = ?, entreprise_site_web = ?,
+          entreprise_banque = ?, entreprise_rib = ?, entreprise_conditions_reglement = ?,
+          entreprise_mentions_legales = ?, devise = ?, facture_template = ?, signature_default = ?,
+          facture_personnalisation = ?
+         WHERE id = ?`,
+        [
+          entreprise_nom, entreprise_logo || null, entreprise_adresse, entreprise_telephone, entreprise_email,
+          entreprise_ninea,
+          texteOptionnel(entreprise_rccm, lockedUser.entreprise_rccm, 80),
+          texteOptionnel(entreprise_site_web, lockedUser.entreprise_site_web, 190),
+          texteOptionnel(entreprise_banque, lockedUser.entreprise_banque, 120),
+          texteOptionnel(entreprise_rib, lockedUser.entreprise_rib, 100),
+          texteOptionnel(entreprise_conditions_reglement, lockedUser.entreprise_conditions_reglement, 5000),
+          texteOptionnel(entreprise_mentions_legales, lockedUser.entreprise_mentions_legales, 2000),
+          requestedCurrency, template, signature_default || null,
+          personnalisationValidee ? JSON.stringify(personnalisationValidee) : null, req.user.id
+        ]
+      );
+      await conn.commit();
+    } catch (err) {
+      if (conn) await conn.rollback().catch(() => {});
+      throw err;
+    } finally {
+      if (conn) conn.release();
+    }
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
     res.json({ user: sanitizeUser(rows[0]) });
   } catch (err) { next(err); }
 });
 
-// Cette route ne peut plus attribuer de plan payant. Les plans Starter, Pro et
-// Entreprise sont activés exclusivement par /abonnement/webhook/* après vérification
-// serveur-à-serveur du paiement. La route reste disponible uniquement pour revenir au
-// plan gratuit ; masquer le bouton dans le frontend ne constitue jamais une protection.
+// Un utilisateur peut changer de formule sans paiement uniquement pendant son essai
+// gratuit actif. Le changement conserve strictement la date initiale de fin ; hors essai,
+// l'activation d'un plan payant reste réservée à un paiement confirmé par webhook.
 /**
  * @openapi
  * /auth/plan:
  *   put:
- *     summary: Permet uniquement de revenir au plan Gratuit ; les plans payants exigent un paiement confirmé
+ *     summary: Permet de choisir une formule pendant l'essai actif ou de revenir au plan Gratuit
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -658,30 +816,67 @@ router.put('/entreprise', requireAuth, async (req, res, next) => {
  *           schema:
  *             type: object
  *             required: [plan]
- *             properties: { plan: { type: string, enum: [gratuit, starter, pro, entreprise] } }
+ *             properties: { plan: { type: string, enum: [gratuit, standard, starter, pro, entreprise] } }
  *     responses:
- *       200: { description: Retour au plan Gratuit. }
- *       403: { description: Un paiement confirmé côté serveur est requis pour activer un plan payant. }
+ *       200: { description: Formule d'essai modifiée sans réinitialiser sa date d'expiration, ou retour au plan Gratuit. }
+ *       403: { description: Un paiement confirmé est requis hors essai actif. }
  */
 router.put('/plan', requireAuth, async (req, res, next) => {
   try {
-    const { plan } = req.body;
-    if (!['gratuit', 'starter', 'pro', 'entreprise'].includes(plan)) {
-      return res.status(400).json({ error: 'Plan invalide.' });
-    }
-    if (plan !== 'gratuit') {
-      return res.status(403).json({
-        error: 'Un plan payant ne peut être activé qu’après confirmation du paiement par le prestataire.',
-        code: 'PAIEMENT_REQUIS'
-      });
-    }
-    const [result] = await pool.query(
-      "UPDATE users SET plan = 'gratuit' WHERE id = ? AND plan <> 'gratuit'",
+    const requestedPlan = req.body && req.body.plan;
+    const targetPlan = requestedPlan === 'gratuit' ? 'gratuit' : normalizeTrialPlan(requestedPlan);
+    if (!targetPlan) return res.status(400).json({ error: 'Plan invalide.' });
+
+    const [[account]] = await pool.query(
+      `SELECT plan, trial_status, trial_ends_at,
+              CASE WHEN trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP() THEN 1 ELSE 0 END AS trial_active
+       FROM users WHERE id = ? LIMIT 1`,
       [req.user.id]
     );
+    if (!account) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+
+    let result = { affectedRows: 0 };
+    if (account.trial_status === 'trialing' && Number(account.trial_active) === 1) {
+      // Rechoisir la formule déjà active est idempotent : cela ne doit pas être
+      // interprété comme une expiration si MySQL ne compte aucune ligne modifiée.
+      if (targetPlan === account.plan && targetPlan !== 'gratuit') {
+        result = { affectedRows: 0 };
+      } else if (targetPlan === 'gratuit') {
+        [result] = await pool.query(
+          `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
+           WHERE id = ? AND trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP()`,
+          [req.user.id]
+        );
+      } else {
+        [result] = await pool.query(
+          `UPDATE users SET plan = ?, trial_plan = ?
+           WHERE id = ? AND trial_status = 'trialing' AND trial_ends_at > UTC_TIMESTAMP()`,
+          [targetPlan, targetPlan, req.user.id]
+        );
+      }
+      if (targetPlan !== account.plan && !result.affectedRows) {
+        await pool.query(
+          `UPDATE users SET plan = 'gratuit', trial_status = 'expired'
+           WHERE id = ? AND trial_status = 'trialing' AND (trial_ends_at IS NULL OR trial_ends_at <= UTC_TIMESTAMP())`,
+          [req.user.id]
+        );
+        return res.status(403).json({ error: 'Votre période d’essai est terminée. Votre compte est repassé sur le plan Gratuit.', code: 'ESSAI_EXPIRE' });
+      }
+    } else {
+      if (targetPlan !== 'gratuit') {
+        return res.status(403).json({
+          error: 'Un plan payant ne peut être activé qu’après confirmation du paiement par le prestataire.',
+          code: 'PAIEMENT_REQUIS'
+        });
+      }
+      [result] = await pool.query(
+        "UPDATE users SET plan = 'gratuit' WHERE id = ? AND plan <> 'gratuit'",
+        [req.user.id]
+      );
+    }
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [req.user.id]);
     if (!rows.length) return res.status(404).json({ error: 'Utilisateur introuvable.' });
-    res.json({ user: sanitizeUser(rows[0]), changed: result.affectedRows > 0 });
+    res.json({ user: sanitizeUser(rows[0]), changed: Boolean(result && result.affectedRows > 0) });
   } catch (err) { next(err); }
 });
 
@@ -732,18 +927,74 @@ router.put('/photo', requireAuth, async (req, res, next) => {
  * @openapi
  * /auth/donnees:
  *   delete:
- *     summary: Supprime définitivement le compte et toutes ses données (clients, factures, produits...)
- *     description: Action irréversible. Supprime en cascade tout ce qui est lié à l'utilisateur (contraintes ON DELETE CASCADE en base).
+ *     summary: Réinitialise les données métier du tableau de bord sans supprimer le compte
+ *     description: Action irréversible pour les données autorisées. Les factures émises et tout historique comptable ou opérationnel protégé font refuser la réinitialisation avec HTTP 409. L'identité du compte et les paramètres de l'entreprise sont conservés.
  *     tags: [Auth]
  *     responses:
- *       200: { description: "Compte et données supprimés." }
+ *       200: { description: "Données métier réinitialisées; le compte et ses paramètres sont conservés." }
+ *       409: { description: "Réinitialisation refusée car un historique métier ou comptable doit être conservé." }
  */
 router.delete('/donnees', requireAuth, async (req, res, next) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    // L'ordre respecte les dépendances : factures d'abord (les lignes et paiements
-    // sont supprimés automatiquement via ON DELETE CASCADE), puis clients, produits, dépenses.
+
+    // Verrouille les plages des données qui seraient supprimées afin d'éviter qu'une
+    // création concurrente ne passe entre la vérification d'historique et le DELETE.
+    await conn.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [req.user.id]);
+    for (const table of ['factures', 'clients', 'produits', 'depenses']) {
+      await conn.query(`SELECT id FROM ${table} WHERE user_id = ? FOR UPDATE`, [req.user.id]);
+    }
+
+    // Le reset historique supprimait toutes les factures émises et faisait cascader
+    // pro_compta_facture_events; il désolidarisait aussi les écritures des factures,
+    // les mouvements de stock des produits, et les activités CRM/portail des clients.
+    // Il ne doit être autorisé que sur un compte sans données métier/audit à préserver.
+    const historiques = [
+      { table: 'factures', where: "user_id = ? AND type = 'facture'", label: 'factures émises' },
+      { table: 'paiements', where: 'user_id = ?', label: 'paiements' },
+      { table: 'pro_compta_ecritures', where: 'user_id = ?', label: 'écritures comptables' },
+      { table: 'pro_compta_lignes', where: 'user_id = ?', label: 'lignes comptables' },
+      { table: 'pro_compta_facture_events', where: 'user_id = ?', label: 'événements de contrepassation' },
+      { table: 'pro_avoirs', where: 'user_id = ?', label: 'avoirs' },
+      { table: 'pro_acomptes', where: 'user_id = ?', label: 'acomptes' },
+      { table: 'pro_refund_requests', where: 'user_id = ?', label: 'demandes de remboursement' },
+      { table: 'pro_payment_links', where: 'user_id = ?', label: 'liens de paiement' },
+      { table: 'pro_invoice_checkouts', where: 'user_id = ?', label: 'sessions de paiement' },
+      { table: 'pro_mouvements_stock', where: 'user_id = ?', label: 'mouvements de stock' },
+      { table: 'pro_stocks_entrepots', where: 'user_id = ?', label: 'stocks entrepôts' },
+      { table: 'pro_commandes', where: 'user_id = ?', label: 'commandes clients' },
+      { table: 'pro_bons_livraison', where: 'user_id = ?', label: 'bons de livraison' },
+      { table: 'pro_commandes_fournisseurs', where: 'user_id = ?', label: 'commandes fournisseurs' },
+      { table: 'pro_commandes_fournisseurs_lignes', where: 'user_id = ?', label: 'lignes achats' },
+      { table: 'pro_receptions_achats', where: 'user_id = ?', label: 'réceptions achats' },
+      { table: 'pro_receptions_achats_lignes', where: 'user_id = ?', label: 'lignes de réception' },
+      { table: 'factures_recurrentes', where: 'user_id = ?', label: 'factures récurrentes' },
+      { table: 'pro_customer_portal_access', where: 'user_id = ?', label: 'accès portail client' },
+      { table: 'pro_portal_quote_decisions', where: 'user_id = ?', label: 'décisions portail' },
+      { table: 'pro_crm_activities', where: 'user_id = ?', label: 'activités CRM' },
+      { table: 'pro_documents', where: 'user_id = ? AND (facture_id IS NOT NULL OR client_id IS NOT NULL)', label: 'documents liés' },
+      { table: 'pro_audit_logs', where: 'user_id = ?', label: 'journal d’audit' },
+      { table: 'pro_caisse_operations', where: 'user_id = ?', label: 'opérations de caisse' }
+    ];
+
+    for (const historique of historiques) {
+      const [rows] = await conn.query(
+        `SELECT id FROM ${historique.table} WHERE ${historique.where} FOR UPDATE`,
+        [req.user.id]
+      );
+      if (rows.length > 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: 'Réinitialisation refusée : des données métier ou comptables historiques sont présentes (' +
+            historique.label + '). Exportez et archivez vos données avant toute opération de réinitialisation.',
+          code: 'RESET_HISTORIQUE_PROTEGE'
+        });
+      }
+    }
+
+    // Compte sans historique protégé : les brouillons et données non comptabilisées
+    // peuvent être supprimés dans cette transaction; les données d'entreprise restent.
     await conn.query('DELETE FROM factures WHERE user_id = ?', [req.user.id]);
     await conn.query('DELETE FROM clients WHERE user_id = ?', [req.user.id]);
     await conn.query('DELETE FROM produits WHERE user_id = ?', [req.user.id]);

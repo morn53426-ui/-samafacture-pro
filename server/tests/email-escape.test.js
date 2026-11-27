@@ -33,3 +33,17 @@ describe('Sécurité des emails sortants', () => {
     }
   });
 });
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+test('les emails d’authentification réutilisent le helper HTML partagé', () => {
+  const authRoute = fs.readFileSync(
+    path.join(__dirname, '..', 'routes', 'auth.js'),
+    'utf8'
+  );
+  assert.match(authRoute, /const \{ escapeHtmlEmail \} = require\('\.\.\/utils\/email-escape'\);/);
+  assert.match(authRoute, /escapeHtmlEmail\(user\.nom\)/);
+  assert.doesNotMatch(authRoute, /function echapperHtml\s*\(/,
+    'Le helper local dupliqué ne doit pas réapparaître.');
+});

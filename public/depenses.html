@@ -35,7 +35,7 @@
         <span class="workspace-data-type"><i class="ic" data-icon="file-stack"></i> Données du compte</span>
       </div>
       <table class="table-stack depenses-table">
-        <thead><tr><th>Libellé</th><th>Catégorie</th><th>Date</th><th>Montant</th><th></th></tr></thead>
+        <thead><tr><th>Libellé</th><th>Catégorie</th><th>Règlement</th><th>Date</th><th>Montant</th><th></th></tr></thead>
         <tbody id="depenses-body"></tbody>
       </table>
     </div>
@@ -54,6 +54,7 @@
         <div class="field" style="flex:1;"><label>Date *</label><input type="date" id="date_depense" required /></div>
       </div>
       <div class="field"><label>Catégorie</label><input type="text" id="categorie" placeholder="Loyer, Transport, Stock..." /></div>
+      <div class="field"><label>Mode de règlement *</label><select id="mode_reglement" required><option value="caisse">Caisse (571)</option><option value="banque">Banque (521)</option></select><small>Choisissez le compte qui a réellement réglé la dépense.</small></div>
       <div class="field"><label>Notes</label><textarea id="notes"></textarea></div>
       <div style="display:flex; gap:10px; justify-content:flex-end;">
         <button type="button" class="btn btn-outline" onclick="closeModal()">Annuler</button>
@@ -78,14 +79,14 @@
       <tr>
         <td data-label="Libellé" class="depense-libelle">${escapeHtml(d.libelle)}</td>
         <td data-label="Catégorie">${escapeHtml(d.categorie) || '—'}</td>
+        <td data-label="Règlement">${d.mode_reglement === 'banque' ? 'Banque (521)' : 'Caisse (571)'}</td>
         <td data-label="Date">${formatDate(d.date_depense)}</td>
-        <td data-label="Montant" class="mono" style="color:var(--clay);">${formatMontant(d.montant)}</td>
+        <td data-label="Montant" class="mono" style="color:var(--clay-text);">${formatMontant(d.montant)}</td>
         <td data-label="Actions" class="depense-actions-cell">
-          <button class="btn btn-sm btn-outline" onclick='editDepense(${d.id})'>${Icon('edit-3')} Modifier</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteDepense(${d.id})">${Icon('trash-2')} Supprimer</button>
+          ${Number(d.comptabilisee) ? '<span class="workspace-data-type">Comptabilisée</span>' : `<button class="btn btn-sm btn-outline" onclick='editDepense(${d.id})'>${Icon('edit-3')} Modifier</button> <button class="btn btn-sm btn-danger" onclick="deleteDepense(${d.id})">${Icon('trash-2')} Supprimer</button>`}
         </td>
       </tr>
-    `).join('') : `<tr><td colspan="5"><div class="empty-state"><div class="ic">${Icon('wallet')}</div>Aucune dépense enregistrée</div></td></tr>`;
+    `).join('') : `<tr><td colspan="6"><div class="empty-state"><div class="ic">${Icon('wallet')}</div>Aucune dépense enregistrée</div></td></tr>`;
   }
 
   function openModal() {
@@ -93,6 +94,7 @@
     document.getElementById('depense-form').reset();
     document.getElementById('depense-id').value = '';
     document.getElementById('date_depense').value = dateCivileAujourdhui();
+    document.getElementById('mode_reglement').value = 'caisse';
     document.getElementById('modal-error').innerHTML = '';
     document.getElementById('modal').style.display = 'flex';
   }
@@ -107,6 +109,7 @@
     document.getElementById('date_depense').value = d.date_depense;
     document.getElementById('categorie').value = d.categorie || '';
     document.getElementById('notes').value = d.notes || '';
+    document.getElementById('mode_reglement').value = d.mode_reglement || 'caisse';
     document.getElementById('modal').style.display = 'flex';
   }
 
@@ -128,6 +131,7 @@
       montant: parseFloat(document.getElementById('montant').value) || 0,
       date_depense: document.getElementById('date_depense').value,
       categorie: document.getElementById('categorie').value,
+      mode_reglement: document.getElementById('mode_reglement').value,
       notes: document.getElementById('notes').value
     };
     const restore = setButtonLoading(e.target.querySelector('button[type=submit]'), 'Enregistrement…');
@@ -137,7 +141,7 @@
       closeModal();
       load().catch(err => alert(err.message));
     } catch (err) {
-      document.getElementById('modal-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('modal-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }

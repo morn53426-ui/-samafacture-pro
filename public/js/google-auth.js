@@ -41,10 +41,11 @@ async function handleGoogleCredential(response) {
   const errorBox = document.getElementById('error-box');
   try {
     const acceptTerms = document.getElementById('accept-terms')?.checked === true;
-    const { token, user } = await Api.post('/auth/google', { credential: response.credential, acceptTerms });
+    const plan = document.getElementById('trial-plan')?.value;
+    const { token, user } = await Api.post('/auth/google', { credential: response.credential, acceptTerms, ...(plan ? { plan } : {}) });
     Api.setSession(token, user);
     location.href = 'dashboard.html';
   } catch (err) {
-    if (errorBox) errorBox.innerHTML = `<div class="error-box">${err.message}</div>`;
+    if (errorBox) errorBox.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
   }
 }

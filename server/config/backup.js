@@ -41,7 +41,11 @@ async function runMysqldump(outputPath, encryptionKey = null) {
     `--port=${process.env.DB_PORT || 3306}`,
     `--user=${process.env.DB_USER || 'root'}`,
     '--single-transaction',
-    '--routines',
+    // MySQL 8.0.21+ otherwise requires the global PROCESS privilege.
+    // The application DB account is deliberately scoped to this schema only.
+    '--no-tablespaces',
+    // The current application schema has no stored procedures/functions.
+    // Avoid --routines, which requires global SELECT on MySQL 8.
     '--events',
     process.env.DB_NAME || 'samafacture'
   ];
@@ -109,7 +113,16 @@ async function nettoyerAnciennesSauvegardes() {
 /** Effectue une sauvegarde. En cas d'échec, l'appelant reçoit une erreur explicite. */
 async function effectuerSauvegarde() {
   const encryptionKey = getBackupEncryptionKey();
-  await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
+  // Le volume peut avoir été créé avec le mode Docker 0755. Les noms et archives
+  // de sauvegarde ne doivent être accessibles qu'au compte applicatif.
+  await fs.promises.mkdir(BACKUP_DIR, { recursive: true, mode: 0o700 });
+  if (process.platform !== 'win32') {
+    const backupDirStat = await fs.promises.stat(BACKUP_DIR);
+    if (!backupDirStat.isDirectory()) {
+      throw new Error('BACKUP_DIR doit désigner un répertoire.');
+    }
+    await fs.promises.chmod(BACKUP_DIR, 0o700);
+  }
   const horodatage = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const suffixe = require('crypto').randomBytes(3).toString('hex');
   const extension = encryptionKey ? '.sql.gz.enc' : '.sql.gz';

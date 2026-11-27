@@ -220,6 +220,14 @@ describe('Génération PDF de facture', () => {
     const baseUrl = process.env.PDF_BASE_URL;
     assert.ok(baseUrl, 'le serveur HTTP de test doit être démarré');
 
+    // Le modèle moderne possède un bandeau -40px avec 40px de padding horizontal.
+    // En impression, son fond doit atteindre exactement les bords utiles sans coller
+    // le titre FACTURE/DEVIS au bord du papier.
+    await pool.query(
+      'UPDATE users SET facture_template = ? WHERE id = ?',
+      ['moderne', userIdA]
+    );
+
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -239,8 +247,10 @@ describe('Génération PDF de facture', () => {
         window.SAMAFACTURE_API_URL = apiBaseUrl;
       }, tokenA, `${baseUrl}/api`);
 
+      // La page signale sa disponibilité via __docReady ; les appels asynchrones
+      // de télémétrie ne doivent pas bloquer cette recette d'impression.
       await page.goto(`${baseUrl}/facture-detail.html?id=${factureId}`, {
-        waitUntil: 'networkidle0',
+        waitUntil: 'domcontentloaded',
         timeout: 20000
       });
       await page.waitForFunction(() => window.__docReady === true, { timeout: 15000 });
@@ -300,15 +310,42 @@ describe('Génération PDF de facture', () => {
       assert.equal(etat.couleurFondApp, couleurPaletteClaire);
       assert.equal(etat.toolbar, 'none');
       assert.equal(etat.fondDocument, 'rgb(255, 254, 252)', 'le fond papier doit rester blanc cassé en impression');
-      const printMetrics = await page.evaluate(() => ({
-        paddingLeft: getComputedStyle(document.querySelector('.invoice-doc')).paddingLeft,
-        paddingRight: getComputedStyle(document.querySelector('.invoice-doc')).paddingRight,
-        fontSize: getComputedStyle(document.querySelector('.invoice-doc')).fontSize,
-        tableFontSize: getComputedStyle(document.querySelector('.sf-document-table td')).fontSize
-      }));
+      const printMetrics = await page.evaluate(() => {
+        const documentNode = document.querySelector('.invoice-doc');
+        const bannerNode = document.querySelector('.invoice-doc [style*="margin:-40px -40px"]');
+        const documentRect = documentNode.getBoundingClientRect();
+        const bannerRect = bannerNode ? bannerNode.getBoundingClientRect() : null;
+        const bannerTitle = bannerNode && bannerNode.querySelector('[style*="text-align:right"]');
+        const bannerTitleRect = bannerTitle ? bannerTitle.getBoundingClientRect() : null;
+        const bannerStyle = bannerNode ? getComputedStyle(bannerNode) : null;
+        return {
+          paddingLeft: getComputedStyle(documentNode).paddingLeft,
+          paddingRight: getComputedStyle(documentNode).paddingRight,
+          fontSize: getComputedStyle(documentNode).fontSize,
+          tableFontSize: getComputedStyle(document.querySelector('.sf-document-table td')).fontSize,
+          bannerExists: Boolean(bannerNode),
+          bannerLeftOffset: bannerRect ? bannerRect.left - documentRect.left : null,
+          bannerRightOffset: bannerRect ? documentRect.right - bannerRect.right : null,
+          bannerPaddingLeft: bannerStyle ? bannerStyle.paddingLeft : null,
+          bannerPaddingRight: bannerStyle ? bannerStyle.paddingRight : null,
+          bannerTitleRightInset: bannerRect && bannerTitleRect ? bannerRect.right - bannerTitleRect.right : null
+        };
+      });
       assert.equal(printMetrics.paddingLeft, '0px',
         'Les marges A4 de @page ne doivent pas être doublées par un padding de 40 px.');
       assert.equal(printMetrics.paddingRight, '0px');
+      assert.equal(printMetrics.bannerExists, true,
+        'Le modèle moderne doit exposer son bandeau principal au rendu imprimé.');
+      assert.ok(Math.abs(printMetrics.bannerLeftOffset) < 1.5,
+        'Le bandeau doit commencer au bord gauche de la zone imprimable : ' + printMetrics.bannerLeftOffset + 'px.');
+      assert.ok(Math.abs(printMetrics.bannerRightOffset) < 1.5,
+        'Le bandeau doit finir au bord droit de la zone imprimable : ' + printMetrics.bannerRightOffset + 'px.');
+      assert.equal(printMetrics.bannerPaddingLeft, '40px',
+        'Le padding gauche du modèle doit être conservé pour protéger le texte.');
+      assert.equal(printMetrics.bannerPaddingRight, '40px',
+        'Le padding droit du modèle doit être conservé pour protéger le titre FACTURE/DEVIS.');
+      assert.ok(printMetrics.bannerTitleRightInset >= 30,
+        'Le titre FACTURE/DEVIS doit garder une marge intérieure visible : ' + printMetrics.bannerTitleRightInset + 'px.');
       assert.ok(Math.abs(parseFloat(printMetrics.fontSize) - 13.3333) < 0.2,
         'Le texte courant doit être imprimé à 10 pt minimum : ' + printMetrics.fontSize);
       assert.ok(Math.abs(parseFloat(printMetrics.tableFontSize) - 12) < 0.2,
@@ -391,6 +428,76 @@ describe('Génération PDF de facture', () => {
     assert.ok(pageCount > 0, 'le PDF doit contenir au moins une page');
     assert.ok(pageCount <= 3,
       'les conditions et l’acceptation doivent suivre les totaux sans créer une quatrième page isolée (pages=' + pageCount + ')');
+  });
+
+  test('un devis Executive de 28 lignes reste en trois pages A4 maximum', async () => {
+    const [[templateBefore]] = await pool.query(
+      'SELECT facture_template FROM users WHERE id = ?',
+      [userIdA]
+    );
+    await pool.query(
+      'UPDATE users SET facture_template = ? WHERE id = ?',
+      ['executive', userIdA]
+    );
+
+    try {
+      const client = await request(app)
+        .post('/api/clients')
+        .set('Authorization', 'Bearer ' + tokenA)
+        .send({ nom: 'Client Devis Executive Pagination' });
+      assert.equal(client.status, 201, client.text);
+
+      const lignes = Array.from({ length: 28 }, (_, index) => ({
+        designation: 'Lot de prestation et fournitures prévu au devis — ' +
+          String(index + 1).padStart(2, '0') +
+          ' — Départements et services régionaux de gestion commerciale',
+        quantite: index % 5 === 0 ? 2 : 1,
+        prix_unitaire: 10000 + index * 250,
+        tva: index % 4 === 0 ? 0 : 18
+      }));
+      const devis = await request(app)
+        .post('/api/factures')
+        .set('Authorization', 'Bearer ' + tokenA)
+        .send({
+          client_id: client.body.client.id,
+          type: 'devis',
+          objet: 'Proposition commerciale détaillée et conditions de réalisation',
+          date_validite: '2026-12-17',
+          conditions_reglement: 'Offre valable 30 jours. Exécution après accord du client et validation du calendrier.',
+          lignes
+        });
+      assert.equal(devis.status, 201, devis.text);
+
+      const res = await request(app)
+        .get('/api/factures/' + devis.body.facture.id + '/pdf')
+        .set('Authorization', 'Bearer ' + tokenA)
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks = [];
+          response.on('data', chunk => chunks.push(chunk));
+          response.on('end', () => callback(null, Buffer.concat(chunks)));
+        });
+
+      assert.equal(res.status, 200);
+      assert.ok((res.headers['content-type'] || '').startsWith('application/pdf'));
+      assert.equal(res.body.subarray(0, 5).toString('latin1'), '%PDF-');
+      const pdfLatin1 = res.body.toString('latin1');
+      const mediaBox = pdfLatin1.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
+      assert.ok(mediaBox, 'Le PDF Executive doit déclarer sa zone A4.');
+      assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1.5 &&
+        Math.abs(Number(mediaBox[2]) - 841.89) < 1.5,
+        'Le devis Executive doit être en A4 portrait ; MediaBox=' + mediaBox.slice(1).join(' × '));
+      const pageCount = (pdfLatin1.match(/\/Type\s*\/Page\b/g) || []).length;
+      assert.ok(pageCount >= 2,
+        'Les 28 lignes du devis Executive doivent produire plusieurs pages (pages=' + pageCount + ').');
+      assert.ok(pageCount <= 3,
+        'Le devis Executive de 28 lignes ne doit pas produire une quatrième page (pages=' + pageCount + ').');
+    } finally {
+      await pool.query(
+        'UPDATE users SET facture_template = ? WHERE id = ?',
+        [templateBefore?.facture_template || 'classique', userIdA]
+      );
+    }
   });
 
   test('une facture volumineuse conserve son suivi de règlement et ses totaux sans page isolée', async () => {
