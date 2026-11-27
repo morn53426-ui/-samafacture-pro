@@ -6,7 +6,9 @@ La version 26 ajoute un centre de traitement interne pour les alertes dérivées
 
 Aucun service KYC/AML tiers, registre externe, fournisseur de paiement ou service d'identification n'est appelé par cette fonctionnalité. Elle ne bloque aucun compte, ne suspend aucun paiement et ne déclenche aucun débit ou remboursement.
 
-## Règle de détection initiale
+## Règles de détection initiales
+
+### Échecs de connexion répétés
 
 | Élément | Valeur |
 |---|---|
@@ -21,6 +23,23 @@ Aucun service KYC/AML tiers, registre externe, fournisseur de paiement ou servic
 Le détecteur ne s'appuie pas sur l'adresse email, le mot de passe ni sur le texte d'une requête. Les tentatives visant des comptes inexistants ne sont pas rattachées à un tenant : elles restent journalisées dans le registre global mais ne produisent pas, dans cette première règle, d'alerte tenant-scoped.
 
 Les tentatives qui suivent la création mettent à jour l'alerte existante. Une alerte résolue ou écartée est rouverte si une nouvelle série atteint de nouveau le seuil. Le déclenchement est exécuté dans la même transaction que l'événement d'audit source. Si un dossier existant est résolu ou clôturé, il est lui aussi rouvert à l'état `open` ; un événement `case.reopened` est ajouté à son historique append-only, et l'identifiant du dossier est inclus dans l'événement `security.alert.reopened` du registre signé.
+
+### Montant de facture inhabituel
+
+| Élément | Valeur |
+|---|---|
+| Événement source | `invoice.created` pour un document de type `facture` uniquement |
+| Règle | `billing.invoice.amount_outlier` |
+| Référence | Médiane des factures de la même entreprise et de la même devise |
+| Historique minimal | 20 factures comparables au cours des 90 derniers jours |
+| Échantillon | Jusqu'aux 50 factures comparables les plus récentes |
+| Seuil | Montant actuel supérieur ou égal à 5 fois la médiane historique |
+| Gravité | Modérée |
+| Déduplication | Une empreinte stable par tenant et identifiant de facture |
+
+Cette règle exclut les devis, les autres entreprises et les autres devises. Elle ne convertit aucune devise. Tant que l'entreprise ne dispose pas d'au moins 20 factures comparables dans la fenêtre de 90 jours, aucun signal de montant atypique n'est créé. L'événement signé `security.alert.created` conserve le montant observé, la médiane, la devise, la taille de l'échantillon et le multiplicateur utilisés.
+
+Le multiplicateur de cinq est une heuristique initiale de triage, pas une règle comptable ou réglementaire, ni une preuve de fraude. Une facture exceptionnelle peut être légitime ; un responsable doit examiner l'alerte et le contexte commercial avant toute décision. Le seuil est fixe dans ce lot et ne constitue pas encore un paramètre réglable par entreprise.
 
 ## Cycle de traitement
 
@@ -51,10 +70,10 @@ Les triggers empêchent UPDATE/DELETE sur l'historique via les privilèges appli
 
 ## Limites connues et suite
 
-- Une seule règle de détection est incluse : échecs répétés de connexion d'un compte connu.
+- Deux règles de détection sont incluses : échecs répétés de connexion d'un compte connu et montant de facture inhabituel par rapport à la médiane historique de la même devise.
 - Les événements d'authentification des comptes inexistants ne sont pas encore agrégés dans un tableau de surveillance globale.
 - Pas de détection de transaction atypique, de fraude de facture, de fraude interne, de blanchiment, de sanctions ou de risque client.
 - Pas de collecte ou de vérification KYC réelle ; pas de scoring juridique AML ; aucune certification réglementaire n'est revendiquée.
-- La configuration des seuils, la gestion multi-règles, les preuves externes, les exports d'investigation et le tableau de bord centralisé restent hors de ce lot.
+- La configuration des seuils par entreprise, la gestion multi-règles administrable, les preuves externes, les exports d'investigation et le tableau de bord centralisé restent hors de ce lot.
 
 Chaque alerte doit être examinée par un utilisateur autorisé avant toute décision opérationnelle.
