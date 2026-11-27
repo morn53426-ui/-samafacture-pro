@@ -246,10 +246,13 @@ router.post('/register', registerLimiter, async (req, res, next) => {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    let result;
+    const connection = await pool.getConnection();
+    let user;
     try {
+      await connection.beginTransaction();
+      let result;
       if (trialPlan) {
-        [result] = await pool.query(
+        [result] = await connection.query(
           `INSERT INTO users
             (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version,
              plan, trial_plan, trial_started_at, trial_ends_at, trial_status)
@@ -259,13 +262,30 @@ router.post('/register', registerLimiter, async (req, res, next) => {
       } else {
         // Rétrocompatibilité API : les anciens clients qui n'envoient pas de plan
         // restent sur Gratuit. L'inscription web propose toujours un plan d'essai.
-        [result] = await pool.query(
+        [result] = await connection.query(
           `INSERT INTO users (nom, email, password_hash, entreprise_nom, terms_accepted_at, terms_version, privacy_version)
            VALUES (?, ?, ?, ?, NOW(), ?, ?)`,
           [nom, emailLower, hash, entreprise_nom || nom, TERMS_VERSION, PRIVACY_VERSION]
         );
       }
+
+      const [rows] = await connection.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+      user = rows[0];
+      await journaliserEvenementAuth(req, {
+        tenantId: Number(user.id),
+        actorUserId: Number(user.id),
+        eventType: 'auth.account.registered',
+        category: 'identity',
+        entityType: 'account',
+        entityId: user.id,
+        outcome: 'success',
+        metadata: { auth_method: 'password', trial_plan: user.trial_plan || null }
+      }, connection);
+      // L'inscription et son événement signé sont validés ou annulés ensemble.
+      if (!user) throw new Error('Le compte créé est introuvable avant validation de la transaction.');
+      await connection.commit();
     } catch (err) {
+      await connection.rollback().catch(() => {});
       // Deux inscriptions simultanées avec le même email passent toutes deux le SELECT ci-dessus :
       // l'index unique uk_users_email départage (un seul compte, un seul essai). Les perdants
       // doivent recevoir le même 409 qu'une inscription séquentielle, pas une erreur 500.
@@ -273,20 +293,10 @@ router.post('/register', registerLimiter, async (req, res, next) => {
         return res.status(409).json({ error: 'Un compte existe déjà avec cet email.' });
       }
       throw err;
+    } finally {
+      connection.release();
     }
 
-    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-    const user = rows[0];
-    await journaliserEvenementAuth(req, {
-      tenantId: Number(user.id),
-      actorUserId: Number(user.id),
-      eventType: 'auth.account.registered',
-      category: 'identity',
-      entityType: 'account',
-      entityId: user.id,
-      outcome: 'success',
-      metadata: { auth_method: 'password', trial_plan: user.trial_plan || null }
-    });
     const token = signToken(user);
     definirCookieSession(res, token);
     res.status(201).json({ token, user: sanitizeUser(user) });
