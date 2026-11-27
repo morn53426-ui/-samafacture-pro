@@ -454,6 +454,67 @@ test('création de facture et encaissement : audit atomique avec les opérations
 });
 
 
+
+test('inscription et événement signé sont atomiques si le registre refuse une écriture', async () => {
+  const email = emailDeTest('audit-register-atomic');
+  const envKeys = ['NODE_ENV', 'AUDIT_LOG_HMAC_KEY', 'AUDIT_LOG_HMAC_KEY_VERSION', 'AUDIT_LOG_HMAC_KEYRING', 'DATA_ENCRYPTION_KEY'];
+  const original = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
+
+  try {
+    process.env.NODE_ENV = 'production';
+    delete process.env.AUDIT_LOG_HMAC_KEY;
+    delete process.env.AUDIT_LOG_HMAC_KEYRING;
+    delete process.env.DATA_ENCRYPTION_KEY;
+    process.env.AUDIT_LOG_HMAC_KEY_VERSION = '1';
+
+    const refused = await request(app)
+      .post('/api/auth/register')
+      .send({
+        nom: 'Compte audit atomique',
+        email,
+        password: 'motdepasse123',
+        acceptTerms: true,
+        plan: 'standard'
+      });
+    assert.equal(refused.status, 500, refused.text);
+
+    const [afterFailure] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+    assert.equal(afterFailure.length, 0,
+      'un défaut de configuration HMAC doit annuler la création du compte');
+
+    // Une clé valide permet ensuite à la même inscription d'être validée avec sa preuve.
+    process.env.NODE_ENV = 'test';
+    process.env.AUDIT_LOG_HMAC_KEY = 'test-only-audit-ledger-key-at-least-32-bytes';
+    const accepted = await request(app)
+      .post('/api/auth/register')
+      .send({
+        nom: 'Compte audit atomique',
+        email,
+        password: 'motdepasse123',
+        acceptTerms: true,
+        plan: 'standard'
+      });
+    assert.equal(accepted.status, 201, accepted.text);
+    const userId = Number(accepted.body.user.id);
+    createdUsers.push(userId);
+
+    const [events] = await pool.query(
+      `SELECT id, event_type, actor_user_id
+         FROM pro_audit_events
+        WHERE tenant_scope_id = ? AND event_type = 'auth.account.registered'`,
+      [userId]
+    );
+    assert.equal(events.length, 1);
+    assert.equal(Number(events[0].actor_user_id), userId);
+    assert.equal((await verifyAuditChain(userId)).valid, true);
+  } finally {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test('réinitialisation du mot de passe : journal et consommation du jeton atomiques', async () => {
   const account = await createAccount('audit-password-reset');
   const rawToken = crypto.randomBytes(32).toString('hex');
