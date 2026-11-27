@@ -34,6 +34,8 @@ on:
       - 'server/tests/factures.test.js'
       - 'server/routes/clients.js'
       - 'server/tests/client-history-protection.test.js'
+      - 'server/tests/stock.test.js'
+      - 'server/tests/produits-delete.test.js'
       - 'server/routes/public.js'
       - 'server/routes/assistant.js'
       - 'server/routes/dashboard.js'
@@ -134,6 +136,8 @@ jobs:
           server/tests/factures.test.js
           server/routes/clients.js
           server/tests/client-history-protection.test.js
+          server/tests/stock.test.js
+          server/tests/produits-delete.test.js
           server/routes/public.js
           server/routes/assistant.js
           server/routes/dashboard.js
