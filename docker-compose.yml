@@ -5,8 +5,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_MIGRATION_USER:-${DB_USER}}
+      MYSQL_PASSWORD: ${DB_MIGRATION_PASSWORD:-${DB_PASSWORD}}
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -15,6 +15,25 @@ services:
       timeout: 5s
       retries: 15
       start_period: 20s
+    networks: [samafacture_net]
+
+  db-provision:
+    image: mysql:8.0
+    restart: "no"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "/usr/local/bin/provision-db-users.sh"]
+    environment:
+      DB_HOST: mysql
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_MIGRATION_USER: ${DB_MIGRATION_USER:-${DB_USER}}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-${DB_PASSWORD}}
+    volumes:
+      - ./deploy/provision-db-users.sh:/usr/local/bin/provision-db-users.sh:ro
     networks: [samafacture_net]
 
   redis:
@@ -39,6 +58,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      db-provision:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     env_file:
@@ -48,6 +69,8 @@ services:
       DB_PORT: "3306"
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_MIGRATION_USER: ${DB_MIGRATION_USER:-${DB_USER}}
+      DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-${DB_PASSWORD}}
       DB_NAME: ${DB_NAME}
       # LOCAL UNIQUEMENT : ne jamais déployer ce fichier seul sur un serveur public (pas de validation
       # de config production, cookie non « secure », Swagger actif). Production : ajouter
