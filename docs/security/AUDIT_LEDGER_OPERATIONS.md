@@ -40,6 +40,20 @@ L'accès est protégé par l'authentification existante, la résolution du tenan
 - Chaque export réussi ajoute `audit.events.exported` au registre après la lecture des lignes. L'événement conserve le format, le nombre de lignes, l'indication de troncature et les filtres, sans enregistrer la valeur de la recherche.
 - La permission `audit.read` autorise la consultation ; la permission distincte `audit.export` est exigée pour exporter. Dans ce premier lot, seuls les rôles disposant de tous les droits (propriétaire/administrateur) détiennent `audit.export`. Les rôles Manager et Comptable peuvent consulter si leur rôle possède `audit.read`, mais pas exporter.
 
+## Comptes SQL et migrations
+
+En production, le serveur utilise deux identités MySQL distinctes :
+
+- `DB_USER` / `DB_PASSWORD` : compte runtime de l'API, du worker et des tâches applicatives. Il reçoit uniquement `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `EXECUTE`, `CREATE TEMPORARY TABLES`, `LOCK TABLES` et `SHOW VIEW` sur la base de l'application. Il ne reçoit ni `CREATE`, `ALTER`, `DROP`, `INDEX`, ni `TRIGGER`.
+- `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` : compte distinct réservé à l'initialisation et aux migrations, avec les privilèges DDL sur cette seule base. Le serveur ferme son pool de migration à la fin de l'initialisation.
+- `DB_ROOT_PASSWORD` : secret administratif utilisé uniquement par le service éphémère `db-provision` de Docker Compose pour créer/actualiser ces comptes. Il n'est pas injecté dans le conteneur applicatif.
+
+Configurer les deux comptes avec des mots de passe forts et différents. En `NODE_ENV=production`, le démarrage de l'API refuse les identifiants de migration absents ou identiques au compte runtime. Le compte de migration ne doit pas être accordé au worker PDF.
+
+Avec Docker Compose, le service `db-provision` attend que MySQL soit sain, applique les privilèges, puis l'API démarre seulement si le provisionnement réussit. Le script `deploy/provision-db-users.sh` est idempotent et s'exécute aussi sur un volume MySQL existant : il ne recrée ni ne supprime le volume, les tables métier, les événements ou les sauvegardes. Pour un déploiement non Docker, précréer la base, les deux comptes et leurs privilèges équivalents avant de lancer l'API.
+
+La migration nécessite un compte distinct car elle crée les tables et triggers du registre. Ne réutilisez pas le compte runtime pour appliquer manuellement une migration.
+
 ## Modèle d'intégrité
 
 Chaque tenant possède une séquence indépendante. Les écritures concurrentes se sérialisent via la ligne verrouillée de `pro_audit_chain_heads`. Chaque événement porte le hash HMAC de son contenu normalisé, de sa séquence, de l'horodatage, de la version de clé et du hash précédent. Des triggers MySQL refusent UPDATE et DELETE sur les événements.
@@ -60,8 +74,8 @@ Le script `server/database/rollbacks/014_audit_ledger.down.sql` retire uniquemen
 ## Couverture fonctionnelle du premier lot
 
 Le premier lot journalise actuellement :
-- inscription et événements d'authentification (succès/échec de connexion par mot de passe, connexion Google et déconnexion) ;
-- création de facture/devis, changement de statut, suppression de devis et paiement manuel ;
+- inscription et événements d'authentification (succès/échec de connexion par mot de passe, connexion Google, déconnexion et réinitialisation du mot de passe) ;
+- création de facture/devis, conversion devis-facture, duplication, changement de statut, suppression de devis et paiement manuel ;
 - création, modification et suppression de clients ;
 - consultations du registre et vérifications d'intégrité.
 
