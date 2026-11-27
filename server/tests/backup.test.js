@@ -226,5 +226,40 @@ describe('Sauvegardes automatiques', () => {
     }
   });
 
+  test('la production refuse un compte mysqldump identique au compte runtime', async () => {
+    const keys = [
+      'NODE_ENV', 'BACKUP_ENCRYPTION_KEY', 'DB_USER', 'DB_PASSWORD',
+      'DB_MIGRATION_USER', 'DB_MIGRATION_PASSWORD',
+      'DB_BACKUP_USER', 'DB_BACKUP_PASSWORD'
+    ];
+    const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+    process.env.NODE_ENV = 'production';
+    process.env.BACKUP_ENCRYPTION_KEY = 'cd'.repeat(32);
+    process.env.DB_USER = 'samafacture_runtime';
+    process.env.DB_PASSWORD = 'runtime-password-test';
+    process.env.DB_MIGRATION_USER = 'samafacture_migrator';
+    process.env.DB_MIGRATION_PASSWORD = 'migration-password-test';
+    process.env.DB_BACKUP_USER = 'samafacture_runtime';
+    process.env.DB_BACKUP_PASSWORD = 'runtime-password-test';
+
+    try {
+      const before = await fs.promises.readdir(BACKUP_DIR);
+      await assert.rejects(
+        effectuerSauvegarde(),
+        /compte de lecture distinct des comptes runtime et migration/
+      );
+      assert.deepEqual(
+        await fs.promises.readdir(BACKUP_DIR),
+        before,
+        'aucune archive ne doit être créée quand le rôle backup est confondu avec le runtime'
+      );
+    } finally {
+      for (const [key, value] of Object.entries(original)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
 });
 
