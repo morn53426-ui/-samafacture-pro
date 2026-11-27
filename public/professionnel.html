@@ -627,8 +627,26 @@ async function loadSecurityCentre() {
       const alertId = Number(alert.id);
       const canCreateCase = can('security.manage') && !alert.case_id && !['resolved', 'dismissed'].includes(alert.status);
       const canDismiss = can('security.manage') && !['resolved', 'dismissed'].includes(alert.status) && !alert.case_id;
+      const evidence = alert.evidence && typeof alert.evidence === 'object' ? alert.evidence : {};
+      let evidenceHtml = '';
+      const attempts = Number(evidence.attempts_in_window);
+      if (Number.isSafeInteger(attempts) && attempts > 0) {
+        evidenceHtml = '<small>Éléments observés : ' + attempts + ' échec(s) de connexion dans la fenêtre de détection.</small>';
+      } else {
+        const observed = Number(evidence.observed_amount);
+        const historicalMedian = Number(evidence.historical_median);
+        const sampleSize = Number(evidence.sample_size);
+        const multiplier = Number(evidence.multiplier);
+        const currency = String(evidence.currency || '').toUpperCase();
+        if (Number.isFinite(observed) && observed > 0 && Number.isFinite(historicalMedian) && historicalMedian > 0 &&
+            Number.isSafeInteger(sampleSize) && sampleSize > 0 && Number.isFinite(multiplier) && multiplier > 0 && /^[A-Z]{3,8}$/.test(currency)) {
+          evidenceHtml = '<small>Éléments observés : montant ' + escapeHtml(formatMontant(observed, currency)) +
+            ' · médiane comparable ' + escapeHtml(formatMontant(historicalMedian, currency)) +
+            ' · échantillon ' + sampleSize + ' facture(s) · seuil ' + multiplier + '×.</small>';
+        }
+      }
       return '<div class="pro-list-row"><div><strong>' + escapeHtml(alert.title) + '</strong>' +
-        '<small>' + escapeHtml(alert.summary) + '</small><small>' +
+        '<small>' + escapeHtml(alert.summary) + '</small>' + evidenceHtml + '<small>' +
         escapeHtml(severityLabels[alert.severity] || alert.severity) + ' · ' +
         escapeHtml(statusLabels[alert.status] || alert.status) + ' · ' +
         Number(alert.occurrence_count || 0) + ' occurrence(s) · ' + formatDate(alert.last_seen_at) + '</small></div><div>' +
