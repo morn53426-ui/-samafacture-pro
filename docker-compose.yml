@@ -63,6 +63,8 @@ services:
       DB_NAME: ${DB_NAME}
       NODE_ENV: development
     command: ["node", "scripts/run-migrations.js"]
+    volumes:
+      - app_backups:/app/server/backups:ro
     networks: [samafacture_net]
 
   redis:
