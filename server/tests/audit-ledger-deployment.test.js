@@ -17,10 +17,12 @@ const provisioner = fs.readFileSync(path.join(root, 'deploy', 'provision-db-user
 const restore = fs.readFileSync(path.join(root, 'server', 'restore-backup.js'), 'utf8');
 
 function serviceBlock(name) {
-  const start = compose.indexOf('\n  ' + name + ':');
+  const lines = compose.split('\\n');
+  const start = lines.findIndex(line => line === '  ' + name + ':');
   assert.ok(start >= 0, 'service Compose absent : ' + name);
-  const next = compose.indexOf('\n  ', start + 4);
-  return compose.slice(start, next < 0 ? compose.length : next);
+  let end = lines.findIndex((line, index) => index > start && /^  [A-Za-z0-9_-]+:$/.test(line));
+  if (end < 0) end = lines.length;
+  return lines.slice(start, end).join('\\n');
 }
 
 test('le processus HTTP ne reçoit aucun compte DDL ou de sauvegarde', () => {
@@ -57,7 +59,7 @@ test('le privilège TRIGGER est limité au worker de sauvegarde dédié', () => 
   const appBlock = serviceBlock('app');
   assert.match(provision, /DB_BACKUP_USER:/);
   assert.match(provisioner, /GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES/);
-  assert.match(provisioner, /DB_USER.*DB_MIGRATION_USER.*DB_BACKUP_USER/);
+  assert.match(provisioner, /DB_USER[\\s\\S]*DB_MIGRATION_USER[\\s\\S]*DB_BACKUP_USER/);
   assert.match(worker, /DB_BACKUP_USER: \$\{DB_BACKUP_USER/);
   assert.match(worker, /workers\/backup-worker\.js/);
   assert.match(worker, /app_backups:/);
