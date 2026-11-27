@@ -11,6 +11,10 @@ services:
     environment:
       NODE_ENV: production
 
+  backup-worker:
+    environment:
+      NODE_ENV: production
+
   pdf-worker:
     environment:
       NODE_ENV: production
