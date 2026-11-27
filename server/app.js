@@ -503,7 +503,9 @@ async function start() {
     // (npm start), où cluster.isWorker vaut toujours false.
     if (!cluster.isWorker || cluster.worker.id === 1) {
       startScheduler();
-      startBackupScheduler();
+      // En Docker, la sauvegarde tourne dans backup-worker avec son compte MySQL dédié.
+      // Le mode historique reste disponible hors Docker si le worker est explicitement activé.
+      if (process.env.BACKUP_SCHEDULER_DISABLED !== 'true') startBackupScheduler();
     }
     // Chaque worker peut dépiler l'outbox : les lignes sont réclamées sous
     // transaction avec SKIP LOCKED, donc un message ne peut être traité que par
