@@ -57,6 +57,33 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
       [sourceDb + '.restore_roundtrip_fixture', 1, 'SamaFacture restore probe', '123456.78', 2, 'Données francophones — Dakar', '987.65']
     );
 
+    // Le garde-fou de sauvegarde exige les protections du registre d'audit.
+    // Construire la base source avec la migration officielle 014 évite de tester
+    // une sauvegarde artificiellement incomplète et vérifie aussi l'export des triggers.
+    const sourceConnection = await mysql.createConnection({
+      host: process.env.DB_HOST || '127.0.0.1',
+      port: Number(process.env.DB_PORT || 3306),
+      user: original.DB_USER || 'root',
+      password: original.DB_PASSWORD || '',
+      database: sourceDb
+    });
+    try {
+      const migrationPath = path.join(__dirname, '..', 'database', 'migrations', '014_audit_ledger.sql');
+      const migrationSql = await fs.readFile(migrationPath, 'utf8');
+      const migrationStatements = migrationSql
+        .split(/\r?\n/)
+        .filter(line => !line.trim().startsWith('--'))
+        .join('\n')
+        .split(';')
+        .map(statement => statement.trim())
+        .filter(Boolean);
+      for (const statement of migrationStatements) {
+        await sourceConnection.query(statement);
+      }
+    } finally {
+      await sourceConnection.end();
+    }
+
     process.env.DB_NAME = sourceDb;
     process.env.DB_USER = backupUser;
     process.env.DB_PASSWORD = backupPassword;
@@ -89,6 +116,30 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
     assert.equal(String(rows[0].amount), '123456.78');
     assert.equal(rows[1].label, 'Données francophones — Dakar');
     assert.equal(String(rows[1].amount), '987.65');
+
+    const [restoredAuditTables] = await connection.query(
+      `SELECT TABLE_NAME FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = ?
+          AND TABLE_NAME IN ('pro_audit_events', 'pro_audit_chain_heads')`,
+      [targetDb]
+    );
+    assert.deepEqual(
+      restoredAuditTables.map(row => row.TABLE_NAME).sort(),
+      ['pro_audit_chain_heads', 'pro_audit_events'],
+      'la restauration doit conserver les deux tables du registre'
+    );
+
+    const [restoredAuditTriggers] = await connection.query(
+      `SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
+        WHERE TRIGGER_SCHEMA = ?
+          AND TRIGGER_NAME IN ('trg_pro_audit_events_block_update', 'trg_pro_audit_events_block_delete')`,
+      [targetDb]
+    );
+    assert.deepEqual(
+      restoredAuditTriggers.map(row => row.TRIGGER_NAME).sort(),
+      ['trg_pro_audit_events_block_delete', 'trg_pro_audit_events_block_update'],
+      'la restauration doit conserver les deux protections append-only'
+    );
   } finally {
     for (const [key, value] of Object.entries(original)) {
       if (value === undefined) delete process.env[key];

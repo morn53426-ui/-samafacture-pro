@@ -2,7 +2,7 @@ name: ESLint — JavaScript modifié
 
 on:
   pull_request:
-    branches: [main, 'feat/compliance-audit-ledger-lot1-20261126', 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape']
+    branches: ['fix/audit-ledger-hardening-lot1-20261127', main, 'feat/compliance-audit-ledger-lot1-20261126', 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape']
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'

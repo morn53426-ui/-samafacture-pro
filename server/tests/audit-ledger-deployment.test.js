@@ -68,6 +68,18 @@ test('le privilège TRIGGER est limité au worker de sauvegarde dédié', () => 
   assert.match(provision, /network_mode: "service:mysql"/);
   assert.ok(provision.includes('DB_HOST: 127.0.0.1'));
   assert.ok(provisioner.includes('GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, LOCK TABLES'));
+  assert.match(backup, /async function verifierSchemaRegistreAudit/);
+  assert.ok(backup.includes('verifyAuditLedgerSchema(connection)'));
+  assert.ok(backupWorker.includes('await verifierSchemaRegistreAudit();'));
+  assert.ok(backupWorker.includes('AUDIT_LEDGER_SCHEMA_CHECK_INTERVAL_MS'));
+  const backupsDisabledBranch = backupWorker.slice(
+    backupWorker.indexOf('if (!timer)'),
+    backupWorker.indexOf('} else {', backupWorker.indexOf('if (!timer)'))
+  );
+  assert.ok(backupsDisabledBranch.includes('surveillance du registre d’audit toujours active'));
+  assert.doesNotMatch(backupsDisabledBranch, /shutdown\(/,
+    'désactiver les sauvegardes ne doit pas arrêter la surveillance périodique du registre');
+  assert.ok(backupWorker.includes('DB_BACKUP_USER'));
   assert.ok(provisioner.includes('[ "$DB_USER" = "$DB_MIGRATION_USER" ]'));
   assert.ok(provisioner.includes('[ "$DB_USER" = "$DB_BACKUP_USER" ]'));
   assert.match(worker, /DB_BACKUP_USER: \$\{DB_BACKUP_USER/);

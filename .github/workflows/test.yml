@@ -2,7 +2,7 @@ name: Tests automatisés
 
 on:
   pull_request:
-    branches: [main, 'feat/compliance-audit-ledger-lot1-20261126', feat/enterprise-multi-company-foundation-20261116, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape']
+    branches: ['fix/audit-ledger-hardening-lot1-20261127', main, 'feat/compliance-audit-ledger-lot1-20261126', feat/enterprise-multi-company-foundation-20261116, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape']
   push:
     branches: [main]
 
@@ -160,6 +160,38 @@ jobs:
               node scripts/run-migrations.js
           )
 
+          # Seul le compte backup, qui détient TRIGGER, peut lire et valider les définitions.
+          (
+            cd server
+            env NODE_ENV=production DB_HOST="$DB_HOST" DB_PORT=3306 DB_NAME="$DB_NAME" \
+              DB_BACKUP_USER="$DB_BACKUP_USER" DB_BACKUP_PASSWORD="$DB_BACKUP_PASSWORD" \
+              node <<'NODE'
+          const assert = require('node:assert/strict');
+          const mysql = require('mysql2/promise');
+          const { verifyAuditLedgerSchema } = require('./config/audit-ledger-schema');
+
+          (async () => {
+            const connection = await mysql.createConnection({
+              host: process.env.DB_HOST,
+              port: Number(process.env.DB_PORT),
+              user: process.env.DB_BACKUP_USER,
+              password: process.env.DB_BACKUP_PASSWORD,
+              database: process.env.DB_NAME
+            });
+            try {
+              const result = await verifyAuditLedgerSchema(connection);
+              assert.equal(result.valid, true);
+              console.log('Compte backup : protections append-only conformes.');
+            } finally {
+              await connection.end();
+            }
+          })().catch(error => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
+          )
+
           # Le runtime valide le schéma avec son compte DML, puis doit échouer sur un CREATE permanent.
           docker exec -e MYSQL_PWD="$DB_MIGRATION_PASSWORD" "$mysql_container" \
             mysql --protocol=TCP --host=127.0.0.1 --user="$DB_MIGRATION_USER" "$DB_NAME" \
@@ -185,7 +217,14 @@ jobs:
               pool.query('CREATE TABLE ci_runtime_must_not_create (id INT PRIMARY KEY)'),
               error => error && error.code === 'ER_TABLEACCESS_DENIED_ERROR'
             );
-            console.log('Compte runtime : DML autorisé, DDL permanent refusé.');
+            const [visibleTriggers] = await pool.query(
+              `SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
+                WHERE TRIGGER_SCHEMA = DATABASE()
+                  AND TRIGGER_NAME IN ('trg_pro_audit_events_block_update', 'trg_pro_audit_events_block_delete')`
+            );
+            assert.equal(visibleTriggers.length, 0,
+              'le compte runtime ne doit pas obtenir le privilège TRIGGER nécessaire à la lecture des définitions');
+            console.log('Compte runtime : DML autorisé, DDL permanent et visibilité TRIGGER refusés.');
           })().catch(error => {
             console.error(error);
             process.exitCode = 1;

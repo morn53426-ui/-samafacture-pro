@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const crypto = require('crypto');
+const mysql = require('mysql2/promise');
+const { verifyAuditLedgerSchema } = require('./audit-ledger-schema');
 const { pipeline } = require('stream/promises');
 const { pool } = require('./db');
 const { captureException } = require('./monitoring');
@@ -46,6 +48,28 @@ function getBackupCredentials() {
     );
   }
   return { user, password };
+}
+
+/**
+ * Contrôle les protections append-only avec le compte DB_BACKUP_USER.
+ * Ce rôle détient TRIGGER pour mysqldump ; le compte runtime de l'API ne le détient pas.
+ */
+async function verifierSchemaRegistreAudit() {
+  const credentials = getBackupCredentials();
+  const connection = await mysql.createConnection({
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3306,
+    user: credentials.user,
+    password: credentials.password,
+    database: process.env.DB_NAME || 'samafacture',
+    connectTimeout: 5000
+  });
+
+  try {
+    return await verifyAuditLedgerSchema(connection);
+  } finally {
+    await connection.end();
+  }
 }
 
 /** Lance mysqldump et vérifie à la fois la fermeture du processus et celle du flux gzip.
@@ -147,6 +171,8 @@ async function effectuerSauvegarde() {
   const fichierTemporaire = `${fichier}.tmp`;
 
   try {
+    // Ne jamais archiver un registre dont les barrières append-only sont absentes ou altérées.
+    await verifierSchemaRegistreAudit();
     // Le fichier définitif n'apparaît qu'après un dump, gzip et chiffrement terminés.
     await runMysqldump(fichierTemporaire, encryptionKey);
     const temporaireStat = await fs.promises.stat(fichierTemporaire);
@@ -241,6 +267,7 @@ function startBackupScheduler(options = {}) {
 
 module.exports = {
   startBackupScheduler,
+  verifierSchemaRegistreAudit,
   effectuerSauvegarde,
   executerSauvegardeQuotidienne,
   BACKUP_DIR
