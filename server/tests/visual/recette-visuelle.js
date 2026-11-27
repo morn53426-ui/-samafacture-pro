@@ -1576,6 +1576,16 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       assert.equal(gridColumns.split(' ').length, 2,
         'Les domaines doivent passer sur deux colonnes sur tablette : ' + gridColumns);
     }
+    if (viewport.width > 1100) {
+      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
+      assert.equal(gridColumns.split(' ').length, 3,
+        'Les six domaines doivent rester organisés en trois colonnes sur grand écran : ' + gridColumns);
+    }
+    if (viewport.width > 560 && viewport.width <= 1100) {
+      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
+      assert.equal(gridColumns.split(' ').length, 2,
+        'Les domaines doivent passer sur deux colonnes sur tablette : ' + gridColumns);
+    }
     if (viewport.width === 1440) {
       await page.click('.pro-workspace-guide a[href="#pro-integrations"]');
       assert.equal(await page.evaluate(() => location.hash), '#pro-integrations',
