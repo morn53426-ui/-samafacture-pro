@@ -44,6 +44,7 @@ test('les migrations s’exécutent dans un service one-shot avant le serveur', 
   const migrate = serviceBlock('db-migrate');
   const appBlock = serviceBlock('app');
   assert.match(migrate, /DB_MIGRATION_USER:/);
+  assert.doesNotMatch(migrate, /env_file:/);
   assert.match(migrate, /DB_BACKUP_USER: ""/);
   assert.match(migrate, /DB_ROOT_PASSWORD: ""/);
   assert.match(migrate, /BACKUP_ENCRYPTION_KEY: \$\{/);
