@@ -49,7 +49,11 @@ En production, trois identités MySQL séparées sont utilisées :
 - `DB_BACKUP_USER` / `DB_BACKUP_PASSWORD` : compte utilisé exclusivement par `backup-worker` pour `mysqldump`. Il dispose de `SELECT`, `SHOW VIEW`, `TRIGGER`, `EVENT` et `LOCK TABLES` sur cette base. MySQL exige `TRIGGER` pour exporter les triggers ; ce droit n'est donc pas un compte purement lecture seule et peut aussi modifier des triggers. Le secret reste néanmoins hors du processus HTTP et du worker PDF.
 - `DB_ROOT_PASSWORD` : secret administratif utilisé uniquement par le service éphémère `db-provision` pour créer/actualiser ces comptes. Il n'est jamais injecté dans les conteneurs applicatifs.
 
-Les trois comptes runtime, migration et sauvegarde doivent avoir des noms et mots de passe distincts en production. Le provisionnement refuse les identifiants partagés. La restauration manuelle utilise le compte DDL `DB_MIGRATION_USER`, jamais le compte runtime. Dans Docker Compose, le service `db-migrate` reçoit le volume de sauvegardes en lecture seule afin que le même environnement DDL puisse vérifier et importer une archive sans donner ce droit à l'API ou au worker PDF.
+Les trois comptes runtime, migration et sauvegarde doivent avoir des noms et mots de passe distincts en production. Le provisionnement refuse les identifiants partagés. La restauration manuelle utilise le compte DDL `DB_MIGRATION_USER`, jamais le compte runtime. Avec Docker Compose, lancer :
+```bash
+docker compose run --rm db-migrate node restore-backup.js /app/server/backups/NOM_ARCHIVE.sql.gz.enc
+```
+Le service `db-migrate` monte le volume d'archives en lecture seule et reçoit `BACKUP_ENCRYPTION_KEY` pour authentifier/déchiffrer l'archive ; la clé et le compte DDL ne sont pas transmis à l'API, au worker PDF ni au worker de sauvegarde. Dans Docker Compose, le service `db-migrate` reçoit le volume de sauvegardes en lecture seule afin que le même environnement DDL puisse vérifier et importer une archive sans donner ce droit à l'API ou au worker PDF.
 
 Pour une restauration en production, arrêter d'abord les services applicatifs et workers (sans arrêter ni supprimer le volume MySQL), puis exécuter le script depuis le service DDL :
 
