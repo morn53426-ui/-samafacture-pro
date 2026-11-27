@@ -15,8 +15,11 @@ sql_string() {
 }
 
 sql_identifier() {
-  local value="${1//\`/\`\`}"
-  printf '\`%s\`' "$value"
+  if [[ ! "$1" =~ ^[A-Za-z0-9_]+$ ]]; then
+    echo "DB_NAME doit contenir uniquement des lettres, chiffres et underscores." >&2
+    return 1
+  fi
+  printf '\x60%s\x60' "$1"
 }
 
 app_user="$(sql_string "$DB_USER")"
