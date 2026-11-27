@@ -44,7 +44,10 @@ test('les migrations s’exécutent dans un service one-shot avant le serveur', 
   const migrate = serviceBlock('db-migrate');
   const appBlock = serviceBlock('app');
   assert.match(migrate, /DB_MIGRATION_USER:/);
-  assert.match(migrate, /app_backups:.*:ro/);
+  assert.match(migrate, /DB_BACKUP_USER: ""/);
+  assert.match(migrate, /DB_ROOT_PASSWORD: ""/);
+  assert.doesNotMatch(migrate, /BACKUP_ENCRYPTION_KEY: \$\{/);
+  assert.doesNotMatch(migrate, /app_backups:/);
   assert.match(migrate, /scripts\/run-migrations\.js/);
   assert.match(appBlock, /db-migrate:[\s\S]*service_completed_successfully/);
   assert.match(db, /DB_SKIP_MIGRATIONS === 'true'/);
@@ -70,6 +73,8 @@ test('le privilège TRIGGER est limité au worker de sauvegarde dédié', () => 
   assert.match(backup, /credentials\.user/);
   assert.match(appBlock, /DB_BACKUP_USER: ""/);
   assert.doesNotMatch(appBlock, /app_backups:/);
+  assert.match(appBlock, /DB_ROOT_PASSWORD: ""/);
+  assert.match(appBlock, /BACKUP_ENCRYPTION_KEY: ""/);
   assert.match(productionCompose, /backup-worker:[\s\S]*NODE_ENV: production/);
 });
 
