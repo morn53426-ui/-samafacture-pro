@@ -58,7 +58,7 @@ async function preparerFluxGzip(sourcePath) {
   }
 }
 
-async function verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseName) {
+async function verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseName, connectionPassword) {
   if (process.env.RESTORE_ALLOW_NON_EMPTY === 'true') {
     console.warn('⚠️ RESTORE_ALLOW_NON_EMPTY=true : la vérification de la base cible non vide est désactivée.');
     return;
@@ -80,7 +80,7 @@ async function verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseNa
   ];
   const output = await new Promise((resolve, reject) => {
     const mysql = spawn(mysqlBin, args, {
-      env: { ...process.env, MYSQL_PWD: process.env.DB_PASSWORD || '' },
+      env: { ...process.env, MYSQL_PWD: connectionPassword },
       stdio: ['ignore', 'pipe', 'pipe']
     });
     let stdout = '';
@@ -132,6 +132,15 @@ async function verifierArchiveGzipValide(gzipPath) {
 
 async function restaurer(sourcePath) {
   if (!sourcePath) throw new Error('Indiquez le chemin du fichier de sauvegarde.');
+  const restoreUser = process.env.DB_MIGRATION_USER || process.env.DB_USER || 'root';
+  const restorePassword = process.env.DB_MIGRATION_PASSWORD || process.env.DB_PASSWORD || '';
+  if (process.env.NODE_ENV === 'production' && (
+    !process.env.DB_MIGRATION_USER ||
+    !process.env.DB_MIGRATION_PASSWORD ||
+    restoreUser === (process.env.DB_USER || 'root')
+  )) {
+    throw new Error('En production, restaurez avec le compte DDL dédié DB_MIGRATION_USER, jamais avec le compte runtime.');
+  }
   const absolutePath = path.resolve(sourcePath);
   await fs.promises.access(absolutePath, fs.constants.R_OK);
 
@@ -140,19 +149,19 @@ async function restaurer(sourcePath) {
   const connectionArgs = [
     `--host=${process.env.DB_HOST || 'localhost'}`,
     `--port=${process.env.DB_PORT || 3306}`,
-    `--user=${process.env.DB_USER || 'root'}`
+    `--user=${restoreUser}`
   ];
 
   // Une restauration contenant des DROP TABLE ne doit jamais remplacer par accident
   // une base déjà utilisée. L'exception exige une variable d'environnement explicite.
-  await verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseName);
+  await verifierBaseRestaurationVide(mysqlBin, connectionArgs, databaseName, restorePassword);
 
   const prepared = await preparerFluxGzip(absolutePath);
   try {
     await verifierArchiveGzipValide(prepared.gzipPath);
     const args = [...connectionArgs, `--database=${databaseName}`];
     const mysql = spawn(mysqlBin, args, {
-      env: { ...process.env, MYSQL_PWD: process.env.DB_PASSWORD || '' },
+      env: { ...process.env, MYSQL_PWD: restorePassword },
       stdio: ['pipe', 'inherit', 'inherit']
     });
 
