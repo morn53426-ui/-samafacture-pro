@@ -20,12 +20,13 @@ services:
   db-provision:
     image: mysql:8.0
     restart: "no"
+    network_mode: "service:mysql"
     depends_on:
       mysql:
         condition: service_healthy
     entrypoint: ["/bin/bash", "/usr/local/bin/provision-db-users.sh"]
     environment:
-      DB_HOST: mysql
+      DB_HOST: 127.0.0.1
       DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
@@ -37,7 +38,6 @@ services:
       NODE_ENV: development
     volumes:
       - ./deploy/provision-db-users.sh:/usr/local/bin/provision-db-users.sh:ro
-    networks: [samafacture_net]
 
   db-migrate:
     build:
