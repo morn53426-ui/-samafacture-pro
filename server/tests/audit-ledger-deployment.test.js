@@ -46,8 +46,8 @@ test('les migrations s’exécutent dans un service one-shot avant le serveur', 
   assert.match(migrate, /DB_MIGRATION_USER:/);
   assert.match(migrate, /DB_BACKUP_USER: ""/);
   assert.match(migrate, /DB_ROOT_PASSWORD: ""/);
-  assert.doesNotMatch(migrate, /BACKUP_ENCRYPTION_KEY: \$\{/);
-  assert.doesNotMatch(migrate, /app_backups:/);
+  assert.match(migrate, /BACKUP_ENCRYPTION_KEY: \$\{/);
+  assert.match(migrate, /app_backups:\/app\/server\/backups:ro/);
   assert.match(migrate, /scripts\/run-migrations\.js/);
   assert.match(appBlock, /db-migrate:[\s\S]*service_completed_successfully/);
   assert.match(db, /DB_SKIP_MIGRATIONS === 'true'/);
