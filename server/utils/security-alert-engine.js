@@ -45,7 +45,7 @@ function median(values) {
 
 async function evaluateInvoiceAmountOutlier(connection, event, sourceEventId) {
   if (event.eventType !== 'invoice.created' || event.entityType !== 'facture') return null;
-  if (event.tenantId === null || !/^\\d+$/.test(String(event.entityId || ''))) return null;
+  if (event.tenantId === null || !/^\d+$/.test(String(event.entityId || ''))) return null;
 
   const metadata = event.metadata || {};
   if (metadata.document_type !== 'facture') return null;
@@ -67,8 +67,8 @@ async function evaluateInvoiceAmountOutlier(connection, event, sourceEventId) {
         AND UPPER(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.currency'))) = ?
         AND CAST(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.total')) AS DECIMAL(24, 2)) > 0
       ORDER BY created_at DESC, id DESC
-      LIMIT ${INVOICE_OUTLIER_RULE.comparisonLimit}`
-    , [event.tenantScopeId, event.tenantId, sourceEventId, currency]
+      LIMIT ${INVOICE_OUTLIER_RULE.comparisonLimit}`,
+    [event.tenantScopeId, event.tenantId, sourceEventId, currency]
   );
   const historicalAmounts = history.map(row => Number(row.amount)).filter(value => Number.isFinite(value) && value > 0);
   if (historicalAmounts.length < INVOICE_OUTLIER_RULE.minimumSamples) return null;
@@ -112,7 +112,7 @@ async function evaluateInvoiceAmountOutlier(connection, event, sourceEventId) {
   };
 }
 /**
- * Détecte uniquement les signaux dérivés des événements d'authentification déjà
+ * Détecte les signaux de sécurité et de facturation dérivés des événements déjà
  * présents dans le registre. Cette fonction ne contacte aucun prestataire externe.
  * Elle doit être appelée avec la même connexion/transaction que l'événement source.
  */
