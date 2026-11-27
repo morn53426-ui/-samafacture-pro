@@ -32,14 +32,31 @@ function isBackupEnabled() {
   return process.env.BACKUP_ENABLED !== 'false';
 }
 
+function getBackupCredentials() {
+  const user = process.env.DB_BACKUP_USER || process.env.DB_USER || 'root';
+  const password = process.env.DB_BACKUP_PASSWORD || process.env.DB_PASSWORD || '';
+  if (process.env.NODE_ENV === 'production' && (
+    !process.env.DB_BACKUP_USER ||
+    !process.env.DB_BACKUP_PASSWORD ||
+    user === (process.env.DB_USER || 'root') ||
+    user === process.env.DB_MIGRATION_USER
+  )) {
+    throw new Error(
+      'En production, DB_BACKUP_USER/DB_BACKUP_PASSWORD doivent désigner un compte de lecture distinct des comptes runtime et migration.'
+    );
+  }
+  return { user, password };
+}
+
 /** Lance mysqldump et vérifie à la fois la fermeture du processus et celle du flux gzip.
  * Un fichier gzip partiel ne doit jamais être considéré comme une sauvegarde réussie. */
 async function runMysqldump(outputPath, encryptionKey = null) {
   const bin = process.env.MYSQLDUMP_PATH || 'mysqldump';
+  const credentials = getBackupCredentials();
   const args = [
     `--host=${process.env.DB_HOST || 'localhost'}`,
     `--port=${process.env.DB_PORT || 3306}`,
-    `--user=${process.env.DB_USER || 'root'}`,
+    `--user=${credentials.user}`,
     '--single-transaction',
     // MySQL 8.0.21+ otherwise requires the global PROCESS privilege.
     // The application DB account is deliberately scoped to this schema only.
@@ -49,7 +66,7 @@ async function runMysqldump(outputPath, encryptionKey = null) {
     '--events',
     process.env.DB_NAME || 'samafacture'
   ];
-  const env = { ...process.env, MYSQL_PWD: process.env.DB_PASSWORD || '' };
+  const env = { ...process.env, MYSQL_PWD: credentials.password };
   const dump = spawn(bin, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let stderr = '';
   dump.stderr.on('data', (chunk) => {
