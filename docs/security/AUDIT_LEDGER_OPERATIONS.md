@@ -68,6 +68,18 @@ Le fichier `.env` racine fournit les comptes SQL et `BACKUP_ENCRYPTION_KEY` à D
 
 Avec Docker Compose, `db-provision` attend MySQL sain, partage son espace réseau et se connecte à `127.0.0.1` avec le compte root local ; il n'exige donc pas que root soit accessible depuis les autres conteneurs, y compris sur un volume MySQL déjà initialisé. Il applique ensuite les privilèges ; `db-migrate` exécute ensuite les migrations, puis l'API, le worker PDF et `backup-worker` démarrent. L'API n'obtient ni compte migration, ni compte backup, ni mot de passe root. Le scheduler intégré au processus HTTP est désactivé dans ce mode ; seule l'instance `backup-worker` produit les sauvegardes. Ce worker utilise `restart: on-failure` : une désactivation volontaire (`BACKUP_ENABLED=false`) ne déclenche pas de boucle de redémarrage, tandis qu'une défaillance non nulle est relancée par Docker.
 
+### Binlog MySQL et création des triggers
+
+MySQL 8 active le binary log par défaut. Quand le binlog est actif et que `log_bin_trust_function_creators=OFF`, MySQL peut exiger `SUPER` lors de `CREATE TRIGGER`, même si le compte possède `TRIGGER` sur la table. Ne jamais accorder `SUPER` au compte `DB_MIGRATION_USER` pour contourner ce contrôle.
+
+Le service Compose `mysql` démarre avec `--log-bin-trust-function-creators=ON`, ce qui permet au migrateur limité au schéma de créer les triggers nécessaires. Pour une base MySQL externe à Compose, le DBA doit activer le paramètre global avant d'exécuter les migrations et le rendre persistant dans la configuration du serveur ou du service managé :
+
+```sql
+SET GLOBAL log_bin_trust_function_creators = ON;
+```
+
+**Attention :** MySQL indique ce paramètre comme déprécié dans la documentation 8.0 ; il assouplit les vérifications de sûreté du binlog pour les fonctions et les triggers. Le compte de migration doit donc rester dédié aux migrations, et le compte de sauvegarde qui détient aussi le privilège `TRIGGER` doit rester isolé dans `backup-worker`. Réévaluer cette configuration avant toute montée vers une version MySQL où ce paramètre ne serait plus disponible. Référence : [Binary Logging Options and Variables](https://dev.mysql.com/doc/refman/8.0/en/replication-options-binary-log.html) et [Stored Program Binary Logging](https://dev.mysql.com/doc/refman/8.0/en/stored-programs-logging.html).
+
 Le script `deploy/provision-db-users.sh` est idempotent et peut mettre à jour les privilèges sur un volume MySQL existant : il ne supprime ni ne recrée le volume, les tables métier, les événements ou les sauvegardes. Pour un déploiement hors Docker, précréer la base et les trois comptes avec des privilèges équivalents, puis exécuter le runner `node server/scripts/run-migrations.js` avec l'identité migration. Après validation du schéma, démarrer le serveur HTTP avec `DB_SKIP_MIGRATIONS=true` et `BACKUP_SCHEDULER_DISABLED=true` ; démarrer le processus séparé `node server/workers/backup-worker.js` avec le compte runtime et les variables `DB_BACKUP_USER` / `DB_BACKUP_PASSWORD`. Ne jamais injecter les secrets migration ou backup dans le service HTTP.
 
 Sauvegarde manuelle dans Docker : `docker compose exec backup-worker node backup-now.js`.
