@@ -139,7 +139,7 @@ router.get('/security-alerts', async (req, res, next) => {
               (SELECT e.metadata_json FROM pro_audit_events e
                 WHERE e.tenant_scope_id = a.tenant_scope_id
                   AND e.entity_type = 'security_alert'
-                  AND e.entity_id = CAST(a.id AS CHAR)
+                  AND e.entity_id = CAST(a.id AS CHAR) COLLATE utf8mb4_unicode_ci
                   AND e.event_type IN ('security.alert.created', 'security.alert.reopened')
                 ORDER BY e.chain_sequence DESC LIMIT 1) AS evidence_json
          FROM pro_security_alerts a
