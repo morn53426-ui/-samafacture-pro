@@ -62,8 +62,9 @@ async function main() {
 
   timer = startBackupScheduler({ keepAlive: true });
   if (!timer) {
-    console.log('backup-worker inactif : BACKUP_ENABLED=false.');
-    await shutdown();
+    // La sauvegarde peut être désactivée indépendamment du contrôle d'intégrité.
+    // auditSchemaCheckTimer reste actif et maintient ce worker en vie.
+    console.log('Sauvegardes automatiques désactivées ; surveillance du registre d’audit toujours active.');
   } else {
     console.log('backup-worker prêt ; les sauvegardes utilisent le compte SQL dédié.');
   }
