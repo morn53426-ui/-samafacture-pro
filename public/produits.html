@@ -26,7 +26,10 @@
         <h1>Produits & services</h1>
         <p>Votre catalogue pour créer des factures plus rapidement</p>
       </div>
-      <button class="btn btn-primary" onclick="openModal()"><i class="ic" data-icon="plus"></i> Nouvelle fiche</button>
+      <button type="button" class="btn btn-primary workspace-desktop-create-action" onclick="openModal()" aria-haspopup="dialog" aria-controls="modal"><i class="ic" data-icon="plus"></i> Nouvelle fiche</button>
+    </div>
+    <div class="workspace-mobile-create-actions">
+      <button type="button" class="btn btn-primary" onclick="openModal()" aria-haspopup="dialog" aria-controls="modal"><i class="ic" data-icon="plus" aria-hidden="true"></i> Nouvelle fiche du catalogue</button>
     </div>
 
     <div class="card workspace-data-card" style="padding:0;">
@@ -48,7 +51,7 @@
   </main>
 </div>
 
-<div id="modal" data-workspace-modal role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+<div id="modal" class="workspace-create-modal" data-workspace-modal role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
   <div class="card workspace-modal-panel" tabindex="-1" style="width:440px; max-width:92vw;">
     <h3 id="modal-title">Nouveau produit</h3>
     <div id="modal-error" role="alert" aria-live="assertive"></div>

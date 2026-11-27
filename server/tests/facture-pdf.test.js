@@ -247,8 +247,10 @@ describe('Génération PDF de facture', () => {
         window.SAMAFACTURE_API_URL = apiBaseUrl;
       }, tokenA, `${baseUrl}/api`);
 
+      // La page signale sa disponibilité via __docReady ; les appels asynchrones
+      // de télémétrie ne doivent pas bloquer cette recette d'impression.
       await page.goto(`${baseUrl}/facture-detail.html?id=${factureId}`, {
-        waitUntil: 'networkidle0',
+        waitUntil: 'domcontentloaded',
         timeout: 20000
       });
       await page.waitForFunction(() => window.__docReady === true, { timeout: 15000 });

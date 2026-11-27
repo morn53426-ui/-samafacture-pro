@@ -155,7 +155,6 @@ function evaluateRenewalSimulation({ subscription, now, simulationEnabled } = {}
 }
 
 module.exports = {
-  parseCivilDate,
   nextMonthlyPeriod,
   buildPeriodIdempotencyKey,
   evaluateRenewalSimulation

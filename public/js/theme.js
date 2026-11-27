@@ -103,3 +103,15 @@
 
   window.SamaTheme = { suivant, definir, get: themeActuel, boutonHtml, synchroniserBoutons };
 })();
+
+
+// Collecte de fréquentation de première partie sur les seules pages répertoriées.
+// Le centre d'administration ne mesure jamais ses propres pages.
+(function chargerMesureFrequentation() {
+  const chemin = window.location.pathname || '/';
+  if (chemin === '/admin.html' || chemin === '/admin') return;
+  const script = document.createElement('script');
+  script.src = 'js/visitor-analytics.js';
+  script.async = true;
+  document.head.appendChild(script);
+})();

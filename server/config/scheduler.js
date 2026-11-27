@@ -18,7 +18,7 @@ async function withMysqlAdvisoryLock(lockName, task) {
     const [[row]] = await conn.query('SELECT GET_LOCK(?, 0) AS acquired', [lockName]);
     if (row.acquired !== 1) return false;
     try {
-      await task();
+      await task(conn);
       return true;
     } finally {
       await conn.query('SELECT RELEASE_LOCK(?)', [lockName]).catch(() => {});
@@ -43,6 +43,25 @@ async function expirerPaiementsAbonnementEnAttente() {
     });
   } catch (err) {
     console.error('⚠️  Erreur lors de l\'expiration des paiements en attente :', err.message);
+    captureException(err);
+  }
+}
+
+/**
+ * Supprime les vues analytiques anciennes uniquement après activation explicite.
+ * Sans SUNUPILOT_ANALYTICS_PURGE_ENABLED=true, aucune connexion ni suppression n'est tentée.
+ * Verrou consultatif : un seul processus purge à la fois lorsque plusieurs instances tournent.
+ */
+async function purgerAnalyticsAnciennes() {
+  if (process.env.SUNUPILOT_ANALYTICS_PURGE_ENABLED !== 'true') return;
+  try {
+    await withMysqlAdvisoryLock('samafacture:purge-sunupilot-analytics', async (conn) => {
+      const { purgeOldPageviews } = require('../utils/sunupilot-analytics');
+      const deleted = await purgeOldPageviews(conn);
+      if (deleted) console.log(`🧹 ${deleted} vue(s) analytique(s) expirée(s) supprimée(s).`);
+    });
+  } catch (err) {
+    console.error('⚠️  Erreur lors de la purge des statistiques de fréquentation :', err.message);
     captureException(err);
   }
 }
@@ -338,10 +357,12 @@ function startScheduler() {
   expirerPaiementsAbonnementEnAttente();
   executerRelancesAutomatiques();
   livrerWebhooksEnAttente();
+  purgerAnalyticsAnciennes();
   const timer = setInterval(() => {
     verifierFacturesRecurrentes();
     expirerPaiementsAbonnementEnAttente();
     executerRelancesAutomatiques();
+    purgerAnalyticsAnciennes();
   }, intervalMs);
   timer.unref(); // ne bloque pas l'arrêt propre du serveur
 
@@ -352,4 +373,4 @@ function startScheduler() {
   webhookTimer.unref();
 }
 
-module.exports = { startScheduler, verifierFacturesRecurrentes, expirerPaiementsAbonnementEnAttente, executerRelancesAutomatiques, livrerWebhooksEnAttente };
+module.exports = { startScheduler, purgerAnalyticsAnciennes, verifierFacturesRecurrentes, expirerPaiementsAbonnementEnAttente, executerRelancesAutomatiques, livrerWebhooksEnAttente };
