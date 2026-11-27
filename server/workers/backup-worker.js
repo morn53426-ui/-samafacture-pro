@@ -5,15 +5,20 @@ require('dotenv').config();
 
 const { pool } = require('../config/db');
 const { waitForDatabase } = require('../config/database-readiness');
-const { startBackupScheduler } = require('../config/backup');
+const { startBackupScheduler, verifierSchemaRegistreAudit } = require('../config/backup');
+
+const AUDIT_LEDGER_SCHEMA_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 let timer = null;
+let auditSchemaCheckTimer = null;
+let auditSchemaCheckInProgress = false;
 let stopping = false;
 
 async function shutdown() {
   if (stopping) return;
   stopping = true;
   if (timer) clearInterval(timer);
+  if (auditSchemaCheckTimer) clearInterval(auditSchemaCheckTimer);
   await pool.end().catch(() => {});
 }
 
@@ -35,6 +40,26 @@ async function main() {
     if (err.code !== 'ER_NO_SUCH_TABLE') throw err;
     throw new Error('Schéma non migré : backup_meta est absent. Attendez db-migrate avant backup-worker.');
   });
+
+  // Le compte backup dispose du droit TRIGGER nécessaire pour contrôler les définitions.
+  // Le contrôle reste hors du processus HTTP et n'accorde aucun privilège supplémentaire au runtime.
+  await verifierSchemaRegistreAudit();
+  console.log('Protections append-only du registre d’audit vérifiées.');
+
+  auditSchemaCheckTimer = setInterval(async () => {
+    if (auditSchemaCheckInProgress || stopping) return;
+    auditSchemaCheckInProgress = true;
+    try {
+      await verifierSchemaRegistreAudit();
+    } catch (err) {
+      console.error('Dérive du schéma du registre d’audit détectée ; arrêt du backup-worker :', err);
+      await shutdown();
+      process.exitCode = 1;
+    } finally {
+      auditSchemaCheckInProgress = false;
+    }
+  }, AUDIT_LEDGER_SCHEMA_CHECK_INTERVAL_MS);
+
   timer = startBackupScheduler({ keepAlive: true });
   if (!timer) {
     console.log('backup-worker inactif : BACKUP_ENABLED=false.');
