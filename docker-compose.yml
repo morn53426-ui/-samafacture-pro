@@ -32,6 +32,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_MIGRATION_USER: ${DB_MIGRATION_USER:-${DB_USER}}
       DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-${DB_PASSWORD}}
+      DB_BACKUP_USER: ${DB_BACKUP_USER:-${DB_USER}}
+      DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD:-${DB_PASSWORD}}
     volumes:
       - ./deploy/provision-db-users.sh:/usr/local/bin/provision-db-users.sh:ro
     networks: [samafacture_net]
@@ -93,6 +95,8 @@ services:
       DB_PORT: "3306"
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_BACKUP_USER: ${DB_BACKUP_USER:-${DB_USER}}
+      DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD:-${DB_PASSWORD}}
       DB_NAME: ${DB_NAME}
       DB_SKIP_MIGRATIONS: "true"
       # LOCAL UNIQUEMENT : ne jamais déployer ce fichier seul sur un serveur public (pas de validation
