@@ -71,9 +71,9 @@ test('sauvegarde chiffrée et restauration complète via les vrais clients MySQL
       const migrationPath = path.join(__dirname, '..', 'database', 'migrations', '014_audit_ledger.sql');
       const migrationSql = await fs.readFile(migrationPath, 'utf8');
       const migrationStatements = migrationSql
-        .split(/\\r?\\n/)
+        .split(/\r?\n/)
         .filter(line => !line.trim().startsWith('--'))
-        .join('\\n')
+        .join('\n')
         .split(';')
         .map(statement => statement.trim())
         .filter(Boolean);
