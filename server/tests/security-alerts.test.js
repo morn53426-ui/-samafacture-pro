@@ -247,6 +247,13 @@ test('une facture très supérieure à l’historique comparable déclenche un s
   assert.equal(visible.status, 200, visible.text);
   assert.equal(visible.body.alerts.length, 1);
   assert.equal(visible.body.alerts[0].rule_code, 'billing.invoice.amount_outlier');
+  assert.deepEqual(visible.body.alerts[0].evidence, {
+    observed_amount: 75000,
+    historical_median: 10000,
+    currency: 'XOF',
+    sample_size: 21,
+    multiplier: 5
+  });
 });
 
 test('API des alertes : permissions, cache et isolation stricte des tenants', async () => {
@@ -256,6 +263,8 @@ test('API des alertes : permissions, cache et isolation stricte des tenants', as
   assert.equal(own.body.alerts.length, 1);
   assert.equal(Number(own.body.alerts[0].id), alertId);
   assert.equal(own.body.alerts[0].case_id, null);
+  assert.equal(own.body.alerts[0].evidence.attempts_in_window, 5);
+  assert.deepEqual(Object.keys(own.body.alerts[0].evidence), ['attempts_in_window']);
 
   const filtered = await request(app)
     .get('/api/pro/security-alerts?status=resolved')
