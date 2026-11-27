@@ -26,7 +26,10 @@
         <h1>Clients</h1>
         <p>Gérez votre portefeuille clients</p>
       </div>
-      <button class="btn btn-primary" onclick="openModal()"><i class="ic" data-icon="plus"></i> Nouveau client</button>
+      <button type="button" class="btn btn-primary workspace-desktop-create-action" onclick="openModal()" aria-haspopup="dialog" aria-controls="modal"><i class="ic" data-icon="plus"></i> Nouveau client</button>
+    </div>
+    <div class="workspace-mobile-create-actions">
+      <button type="button" class="btn btn-primary" onclick="openModal()" aria-haspopup="dialog" aria-controls="modal"><i class="ic" data-icon="plus" aria-hidden="true"></i> Nouveau client</button>
     </div>
 
     <section class="card workspace-filter-card" aria-label="Recherche dans le répertoire clients">
@@ -54,7 +57,7 @@
 </div>
 
 <!-- Modal client -->
-<div id="modal" data-workspace-modal role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
+<div id="modal" class="workspace-create-modal" data-workspace-modal role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-title" style="display:none; position:fixed; inset:0; background:rgba(15,27,51,0.5); z-index:60; align-items:center; justify-content:center;">
   <div class="card workspace-modal-panel" tabindex="-1" style="width:440px; max-width:92vw;">
     <h3 id="modal-title">Nouveau client</h3>
     <div id="modal-error" role="alert" aria-live="assertive"></div>
@@ -109,7 +112,7 @@
           </div>
         </td>
         <td data-label="Contact">${escapeHtml(c.telephone || c.email) || '—'}</td>
-        <td data-label="Montant dû" class="mono" style="color:${c.total_du > 0 ? 'var(--clay)' : 'var(--ink-soft)'};">${formatMontant(c.total_du)}</td>
+        <td data-label="Montant dû" class="mono" style="color:${c.total_du > 0 ? 'var(--clay-text)' : 'var(--ink-soft)'};">${formatMontant(c.total_du)}</td>
         <td data-label="Total facturé" class="mono">${formatMontant(c.total_facture)}</td>
         <td data-label="Actions" style="text-align:right;" onclick="event.stopPropagation();">
           <button class="btn btn-sm btn-outline" onclick='editClient(${c.id})'>${Icon('edit-3')} Modifier</button>
@@ -172,7 +175,7 @@
       closeModal();
       load().catch(err => alert(err.message));
     } catch (err) {
-      document.getElementById('modal-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('modal-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }

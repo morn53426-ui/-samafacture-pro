@@ -81,7 +81,7 @@
         <td data-label="Catégorie">${escapeHtml(d.categorie) || '—'}</td>
         <td data-label="Règlement">${d.mode_reglement === 'banque' ? 'Banque (521)' : 'Caisse (571)'}</td>
         <td data-label="Date">${formatDate(d.date_depense)}</td>
-        <td data-label="Montant" class="mono" style="color:var(--clay);">${formatMontant(d.montant)}</td>
+        <td data-label="Montant" class="mono" style="color:var(--clay-text);">${formatMontant(d.montant)}</td>
         <td data-label="Actions" class="depense-actions-cell">
           ${Number(d.comptabilisee) ? '<span class="workspace-data-type">Comptabilisée</span>' : `<button class="btn btn-sm btn-outline" onclick='editDepense(${d.id})'>${Icon('edit-3')} Modifier</button> <button class="btn btn-sm btn-danger" onclick="deleteDepense(${d.id})">${Icon('trash-2')} Supprimer</button>`}
         </td>
@@ -141,7 +141,7 @@
       closeModal();
       load().catch(err => alert(err.message));
     } catch (err) {
-      document.getElementById('modal-error').innerHTML = `<div class="error-box">${err.message}</div>`;
+      document.getElementById('modal-error').innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
     } finally {
       restore();
     }

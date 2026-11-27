@@ -26,6 +26,8 @@ describe('Authentification', () => {
     assert.ok(res.body.token, 'un jeton JWT doit être renvoyé');
     assert.equal(res.body.user.email, email);
     assert.equal(res.body.user.password_hash, undefined, 'le mot de passe ne doit jamais être renvoyé');
+    assert.equal(res.body.user.reset_token_hash, undefined, 'le hash de réinitialisation ne doit jamais être renvoyé');
+    assert.equal(res.body.user.reset_token_expires, undefined, 'la date d’expiration interne ne doit jamais être renvoyée');
     userId = res.body.user.id;
   });
 
@@ -143,6 +145,39 @@ describe('Authentification', () => {
     assert.equal(res.body.user.email, email);
   });
 
+  test('les réponses login et auth/me masquent les secrets de réinitialisation sans les effacer de la base', async () => {
+    const markerHash = 'a'.repeat(64);
+    const { pool } = require('../config/db');
+    await pool.query(
+      'UPDATE users SET reset_token_hash = ?, reset_token_expires = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE id = ?',
+      [markerHash, userId]
+    );
+
+    const connexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
+    assert.equal(connexion.status, 200, connexion.text);
+    const profil = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', 'Bearer ' + connexion.body.token);
+    assert.equal(profil.status, 200, profil.text);
+
+    for (const [route, user] of [
+      ['/api/auth/login', connexion.body.user],
+      ['/api/auth/me', profil.body.user]
+    ]) {
+      assert.ok(user, route + ' doit renvoyer le profil utilisateur.');
+      assert.equal(user.password_hash, undefined, route + ' ne doit pas exposer password_hash.');
+      assert.equal(user.reset_token_hash, undefined, route + ' ne doit pas exposer reset_token_hash.');
+      assert.equal(user.reset_token_expires, undefined, route + ' ne doit pas exposer reset_token_expires.');
+    }
+
+    const [[stored]] = await pool.query(
+      'SELECT reset_token_hash FROM users WHERE id = ?',
+      [userId]
+    );
+    assert.equal(stored.reset_token_hash, markerHash,
+      'la lecture du profil ne doit pas invalider ni supprimer le hash stocké.');
+  });
+
   test('les informations légales et bancaires de l’entreprise sont enregistrées et conservées', async () => {
     const login = await request(app).post('/api/auth/login').send({ email, password });
     const token = login.body.token;
@@ -223,6 +258,158 @@ describe('Authentification', () => {
     const reconnexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
     assert.equal(reconnexion.status, 200, reconnexion.text);
     assert.equal((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${reconnexion.body.token}`)).status, 200);
+  });
+
+  test('la réinitialisation protège un événement de contrepassation même si la facture liée est un devis', async () => {
+    const { pool } = require('../config/db');
+    const registration = await request(app)
+      .post('/api/auth/register')
+      .send({
+        nom: 'Compte événement comptable',
+        email: emailDeTest('reset-event'),
+        password,
+        entreprise_nom: 'Société événement comptable',
+        acceptTerms: true
+      });
+    assert.equal(registration.status, 201, registration.text);
+    const resetUserId = registration.body.user.id;
+
+    try {
+      const [clientResult] = await pool.query(
+        'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+        [resetUserId, 'Client événement comptable']
+      );
+      const [invoiceResult] = await pool.query(
+        'INSERT INTO factures (user_id, client_id, numero, type, date_emission) VALUES (?, ?, ?, ?, CURRENT_DATE)',
+        [resetUserId, clientResult.insertId, 'RESET-EVENT-' + resetUserId, 'devis']
+      );
+      // Depuis le schéma v22, facture_id est conservé comme référence d'audit
+      // sans FK vers factures : l'événement doit rester protégé même si la
+      // facture n'est plus un document émis et même si le lien est orphelin.
+      const [eventResult] = await pool.query(
+        'INSERT INTO pro_compta_facture_events (user_id, facture_id, transition, previous_ecriture_id) VALUES (?, ?, ?, ?)',
+        [resetUserId, invoiceResult.insertId, 'annulation', 987654]
+      );
+      // Simule une facture supprimée par une ancienne voie de contournement :
+      // l'événement v22 doit subsister et bloquer le reset même sans ligne facture.
+      await pool.query(
+        'DELETE FROM factures WHERE id = ? AND user_id = ?',
+        [invoiceResult.insertId, resetUserId]
+      );
+
+      const reset = await request(app)
+        .delete('/api/auth/donnees')
+        .set('Authorization', 'Bearer ' + registration.body.token);
+      assert.equal(reset.status, 409, reset.text);
+      assert.equal(reset.body.code, 'RESET_HISTORIQUE_PROTEGE');
+      assert.match(reset.body.error, /contrepassation/i);
+
+      const [[event]] = await pool.query(
+        'SELECT COUNT(*) AS total FROM pro_compta_facture_events WHERE user_id = ? AND id = ?',
+        [resetUserId, eventResult.insertId]
+      );
+      const [[invoice]] = await pool.query(
+        'SELECT COUNT(*) AS total FROM factures WHERE user_id = ? AND id = ?',
+        [resetUserId, invoiceResult.insertId]
+      );
+      assert.equal(Number(event.total), 1, 'l’événement de contrepassation doit rester présent');
+      assert.equal(Number(invoice.total), 0, 'le test doit bien exercer le cas de référence de facture orpheline');
+    } finally {
+      await nettoyerUtilisateur(resetUserId);
+    }
+  });
+
+  test('la réinitialisation autorise les brouillons et conserve le compte et ses paramètres', async () => {
+    const { pool } = require('../config/db');
+    const registration = await request(app)
+      .post('/api/auth/register')
+      .send({
+        nom: 'Compte reset sans historique',
+        email: emailDeTest('reset-drafts'),
+        password,
+        entreprise_nom: 'Société à conserver',
+        acceptTerms: true
+      });
+    assert.equal(registration.status, 201, registration.text);
+    const resetUserId = registration.body.user.id;
+
+    try {
+      const [clientResult] = await pool.query(
+        'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+        [resetUserId, 'Client brouillon']
+      );
+      await pool.query(
+        'INSERT INTO produits (user_id, nom) VALUES (?, ?)',
+        [resetUserId, 'Produit sans mouvement']
+      );
+      await pool.query(
+        'INSERT INTO factures (user_id, client_id, numero, type, date_emission) VALUES (?, ?, ?, ?, CURRENT_DATE)',
+        [resetUserId, clientResult.insertId, 'RESET-DRAFT-' + resetUserId, 'devis']
+      );
+      await pool.query(
+        'INSERT INTO depenses (user_id, libelle, montant, date_depense) VALUES (?, ?, ?, CURRENT_DATE)',
+        [resetUserId, 'Dépense non comptabilisée', 1250]
+      );
+
+      const reset = await request(app)
+        .delete('/api/auth/donnees')
+        .set('Authorization', 'Bearer ' + registration.body.token);
+      assert.equal(reset.status, 200, reset.text);
+      assert.equal(reset.body.success, true);
+
+      const [[account]] = await pool.query(
+        'SELECT id, entreprise_nom FROM users WHERE id = ?',
+        [resetUserId]
+      );
+      assert.equal(Number(account.id), resetUserId);
+      assert.equal(account.entreprise_nom, 'Société à conserver');
+
+      for (const table of ['clients', 'produits', 'factures', 'depenses']) {
+        const [[count]] = await pool.query(
+          `SELECT COUNT(*) AS total FROM ${table} WHERE user_id = ?`,
+          [resetUserId]
+        );
+        assert.equal(Number(count.total), 0, 'les données non historiques de ' + table + ' doivent être réinitialisées');
+      }
+    } finally {
+      await nettoyerUtilisateur(resetUserId);
+    }
+  });
+
+  test('la réinitialisation refuse de supprimer une facture émise et conserve les données liées', async () => {
+    const { pool } = require('../config/db');
+    const connexion = await request(app).post('/api/auth/login').send({ email, password: currentPassword });
+    assert.equal(connexion.status, 200, connexion.text);
+    const token = connexion.body.token;
+
+    const [clientResult] = await pool.query(
+      'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+      [userId, 'Client historique reset guard']
+    );
+    const clientId = clientResult.insertId;
+    const numero = 'RESET-GUARD-' + userId;
+    const [invoiceResult] = await pool.query(
+      'INSERT INTO factures (user_id, client_id, numero, type, date_emission) VALUES (?, ?, ?, ?, CURRENT_DATE)',
+      [userId, clientId, numero, 'facture']
+    );
+    const factureId = invoiceResult.insertId;
+
+    const reset = await request(app)
+      .delete('/api/auth/donnees')
+      .set('Authorization', 'Bearer ' + token);
+    assert.equal(reset.status, 409, reset.text);
+    assert.equal(reset.body.code, 'RESET_HISTORIQUE_PROTEGE');
+
+    const [[facture]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM factures WHERE user_id = ? AND id = ?',
+      [userId, factureId]
+    );
+    const [[client]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM clients WHERE user_id = ? AND id = ?',
+      [userId, clientId]
+    );
+    assert.equal(Number(facture.total), 1, 'la facture émise doit rester présente après le refus');
+    assert.equal(Number(client.total), 1, 'le client lié doit rester présent après le refus');
   });
 
   test('la déconnexion invalide aussi le jeton Bearer courant', async () => {

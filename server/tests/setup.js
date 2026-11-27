@@ -77,6 +77,9 @@ async function nettoyerUtilisateur(userId) {
   // Les supprimer explicitement avant l'utilisateur permet ensuite aux cascades des
   // factures et paiements de s'exécuter sans contourner l'intégrité référentielle.
   await pool.query('DELETE FROM pro_refund_requests WHERE user_id = ?', [userId]);
+  // Les commandes professionnelles référencent les clients avec ON DELETE RESTRICT.
+  // Les supprimer d'abord évite que la cascade users -> clients soit bloquée.
+  await pool.query('DELETE FROM pro_commandes WHERE user_id = ?', [userId]);
   await pool.query('DELETE FROM users WHERE id = ?', [userId]);
 }
 
@@ -128,5 +131,5 @@ async function teardownTestEnvironment() {
   if (cleanupError) throw cleanupError;
 }
 
-module.exports = { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, ensureTestHttpServer, teardownTestEnvironment };
+module.exports = { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment };
 

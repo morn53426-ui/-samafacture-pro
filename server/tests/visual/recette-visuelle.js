@@ -38,6 +38,10 @@ const PAGES = [
   { name: 'finances', file: 'finances.html', ready: '#stat-prevision', charts: ['chart-finances'] },
   { name: 'parametres', file: 'parametres.html', ready: '[data-template-card="classique"]' },
   { name: 'professionnel', file: 'professionnel.html', ready: '#pro-sales' },
+  { name: 'confidentialite-info', file: 'confidentialite.html?from=workspace', ready: '.lp-back-link', public: true, infoPage: true },
+  { name: 'support-info', file: 'support.html?from=workspace', ready: '.lp-back-link', public: true, infoPage: true },
+  { name: 'conditions-info', file: 'conditions.html?from=workspace', ready: '.lp-back-link', public: true, infoPage: true },
+  { name: 'aide-info', file: 'aide.html?from=workspace', ready: '.lp-back-link', public: true, infoPage: true },
   { name: 'nouvelle-facture', file: 'nouvelle-facture.html', ready: '#l1' },
   { name: 'crm', file: 'crm.html', ready: '#activity-form' },
   { name: 'internationalisation', file: 'internationalisation.html', ready: '#save-localization' },
@@ -45,7 +49,8 @@ const PAGES = [
   { name: 'abonnement', file: 'abonnement.html', ready: '#plan-cards .subscription-plan-card' },
   { name: 'groupe-entreprise', file: 'groupe-entreprise.html', ready: '#invite-company-form', plan: 'entreprise' },
   { name: 'invitation', file: 'invitation.html?type=company-group&token=' + 'a'.repeat(64), ready: '#accept-invite', public: true },
-  { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true }
+  { name: 'portail-client', file: 'portail-client.html#token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', ready: '.portal-hero', public: true },
+  { name: 'admin', file: 'admin.html', ready: '#admin-dashboard:not([hidden])', noWorkspaceShell: true }
 ];
 
 const DOCUMENT_TEMPLATES = [
@@ -452,6 +457,80 @@ function fixtureFor(pathname, fixtures) {
       { id: 2, nom: 'Alertes de stock faible', type: 'alerte_stock_email', actif: false, configuration: { frequence_jours: 1 }, derniere_execution: '2026-11-11 08:00:00', prochaine_execution: null, dernier_resultat: 'smtp_non_configure' }
     ]
   };
+  if (pathname === '/api/admin/overview') {
+    const empty = DATASET === 'empty';
+    const large = DATASET === 'worst';
+    const value = empty ? 0 : (large ? 999999999999.99 : 1250000);
+    const count = empty ? 0 : (large ? 999999999 : 42);
+    return {
+      period: { from: '2026-10-28', to: '2026-11-26', days: 30, bucket: '%Y-%m-%d' },
+      summary: {
+        page_views: count,
+        estimated_sessions: empty ? 0 : (large ? 888888888 : 31),
+        registered_accounts: empty ? 0 : (large ? 999999999 : 248),
+        new_accounts: empty ? 0 : (large ? 999999 : 18),
+        active_trials: empty ? 0 : (large ? 999999 : 12),
+        accounts_with_paid_plan: empty ? 0 : (large ? 999999 : 73),
+        active_saas_subscriptions: empty ? 0 : (large ? 999999 : 39),
+        accounts_with_confirmed_subscription_payment: empty ? 0 : (large ? 999999 : 28)
+      },
+      plans: {
+        accounts_by_plan: empty ? [] : [
+          { plan: 'gratuit', accounts: large ? 999999999 : 175 },
+          { plan: 'starter', accounts: large ? 888888888 : 32 },
+          { plan: 'pro', accounts: large ? 777777777 : 27 },
+          { plan: 'entreprise', accounts: large ? 666666666 : 14 }
+        ],
+        active_saas_subscriptions_by_plan: empty ? [] : [
+          { plan: 'pro', subscriptions: large ? 99999999 : 22 },
+          { plan: 'entreprise', subscriptions: large ? 88888888 : 17 }
+        ]
+      },
+      revenue: {
+        period_by_currency: empty ? [] : [
+          { currency: 'XOF', confirmed_payments: large ? 999999 : 17, amount: value },
+          { currency: 'EUR', confirmed_payments: large ? 888888 : 3, amount: large ? 888888888888.88 : 950 }
+        ],
+        all_time_by_currency: empty ? [] : [
+          { currency: 'XOF', confirmed_payments: large ? 9999999 : 83, amount: large ? 999999999999.99 : 12850000 },
+          { currency: 'EUR', confirmed_payments: large ? 8888888 : 9, amount: large ? 888888888888.88 : 4200 }
+        ],
+        trend: empty ? [] : [
+          { bucket: '2026-11-01', currency: 'XOF', confirmed_payments: large ? 999999 : 5, amount: large ? 999999999999.99 : 450000 },
+          { bucket: '2026-11-12', currency: 'XOF', confirmed_payments: large ? 888888 : 7, amount: large ? 888888888888.88 : 620000 },
+          { bucket: '2026-11-20', currency: 'EUR', confirmed_payments: large ? 777777 : 2, amount: large ? 777777777777.77 : 950 }
+        ],
+        by_plan_by_currency: empty ? [] : [
+          { plan: 'pro', currency: 'XOF', confirmed_payments: large ? 999999 : 11, amount: large ? 999999999999.99 : 890000 },
+          { plan: 'entreprise', currency: 'EUR', confirmed_payments: large ? 888888 : 3, amount: large ? 888888888888.88 : 950 }
+        ],
+        recurring_metrics_available: false,
+        recurring_metrics_note: 'MRR et ARR non calculés : aucun cycle SaaS approuvé.'
+      },
+      traffic: {
+        trend: empty ? [] : [
+          { bucket: '2026-11-01', page_views: large ? 999999999 : 120, estimated_sessions: large ? 888888888 : 80 },
+          { bucket: '2026-11-15', page_views: large ? 777777777 : 245, estimated_sessions: large ? 666666666 : 162 }
+        ],
+        top_pages: empty ? [] : [
+          { page_path: '/dashboard.html', page_views: large ? 999999999 : 185, estimated_sessions: large ? 888888888 : 112 },
+          { page_path: '/facture-detail.html', page_views: large ? 888888888 : 94, estimated_sessions: large ? 777777777 : 61 },
+          { page_path: '/abonnement.html', page_views: large ? 777777777 : 36, estimated_sessions: large ? 666666666 : 24 }
+        ]
+      },
+      signups: {
+        trend: empty ? [] : [
+          { bucket: '2026-11-01', new_accounts: large ? 999999999 : 8 },
+          { bucket: '2026-11-15', new_accounts: large ? 888888888 : 13 }
+        ]
+      },
+      definitions: {
+        estimated_sessions: 'Sessions estimées par onglet.',
+        accounts_with_paid_plan: 'Formule sélectionnée, ne prouvant pas un paiement.',
+        subscription_revenue: 'Paiements d’abonnement confirmés uniquement.'
+      }
+    };
+  }
   if (pathname === '/api/portal/') return {
     client: { nom: fixtures.clients[0]?.nom || 'Client de recette', email: fixtures.clients[0]?.email || 'client@example.test' },
     entreprise: { nom: 'SamaFacture — Société de test', logo: null, email: 'support@example.test', telephone: '+221 77 000 00 00', site_web: 'https://example.test', devise: 'FCFA', langue: 'fr', locale: 'fr-SN' },
@@ -563,7 +642,7 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
   const pageErrors = [];
   const onPageError = (error) => pageErrors.push(error.message);
   page.on('pageerror', onPageError);
-  const workspacePage = !pageDefinition.public && !pageDefinition.standaloneDocument;
+  const workspacePage = !pageDefinition.public && !pageDefinition.standaloneDocument && !pageDefinition.noWorkspaceShell;
 
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: 1 });
   if (pageDefinition.plan) {
@@ -714,6 +793,96 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       JSON.stringify(mobileTableMetrics.cells));
   }
 
+  if (pageDefinition.name === 'admin') {
+    await page.waitForFunction(() => {
+      const traffic = document.getElementById('traffic-chart');
+      const signups = document.getElementById('signup-chart');
+      return traffic?.dataset.sfChartType && signups?.dataset.sfChartType;
+    }, { timeout: 15000 });
+    const adminUi = await page.evaluate(() => ({
+      dashboardVisible: document.getElementById('admin-dashboard')?.hidden === false,
+      loadingStateHidden: (() => {
+        const loading = document.getElementById('admin-state');
+        return Boolean(loading && loading.hidden &&
+          getComputedStyle(loading).display === 'none' &&
+          loading.getClientRects().length === 0);
+      })(),
+      kpiCount: document.querySelectorAll('.admin-kpi').length,
+      trafficChart: Boolean(document.getElementById('traffic-chart')?.dataset.sfChartType),
+      signupChart: Boolean(document.getElementById('signup-chart')?.dataset.sfChartType),
+      revenueChartCount: document.querySelectorAll('#revenue-charts canvas').length,
+      revenueCards: document.querySelectorAll('#revenue-cards .admin-revenue-card').length,
+      revenueRows: document.querySelectorAll('#revenue-table tr').length,
+      planRows: document.querySelectorAll('#plans-table tr').length,
+      pageRows: document.querySelectorAll('#pages-table tr').length,
+      fromDate: document.getElementById('period-from')?.value || '',
+      toDate: document.getElementById('period-to')?.value || '',
+      horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth
+    }));
+    assert.equal(adminUi.dashboardVisible, true,
+      'Le centre administrateur doit terminer son chargement avec des données de démonstration.');
+    assert.equal(adminUi.loadingStateHidden, true,
+      'Le panneau de chargement doit être masqué et ne plus occuper d’espace après le rendu.');
+    assert.equal(adminUi.kpiCount, 6, 'Les six indicateurs de pilotage doivent être affichés.');
+    assert.equal(adminUi.trafficChart, true, 'Le graphique de fréquentation doit être construit.');
+    assert.equal(adminUi.signupChart, true, 'Le graphique des inscriptions doit être construit.');
+    assert.ok(adminUi.revenueChartCount >= (DATASET === 'empty' ? 0 : 2),
+      'Les graphiques de revenus doivent être séparés par devise : ' + JSON.stringify(adminUi));
+    assert.ok(adminUi.revenueCards >= 1, 'La synthèse de revenus doit afficher ses cartes.');
+    assert.ok(adminUi.revenueRows >= 1 && adminUi.planRows >= 1 && adminUi.pageRows >= 1,
+      'Les tableaux des revenus, formules et pages doivent être présents.');
+    assert.ok(adminUi.fromDate && adminUi.toDate, 'Les deux filtres de période doivent être initialisés.');
+    assert.ok(adminUi.horizontalOverflow <= 1,
+      'Le centre administrateur ne doit pas déborder horizontalement à ' + viewport.width + 'px : ' + JSON.stringify(adminUi));
+  }
+
+  if (pageDefinition.name === 'admin') {
+    const skipLink = await page.evaluate(() => {
+      const link = document.querySelector('.admin-skip-link');
+      const main = document.getElementById('main-content');
+      return {
+        exists: Boolean(link),
+        targetExists: Boolean(link && main && link.getAttribute('href') === '#main-content'),
+        targetIsMain: Boolean(main && main.tagName === 'MAIN'),
+        firstTabStop: Boolean(link && link.tabIndex === 0 &&
+          document.querySelector('body')?.firstElementChild === link)
+      };
+    });
+    assert.equal(skipLink.exists, true, 'Le centre admin doit proposer un lien d’évitement clavier.');
+    assert.equal(skipLink.targetExists, true, 'Le lien d’évitement doit cibler le contenu principal.');
+    assert.equal(skipLink.targetIsMain, true, 'La cible du lien d’évitement doit être le repère principal.');
+    assert.equal(skipLink.firstTabStop, true, 'Le lien d’évitement doit être le premier arrêt clavier.');
+  }
+
+  if (pageDefinition.infoPage) {
+    const returnNavigation = await page.evaluate(() => {
+      const link = document.querySelector('.lp-back-link[data-smart-back]');
+      const header = document.querySelector('body.info-page .lp-header');
+      if (!link || !header) return { found: false };
+      const rect = link.getBoundingClientRect();
+      const linkStyle = getComputedStyle(link);
+      const headerStyle = getComputedStyle(header);
+      return {
+        found: true,
+        visible: linkStyle.display !== 'none' && linkStyle.visibility !== 'hidden' &&
+          rect.width > 0 && rect.height >= 40 && rect.left >= -1 && rect.right <= window.innerWidth + 1,
+        stickyHeader: headerStyle.position === 'sticky',
+        fallback: link.getAttribute('href'),
+        hasWorkspaceContext: new URLSearchParams(location.search).get('from') === 'workspace'
+      };
+    });
+    assert.equal(returnNavigation.found, true,
+      pageDefinition.name + ' doit afficher le bouton Retour.');
+    assert.equal(returnNavigation.visible, true,
+      pageDefinition.name + ' : le bouton Retour doit rester visible dans la largeur de l’écran : ' + JSON.stringify(returnNavigation));
+    assert.equal(returnNavigation.stickyHeader, true,
+      pageDefinition.name + ' : la barre de navigation doit rester accessible pendant le défilement.');
+    assert.equal(returnNavigation.fallback, 'dashboard.html',
+      pageDefinition.name + ' : une arrivée directe depuis l’espace doit revenir au tableau de bord.');
+    assert.equal(returnNavigation.hasWorkspaceContext, true,
+      pageDefinition.name + ' doit conserver le contexte de l’espace de travail.');
+  }
+
   if (pageDefinition.name === 'produits') {
     const catalogue = await page.evaluate(() => [...document.querySelectorAll('#produits-body tr')].map(row => ({
       type: row.querySelector('[data-label="Type"]')?.textContent.trim() || '',
@@ -723,6 +892,105 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
       'La recette du catalogue doit couvrir les trois types de fiche.');
     assert.ok(catalogue.filter(row => row.type === 'Service').every(row => row.stock === '—'),
       'Un service ne doit jamais afficher de quantité de stock physique.');
+  }
+
+  if (['clients', 'produits'].includes(pageDefinition.name) && viewport.width <= 640) {
+    const createAction = await page.evaluate(() => {
+      const action = document.querySelector('.workspace-mobile-create-actions > button');
+      if (!action) return { found: false };
+      const rect = action.getBoundingClientRect();
+      const style = getComputedStyle(action);
+      return {
+        found: true,
+        visible: style.display !== 'none' && style.visibility !== 'hidden' &&
+          rect.width > 0 && rect.height >= 44 && rect.top >= -1 && rect.bottom <= window.innerHeight + 1,
+        text: action.textContent.trim(),
+        target: action.getAttribute('aria-controls'),
+        horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
+      };
+    });
+    assert.equal(createAction.found, true,
+      pageDefinition.name + ' doit proposer une action de création mobile.');
+    assert.equal(createAction.visible, true,
+      pageDefinition.name + ' : le bouton de création doit être visible sans défilement horizontal : ' + JSON.stringify(createAction));
+    assert.equal(createAction.target, 'modal',
+      pageDefinition.name + ' : le bouton doit ouvrir la fenêtre de création existante.');
+    assert.equal(createAction.horizontalOverflow, false,
+      pageDefinition.name + ' ne doit pas déborder horizontalement à ' + viewport.width + 'px.');
+
+    await page.click('.workspace-mobile-create-actions > button');
+    await page.waitForFunction(() => {
+      const dialog = document.getElementById('modal');
+      return dialog && getComputedStyle(dialog).display !== 'none' &&
+        dialog.getAttribute('aria-hidden') === 'false';
+    }, { timeout: 5000 });
+    const dialogMetrics = await page.evaluate(() => {
+      const dialog = document.getElementById('modal');
+      const panel = dialog?.querySelector('.workspace-modal-panel');
+      const actions = dialog?.querySelector('.workspace-modal-actions');
+      const save = actions?.querySelector('button[type="submit"]');
+      const panelRect = panel?.getBoundingClientRect();
+      const actionsRect = actions?.getBoundingClientRect();
+      const title = panel?.querySelector('#modal-title');
+      const titleRect = title?.getBoundingClientRect();
+      const sidebar = document.querySelector('#app-sidebar, .sidebar');
+      const modalZ = Number.parseInt(getComputedStyle(dialog).zIndex, 10) || 0;
+      const sidebarZ = sidebar ? Number.parseInt(getComputedStyle(sidebar).zIndex, 10) || 0 : 0;
+      const titleHit = titleRect && document.elementFromPoint(
+        Math.min(window.innerWidth - 1, Math.max(0, titleRect.left + Math.min(12, titleRect.width / 2))),
+        Math.min(window.innerHeight - 1, Math.max(0, titleRect.top + Math.min(12, titleRect.height / 2)))
+      );
+      return {
+        visible: Boolean(dialog && getComputedStyle(dialog).display !== 'none'),
+        focusManaged: Boolean(dialog?.contains(document.activeElement)),
+        panelFound: Boolean(panel && panelRect),
+        panelWithinViewport: Boolean(panelRect && panelRect.top >= -1 &&
+          panelRect.bottom <= window.innerHeight + 1 && panelRect.width <= window.innerWidth + 1),
+        panelScrolls: Boolean(panel && ['auto', 'scroll'].includes(getComputedStyle(panel).overflowY)),
+        titleFound: Boolean(title && titleRect),
+        titleVisible: Boolean(titleRect && titleRect.width > 0 && titleRect.height > 0 &&
+          titleRect.top >= -1 && titleRect.bottom <= window.innerHeight + 1 &&
+          getComputedStyle(title).visibility !== 'hidden' && getComputedStyle(title).display !== 'none'),
+        titleUnobscured: Boolean(titleHit && panel?.contains(titleHit)),
+        modalZ,
+        sidebarZ,
+        modalAboveSidebar: modalZ > sidebarZ,
+        actionsFound: Boolean(actions && save),
+        actionsVisible: Boolean(actionsRect && actionsRect.height >= 40 &&
+          actionsRect.top >= panelRect.top - 1 && actionsRect.bottom <= panelRect.bottom + 1),
+        actionsPosition: actions ? getComputedStyle(actions).position : '',
+        requiredName: Boolean(document.querySelector('#nom[required]'))
+      };
+    });
+    assert.equal(dialogMetrics.visible, true, pageDefinition.name + ' : la fenêtre doit s’ouvrir.');
+    assert.equal(dialogMetrics.focusManaged, true, pageDefinition.name + ' : le focus doit rester dans la fenêtre.');
+    assert.equal(dialogMetrics.panelFound, true, pageDefinition.name + ' : le panneau du formulaire doit exister.');
+    assert.equal(dialogMetrics.panelWithinViewport, true,
+      pageDefinition.name + ' : le panneau doit rester dans le viewport : ' + JSON.stringify(dialogMetrics));
+    assert.equal(dialogMetrics.panelScrolls, true, pageDefinition.name + ' : le formulaire doit pouvoir défiler.');
+    assert.equal(dialogMetrics.titleFound, true, pageDefinition.name + ' : le titre de la fenêtre doit exister.');
+    assert.equal(dialogMetrics.titleVisible, true,
+      pageDefinition.name + ' : le titre de la modale doit rester visible dans le viewport : ' + JSON.stringify(dialogMetrics));
+    assert.equal(dialogMetrics.titleUnobscured, true,
+      pageDefinition.name + ' : le bandeau mobile ne doit pas recouvrir le titre de la modale : ' + JSON.stringify(dialogMetrics));
+    assert.equal(dialogMetrics.modalAboveSidebar, true,
+      pageDefinition.name + ' : la modale doit être empilée au-dessus du menu mobile : ' + JSON.stringify(dialogMetrics));
+    assert.equal(dialogMetrics.actionsFound, true, pageDefinition.name + ' : les actions du formulaire doivent exister.');
+    assert.equal(dialogMetrics.actionsVisible, true,
+      pageDefinition.name + ' : les actions doivent rester accessibles dans le panneau : ' + JSON.stringify(dialogMetrics));
+    assert.equal(dialogMetrics.requiredName, true, pageDefinition.name + ' : le champ principal doit rester accessible.');
+    if (viewport.width <= 560) {
+      assert.equal(dialogMetrics.actionsPosition, 'sticky',
+        pageDefinition.name + ' : les boutons doivent rester ancrés au bas du formulaire sur téléphone.');
+    }
+    // Conserver une preuve visuelle de l'état de création, pas seulement de la page
+    // de liste. Une capture par largeur mobile documente le formulaire réellement ouvert.
+    await page.screenshot({
+      path: path.join(screenshots, pageDefinition.name + '-create-modal-' + viewport.name + '-' + DATASET + '.png'),
+      fullPage: false
+    });
+    await page.click('#modal [data-modal-close]');
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('modal')).display === 'none');
   }
   if (pageDefinition.name === 'groupe-entreprise') {
     const groupUi = await page.evaluate(() => {
@@ -1273,9 +1541,30 @@ async function verifyPage(page, baseUrl, pageDefinition, viewport, screenshots) 
     assert.ok(nav.left >= -1 && nav.right <= metrics.viewport + 1,
       'La navigation professionnelle ne doit pas sortir de l’écran : ' + JSON.stringify(nav));
     if (viewport.width <= 560) {
-      const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
-      assert.equal(gridColumns.split(' ').length, 1,
-        'Les rubriques professionnelles doivent s’empiler sur téléphone : ' + gridColumns);
+      const mobileRail = await page.$eval('.pro-workspace-guide-grid', element => {
+        const style = getComputedStyle(element);
+        return {
+          gridAutoFlow: style.gridAutoFlow,
+          overflowX: style.overflowX,
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+          role: element.getAttribute('role'),
+          tabIndex: element.tabIndex,
+          label: element.getAttribute('aria-label')
+        };
+      });
+      assert.equal(mobileRail.gridAutoFlow, 'column',
+        'Les domaines professionnels doivent former un rail horizontal sur téléphone : ' + JSON.stringify(mobileRail));
+      assert.equal(mobileRail.overflowX, 'auto',
+        'Le rail mobile doit pouvoir défiler horizontalement : ' + JSON.stringify(mobileRail));
+      assert.ok(mobileRail.scrollWidth > mobileRail.clientWidth,
+        'Le rail mobile doit contenir plusieurs domaines au-delà de la largeur visible : ' + JSON.stringify(mobileRail));
+      assert.equal(mobileRail.role, 'region',
+        'Le rail mobile doit être identifié comme une région accessible.');
+      assert.equal(mobileRail.tabIndex, 0,
+        'Le rail mobile doit être accessible au clavier.');
+      assert.ok(mobileRail.label,
+        'Le rail mobile doit avoir un libellé pour les technologies d’assistance.');
     }
     if (viewport.width > 1100) {
       const gridColumns = await page.$eval('.pro-workspace-guide-grid', element => getComputedStyle(element).gridTemplateColumns);
@@ -1692,17 +1981,41 @@ async function verifyMotion(browser, baseUrl, fixtures) {
   await normalPage.waitForFunction(() =>
     document.getElementById('chart-evolution')?.dataset.dashboardPeriod === '6m'
   );
-  const bounds = await periodSelect.boundingBox();
+  assert.equal(
+    await periodSelect.evaluate((element) => element.disabled),
+    false,
+    'Le sélecteur de période doit rester disponible après le changement de vue.'
+  );
+
+  // :active est ici vérifié sur un vrai bouton HTML. Un <select> ouvre un menu natif
+  // et ne conserve pas forcément cet état pendant une mesure Puppeteer prolongée.
+  const pressButton = await normalPage.evaluateHandle(() => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-primary';
+    button.textContent = 'Contrôle du retour tactile';
+    Object.assign(button.style, {
+      position: 'fixed',
+      right: '16px',
+      bottom: '16px',
+      zIndex: '99999'
+    });
+    document.body.appendChild(button);
+    return button;
+  });
+  const bounds = await pressButton.boundingBox();
+  assert.ok(bounds, 'Le bouton de contrôle doit être visible pour la mesure.');
   await normalPage.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await normalPage.mouse.down();
   // Laisser la transition de 130 ms atteindre son état final avant de lire la matrice.
   await new Promise((resolve) => setTimeout(resolve, 180));
-  const buttonState = await periodSelect.evaluate((element) => ({
+  const buttonState = await pressButton.evaluate((element) => ({
     active: element.matches(':active'),
     transform: getComputedStyle(element).transform
   }));
   await normalPage.mouse.up();
-  assert.equal(buttonState.active, true, 'Le sélecteur de période doit rester actif pendant la mesure.');
+  await pressButton.dispose();
+  assert.equal(buttonState.active, true, 'Le bouton doit rester actif pendant la mesure.');
   const pressMatrix = buttonState.transform.match(/^matrix\(([^)]+)\)$/);
   const pressScale = pressMatrix ? pressMatrix[1].split(',').map(Number) : [];
   assert.ok(pressScale.length === 6 &&
@@ -2443,11 +2756,16 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     const soon = getComputedStyle(probe);
     const proBadge = document.querySelector('.invoice-template-tier.tier-pro');
     const pro = proBadge ? getComputedStyle(proBadge) : null;
+    const enterpriseBadge = document.querySelector('.invoice-template-tier.tier-enterprise');
+    const enterprise = enterpriseBadge ? getComputedStyle(enterpriseBadge) : null;
+    if (!enterprise) throw new Error('Le badge Entreprise doit être présent dans la galerie des modèles.');
     const result = {
       soonText: soon.color,
       soonBackground: soon.backgroundColor,
       proText: pro ? pro.color : null,
-      proBackground: pro ? pro.backgroundColor : null
+      proBackground: pro ? pro.backgroundColor : null,
+      enterpriseText: enterprise.color,
+      enterpriseBackground: enterprise.backgroundColor
     };
     probe.remove();
     return result;
@@ -2459,13 +2777,25 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
   const goldBadgeColorsDark = await readGoldBadgeColors();
   const soonBadgeLightContrast = contrastRatio(goldBadgeColorsLight.soonText, goldBadgeColorsLight.soonBackground);
   const proBadgeLightContrast = contrastRatio(goldBadgeColorsLight.proText, goldBadgeColorsLight.proBackground);
+  const enterpriseBadgeLightContrast = contrastRatio(goldBadgeColorsLight.enterpriseText, goldBadgeColorsLight.enterpriseBackground);
   const soonBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.soonText, goldBadgeColorsDark.soonBackground);
   const proBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.proText, goldBadgeColorsDark.proBackground);
+  const enterpriseBadgeDarkContrast = contrastRatio(goldBadgeColorsDark.enterpriseText, goldBadgeColorsDark.enterpriseBackground);
+  await settingsPage.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+  await settingsPage.evaluate(() => window.SamaTheme.definir('auto'));
+  const goldBadgeColorsSystemDark = await readGoldBadgeColors();
+  const enterpriseBadgeSystemDarkContrast = contrastRatio(
+    goldBadgeColorsSystemDark.enterpriseText,
+    goldBadgeColorsSystemDark.enterpriseBackground
+  );
   for (const [label, contrast] of [
     ['Disponibilité clair', soonBadgeLightContrast],
     ['Modèle Pro clair', proBadgeLightContrast],
+    ['Modèle Entreprise clair', enterpriseBadgeLightContrast],
     ['Disponibilité sombre', soonBadgeDarkContrast],
-    ['Modèle Pro sombre', proBadgeDarkContrast]
+    ['Modèle Pro sombre', proBadgeDarkContrast],
+    ['Modèle Entreprise sombre', enterpriseBadgeDarkContrast],
+    ['Modèle Entreprise système sombre', enterpriseBadgeSystemDarkContrast]
   ]) {
     assert.ok(contrast >= 4.5,
       label + ' doit conserver un contraste de 4,5:1. Valeur : ' + contrast.toFixed(2));
@@ -2493,8 +2823,22 @@ async function verifyThemeConsistency(browser, baseUrl, fixtures) {
     charts: { finances, reports },
     settingsPreview: { light: previewLight, dark: previewDark },
     goldBadges: {
-      light: { colors: goldBadgeColorsLight, soonContrast: Number(soonBadgeLightContrast.toFixed(2)), proContrast: Number(proBadgeLightContrast.toFixed(2)) },
-      dark: { colors: goldBadgeColorsDark, soonContrast: Number(soonBadgeDarkContrast.toFixed(2)), proContrast: Number(proBadgeDarkContrast.toFixed(2)) }
+      light: {
+        colors: goldBadgeColorsLight,
+        soonContrast: Number(soonBadgeLightContrast.toFixed(2)),
+        proContrast: Number(proBadgeLightContrast.toFixed(2)),
+        enterpriseContrast: Number(enterpriseBadgeLightContrast.toFixed(2))
+      },
+      dark: {
+        colors: goldBadgeColorsDark,
+        soonContrast: Number(soonBadgeDarkContrast.toFixed(2)),
+        proContrast: Number(proBadgeDarkContrast.toFixed(2)),
+        enterpriseContrast: Number(enterpriseBadgeDarkContrast.toFixed(2))
+      },
+      systemDark: {
+        colors: goldBadgeColorsSystemDark,
+        enterpriseContrast: Number(enterpriseBadgeSystemDarkContrast.toFixed(2))
+      }
     },
     screenshots: 6
   };
@@ -3014,8 +3358,20 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
               Number(navToggleStyle.opacity) > 0 && navToggleRect.width >= 32 && navToggleRect.height >= 32),
             mobileToggleAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
               navToggleLabel && navToggleControls === 'app-navigation' &&
-              document.getElementById(navToggleControls))
-          };
+              document.getElementById(navToggleControls)),
+            adminReturnLinkVisible: (() => {
+              const link = document.querySelector('.admin-exit-link');
+              if (!link) return false;
+              const style = getComputedStyle(link);
+              const rect = link.getBoundingClientRect();
+              return style.display !== 'none' && style.visibility !== 'hidden' &&
+                Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+                rect.right > 0 && rect.left < window.innerWidth &&
+                rect.bottom > 0 && rect.top < window.innerHeight &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+            })()
+};
         });
 
         assert.equal(metrics.viewport, viewport.width,
@@ -3033,12 +3389,17 @@ async function verifyBusinessPagesDarkThemeMobile(browser, baseUrl, fixtures) {
         assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
           pageDefinition.name + ' : la zone métier doit rester dans le viewport à ' + viewport.width + 'px : ' +
           JSON.stringify(metrics));
-        assert.equal(metrics.mobileToggleExists, true,
-          pageDefinition.name + ' doit exposer une commande de navigation mobile.');
-        assert.equal(metrics.mobileToggleVisible, true,
-          pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
-        assert.equal(metrics.mobileToggleAccessible, true,
-          pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        if (pageDefinition.noWorkspaceShell) {
+          assert.equal(metrics.adminReturnLinkVisible, true,
+            pageDefinition.name + ' doit conserver un lien de retour accessible vers l’application sur mobile.');
+        } else {
+          assert.equal(metrics.mobileToggleExists, true,
+            pageDefinition.name + ' doit exposer une commande de navigation mobile.');
+          assert.equal(metrics.mobileToggleVisible, true,
+            pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
+          assert.equal(metrics.mobileToggleAccessible, true,
+            pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        }
 
         const screenshot = 'theme-sombre-' + pageDefinition.name + '-' + viewport.name + '.png';
         await page.screenshot({
@@ -3148,8 +3509,20 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
               Number(navToggleStyle.opacity) > 0 && navToggleRect.width >= 32 && navToggleRect.height >= 32),
             mobileToggleAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
               navToggleLabel && navToggleControls === 'app-navigation' &&
-              document.getElementById(navToggleControls))
-          };
+              document.getElementById(navToggleControls)),
+            adminReturnLinkVisible: (() => {
+              const link = document.querySelector('.admin-exit-link');
+              if (!link) return false;
+              const style = getComputedStyle(link);
+              const rect = link.getBoundingClientRect();
+              return style.display !== 'none' && style.visibility !== 'hidden' &&
+                Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+                rect.right > 0 && rect.left < window.innerWidth &&
+                rect.bottom > 0 && rect.top < window.innerHeight &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+            })()
+};
         });
 
         assert.equal(metrics.viewport, viewport.width,
@@ -3167,12 +3540,17 @@ async function verifyBusinessPagesLightThemeMobile(browser, baseUrl, fixtures) {
         assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
           pageDefinition.name + ' : la zone métier doit rester dans le viewport à ' + viewport.width + 'px : ' +
           JSON.stringify(metrics));
-        assert.equal(metrics.mobileToggleExists, true,
-          pageDefinition.name + ' doit exposer une commande de navigation mobile.');
-        assert.equal(metrics.mobileToggleVisible, true,
-          pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
-        assert.equal(metrics.mobileToggleAccessible, true,
-          pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        if (pageDefinition.noWorkspaceShell) {
+          assert.equal(metrics.adminReturnLinkVisible, true,
+            pageDefinition.name + ' doit conserver un lien de retour accessible vers l’application sur mobile.');
+        } else {
+          assert.equal(metrics.mobileToggleExists, true,
+            pageDefinition.name + ' doit exposer une commande de navigation mobile.');
+          assert.equal(metrics.mobileToggleVisible, true,
+            pageDefinition.name + ' doit garder la commande de navigation mobile visible et utilisable.');
+          assert.equal(metrics.mobileToggleAccessible, true,
+            pageDefinition.name + ' doit fournir un bouton de navigation mobile accessible.');
+        }
 
         const screenshot = 'theme-clair-' + pageDefinition.name + '-' + viewport.name + '.png';
         await page.screenshot({
@@ -3274,6 +3652,18 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
             Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
           navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
             navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          adminReturnLinkVisible: (() => {
+            const link = document.querySelector('.admin-exit-link');
+            if (!link) return false;
+            const style = getComputedStyle(link);
+            const rect = link.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' &&
+              Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+                rect.right > 0 && rect.left < window.innerWidth &&
+                rect.bottom > 0 && rect.top < window.innerHeight &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+          })(),
           responsiveTables
         };
       });
@@ -3288,10 +3678,15 @@ async function verifyBusinessPagesZoom200(browser, baseUrl, fixtures) {
         pageDefinition.name + ' déborde horizontalement au zoom 200 % : ' + JSON.stringify(metrics));
       assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
         pageDefinition.name + ' sort du viewport utile au zoom 200 % : ' + JSON.stringify(metrics));
-      assert.equal(metrics.navigationVisible, true,
-        pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
-      assert.equal(metrics.navigationAccessible, true,
-        pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      if (pageDefinition.noWorkspaceShell) {
+        assert.equal(metrics.adminReturnLinkVisible, true,
+          pageDefinition.name + ' doit conserver son lien de retour accessible au zoom 200 %.');
+      } else {
+        assert.equal(metrics.navigationVisible, true,
+          pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
+        assert.equal(metrics.navigationAccessible, true,
+          pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      }
       for (const table of metrics.responsiveTables) {
         assert.equal(table.tableDisplay, 'block',
           pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
@@ -3415,6 +3810,18 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
             Number(navStyle.opacity) > 0 && navRect.width >= 32 && navRect.height >= 32),
           navigationAccessible: Boolean(navToggle && navToggle.tagName === 'BUTTON' &&
             navLabel && controls === 'app-navigation' && document.getElementById(controls)),
+          adminReturnLinkVisible: (() => {
+            const link = document.querySelector('.admin-exit-link');
+            if (!link) return false;
+            const style = getComputedStyle(link);
+            const rect = link.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' &&
+              Number(style.opacity) > 0 && rect.width > 0 && rect.height > 0 &&
+                rect.right > 0 && rect.left < window.innerWidth &&
+                rect.bottom > 0 && rect.top < window.innerHeight &&
+                link.getAttribute('href') === 'dashboard.html' &&
+                (link.textContent || '').trim().length > 0;
+          })(),
           responsiveTables
         };
       });
@@ -3432,10 +3839,15 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
         pageDefinition.name + ' déborde horizontalement en thème sombre au zoom 200 % : ' + JSON.stringify(metrics));
       assert.ok(metrics.mainLeft >= -1 && metrics.mainRight <= viewport.width + 1,
         pageDefinition.name + ' sort du viewport utile en thème sombre au zoom 200 % : ' + JSON.stringify(metrics));
-      assert.equal(metrics.navigationVisible, true,
-        pageDefinition.name + ' doit garder la navigation visible en thème sombre au zoom 200 %.');
-      assert.equal(metrics.navigationAccessible, true,
-        pageDefinition.name + ' doit garder un bouton de navigation accessible en thème sombre au zoom 200 %.');
+      if (pageDefinition.noWorkspaceShell) {
+        assert.equal(metrics.adminReturnLinkVisible, true,
+          pageDefinition.name + ' doit conserver son lien de retour accessible au zoom 200 %.');
+      } else {
+        assert.equal(metrics.navigationVisible, true,
+          pageDefinition.name + ' doit garder la navigation visible au zoom 200 %.');
+        assert.equal(metrics.navigationAccessible, true,
+          pageDefinition.name + ' doit garder un bouton de navigation accessible au zoom 200 %.');
+      }
       for (const table of metrics.responsiveTables) {
         assert.equal(table.tableDisplay, 'block',
           pageDefinition.name + ' : le tableau empilé doit passer en cartes à 720 px.');
@@ -3476,8 +3888,10 @@ async function verifyBusinessPagesDarkThemeZoom200(browser, baseUrl, fixtures) {
 async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
   const results = [];
   const pages = PAGES.filter(pageDefinition => !pageDefinition.public && !pageDefinition.standaloneDocument);
+  const themes = ['light', 'dark'];
 
-  for (const pageDefinition of pages) {
+  for (const theme of themes) {
+    for (const pageDefinition of pages) {
     const page = await preparePage(browser, baseUrl, fixtures, false);
     const pageErrors = [];
     page.on('pageerror', error => pageErrors.push(error.message));
@@ -3491,15 +3905,242 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           localStorage.setItem('sf_user', JSON.stringify(user));
         }, pageDefinition.plan);
       }
-      await page.evaluate(() => localStorage.setItem('sf_theme', 'light'));
+      await page.evaluate(themeValue => localStorage.setItem('sf_theme', themeValue), theme);
       await page.goto(baseUrl + '/' + pageDefinition.file, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector(pageDefinition.ready, { timeout: 15000 });
       await page.evaluate(() => document.fonts && document.fonts.ready);
       await new Promise(resolve => setTimeout(resolve, 80));
 
-      // Vérifier le vrai parcours clavier (pas un focus() programmatique, qui ne
-      // déclenche pas nécessairement :focus-visible).
-      await page.keyboard.press('Tab');
+      // Recenser les éléments réellement visibles et tabulables, puis parcourir
+      // l'ordre clavier dans les deux sens. Une page entière ne doit pas enfermer
+      // le focus : le navigateur peut sortir du document après le dernier arrêt.
+      const { focusableKeys, nativeDateControls } = await page.evaluate(() => {
+        const isVisible = element => {
+          if (!element.getClientRects().length) return false;
+          let current = element;
+          while (current && current !== document.documentElement) {
+            const style = getComputedStyle(current);
+            const rect = current.getBoundingClientRect();
+            if (style.display === 'none' || style.visibility === 'hidden' ||
+                style.visibility === 'collapse' || Number(style.opacity) === 0 ||
+                rect.width <= 0 || rect.height <= 0) return false;
+            current = current.parentElement;
+          }
+          return true;
+        };
+        const keyFor = element => {
+          const parts = [];
+          let current = element;
+          while (current && current.parentElement) {
+            const index = Array.prototype.indexOf.call(current.parentElement.children, current) + 1;
+            parts.unshift(current.tagName.toLowerCase() + ':nth-child(' + index + ')');
+            current = current.parentElement;
+          }
+          return parts.join('>');
+        };
+        // Chromium délègue certaines sous-parties d'un input[type=date] à son
+        // sélecteur natif hors du DOM. On contrôle séparément son focusabilité et
+        // son indicateur, sans confondre ces sous-parties système avec des arrêts DOM.
+        const nativeDateControls = Array.from(document.querySelectorAll('input[type="date"]'))
+          .filter(isVisible)
+          .map(element => {
+            element.focus({ preventScroll: true });
+            const style = getComputedStyle(element);
+            const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
+            const shadow = Boolean(style.boxShadow && style.boxShadow !== 'none' &&
+              !style.boxShadow.includes('inset'));
+            return {
+              id: element.id || '',
+              tabIndex: element.tabIndex,
+              focused: document.activeElement === element,
+              hasIndicator: Boolean(outline || shadow)
+            };
+          });
+        const allRadios = Array.from(document.querySelectorAll('input[type="radio"]'));
+        const focusableKeys = Array.from(document.body.querySelectorAll('*'))
+          .filter(element => {
+            if (element.matches('input[type="date"]') ||
+                element.tabIndex < 0 || element.matches(':disabled') ||
+                element.closest('[inert]') || !isVisible(element)) return false;
+
+            // HTML place une seule radio d'un même groupe dans l'ordre Tab :
+            // la radio cochée, ou la première activée si aucune n'est cochée.
+            // Les autres choix se parcourent avec les flèches, pas avec Tab.
+            if (element.matches('input[type="radio"]') && element.name) {
+              const group = allRadios.filter(candidate =>
+                candidate.name === element.name &&
+                candidate.form === element.form &&
+                !candidate.matches(':disabled') &&
+                !candidate.closest('[inert]') &&
+                isVisible(candidate)
+              );
+              const tabStop = group.find(candidate => candidate.checked) || group[0];
+              return element === tabStop;
+            }
+            return true;
+          })
+          .map(keyFor);
+        return { focusableKeys, nativeDateControls };
+      });
+      const invalidNativeDateControls = nativeDateControls.filter(control =>
+        control.tabIndex < 0 || !control.focused || !control.hasIndicator
+      );
+      assert.deepEqual(invalidNativeDateControls, [],
+        pageDefinition.name + ' : les champs date natifs doivent rester focusables et afficher un indicateur : ' +
+        JSON.stringify(invalidNativeDateControls));
+      const focusableCount = focusableKeys.length;
+      // Les champs natifs (notamment input[type=date]) peuvent garder le même
+      // activeElement pendant qu'une touche Tab traverse leurs sous-segments.
+      // Prévoir une marge de répétitions, sans permettre une boucle infinie.
+      const maxTabSteps = Math.min(Math.max(focusableCount * 2 + 4, 4), 240);
+
+      const readFocusStop = () => page.evaluate(() => {
+        const element = document.activeElement;
+        if (!element || element === document.body || element === document.documentElement) return null;
+        const parts = [];
+        let current = element;
+        while (current && current.parentElement) {
+          const index = Array.prototype.indexOf.call(current.parentElement.children, current) + 1;
+          parts.unshift(current.tagName.toLowerCase() + ':nth-child(' + index + ')');
+          current = current.parentElement;
+        }
+        const indicatorFor = candidate => {
+          const style = getComputedStyle(candidate);
+          const outline = style.outlineStyle !== 'none' && Number.parseFloat(style.outlineWidth) > 0;
+          const shadow = Boolean(style.boxShadow && style.boxShadow !== 'none' &&
+            !style.boxShadow.includes('inset'));
+          return { visible: Boolean(outline || shadow), outline: style.outline, boxShadow: style.boxShadow };
+        };
+        // Certains composants placent l'indicateur sur leur enveloppe : le focus
+        // réel reste sur le champ, tandis que le contour est rendu par :focus-within.
+        let indicatorOwner = null;
+        let ancestor = element;
+        while (ancestor && ancestor !== document.body) {
+          if (ancestor === element || ancestor.matches(':focus-within')) {
+            const indicator = indicatorFor(ancestor);
+            if (indicator.visible) {
+              indicatorOwner = {
+                selector: ancestor.tagName.toLowerCase() +
+                  (ancestor.id ? '#' + ancestor.id : '') +
+                  (typeof ancestor.className === 'string' && ancestor.className.trim()
+                    ? '.' + ancestor.className.trim().split(/\s+/).slice(0, 2).join('.')
+                    : ''),
+                ...indicator
+              };
+              break;
+            }
+          }
+          ancestor = ancestor.parentElement;
+        }
+        const style = getComputedStyle(element);
+        return {
+          key: parts.join('>'),
+          selector: element.tagName.toLowerCase() +
+            (element.id ? '#' + element.id : '') +
+            (typeof element.className === 'string' && element.className.trim()
+              ? '.' + element.className.trim().split(/\s+/).slice(0, 2).join('.')
+              : ''),
+          text: String(element.innerText || element.textContent || element.getAttribute('aria-label') || '')
+            .replace(/\s+/g, ' ').trim().slice(0, 80),
+          focusVisible: element.matches(':focus-visible'),
+          focused: element.matches(':focus'),
+          nativeDateControl: element.matches('input[type="date"]'),
+          hasIndicator: Boolean(indicatorOwner),
+          indicatorOwner,
+          outline: style.outline,
+          boxShadow: style.boxShadow
+        };
+      });
+
+      const collectKeyboardTraversal = async reverse => {
+        const stops = [];
+        const seen = new Set();
+        const expected = new Set(focusableKeys);
+        const visitedExpected = new Set();
+        let consecutiveUntrackedSteps = 0;
+        for (let step = 0; step < maxTabSteps; step++) {
+          if (reverse) {
+            await page.keyboard.down('Shift');
+            try {
+              await page.keyboard.press('Tab');
+            } finally {
+              await page.keyboard.up('Shift');
+            }
+          } else {
+            await page.keyboard.press('Tab');
+          }
+          const stop = await readFocusStop();
+          if (!stop || !stop.focused) {
+            // Chromium peut exposer brièvement le focus d'un contrôle natif (notamment
+            // les sous-parties d'un input[type=date]) hors de l'arbre DOM. Ne pas
+            // interrompre le parcours au premier état non observable ; borner toutefois
+            // ces transitions pour ne pas masquer une sortie réelle de la page.
+            consecutiveUntrackedSteps += 1;
+            if (visitedExpected.size >= expected.size || consecutiveUntrackedSteps > 4) break;
+            continue;
+          }
+          consecutiveUntrackedSteps = 0;
+          if (!seen.has(stop.key)) {
+            seen.add(stop.key);
+            stops.push(stop);
+            if (expected.has(stop.key)) visitedExpected.add(stop.key);
+          } else if (visitedExpected.size >= expected.size) {
+            // Retour au premier élément après avoir visité tous les arrêts DOM attendus.
+            break;
+          }
+          if (visitedExpected.size >= expected.size) break;
+        }
+        return stops;
+      };
+
+      const keyboardOriginReady = await page.evaluate(() => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement && active !== document.body) active.blur();
+        // Démarrer depuis body évite que le focus natif résiduel d'un input[type=date]
+        // soit repris comme premier arrêt et que Chromium quitte ensuite la page.
+        document.body.setAttribute('tabindex', '-1');
+        document.body.focus({ preventScroll: true });
+        return document.activeElement === document.body;
+      });
+      assert.ok(keyboardOriginReady,
+        pageDefinition.name + ' : impossible de réinitialiser le focus avant le parcours Tab.');
+      const keyboardTraversal = await collectKeyboardTraversal(false);
+      await page.evaluate(() => document.body.removeAttribute('tabindex'));
+      const forwardVisited = new Set(keyboardTraversal.map(stop => stop.key));
+      const missingForwardKeys = focusableKeys.filter(key => !forwardVisited.has(key));
+
+      const reverseAnchorKey = focusableKeys[focusableKeys.length - 1] || null;
+      const reverseAnchorFocused = await page.evaluate(() => {
+        const isVisible = element => {
+          if (!element.getClientRects().length) return false;
+          let current = element;
+          while (current && current !== document.documentElement) {
+            const style = getComputedStyle(current);
+            const rect = current.getBoundingClientRect();
+            if (style.display === 'none' || style.visibility === 'hidden' ||
+                style.visibility === 'collapse' || Number(style.opacity) === 0 ||
+                rect.width <= 0 || rect.height <= 0) return false;
+            current = current.parentElement;
+          }
+          return true;
+        };
+        const focusables = Array.from(document.body.querySelectorAll('*'))
+          .filter(element => !element.matches('input[type="date"]') &&
+            element.tabIndex >= 0 && !element.matches(':disabled') &&
+            !element.closest('[inert]') && isVisible(element));
+        const target = focusables[focusables.length - 1];
+        if (target instanceof HTMLElement) target.focus({ preventScroll: true });
+        return Boolean(target && document.activeElement === target);
+      });
+      assert.ok(reverseAnchorFocused,
+        pageDefinition.name + ' : impossible de positionner le point de départ du parcours Maj+Tab.');
+
+      const reverseTraversal = await collectKeyboardTraversal(true);
+      const reverseVisited = new Set(reverseTraversal.map(stop => stop.key));
+      if (reverseAnchorKey) reverseVisited.add(reverseAnchorKey);
+      const missingReverseKeys = focusableKeys.filter(key => !reverseVisited.has(key));
+      const reverseFocus = reverseTraversal[0] || null;
+
       const metrics = await page.evaluate(() => {
         const isVisible = element => {
           if (!element || !element.getClientRects().length) return false;
@@ -3605,23 +4246,35 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
           const values = [luminance(first), luminance(second)].sort((a, b) => b - a);
           return (values[0] + 0.05) / (values[1] + 0.05);
         };
-        const textCandidates = Array.from(document.querySelectorAll(
-          'h1,h2,h3,h4,h5,h6,p,label,a,button,td,th,caption,legend,.stat-value,.nav-item,.field-label'
-        )).filter(element => isVisible(element) && textOf(element) &&
-          !element.closest('svg,[aria-hidden="true"],.ic,.icon'));
+        const textCandidateSelector =
+          'h1,h2,h3,h4,h5,h6,p,label,a,button,td,th,caption,legend,span,strong,em,b,i,.stat-value,.nav-item,.field-label';
+        const textCandidates = Array.from(document.querySelectorAll(textCandidateSelector))
+          .filter(element => isVisible(element) && textOf(element) &&
+            !element.closest('svg,[aria-hidden="true"],.ic,.icon'))
+          // Contrôler le nœud qui porte réellement le texte visible. Un bouton parent
+          // peut avoir un dégradé transparent et une couleur héritée, tandis que son
+          // libellé enfant possède son propre fond opaque et sa propre couleur.
+          // Mesurer les deux transforme à tort le fond transparent du parent en noir.
+          .filter(element => !Array.from(element.querySelectorAll(textCandidateSelector))
+            .some(child => isVisible(child) && textOf(child) &&
+              !child.closest('svg,[aria-hidden="true"],.ic,.icon')));
         const contrastIssues = [];
         const unmeasurableContrast = [];
         for (const element of textCandidates) {
           const ownStyle = getComputedStyle(element);
           const foreground = parseColor(ownStyle.color);
-          if (!foreground || foreground.a < 0.95) continue;
+          if (!foreground || foreground.a <= 0) continue;
+          const fontSize = Number.parseFloat(ownStyle.fontSize) || 15;
+          const fontWeight = Number.parseInt(ownStyle.fontWeight, 10) || 400;
+          const largeText = fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
+          const required = largeText ? 3 : 4.5;
           let ancestor = element;
           let background = null;
-          let gradient = false;
+          let gradientImage = null;
           while (ancestor) {
             const style = getComputedStyle(ancestor);
             if (style.backgroundImage && style.backgroundImage !== 'none') {
-              gradient = true;
+              gradientImage = style.backgroundImage;
               break;
             }
             const color = parseColor(style.backgroundColor);
@@ -3631,20 +4284,38 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             }
             ancestor = ancestor.parentElement;
           }
-          if (gradient || element.closest(
-            '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
-          )) {
-            unmeasurableContrast.push(selectorFor(element));
+          if (gradientImage) {
+            const gradientStops = Array.from(gradientImage.matchAll(/rgba?\(([^)]+)\)/g))
+              .map(match => parseColor('rgb(' + match[1] + ')'))
+              .filter(Boolean);
+            if (!gradientStops.length) {
+              unmeasurableContrast.push(selectorFor(element));
+              continue;
+            }
+            const ratios = gradientStops.map(stop => {
+              const renderedForeground = foreground.a < 1 ? composite(foreground, stop) : foreground;
+              return contrastRatio(renderedForeground, stop);
+            });
+            const ratio = Math.min(...ratios);
+            if (ratio + 0.01 < required) {
+              contrastIssues.push({
+                selector: selectorFor(element),
+                text: textOf(element).slice(0, 80),
+                foreground: ownStyle.color,
+                background: gradientImage,
+                ratio: Number(ratio.toFixed(2)),
+                required
+              });
+            }
             continue;
           }
           if (!background) background = parseColor(getComputedStyle(document.body).backgroundColor);
-          if (!background) continue;
+          if (!background) {
+            unmeasurableContrast.push(selectorFor(element));
+            continue;
+          }
           const renderedForeground = foreground.a < 1 ? composite(foreground, background) : foreground;
           const ratio = contrastRatio(renderedForeground, background);
-          const fontSize = Number.parseFloat(ownStyle.fontSize) || 15;
-          const fontWeight = Number.parseInt(ownStyle.fontWeight, 10) || 400;
-          const largeText = fontSize >= 24 || (fontSize >= 18.67 && fontWeight >= 700);
-          const required = largeText ? 3 : 4.5;
           if (ratio + 0.01 < required) {
             contrastIssues.push({
               selector: selectorFor(element),
@@ -3672,16 +4343,27 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
 
         const gradientSurfaces = Array.from(document.querySelectorAll(
           '.reports-kpi-blue,.reports-kpi-green,.reports-kpi-purple,.reports-kpi-amber'
-        )).map(element => ({
-          className: element.className,
-          backgroundImage: getComputedStyle(element).backgroundImage,
-          labelColor: getComputedStyle(element.querySelector('.stat-label')).color,
-          valueColor: getComputedStyle(element.querySelector('.stat-value')).color
-        }));
+        )).map(element => {
+          const backgroundImage = getComputedStyle(element).backgroundImage;
+          const stops = Array.from(backgroundImage.matchAll(/rgba?\(([^)]+)\)/g))
+            .map(match => parseColor('rgb(' + match[1] + ')'))
+            .filter(Boolean);
+          const white = { r: 1, g: 1, b: 1, a: 1 };
+          return {
+            className: element.className,
+            backgroundImage,
+            labelColor: getComputedStyle(element.querySelector('.stat-label')).color,
+            valueColor: getComputedStyle(element.querySelector('.stat-value')).color,
+            minimumWhiteContrast: stops.length
+              ? Number(Math.min(...stops.map(stop => contrastRatio(white, stop))).toFixed(2))
+              : null
+          };
+        });
 
         return {
           viewport: window.innerWidth,
           theme: document.documentElement.getAttribute('data-theme'),
+          colorScheme: getComputedStyle(document.documentElement).colorScheme,
           gradientSurfaces,
           visibleControlCount: controls.length,
           unnamedControls,
@@ -3705,6 +4387,36 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
         };
       });
 
+      assert.equal(metrics.theme, theme,
+        pageDefinition.name + ' ne conserve pas le thème ' + theme + ' dans l’audit clavier.');
+      assert.equal(metrics.colorScheme, theme,
+        pageDefinition.name + ' ne conserve pas color-scheme: ' + theme + ' dans l’audit clavier.');
+      assert.deepEqual(missingForwardKeys, [],
+        pageDefinition.name + ' : certains éléments tabulables ne sont pas atteignables avec Tab : ' +
+        JSON.stringify({
+          missing: missingForwardKeys,
+          visited: keyboardTraversal.map(stop => ({ selector: stop.selector, text: stop.text }))
+        }));
+      assert.deepEqual(missingReverseKeys, [],
+        pageDefinition.name + ' : certains éléments tabulables ne sont pas atteignables avec Maj+Tab : ' +
+        JSON.stringify({
+          missing: missingReverseKeys,
+          visited: reverseTraversal.map(stop => ({ selector: stop.selector, text: stop.text }))
+        }));
+      const hasKeyboardFocusIndicator = stop => stop.hasIndicator &&
+        (stop.focusVisible || (stop.nativeDateControl && stop.focused));
+      assert.ok(keyboardTraversal.every(hasKeyboardFocusIndicator),
+        pageDefinition.name + ' : certains arrêts Tab n’ont pas de focus visible : ' +
+        JSON.stringify(keyboardTraversal.filter(stop => !hasKeyboardFocusIndicator(stop))));
+      assert.ok(reverseTraversal.every(hasKeyboardFocusIndicator),
+        pageDefinition.name + ' : certains arrêts Maj+Tab n’ont pas de focus visible : ' +
+        JSON.stringify(reverseTraversal.filter(stop => !hasKeyboardFocusIndicator(stop))));
+      assert.ok(reverseFocus && hasKeyboardFocusIndicator(reverseFocus),
+        pageDefinition.name + ' : Maj+Tab ne produit pas un premier focus visible : ' +
+        JSON.stringify(reverseFocus));
+      assert.deepEqual(pageErrors, [],
+        pageDefinition.name + ' a généré des erreurs JavaScript pendant l’audit ' + theme + ' : ' +
+        pageErrors.join(' | '));
       assert.equal(metrics.unnamedControls.length, 0,
         pageDefinition.name + ' contient des commandes sans nom accessible : ' + JSON.stringify(metrics.unnamedControls));
       assert.equal(metrics.unnamedImages.length, 0,
@@ -3733,13 +4445,26 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
             'Les libellés des cartes KPI doivent être blancs à pleine opacité.');
           assert.equal(surface.valueColor, 'rgb(255, 255, 255)',
             'Les valeurs des cartes KPI doivent être blanches.');
+          assert.ok(surface.minimumWhiteContrast !== null && surface.minimumWhiteContrast >= 4.5,
+            'Le texte blanc du dégradé ' + surface.className +
+            ' doit respecter 4,5:1 sur toutes les couleurs du dégradé : ' + surface.minimumWhiteContrast);
         }
       }
 
-      const screenshot = 'accessibilite-' + pageDefinition.name + '-1280.png';
+      metrics.focus = keyboardTraversal[0] || null;
+      metrics.keyboard = {
+        focusableCount,
+        forwardVisitedStops: keyboardTraversal.length,
+        reverseVisitedStops: reverseVisited.size,
+        forwardCoverageComplete: missingForwardKeys.length === 0,
+        reverseCoverageComplete: missingReverseKeys.length === 0,
+        reverseFocus
+      };
+      const screenshot = 'accessibilite-' + theme + '-' + pageDefinition.name + '-1280.png';
       await page.screenshot({ path: path.join(OUTPUT_DIR, screenshot), fullPage: true });
       results.push({
         page: pageDefinition.name,
+        theme,
         screenshot,
         ...metrics,
         javascriptErrors: pageErrors
@@ -3747,10 +4472,13 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
     } finally {
       await page.close();
     }
+    }
   }
 
   return {
     pageCount: pages.length,
+    themeCount: themes.length,
+    runCount: results.length,
     viewportWidth: 1280,
     pages: results,
     totals: {
@@ -3762,6 +4490,11 @@ async function verifyBusinessPagesAccessibility(browser, baseUrl, fixtures) {
       pagesWithoutH1: results.filter(page => page.visibleH1 < 1).length,
       pagesWithMultipleH1: results.filter(page => page.visibleH1 > 1).length,
       missingKeyboardFocus: results.filter(page => !page.focus?.focusVisible || !page.focus?.hasIndicator).length,
+      incompleteKeyboardTraversal: results.filter(page =>
+        !page.keyboard?.forwardCoverageComplete ||
+        !page.keyboard?.reverseCoverageComplete ||
+        page.keyboard.reverseVisitedStops < page.keyboard.focusableCount ||
+        !page.keyboard.reverseFocus?.focusVisible || !page.keyboard.reverseFocus?.hasIndicator).length,
       contrastIssues: results.reduce((sum, page) => sum + page.contrastIssueCount, 0),
       nonSemanticActions: results.reduce((sum, page) => sum + page.nonSemanticActions.length, 0),
       javascriptErrors: results.reduce((sum, page) => sum + page.javascriptErrors.length, 0)
