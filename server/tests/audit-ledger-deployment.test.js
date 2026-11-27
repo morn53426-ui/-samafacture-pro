@@ -41,8 +41,10 @@ test('le processus HTTP ne reçoit aucun compte DDL ou de sauvegarde', () => {
 });
 
 test('les migrations s’exécutent dans un service one-shot avant le serveur', () => {
+  const mysql = serviceBlock('mysql');
   const migrate = serviceBlock('db-migrate');
   const appBlock = serviceBlock('app');
+  assert.match(mysql, /log-bin-trust-function-creators=ON/);
   assert.match(migrate, /DB_MIGRATION_USER:/);
   assert.doesNotMatch(migrate, /env_file:/);
   assert.match(migrate, /DB_BACKUP_USER: ""/);
