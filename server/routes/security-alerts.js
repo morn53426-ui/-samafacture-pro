@@ -250,7 +250,7 @@ router.post('/security-cases', async (req, res, next) => {
     }
     const created = await withTransaction(async connection => {
       const [alerts] = await connection.query(
-        `SELECT id, title, severity, status
+        `SELECT id, title, severity, status, source_event_type, rule_code
            FROM pro_security_alerts
           WHERE id = ? AND tenant_scope_id = ?
           FOR UPDATE`,
@@ -289,7 +289,7 @@ router.post('/security-cases', async (req, res, next) => {
         'security.case.created',
         'security_case',
         caseId,
-        { alert_id: alertId, source_event_type: 'auth.login.failed' }
+        { alert_id: alertId, source_event_type: alert.source_event_type, rule_code: alert.rule_code }
       ), connection);
       return { caseId };
     });
