@@ -135,7 +135,7 @@ jobs:
           # Le schéma est isolé du DB samafacture_test utilisé par les autres tests.
           docker exec -e MYSQL_PWD="$DB_ROOT_PASSWORD" "$mysql_container" \
             mysql --protocol=TCP --host=127.0.0.1 --user=root \
-            -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+            -e "SET GLOBAL log_bin_trust_function_creators = ON; CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 
           docker cp deploy/provision-db-users.sh "$mysql_container":/tmp/provision-db-users.sh
           docker exec \
