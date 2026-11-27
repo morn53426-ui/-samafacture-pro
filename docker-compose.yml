@@ -34,6 +34,7 @@ services:
       DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-${DB_PASSWORD}}
       DB_BACKUP_USER: ${DB_BACKUP_USER:-${DB_USER}}
       DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD:-${DB_PASSWORD}}
+      NODE_ENV: development
     volumes:
       - ./deploy/provision-db-users.sh:/usr/local/bin/provision-db-users.sh:ro
     networks: [samafacture_net]
@@ -119,7 +120,6 @@ services:
       PDF_JOBS_DIR: /app/server/pdf-jobs
       BACKUP_DIR: /app/server/backups
     volumes:
-      - app_backups:/app/server/backups
       - pdf_jobs:/app/server/pdf-jobs
     networks: [samafacture_net]
 
@@ -145,8 +145,15 @@ services:
       DB_BACKUP_USER: ${DB_BACKUP_USER:-${DB_USER}}
       DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD:-${DB_PASSWORD}}
       DB_NAME: ${DB_NAME}
+      DB_BACKUP_USER: ${DB_BACKUP_USER:-${DB_USER}}
+      DB_BACKUP_PASSWORD: ${DB_BACKUP_PASSWORD:-${DB_PASSWORD}}
       NODE_ENV: development
       BACKUP_DIR: /app/server/backups
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_HOUR: ${BACKUP_HOUR:-2}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_ON_STARTUP: ${BACKUP_ON_STARTUP:-false}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
     volumes:
       - app_backups:/app/server/backups
     command: ["node", "workers/backup-worker.js"]
