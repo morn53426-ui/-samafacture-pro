@@ -10,6 +10,15 @@ set -Eeuo pipefail
 : "${DB_BACKUP_USER:?DB_BACKUP_USER doit identifier le compte de sauvegarde}"
 : "${DB_BACKUP_PASSWORD:?DB_BACKUP_PASSWORD est obligatoire pour le compte de sauvegarde}"
 
+if [ "${NODE_ENV:-development}" = "production" ]; then
+  if [ "$DB_USER" = "$DB_MIGRATION_USER" ] ||
+     [ "$DB_USER" = "$DB_BACKUP_USER" ] ||
+     [ "$DB_MIGRATION_USER" = "$DB_BACKUP_USER" ]; then
+    echo "Erreur : les comptes SQL runtime, migration et sauvegarde doivent être distincts en production." >&2
+    exit 1
+  fi
+fi
+
 sql_string() {
   local value="${1//\\/\\\\}"
   value="${value//\'/\'\'}"
