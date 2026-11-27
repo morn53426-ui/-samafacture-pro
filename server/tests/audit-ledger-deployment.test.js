@@ -77,7 +77,7 @@ test('le privilège TRIGGER est limité au worker de sauvegarde dédié', () => 
     backupWorker.indexOf('} else {', backupWorker.indexOf('if (!timer)'))
   );
   assert.ok(backupsDisabledBranch.includes('surveillance du registre d’audit toujours active'));
-  assert.doesNotMatch(backupsDisabledBranch, /shutdown\\(/,
+  assert.doesNotMatch(backupsDisabledBranch, /shutdown\(/,
     'désactiver les sauvegardes ne doit pas arrêter la surveillance périodique du registre');
   assert.ok(backupWorker.includes('DB_BACKUP_USER'));
   assert.ok(provisioner.includes('[ "$DB_USER" = "$DB_MIGRATION_USER" ]'));
