@@ -61,6 +61,7 @@ services:
       DB_BACKUP_USER: ""
       DB_BACKUP_PASSWORD: ""
       DB_NAME: ${DB_NAME}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
       NODE_ENV: development
     command: ["node", "scripts/run-migrations.js"]
     volumes:
