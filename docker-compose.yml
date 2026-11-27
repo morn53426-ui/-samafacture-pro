@@ -55,17 +55,17 @@ services:
       DB_HOST: mysql
       DB_PORT: "3306"
       DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PASSWORD: ""
+      DB_ROOT_PASSWORD: ""
       DB_MIGRATION_USER: ${DB_MIGRATION_USER:-${DB_USER}}
       DB_MIGRATION_PASSWORD: ${DB_MIGRATION_PASSWORD:-${DB_PASSWORD}}
       DB_BACKUP_USER: ""
       DB_BACKUP_PASSWORD: ""
       DB_NAME: ${DB_NAME}
-      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+      BACKUP_ENCRYPTION_KEY: ""
+      DATA_ENCRYPTION_KEY: ""
       NODE_ENV: development
     command: ["node", "scripts/run-migrations.js"]
-    volumes:
-      - app_backups:/app/server/backups:ro
     networks: [samafacture_net]
 
   redis:
@@ -101,10 +101,12 @@ services:
       DB_PORT: "3306"
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_ROOT_PASSWORD: ""
       DB_MIGRATION_USER: ""
       DB_MIGRATION_PASSWORD: ""
       DB_BACKUP_USER: ""
       DB_BACKUP_PASSWORD: ""
+      BACKUP_ENCRYPTION_KEY: ""
       DB_NAME: ${DB_NAME}
       DB_SKIP_MIGRATIONS: "true"
       BACKUP_SCHEDULER_DISABLED: "true"
@@ -142,6 +144,7 @@ services:
       DB_PORT: "3306"
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_ROOT_PASSWORD: ""
       DB_MIGRATION_USER: ""
       DB_MIGRATION_PASSWORD: ""
       DB_BACKUP_USER: ${DB_BACKUP_USER:-${DB_USER}}
@@ -178,10 +181,12 @@ services:
       DB_PORT: "3306"
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_ROOT_PASSWORD: ""
       DB_MIGRATION_USER: ""
       DB_MIGRATION_PASSWORD: ""
       DB_BACKUP_USER: ""
       DB_BACKUP_PASSWORD: ""
+      BACKUP_ENCRYPTION_KEY: ""
       DB_NAME: ${DB_NAME}
       NODE_ENV: production
       REDIS_URL: redis://redis:6379
