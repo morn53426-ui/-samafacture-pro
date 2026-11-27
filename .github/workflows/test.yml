@@ -112,6 +112,92 @@ jobs:
         working-directory: server
         run: npm ci
 
+      - name: Vérifier les rôles SQL, les migrations isolées et le dump des triggers
+        shell: bash
+        env:
+          DB_HOST: 127.0.0.1
+          DB_NAME: samafacture_roles_smoke
+          DB_ROOT_PASSWORD: root
+          DB_USER: ci_audit_runtime
+          DB_PASSWORD: ci-audit-runtime-password
+          DB_MIGRATION_USER: ci_audit_migrator
+          DB_MIGRATION_PASSWORD: ci-audit-migration-password
+          DB_BACKUP_USER: ci_audit_backup
+          DB_BACKUP_PASSWORD: ci-audit-backup-password
+        run: |
+          set -euo pipefail
+          mysql_container="$(docker ps -q --filter 'ancestor=mysql:8.0' | head -n 1)"
+          if [ -z "$mysql_container" ]; then
+            echo "Le conteneur MySQL de CI est introuvable." >&2
+            exit 1
+          fi
+
+          # Le schéma est isolé du DB samafacture_test utilisé par les autres tests.
+          docker exec -e MYSQL_PWD="$DB_ROOT_PASSWORD" "$mysql_container" \
+            mysql --protocol=TCP --host=127.0.0.1 --user=root \
+            -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+
+          docker cp deploy/provision-db-users.sh "$mysql_container":/tmp/provision-db-users.sh
+          docker exec \
+            -e DB_HOST=127.0.0.1 \
+            -e DB_ROOT_PASSWORD="$DB_ROOT_PASSWORD" \
+            -e DB_NAME="$DB_NAME" \
+            -e DB_USER="$DB_USER" \
+            -e DB_PASSWORD="$DB_PASSWORD" \
+            -e DB_MIGRATION_USER="$DB_MIGRATION_USER" \
+            -e DB_MIGRATION_PASSWORD="$DB_MIGRATION_PASSWORD" \
+            -e DB_BACKUP_USER="$DB_BACKUP_USER" \
+            -e DB_BACKUP_PASSWORD="$DB_BACKUP_PASSWORD" \
+            -e NODE_ENV=production \
+            "$mysql_container" /bin/bash /tmp/provision-db-users.sh
+
+          # Le runner de migrations ne reçoit le compte DDL que pour ce processus éphémère.
+          (
+            cd server
+            env NODE_ENV=production DB_HOST="$DB_HOST" DB_PORT=3306 \
+              DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD" \
+              DB_MIGRATION_USER="$DB_MIGRATION_USER" DB_MIGRATION_PASSWORD="$DB_MIGRATION_PASSWORD" \
+              node scripts/run-migrations.js
+          )
+
+          # Le runtime valide le schéma avec son compte DML, puis doit échouer sur un CREATE permanent.
+          (
+            cd server
+            env NODE_ENV=production DB_SKIP_MIGRATIONS=true DB_HOST="$DB_HOST" DB_PORT=3306 \
+              DB_NAME="$DB_NAME" DB_USER="$DB_USER" DB_PASSWORD="$DB_PASSWORD" \
+              DB_MIGRATION_USER="" DB_MIGRATION_PASSWORD="" DB_BACKUP_USER="" DB_BACKUP_PASSWORD="" \
+              node <<'NODE'
+          const assert = require('node:assert/strict');
+          const { pool, initDatabase } = require('./config/db');
+          (async () => {
+            await initDatabase();
+            await pool.query('INSERT INTO pro_audit_chain_heads (tenant_scope_id, last_sequence, last_hash) VALUES (990001, 0, REPEAT("0", 64))');
+            await assert.rejects(
+              pool.query('CREATE TABLE ci_runtime_must_not_create (id INT PRIMARY KEY)'),
+              error => error && error.code === 'ER_TABLEACCESS_DENIED_ERROR'
+            );
+            const [[row]] = await pool.query(
+              'SELECT last_sequence FROM pro_audit_chain_heads WHERE tenant_scope_id = 990001'
+            );
+            assert.equal(Number(row.last_sequence), 0);
+            console.log('Compte runtime : DML autorisé, DDL permanent refusé.');
+          })().catch(error => {
+            console.error(error);
+            process.exitCode = 1;
+          }).finally(async () => {
+            await pool.end().catch(() => {});
+          });
+          NODE
+          )
+
+          # Le compte backup doit pouvoir exporter les triggers, sans privilèges globaux.
+          docker exec -e MYSQL_PWD="$DB_BACKUP_PASSWORD" "$mysql_container" \
+            mysqldump --protocol=TCP --host=127.0.0.1 --user="$DB_BACKUP_USER" \
+            --no-tablespaces --single-transaction --triggers --events "$DB_NAME" \
+            > /tmp/samafacture-audit-role-dump.sql
+          grep -q 'trg_pro_audit_events_block_update' /tmp/samafacture-audit-role-dump.sql
+          echo "Compte backup : mysqldump exporte bien les triggers du registre."
+
       - name: Détecter le navigateur Chromium du runner CI
         shell: bash
         run: |
