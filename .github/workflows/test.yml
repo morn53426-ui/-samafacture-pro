@@ -161,6 +161,10 @@ jobs:
           )
 
           # Le runtime valide le schéma avec son compte DML, puis doit échouer sur un CREATE permanent.
+          docker exec -e MYSQL_PWD="$DB_MIGRATION_PASSWORD" "$mysql_container" \
+            mysql --protocol=TCP --host=127.0.0.1 --user="$DB_MIGRATION_USER" "$DB_NAME" \
+            -e "CREATE TABLE ci_runtime_probe (id INT PRIMARY KEY, label VARCHAR(40) NOT NULL)"
+
           (
             cd server
             env NODE_ENV=production DB_SKIP_MIGRATIONS=true DB_HOST="$DB_HOST" DB_PORT=3306 \
@@ -171,15 +175,16 @@ jobs:
           const { pool, initDatabase } = require('./config/db');
           (async () => {
             await initDatabase();
-            await pool.query('INSERT INTO pro_audit_chain_heads (tenant_scope_id, last_sequence, last_hash) VALUES (990001, 0, REPEAT("0", 64))');
+            await pool.query(
+              'INSERT INTO ci_runtime_probe (id, label) VALUES (?, ?)',
+              [1, 'runtime DML only']
+            );
+            const [[row]] = await pool.query('SELECT label FROM ci_runtime_probe WHERE id = 1');
+            assert.equal(row.label, 'runtime DML only');
             await assert.rejects(
               pool.query('CREATE TABLE ci_runtime_must_not_create (id INT PRIMARY KEY)'),
               error => error && error.code === 'ER_TABLEACCESS_DENIED_ERROR'
             );
-            const [[row]] = await pool.query(
-              'SELECT last_sequence FROM pro_audit_chain_heads WHERE tenant_scope_id = 990001'
-            );
-            assert.equal(Number(row.last_sequence), 0);
             console.log('Compte runtime : DML autorisé, DDL permanent refusé.');
           })().catch(error => {
             console.error(error);
