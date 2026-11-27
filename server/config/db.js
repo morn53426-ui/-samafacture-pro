@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 23;
+const CURRENT_SCHEMA_VERSION = 24;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -177,6 +177,7 @@ async function runMigrations(conn) {
   // v21 : état et dates UTC de l'essai gratuit de 15 jours, sans attribution rétroactive.
   // v22 : les événements comptables de facture ne doivent pas être supprimés en cascade par une suppression de facture.
   // v23 : correspondances comptables propres à chaque entreprise, pour ventes et catégories de dépenses.
+  // v24 : statistiques de fréquentation pseudonymisées pour le centre administrateur Sunupilot.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -524,6 +525,20 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of accountingMappingsStatements) {
+    await conn.query(statement);
+  }
+
+  // v24 : journal minimal de fréquentation ; aucune donnée métier n'est supprimée ni modifiée.
+  const analyticsPath = path.join(__dirname, '..', 'database', 'migrations', '013_sunupilot_analytics.sql');
+  const analyticsSql = fs.readFileSync(analyticsPath, 'utf8');
+  const analyticsStatements = analyticsSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of analyticsStatements) {
     await conn.query(statement);
   }
 

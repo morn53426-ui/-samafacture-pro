@@ -81,3 +81,20 @@ La recette Chromium inclut un diagnostic dédié sur chaque page métier, à 128
 - éléments cliquables non sémantiques à examiner.
 
 Les résultats sont ajoutés au rapport `rapport-recette-visuelle.json` sous la clé `accessibility`, avec une capture par page. Les fonds en dégradé sont comptés séparément et ne sont pas déclarés conformes sur la base d’une estimation trompeuse. Ce diagnostic sert à identifier les correctifs ; il ne remplace pas une revue avec lecteur d’écran (NVDA/VoiceOver), clavier complet, ni les essais sur Safari iOS et Chrome Android.
+
+
+## Audit clavier et contraste des deux thèmes
+
+L'audit d'accessibilité s'exécute sur les pages métier en thème clair et sombre.
+Il vérifie le thème réellement appliqué, la propriété `color-scheme`, la couverture
+Tab et Maj+Tab, les indicateurs de focus visibles, les noms accessibles et le contraste
+WCAG AA (4,5:1 pour le texte courant et 3:1 pour le grand texte), y compris aux arrêts
+de couleur déclarés dans les dégradés.
+
+Les champs `input[type="date"]` sont contrôlés individuellement pour leur focusabilité
+et leur indicateur visuel. Chromium délègue certaines sous-parties du sélecteur natif
+hors de l'arbre DOM : elles ne sont pas comptées comme des arrêts HTML distincts.
+Les indicateurs portés par des conteneurs `:focus-within` sont acceptés et identifiés
+séparément de l'élément qui conserve le focus réel.
+
+La recette Chromium ne remplace pas une vérification manuelle VoiceOver et NVDA.

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "app.js",
+    "cluster.js",
+    "backup-now.js",
+    "restore-backup.js",
+    "workers/pdf-worker.js",
+    "scripts/*.js",
+    "tests/*.test.js",
+    "tests/visual/*.js"
+  ],
+  "project": [
+    "**/*.js"
+  ]
+}

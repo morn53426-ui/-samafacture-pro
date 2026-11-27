@@ -14,7 +14,6 @@ function isStockManagedType(type) {
 }
 
 module.exports = {
-  TYPES_CATALOGUE,
   normalizeCatalogueType,
   isStockManagedType
 };

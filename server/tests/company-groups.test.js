@@ -121,7 +121,7 @@ before(async () => {
   subsidiaryClientId = client.body.client.id;
 });
 
-test('une base v8 reçoit les migrations v9 à v23 sans perdre les données existantes', async () => {
+test('une base v8 reçoit les migrations v9 à v24 sans perdre les données existantes', async () => {
   // Simule strictement une base v8 : schéma v8 sans les migrations v9-v22
   // (échéances récurrentes, multi-sociétés, outbox, preuves email, abonnements, catalogue, entrepôts, comptabilité et essai).
   const [[trialRows]] = await pool.query("SELECT COUNT(*) AS total FROM users WHERE trial_status = 'trialing' OR trial_started_at IS NOT NULL OR trial_ends_at IS NOT NULL");
@@ -152,6 +152,8 @@ test('une base v8 reçoit les migrations v9 à v23 sans perdre les données exis
   await pool.query('DROP TABLE IF EXISTS saas_subscription_consents');
   await pool.query('DROP TABLE IF EXISTS saas_subscriptions');
   await pool.query('DROP TABLE IF EXISTS saas_subscription_price_versions');
+  // La migration v24 doit recréer la table analytique absente d'une base v8.
+  await pool.query('DROP TABLE IF EXISTS sunupilot_analytics_pageviews');
 
   const [existingDueIndex] = await pool.query(
     `SELECT INDEX_NAME FROM information_schema.STATISTICS
@@ -192,10 +194,10 @@ test('une base v8 reçoit les migrations v9 à v23 sans perdre les données exis
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v23 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v8 → v24 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 23, 'la version doit inclure les migrations v19 à v22 après le socle v18.');
+  assert.equal(Number(meta.version), 24, 'la version doit inclure les migrations v19 à v24 après le socle v18.');
 
   const [[afterUser]] = await pool.query(
     'SELECT id, email FROM users WHERE id = ? LIMIT 1',
@@ -257,6 +259,10 @@ test('une base v8 reçoit les migrations v9 à v23 sans perdre les données exis
   assert.equal(accountingEventsAfter.length, 1, 'la migration v19 doit créer la table des événements comptables.');
   const [expenseModeAfter] = await pool.query(`SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'depenses' AND COLUMN_NAME = 'mode_reglement'`);
   assert.equal(expenseModeAfter[0]?.COLUMN_DEFAULT, 'caisse', 'la migration v20 doit restaurer le mode par défaut caisse.');
+  const [analyticsTableAfter] = await pool.query(`SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sunupilot_analytics_pageviews'`);
+  assert.equal(analyticsTableAfter.length, 1, 'la migration v24 doit recréer la table analytique sur une base v8.');
+  const [analyticsColumnsAfter] = await pool.query(`SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sunupilot_analytics_pageviews' AND COLUMN_NAME IN ('visitor_hash', 'page_path', 'created_at')`);
+  assert.deepEqual(analyticsColumnsAfter.map(row => row.COLUMN_NAME).sort(), ['created_at', 'page_path', 'visitor_hash'], 'la table analytique v24 doit conserver uniquement les champs attendus.');
 });
 
 

@@ -34,4 +34,4 @@ function isTrialActive(trial, now = new Date()) {
   return Number.isFinite(end) && Number.isFinite(instant) && end > instant;
 }
 
-module.exports = { TRIAL_DAYS, TRIAL_DURATION_MS, TRIAL_PLANS, normalizeTrialPlan, isTrialActive };
+module.exports = { TRIAL_DAYS, TRIAL_DURATION_MS, normalizeTrialPlan, isTrialActive };

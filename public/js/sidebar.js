@@ -33,10 +33,10 @@ function renderSidebar(activePage) {
       { id: 'parametres', icon: 'settings', label: 'Paramètres', href: 'parametres.html' }
     ]},
     { group: 'Aide et ressources', items: [
-      { id: 'aide', icon: 'help-circle', label: 'Centre d’aide', href: 'aide.html' },
-      { id: 'support', icon: 'message-square', label: 'Support technique', href: 'support.html' },
-      { id: 'confidentialite', icon: 'shield-check', label: 'Confidentialité', href: 'confidentialite.html' },
-      { id: 'conditions', icon: 'file-text', label: "Conditions d'utilisation", href: 'conditions.html' }
+      { id: 'aide', icon: 'help-circle', label: 'Centre d’aide', href: 'aide.html?from=workspace' },
+      { id: 'support', icon: 'message-square', label: 'Support technique', href: 'support.html?from=workspace' },
+      { id: 'confidentialite', icon: 'shield-check', label: 'Confidentialité', href: 'confidentialite.html?from=workspace' },
+      { id: 'conditions', icon: 'file-text', label: "Conditions d'utilisation", href: 'conditions.html?from=workspace' }
     ]}
   ];
 
@@ -179,7 +179,12 @@ function closeSidebar() {
 
 function ensureWorkspaceTopbar() {
   const main = document.querySelector('.main-content');
-  if (!main || document.getElementById('topbar-root')) return;
+  if (!main) return;
+  const hasPageHeading = Array.from(main.children).some(child =>
+    child.classList.contains('page-header') || child.classList.contains('workspace-page-header')
+  );
+  main.classList.toggle('workspace-page-has-heading', hasPageHeading);
+  if (document.getElementById('topbar-root')) return;
   const root = document.createElement('div');
   root.id = 'topbar-root';
   main.insertBefore(root, main.firstChild);
