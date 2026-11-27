@@ -42,17 +42,20 @@ L'accès est protégé par l'authentification existante, la résolution du tenan
 
 ## Comptes SQL et migrations
 
-En production, le serveur utilise deux identités MySQL distinctes :
+En production, trois identités MySQL séparées sont utilisées :
 
-- `DB_USER` / `DB_PASSWORD` : compte runtime de l'API, du worker et des tâches applicatives. Il reçoit uniquement `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `EXECUTE`, `CREATE TEMPORARY TABLES`, `LOCK TABLES` et `SHOW VIEW` sur la base de l'application. Il ne reçoit ni `CREATE`, `ALTER`, `DROP`, `INDEX`, ni `TRIGGER`.
-- `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` : compte distinct réservé à l'initialisation et aux migrations, avec les privilèges DDL sur cette seule base. Le serveur ferme son pool de migration à la fin de l'initialisation.
-- `DB_ROOT_PASSWORD` : secret administratif utilisé uniquement par le service éphémère `db-provision` de Docker Compose pour créer/actualiser ces comptes. Il n'est pas injecté dans le conteneur applicatif.
+- `DB_USER` / `DB_PASSWORD` : compte runtime de l'API, du worker PDF et des tâches applicatives. Il reçoit uniquement `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `EXECUTE`, `CREATE TEMPORARY TABLES` et `SHOW VIEW` sur la base applicative. Il ne reçoit ni privilège DDL, ni `TRIGGER`, ni `LOCK TABLES`.
+- `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` : compte DDL distinct, transmis uniquement au service one-shot `db-migrate` (migrations initiales, évolutions et opérations de restauration). Le processus ferme son pool à la fin de la migration ; l'API reçoit des identifiants vides et vérifie uniquement que `_samafacture_schema_meta.version` est à jour.
+- `DB_BACKUP_USER` / `DB_BACKUP_PASSWORD` : compte utilisé exclusivement par `backup-worker` pour `mysqldump`. Il dispose de `SELECT`, `SHOW VIEW`, `TRIGGER`, `EVENT` et `LOCK TABLES` sur cette base. MySQL exige `TRIGGER` pour exporter les triggers ; ce droit n'est donc pas un compte purement lecture seule et peut aussi modifier des triggers. Le secret reste néanmoins hors du processus HTTP et du worker PDF.
+- `DB_ROOT_PASSWORD` : secret administratif utilisé uniquement par le service éphémère `db-provision` pour créer/actualiser ces comptes. Il n'est jamais injecté dans les conteneurs applicatifs.
 
-Configurer les deux comptes avec des mots de passe forts et différents. En `NODE_ENV=production`, le démarrage de l'API refuse les identifiants de migration absents ou identiques au compte runtime. Le compte de migration ne doit pas être accordé au worker PDF.
+Les trois comptes runtime, migration et sauvegarde doivent avoir des noms et mots de passe distincts en production. Le provisionnement refuse les identifiants partagés. La restauration manuelle utilise le compte DDL `DB_MIGRATION_USER`, jamais le compte runtime.
 
-Avec Docker Compose, le service `db-provision` attend que MySQL soit sain, applique les privilèges, puis l'API démarre seulement si le provisionnement réussit. Le script `deploy/provision-db-users.sh` est idempotent et s'exécute aussi sur un volume MySQL existant : il ne recrée ni ne supprime le volume, les tables métier, les événements ou les sauvegardes. Pour un déploiement non Docker, précréer la base, les deux comptes et leurs privilèges équivalents avant de lancer l'API.
+Avec Docker Compose, `db-provision` attend MySQL sain et applique les privilèges ; `db-migrate` exécute ensuite les migrations, puis l'API, le worker PDF et `backup-worker` démarrent. L'API n'obtient ni compte migration, ni compte backup, ni mot de passe root. Le scheduler intégré au processus HTTP est désactivé dans ce mode ; seule l'instance `backup-worker` produit les sauvegardes.
 
-La migration nécessite un compte distinct car elle crée les tables et triggers du registre. Ne réutilisez pas le compte runtime pour appliquer manuellement une migration.
+Le script `deploy/provision-db-users.sh` est idempotent et peut mettre à jour les privilèges sur un volume MySQL existant : il ne supprime ni ne recrée le volume, les tables métier, les événements ou les sauvegardes. Pour un déploiement hors Docker, précréer la base et les trois comptes avec des privilèges équivalents, puis exécuter le runner `node server/scripts/run-migrations.js` avec l'identité migration.
+
+Sauvegarde manuelle dans Docker : `docker compose exec backup-worker node backup-now.js`.
 
 ## Modèle d'intégrité
 
@@ -61,8 +64,8 @@ Chaque tenant possède une séquence indépendante. Les écritures concurrentes 
 Les événements ne possèdent volontairement aucune clé étrangère vers `users` : une suppression de compte ne doit pas effacer ces traces. L'identifiant du tenant et celui de l'acteur sont conservés comme références historiques ; il faut traiter les demandes d'anonymisation/rétention selon les obligations applicables et une procédure validée.
 
 La chaîne HMAC et les triggers augmentent la résistance à l'altération, mais ne constituent pas une preuve inviolable contre un administrateur de base de données ou une personne disposant de privilèges DDL élevés. En particulier, `TRUNCATE TABLE`, `DROP TABLE`, la suppression/désactivation des triggers ou la modification des objets par un compte privilégié peuvent contourner les protections ligne par ligne. En production, il faut donc :
-- utiliser des identifiants SQL avec les privilèges minimaux nécessaires et séparer le compte d'exécution applicatif du compte de migration ;
-- interdire au compte d'exécution les privilèges `DROP`, `ALTER`, `TRIGGER` et les opérations de maintenance non nécessaires sur le registre ;
+- utiliser les trois identités SQL séparées, le moindre privilège et des checkpoints signés hors du serveur applicatif ;
+- interdire au compte runtime les privilèges `CREATE`, `ALTER`, `DROP`, `TRIGGER` et les opérations de maintenance sur le registre ; ne transmettre le privilège `TRIGGER` qu'au worker de sauvegarde isolé et au runner de migration ;
 - exporter périodiquement les têtes de chaîne et des checkpoints signés vers un stockage séparé et non modifiable par le serveur applicatif ;
 - conserver les sauvegardes chiffrées et les clés hors du même domaine d'administration ;
 - surveiller les accès administrateur MySQL et système hôte.
