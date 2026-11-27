@@ -72,6 +72,13 @@ test('le privilège TRIGGER est limité au worker de sauvegarde dédié', () => 
   assert.ok(backup.includes('verifyAuditLedgerSchema(connection)'));
   assert.ok(backupWorker.includes('await verifierSchemaRegistreAudit();'));
   assert.ok(backupWorker.includes('AUDIT_LEDGER_SCHEMA_CHECK_INTERVAL_MS'));
+  const backupsDisabledBranch = backupWorker.slice(
+    backupWorker.indexOf('if (!timer)'),
+    backupWorker.indexOf('} else {', backupWorker.indexOf('if (!timer)'))
+  );
+  assert.ok(backupsDisabledBranch.includes('surveillance du registre d’audit toujours active'));
+  assert.doesNotMatch(backupsDisabledBranch, /shutdown\\(/,
+    'désactiver les sauvegardes ne doit pas arrêter la surveillance périodique du registre');
   assert.ok(backupWorker.includes('DB_BACKUP_USER'));
   assert.ok(provisioner.includes('[ "$DB_USER" = "$DB_MIGRATION_USER" ]'));
   assert.ok(provisioner.includes('[ "$DB_USER" = "$DB_BACKUP_USER" ]'));
