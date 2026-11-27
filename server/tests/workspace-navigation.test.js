@@ -119,6 +119,22 @@ describe('Navigation et structure des pages métier', () => {
     }
   });
 
+  test('la navigation des domaines professionnels est défilable au clavier sur mobile', () => {
+    const html = readPage('professionnel.html');
+    const grid = html.match(/<div class="pro-workspace-guide-grid"([^>]*)>/);
+    assert.ok(grid, 'Le rail des domaines professionnels doit être présent.');
+    assert.match(grid[1], /role="region"/);
+    assert.match(grid[1], /tabindex="0"/);
+    assert.match(grid[1], /aria-label=/);
+    assert.match(html, /Sur mobile, faites défiler les domaines horizontalement/);
+    assert.ok(enterpriseStyles.includes('@media (max-width: 560px)'));
+    assert.ok(enterpriseStyles.includes('grid-auto-flow: column'));
+    assert.ok(enterpriseStyles.includes('grid-auto-columns: min(84vw, 300px)'));
+    assert.ok(enterpriseStyles.includes('overflow-x: auto'));
+    assert.ok(enterpriseStyles.includes('scroll-snap-type: x proximity'));
+    assert.ok(enterpriseStyles.includes('.pro-workspace-guide-grid:focus-visible'));
+  });
+
   test('le plan de comptes OHADA peut être consulté et complété depuis son écran', () => {
     const html = readPage('comptabilite.html');
     assert.match(html, /id="accounting-accounts"/);

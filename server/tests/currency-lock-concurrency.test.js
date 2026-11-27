@@ -539,3 +539,134 @@ test('une facture créée par API lit la devise après le verrou du compte', asy
     return stored;
   });
 });
+
+
+test('une commande accepte la devise de base explicite et refuse une devise étrangère supportée', async () => {
+  const company = await createCompanyAndClient('currency-order-mismatch-fcfa');
+
+  const matchingResponse = await request(app)
+    .post('/api/pro/orders')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      client_id: company.clientId,
+      devise: 'FCFA',
+      lignes: [{ designation: 'Commande dans la devise de base', quantite: 1, prix_unitaire: 2500 }]
+    });
+  assert.equal(matchingResponse.status, 201, matchingResponse.text);
+  assert.equal(matchingResponse.body.devise, 'FCFA');
+
+  const mismatchResponse = await request(app)
+    .post('/api/pro/orders')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      client_id: company.clientId,
+      devise: 'EUR',
+      lignes: [{ designation: 'Commande devise incohérente', quantite: 1, prix_unitaire: 100 }]
+    });
+  assert.equal(mismatchResponse.status, 409, mismatchResponse.text);
+  assert.match(mismatchResponse.body.error, /conversions multi-devises ne sont pas encore activées/i);
+
+  const [[count]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_commandes WHERE user_id = ?',
+    [company.userId]
+  );
+  assert.equal(Number(count.total), 1, 'la commande rejetée ne doit pas être enregistrée');
+});
+
+test('une commande EUR refuse un override FCFA lorsque la devise de base est EUR', async () => {
+  const company = await createCompanyAndClient('currency-order-mismatch-eur');
+  const profileResponse = await request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  assert.equal(profileResponse.status, 200, profileResponse.text);
+
+  const mismatchResponse = await request(app)
+    .post('/api/pro/orders')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({
+      client_id: company.clientId,
+      devise: 'FCFA',
+      lignes: [{ designation: 'Commande devise incohérente', quantite: 1, prix_unitaire: 100 }]
+    });
+  assert.equal(mismatchResponse.status, 409, mismatchResponse.text);
+  assert.match(mismatchResponse.body.error, /conversions multi-devises ne sont pas encore activées/i);
+
+  const [[count]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_commandes WHERE user_id = ?',
+    [company.userId]
+  );
+  assert.equal(Number(count.total), 0, 'aucune commande incohérente ne doit être enregistrée');
+});
+
+test('une nouvelle caisse reprend la devise de base et refuse les devises inconnues', async () => {
+  const company = await createCompanyAndClient('cash-register-currency-default');
+  const profileResponse = await request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  assert.equal(profileResponse.status, 200, profileResponse.text);
+
+  const defaultRegister = await request(app)
+    .post('/api/pro/cash/registers')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Caisse principale EUR' });
+  assert.equal(defaultRegister.status, 201, defaultRegister.text);
+  assert.equal(defaultRegister.body.devise, 'EUR');
+
+  const [[storedDefault]] = await pool.query(
+    'SELECT devise FROM pro_caisses WHERE id = ? AND user_id = ?',
+    [defaultRegister.body.id, company.userId]
+  );
+  assert.equal(storedDefault.devise, 'EUR',
+    'une caisse sans devise explicite doit reprendre la devise de base de l’entreprise');
+
+  // Les caisses multi-devises explicites restent possibles et sont comptabilisées
+  // séparément par devise dans les rapports.
+  const foreignRegister = await request(app)
+    .post('/api/pro/cash/registers')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Caisse USD', devise: 'USD' });
+  assert.equal(foreignRegister.status, 201, foreignRegister.text);
+  assert.equal(foreignRegister.body.devise, 'USD');
+
+  const unsupportedRegister = await request(app)
+    .post('/api/pro/cash/registers')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Caisse devise invalide', devise: 'ZZZ' });
+  assert.equal(unsupportedRegister.status, 400, unsupportedRegister.text);
+
+  const [[counts]] = await pool.query(
+    'SELECT COUNT(*) AS total FROM pro_caisses WHERE user_id = ?',
+    [company.userId]
+  );
+  assert.equal(Number(counts.total), 2,
+    'une caisse avec une devise non prise en charge ne doit pas être créée');
+});
+
+test('une caisse créée en concurrence avec un changement de devise reprend la devise verrouillée', async () => {
+  const company = await createCompanyAndClient('cash-register-currency-race');
+  const updateRequest = request(app)
+    .put('/api/auth/entreprise')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send(entrepriseProfile('EUR'));
+  const createRequest = request(app)
+    .post('/api/pro/cash/registers')
+    .set('Authorization', 'Bearer ' + company.token)
+    .send({ nom: 'Caisse concurrente sans devise' });
+
+  const response = await runCurrencyChangeBeforeCreation(
+    company,
+    updateRequest,
+    createRequest,
+    async (createResponse, currentCompany) => {
+      const [[stored]] = await pool.query(
+        'SELECT devise FROM pro_caisses WHERE id = ? AND user_id = ?',
+        [createResponse.body.id, currentCompany.userId]
+      );
+      return stored;
+    }
+  );
+  assert.equal(response.status, 201, response.text);
+  assert.equal(response.body.devise, 'EUR');
+});

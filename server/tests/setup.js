@@ -131,5 +131,5 @@ async function teardownTestEnvironment() {
   if (cleanupError) throw cleanupError;
 }
 
-module.exports = { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, ensureTestHttpServer, teardownTestEnvironment };
+module.exports = { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment };
 

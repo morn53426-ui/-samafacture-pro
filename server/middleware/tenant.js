@@ -156,4 +156,4 @@ function requirePermission(req, res, next) {
   return res.status(403).json({ error: 'Cette action n’est pas autorisée pour votre rôle.' });
 }
 
-module.exports = { resolveTenant, requirePermission, ROLE_PERMISSIONS, parsePermissions };
+module.exports = { resolveTenant, requirePermission, ROLE_PERMISSIONS };
