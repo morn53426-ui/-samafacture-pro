@@ -28,8 +28,8 @@ test('login video layout has a bounded 16:9 frame and responsive safe-area spaci
   const loginVideoStyles = stylesheet.slice(
     stylesheet.indexOf('/* ---------- Connexion : présentation vidéo Sunupilot ---------- */')
   );
-  assert.match(loginVideoStyles, /@media\\s*\\(max-width:\\s*900px\\)/);
-  assert.match(loginVideoStyles, /\\.auth-login-video-side\\s*\\{/);
+  assert.ok(loginVideoStyles.includes('@media (max-width: 900px)'));
+  assert.ok(loginVideoStyles.includes('.auth-login-video-side {'));
   assert.match(stylesheet, /env\(safe-area-inset-bottom/);
 });
 
