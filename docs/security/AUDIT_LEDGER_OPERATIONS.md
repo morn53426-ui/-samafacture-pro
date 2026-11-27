@@ -49,7 +49,18 @@ En production, trois identités MySQL séparées sont utilisées :
 - `DB_BACKUP_USER` / `DB_BACKUP_PASSWORD` : compte utilisé exclusivement par `backup-worker` pour `mysqldump`. Il dispose de `SELECT`, `SHOW VIEW`, `TRIGGER`, `EVENT` et `LOCK TABLES` sur cette base. MySQL exige `TRIGGER` pour exporter les triggers ; ce droit n'est donc pas un compte purement lecture seule et peut aussi modifier des triggers. Le secret reste néanmoins hors du processus HTTP et du worker PDF.
 - `DB_ROOT_PASSWORD` : secret administratif utilisé uniquement par le service éphémère `db-provision` pour créer/actualiser ces comptes. Il n'est jamais injecté dans les conteneurs applicatifs.
 
-Les trois comptes runtime, migration et sauvegarde doivent avoir des noms et mots de passe distincts en production. Le provisionnement refuse les identifiants partagés. La restauration manuelle utilise le compte DDL `DB_MIGRATION_USER`, jamais le compte runtime.
+Les trois comptes runtime, migration et sauvegarde doivent avoir des noms et mots de passe distincts en production. Le provisionnement refuse les identifiants partagés. La restauration manuelle utilise le compte DDL `DB_MIGRATION_USER`, jamais le compte runtime. Dans Docker Compose, le service `db-migrate` reçoit le volume de sauvegardes en lecture seule afin que le même environnement DDL puisse vérifier et importer une archive sans donner ce droit à l'API ou au worker PDF.
+
+Pour une restauration en production, arrêter d'abord les services applicatifs et workers (sans arrêter ni supprimer le volume MySQL), puis exécuter le script depuis le service DDL :
+
+```bash
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml stop app backup-worker pdf-worker nginx
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml run --rm --entrypoint node db-migrate restore-backup.js /app/server/backups/NOM_ARCHIVE.sql.gz.enc
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml run --rm db-migrate
+docker compose --env-file .env -f docker-compose.yml -f docker-compose.production.yml up -d app backup-worker pdf-worker nginx
+```
+
+Le fichier `.env` racine fournit les comptes SQL et `BACKUP_ENCRYPTION_KEY` à Docker Compose ; ne jamais transmettre la clé à une commande en argument ou l'inscrire dans des journaux. Vérifier l'archive et la base cible avant restauration. La vérification par défaut refuse une base non vide ; ne pas contourner cette protection sans approbation explicite et sauvegarde préalable.
 
 Avec Docker Compose, `db-provision` attend MySQL sain et applique les privilèges ; `db-migrate` exécute ensuite les migrations, puis l'API, le worker PDF et `backup-worker` démarrent. L'API n'obtient ni compte migration, ni compte backup, ni mot de passe root. Le scheduler intégré au processus HTTP est désactivé dans ce mode ; seule l'instance `backup-worker` produit les sauvegardes.
 
