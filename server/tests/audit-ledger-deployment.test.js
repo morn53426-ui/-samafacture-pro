@@ -69,6 +69,7 @@ test('le privilège TRIGGER est limité au worker de sauvegarde dédié', () => 
   assert.ok(provisioner.includes('[ "$DB_USER" = "$DB_MIGRATION_USER" ]'));
   assert.ok(provisioner.includes('[ "$DB_USER" = "$DB_BACKUP_USER" ]'));
   assert.match(worker, /DB_BACKUP_USER: \$\{DB_BACKUP_USER/);
+  assert.ok(worker.includes('restart: on-failure'));
   assert.match(worker, /workers\/backup-worker\.js/);
   assert.match(worker, /app_backups:/);
   assert.match(backupWorker, /startBackupScheduler\(\{ keepAlive: true \}\)/);
