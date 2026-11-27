@@ -19,7 +19,7 @@ const { appendAuditEvent } = require('../utils/audit-ledger');
 
 const router = express.Router();
 
-async function journaliserEvenementAuth(req, event) {
+async function journaliserEvenementAuth(req, event, connection = null) {
   return appendAuditEvent({
     tenantId: event.tenantId === undefined ? null : event.tenantId,
     actorUserId: event.actorUserId === undefined ? null : event.actorUserId,
@@ -34,7 +34,7 @@ async function journaliserEvenementAuth(req, event) {
     userAgent: req.get('user-agent') || null,
     requestId: req.requestId || null,
     metadata: event.metadata || null
-  });
+  }, connection);
 }
 
 // Incrémenter ces versions à chaque modification substantielle des documents publics.
@@ -594,7 +594,32 @@ router.post('/mot-de-passe-oublie', resetLimiter, async (req, res, next) => {
       const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
       const expires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
-      await pool.query('UPDATE users SET reset_token_hash = ?, reset_token_expires = ? WHERE id = ?', [tokenHash, expires, user.id]);
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
+        await connection.query(
+          'UPDATE users SET reset_token_hash = ?, reset_token_expires = ? WHERE id = ?',
+          [tokenHash, expires, user.id]
+        );
+        await journaliserEvenementAuth(req, {
+          tenantId: Number(user.id),
+          actorUserId: null,
+          actorKind: 'anonymous',
+          eventType: 'auth.password_reset.requested',
+          category: 'identity',
+          severity: 'low',
+          entityType: 'account',
+          entityId: user.id,
+          outcome: 'success',
+          metadata: { reset_method: 'email_token', expires_in_minutes: 30 }
+        }, connection);
+        await connection.commit();
+      } catch (err) {
+        await connection.rollback().catch(() => {});
+        throw err;
+      } finally {
+        connection.release();
+      }
 
       const resetUrl = `${process.env.APP_URL || 'http://localhost:4000'}/reinitialiser-mot-de-passe.html?token=${rawToken}`;
       await sendMail({
@@ -645,14 +670,37 @@ router.post('/reinitialiser-mot-de-passe', async (req, res, next) => {
     if (!user) return res.status(400).json({ error: 'Ce lien de réinitialisation est invalide ou a expiré.' });
 
     const hash = await bcrypt.hash(password, 10);
-    // Consommation atomique : si deux demandes utilisent le même lien en parallèle,
-    // une seule peut mettre à jour le compte et incrémenter la version de session.
-    const [updated] = await pool.query(
-      'UPDATE users SET password_hash = ?, token_version = token_version + 1, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ? AND reset_token_hash = ? AND reset_token_expires > NOW()',
-      [hash, user.id, tokenHash]
-    );
-    if (updated.affectedRows !== 1) {
-      return res.status(400).json({ error: 'Ce lien de réinitialisation est invalide ou a expiré.' });
+    // La mise à jour du mot de passe et sa preuve d'audit partagent la même
+    // transaction : aucune réinitialisation validée ne peut rester sans événement.
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [updated] = await connection.query(
+        'UPDATE users SET password_hash = ?, token_version = token_version + 1, reset_token_hash = NULL, reset_token_expires = NULL WHERE id = ? AND reset_token_hash = ? AND reset_token_expires > NOW()',
+        [hash, user.id, tokenHash]
+      );
+      if (updated.affectedRows !== 1) {
+        await connection.rollback();
+        return res.status(400).json({ error: 'Ce lien de réinitialisation est invalide ou a expiré.' });
+      }
+      await journaliserEvenementAuth(req, {
+        tenantId: Number(user.id),
+        actorUserId: null,
+        actorKind: 'anonymous',
+        eventType: 'auth.password_reset.completed',
+        category: 'identity',
+        severity: 'medium',
+        entityType: 'account',
+        entityId: user.id,
+        outcome: 'success',
+        metadata: { reset_method: 'email_token', sessions_revoked: true }
+      }, connection);
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback().catch(() => {});
+      throw err;
+    } finally {
+      connection.release();
     }
     invaliderCacheVersion(user.id);
 
