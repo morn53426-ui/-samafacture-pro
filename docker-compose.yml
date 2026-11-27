@@ -2,6 +2,9 @@ services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
+    # MySQL 8 binlog impose SUPER pour CREATE TRIGGER sinon.
+    # Cette option maintient le compte migrator limité au schéma au lieu d'accorder SUPER.
+    command: ["--log-bin-trust-function-creators=ON"]
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
