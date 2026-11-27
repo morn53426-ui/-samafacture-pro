@@ -92,3 +92,43 @@ test('les sélecteurs de couleur ont chacun un nom accessible', () => {
       'Le sélecteur de couleur #' + id + ' doit avoir un aria-label non vide.');
   }
 });
+
+
+test('les coordonnées de l’entreprise sont dans une grille responsive fermée avant les champs légaux', () => {
+  const start = html.indexOf('<div class="settings-company-fields-grid">');
+  assert.notEqual(start, -1, 'Les coordonnées entreprise doivent partager un conteneur de grille.');
+
+  const ribStart = html.indexOf('<div class="field settings-field-wide"><label for="entreprise_rib">', start);
+  assert.ok(ribStart > start, 'Le RIB doit rester dans la grille.');
+  const ribFieldClose = html.indexOf('</div>', ribStart);
+  assert.ok(ribFieldClose > ribStart, 'Le champ RIB doit se fermer.');
+  const gridClose = html.indexOf('</div>', ribFieldClose + '</div>'.length);
+  assert.ok(gridClose > ribFieldClose, 'Le conteneur de grille doit se fermer après le champ RIB.');
+
+  const conditionsStart = html.indexOf('<div class="field"><label for="entreprise_conditions_reglement">', start);
+  assert.ok(conditionsStart > gridClose, 'Les conditions de règlement doivent rester hors de la grille.');
+  const legalMentionsStart = html.indexOf('<div class="field"><label for="entreprise_mentions_legales">', conditionsStart);
+  assert.ok(legalMentionsStart > conditionsStart, 'Les mentions légales doivent rester après la grille.');
+
+  const grid = html.slice(start, gridClose);
+  for (const id of [
+    'entreprise_nom',
+    'entreprise_adresse',
+    'entreprise_telephone',
+    'entreprise_email',
+    'entreprise_ninea',
+    'entreprise_rccm',
+    'entreprise_site_web',
+    'entreprise_banque',
+    'entreprise_rib'
+  ]) {
+    assert.ok(grid.includes('id="' + id + '"'), 'Le champ #' + id + ' doit rester dans la grille.');
+  }
+  assert.match(grid, /<div class="field settings-field-wide"><label for="entreprise_rib">/,
+    'Le RIB doit utiliser toute la largeur sur grand écran.');
+  assert.match(html, /\.settings-company-fields-grid\s*\{[^}]*display:\s*grid/s);
+  assert.match(html, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(html, /@media\s*\(max-width:\s*700px\)[\s\S]*?\.settings-company-fields-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.equal((html.match(/<form\b/g) || []).length, 1,
+    'Le formulaire d’enregistrement unique ne doit pas être fragmenté.');
+});
