@@ -6,7 +6,7 @@ on:
     types: [opened, synchronize, reopened]
 
   push:
-    branches: ['fix/security-concurrent-case-creation-20261128']
+    branches: ['fix/security-concurrent-case-creation-20261128', 'fix/security-test-tenant-isolation-20261128']
 
 permissions:
   contents: read
