@@ -102,6 +102,8 @@ function permissionForRequest(req) {
     return method === 'GET' ? 'invoices.read' : 'invoices.write';
   }
   if (base.endsWith('/pro')) {
+    if (path.startsWith('/audit-events/export.')) return method === 'GET' ? 'audit.export' : 'admin.only';
+    if (path.startsWith('/audit-events')) return method === 'GET' ? 'audit.read' : 'admin.only';
     // Expose uniquement le code devise du tenant actif aux membres qui doivent
     // afficher les montants, sans leur ouvrir les autres paramètres internationaux.
     if (path === '/company-context') return null;

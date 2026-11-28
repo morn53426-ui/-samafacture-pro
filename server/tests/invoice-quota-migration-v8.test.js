@@ -61,10 +61,10 @@ test('une base en version 7 reçoit la migration du quota sans bloquer les versi
 
   const child = runMigrationInNewProcess();
   assert.equal(child.error, undefined, child.error?.message);
-  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v24 a échoué.');
+  assert.equal(child.status, 0, child.stderr || child.stdout || 'La migration v7 → v25 a échoué.');
 
   const [[meta]] = await pool.query('SELECT version FROM _samafacture_schema_meta WHERE id = 1');
-  assert.equal(Number(meta.version), 24, 'une base v7 doit exécuter toute la chaîne de migrations v8 à v24');
+  assert.equal(Number(meta.version), 25, 'une base v7 doit exécuter toute la chaîne de migrations v8 à v24');
 
   const [tables] = await pool.query(
     `SELECT TABLE_NAME FROM information_schema.TABLES

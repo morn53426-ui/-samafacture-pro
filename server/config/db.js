@@ -12,7 +12,7 @@ const SCHEMA_PATH = path.join(__dirname, '..', 'database', 'schema.sql');
 // plusieurs workers/processus (cluster), mais il ne faut pas faire patienter 5 appels
 // du même worker les uns derrière les autres.
 let initializationPromise = null;
-const CURRENT_SCHEMA_VERSION = 24;
+const CURRENT_SCHEMA_VERSION = 25;
 
 // Pool de connexions MySQL — configuré via les variables d'environnement (.env)
 // Valeurs par défaut alignées sur une installation WAMPserver standard
@@ -178,6 +178,7 @@ async function runMigrations(conn) {
   // v22 : les événements comptables de facture ne doivent pas être supprimés en cascade par une suppression de facture.
   // v23 : correspondances comptables propres à chaque entreprise, pour ventes et catégories de dépenses.
   // v24 : statistiques de fréquentation pseudonymisées pour le centre administrateur Sunupilot.
+  // v25 : registre d’audit signé, append-only, avec chaînes indépendantes par tenant.
   await conn.query(`
     CREATE TABLE IF NOT EXISTS facture_usage_mensuelle (
       user_id INT UNSIGNED NOT NULL,
@@ -539,6 +540,29 @@ async function runMigrations(conn) {
     .map(statement => statement.trim())
     .filter(Boolean);
   for (const statement of analyticsStatements) {
+    await conn.query(statement);
+  }
+
+  // v25 : registre d'audit signé, append-only et sans FK vers users pour conserver
+  // les éléments de preuve au-delà du cycle de vie d'un compte.
+  const auditLedgerPath = path.join(__dirname, '..', 'database', 'migrations', '014_audit_ledger.sql');
+  const auditLedgerSql = fs.readFileSync(auditLedgerPath, 'utf8');
+  const auditLedgerStatements = auditLedgerSql
+    .split(/\r?\n/)
+    .filter(line => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+  for (const statement of auditLedgerStatements) {
+    const triggerMatch = /^CREATE TRIGGER\s+([a-zA-Z0-9_]+)/i.exec(statement);
+    if (triggerMatch) {
+      const [existingTriggers] = await conn.query(
+        'SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = ? LIMIT 1',
+        [triggerMatch[1]]
+      );
+      if (existingTriggers.length) continue;
+    }
     await conn.query(statement);
   }
 
