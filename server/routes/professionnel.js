@@ -14,6 +14,7 @@ const { formatAmountWithCurrency, normalizeCurrency } = require('../utils/money-
 const { isEnterprisePlan } = require('../utils/plans');
 const { encryptEmailPayload, decryptEmailPayload } = require('../utils/email-outbox-crypto');
 const { optionalText, optionalIsoDate } = require('../utils/optional-fields');
+const { reserveInvoiceCheckout } = require('../services/invoice-checkout-lifecycle');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -2493,6 +2494,7 @@ router.put('/payment-gateways/:provider', async (req, res, next) => {
 });
 
 router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
+  let conn;
   try {
     const uid = owner(req), provider = String(req.body.fournisseur || '').toLowerCase();
     if (!['wave', 'paydunya'].includes(provider)) return res.status(400).json({ error: 'Choisissez Wave ou PayDunya.' });
@@ -2500,30 +2502,27 @@ router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
     if (!credentials || (provider === 'wave' ? !waveConfigured(credentials) : !paydunyaConfigured(credentials))) {
       return res.status(409).json({ error: 'Ce prestataire n’est pas configuré pour cette entreprise. Renseignez d’abord ses clés marchandes.' });
     }
-    const [rows] = await pool.query(
-      "SELECT f.id, f.numero, f.total, f.montant_paye, f.statut, f.type, u.entreprise_nom, u.devise FROM factures f JOIN users u ON u.id = f.user_id WHERE f.id = ? AND f.user_id = ? LIMIT 1",
-      [req.params.invoiceId, uid]
-    );
-    const invoice = rows[0];
-    if (!invoice || invoice.type !== 'facture') return res.status(404).json({ error: 'Facture introuvable.' });
-    if (invoice.statut === 'annulee') return res.status(409).json({ error: 'Une facture annulée ne peut pas être payée.' });
-    const remaining = Math.round((Number(invoice.total) - Number(invoice.montant_paye)) * 100) / 100;
-    if (!Number.isFinite(remaining) || remaining <= 0) return res.status(409).json({ error: 'Cette facture est déjà soldée.' });
-    // Wave et PayDunya règlent ici en XOF, devise sans sous-unité. Refuser un solde
-    // fractionnaire plutôt que de créer un lien arrondi qui pourrait encaisser un autre montant.
-    if (invoice.devise && invoice.devise !== 'FCFA' && invoice.devise !== 'XOF') {
-      return res.status(409).json({ error: 'Les paiements en ligne ne sont activés que pour les factures en XOF/FCFA.' });
-    }
-    if (Math.abs(remaining - Math.round(remaining)) > 0.001) {
-      return res.status(409).json({ error: 'Le solde XOF doit être un montant entier avant de créer un lien Wave ou PayDunya.' });
-    }
 
     const base = String(process.env.APP_URL || '').replace(/\/$/, '');
     if (!base || !base.startsWith('https://')) return res.status(503).json({ error: 'APP_URL doit être une URL publique HTTPS pour activer le paiement en ligne.' });
+
     const reference = crypto.randomBytes(32).toString('hex');
-    const [inserted] = await pool.query(
-      "INSERT INTO pro_invoice_checkouts (user_id, facture_id, fournisseur, reference_interne, montant, devise, statut, expire_at) VALUES (?, ?, ?, ?, ?, 'XOF', 'creation', DATE_ADD(NOW(), INTERVAL 30 MINUTE))",
-      [uid, invoice.id, provider, reference, remaining]
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const reservation = await reserveInvoiceCheckout(conn, {
+      userId: uid,
+      invoiceId: req.params.invoiceId,
+      provider,
+      reference
+    });
+    await conn.commit();
+    conn.release();
+    conn = null;
+
+    const { invoice, checkoutId, remaining } = reservation;
+    const [[company]] = await pool.query(
+      'SELECT entreprise_nom FROM users WHERE id = ? LIMIT 1',
+      [uid]
     );
     const returnUrl = base + '/paiement-retour.html?reference=' + encodeURIComponent(reference);
     try {
@@ -2539,7 +2538,7 @@ router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
           amount: remaining,
           description: 'Facture ' + invoice.numero,
           reference,
-          storeName: invoice.entreprise_nom || 'SamaFacture Pro',
+          storeName: company?.entreprise_nom || 'SamaFacture Pro',
           returnUrl,
           cancelUrl: returnUrl,
           callbackUrl: base + '/api/payment-webhooks/paydunya',
@@ -2549,19 +2548,29 @@ router.post('/invoices/:invoiceId/checkout', async (req, res, next) => {
         providerRef = created.token;
       }
       if (!checkoutUrl || !providerRef) throw new Error('Le prestataire n’a pas retourné une session de paiement valide.');
+      // Le webhook ne peut plus être rétrogradé : il peut passer le checkout à
+      // "payee" dès que la référence prestataire est persistée.
       await pool.query(
-        "UPDATE pro_invoice_checkouts SET reference_prestataire = ?, checkout_url = ?, statut = 'en_attente' WHERE id = ? AND user_id = ?",
-        [String(providerRef), checkoutUrl, inserted.insertId, uid]
+        "UPDATE pro_invoice_checkouts SET reference_prestataire = ?, checkout_url = ?, statut = 'en_attente' WHERE id = ? AND user_id = ? AND statut = 'creation'",
+        [String(providerRef), checkoutUrl, checkoutId, uid]
       );
       await audit(req, 'paiement.checkout_cree', 'facture', invoice.id, { fournisseur: provider, montant: remaining, reference_interne: reference });
       res.status(201).json({ checkout_url: checkoutUrl, reference, fournisseur: provider, montant: remaining, devise: 'XOF', expires_in_minutes: 30 });
     } catch (providerError) {
-      await pool.query("UPDATE pro_invoice_checkouts SET statut = 'echec' WHERE id = ? AND user_id = ?", [inserted.insertId, uid]);
+      // Ne jamais écraser un état final si un traitement concurrent a déjà fait évoluer le checkout.
+      await pool.query(
+        "UPDATE pro_invoice_checkouts SET statut = 'echec' WHERE id = ? AND user_id = ? AND statut = 'creation'",
+        [checkoutId, uid]
+      );
       throw providerError;
     }
   } catch (err) {
+    if (conn) await conn.rollback().catch(() => {});
+    if (err?.status && err?.code) return res.status(err.status).json({ error: err.message, code: err.code });
     if (/Impossible|prestataire|Wave|PayDunya|session/i.test(err.message || '')) return res.status(502).json({ error: err.message });
     next(err);
+  } finally {
+    if (conn) conn.release();
   }
 });
 
