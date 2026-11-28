@@ -340,6 +340,57 @@ test('un dossier ne peut pas être ouvert sur une alerte résolue ou écartée',
   }
 });
 
+test('création concurrente de dossier : une seule investigation est ouverte par alerte', async () => {
+  const fingerprint = '3'.repeat(64);
+  const [insert] = await pool.query(
+    `INSERT INTO pro_security_alerts
+      (tenant_scope_id, tenant_id, rule_code, fingerprint, severity, status, title, summary,
+       source_event_type, first_seen_at, last_seen_at, occurrence_count)
+     VALUES (?, ?, 'auth.login.failed.threshold', ?, 'high', 'open', ?, ?, 'auth.login.failed',
+             UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), 5)`,
+    [ownerB, ownerB, fingerprint, 'Alerte de concurrence', 'Test de concurrence sur la création de dossier']
+  );
+  const concurrentAlertId = Number(insert.insertId);
+
+  const responses = await Promise.all([
+    request(app)
+      .post('/api/pro/security-cases')
+      .set(auth(ownerBToken))
+      .send({ alert_id: concurrentAlertId }),
+    request(app)
+      .post('/api/pro/security-cases')
+      .set(auth(ownerBToken))
+      .send({ alert_id: concurrentAlertId })
+  ]);
+  assert.deepEqual(responses.map(response => response.status).sort(), [201, 409]);
+
+  const created = responses.find(response => response.status === 201);
+  const duplicate = responses.find(response => response.status === 409);
+  assert.ok(created.body.id);
+  assert.equal(Number(duplicate.body.case_id), Number(created.body.id));
+
+  const [[counts]] = await pool.query(
+    `SELECT
+       (SELECT COUNT(*) FROM pro_security_cases
+         WHERE tenant_scope_id = ? AND source_alert_id = ?) AS cases_total,
+       (SELECT COUNT(*) FROM pro_security_case_events
+         WHERE tenant_scope_id = ? AND case_id = ?) AS events_total,
+       (SELECT COUNT(*) FROM pro_audit_events
+         WHERE tenant_scope_id = ? AND event_type = 'security.case.created'
+           AND entity_id = ?) AS signed_events_total`,
+    [ownerB, concurrentAlertId, ownerB, created.body.id, ownerB, String(created.body.id)]
+  );
+  assert.equal(Number(counts.cases_total), 1, 'une seule ligne de dossier doit exister');
+  assert.equal(Number(counts.events_total), 1, 'un seul événement de création doit exister');
+  assert.equal(Number(counts.signed_events_total), 1, 'un seul événement signé doit exister');
+
+  const [[alert]] = await pool.query(
+    'SELECT status FROM pro_security_alerts WHERE id = ? AND tenant_scope_id = ?',
+    [concurrentAlertId, ownerB]
+  );
+  assert.equal(alert.status, 'investigating');
+});
+
 test('dossier d’investigation : création idempotente, transitions et historique immuable', async () => {
   const created = await request(app)
     .post('/api/pro/security-cases')
