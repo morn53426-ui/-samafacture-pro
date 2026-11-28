@@ -730,6 +730,7 @@ router.put('/:id/statut', async (req, res, next) => {
       return res.status(404).json({ error: 'Facture introuvable.' });
     }
 
+    const { statut } = req.body;
     if (statut === 'annulee' && existing.statut !== 'annulee') {
       const activeCheckout = await findActiveInvoiceCheckout(conn, req.tenantId, existing.id);
       if (activeCheckout) {
@@ -740,8 +741,6 @@ router.put('/:id/statut', async (req, res, next) => {
         });
       }
     }
-
-    const { statut } = req.body;
     const valides = ['en_attente', 'payee', 'en_retard', 'annulee'];
     if (!valides.includes(statut)) {
       await conn.rollback();

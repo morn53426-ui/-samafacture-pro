@@ -16,7 +16,6 @@ const { reserveInvoiceCheckout } = require('../services/invoice-checkout-lifecyc
 let userId;
 let token;
 let clientId;
-const createdCheckouts = [];
 
 async function createInvoice(label) {
   const response = await request(app)
@@ -42,7 +41,6 @@ async function reserve(invoiceId, suffix) {
       reference: (suffix + Date.now().toString(16)).padEnd(64, '0').slice(0, 64)
     });
     await connection.commit();
-    createdCheckouts.push(result.checkoutId);
     return result;
   } catch (error) {
     await connection.rollback().catch(() => {});
