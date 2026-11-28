@@ -88,6 +88,10 @@ on:
       - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
       - 'server/tests/security-alerts.test.js'
+      - 'server/routes/factures.js'
+      - 'server/routes/professionnel.js'
+      - 'server/routes/produits.js'
+      - 'server/tests/stock.test.js'
 
 permissions:
   contents: read

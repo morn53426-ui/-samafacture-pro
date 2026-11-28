@@ -13,7 +13,7 @@ function observeProductLockAttempts() {
     const originalQuery = conn.query.bind(conn);
     conn.query = (sql, ...queryArgs) => {
       const isProductLock = typeof sql === 'string' &&
-        /\\bFROM\\s+produits\\b[\\s\\S]*\\bFOR\\s+UPDATE\\b/i.test(sql);
+        /\bFROM\s+produits\b[\s\S]*\bFOR\s+UPDATE\b/i.test(sql);
       const result = originalQuery(sql, ...queryArgs);
       if (active && isProductLock) {
         const waiter = waiters.shift();
