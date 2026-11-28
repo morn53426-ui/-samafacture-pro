@@ -1,8 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
 
-const source = fs.readFileSync(require.resolve('../routes/professionnel'), 'utf8');
+const source = require('./helpers/professional-source').readProfessionalSource();
 const start = source.indexOf("router.get('/reports/forecast'");
 const end = source.indexOf("router.get('/reports/custom'", start);
 const forecast = source.slice(start, end);

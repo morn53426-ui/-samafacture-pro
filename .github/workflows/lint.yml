@@ -31,6 +31,7 @@ on:
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
+      - 'server/routes/professionnel/**'
       - 'server/tests/factures.test.js'
       - 'server/routes/clients.js'
       - 'server/tests/client-history-protection.test.js'
