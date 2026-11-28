@@ -141,17 +141,43 @@ router.get('/security-alerts', async (req, res, next) => {
                   AND e.entity_type = 'security_alert'
                   AND e.entity_id = CAST(a.id AS CHAR) COLLATE utf8mb4_unicode_ci
                   AND e.event_type IN ('security.alert.created', 'security.alert.reopened')
-                ORDER BY e.chain_sequence DESC LIMIT 1) AS evidence_json
+                ORDER BY e.chain_sequence DESC LIMIT 1) AS evidence_json,
+              CASE WHEN a.rule_code = 'auth.login.failed.threshold' THEN
+                (SELECT COUNT(*)
+                   FROM pro_audit_events failed
+                  WHERE failed.tenant_scope_id = a.tenant_scope_id
+                    AND failed.tenant_id = a.tenant_id
+                    AND failed.event_type = 'auth.login.failed'
+                    AND failed.entity_type = 'account'
+                    AND failed.entity_id = source_auth_event.entity_id
+                    AND failed.outcome = 'failure'
+                    AND failed.created_at >= DATE_SUB(UTC_TIMESTAMP(6), INTERVAL 15 MINUTE))
+              ELSE NULL END AS attempts_in_window
          FROM pro_security_alerts a
+         LEFT JOIN pro_audit_events source_auth_event
+           ON source_auth_event.id = a.source_event_id
+          AND source_auth_event.tenant_scope_id = a.tenant_scope_id
+          AND source_auth_event.tenant_id = a.tenant_id
+          AND source_auth_event.event_type = 'auth.login.failed'
+          AND source_auth_event.entity_type = 'account'
+          AND source_auth_event.outcome = 'failure'
         WHERE ${clause}
         ORDER BY FIELD(a.severity, 'critical', 'high', 'medium', 'low'), a.last_seen_at DESC, a.id DESC
         LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
-    const visibleAlerts = alerts.map(({ evidence_json, ...alert }) => ({
-      ...alert,
-      evidence: safeEvidence(evidence_json)
-    }));
+    const visibleAlerts = alerts.map(({ evidence_json, attempts_in_window, ...alert }) => {
+      const evidence = safeEvidence(evidence_json) || {};
+      if (alert.rule_code === 'auth.login.failed.threshold') {
+        const attempts = Number(attempts_in_window);
+        // Remplace la preuve de création par le décompte courant, même lorsqu'il est retombé à zéro.
+        evidence.attempts_in_window = Number.isSafeInteger(attempts) && attempts >= 0 ? attempts : 0;
+      }
+      return {
+        ...alert,
+        evidence: Object.keys(evidence).length ? evidence : null
+      };
+    });
     return res.json({
       alerts: visibleAlerts,
       pagination: {

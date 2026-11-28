@@ -155,6 +155,14 @@ test('cinq échecs de connexion sur quinze minutes créent une seule alerte tena
     [alertId, ownerA]
   );
   assert.equal(Number(updated.occurrence_count), 6, 'les nouvelles tentatives enrichissent l’alerte existante');
+
+  const refreshed = await request(app).get('/api/pro/security-alerts').set(auth(ownerAToken));
+  assert.equal(refreshed.status, 200, refreshed.text);
+  assert.equal(
+    refreshed.body.alerts[0].evidence.attempts_in_window,
+    6,
+    'la preuve exposée par l’API doit être recalculée après la sixième tentative, pas rester figée à la création'
+  );
 });
 
 test('une facture très supérieure à l’historique comparable déclenche un signal explicable', async () => {
@@ -263,7 +271,7 @@ test('API des alertes : permissions, cache et isolation stricte des tenants', as
   assert.equal(own.body.alerts.length, 1);
   assert.equal(Number(own.body.alerts[0].id), alertId);
   assert.equal(own.body.alerts[0].case_id, null);
-  assert.equal(own.body.alerts[0].evidence.attempts_in_window, 5);
+  assert.equal(own.body.alerts[0].evidence.attempts_in_window, 6);
   assert.deepEqual(Object.keys(own.body.alerts[0].evidence), ['attempts_in_window']);
 
   const filtered = await request(app)
