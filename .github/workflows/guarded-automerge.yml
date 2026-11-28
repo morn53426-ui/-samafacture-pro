@@ -1,0 +1,102 @@
+name: Auto-merge gardé — PR à faible risque
+
+on:
+  pull_request:
+    types:
+      - labeled
+      - unlabeled
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: guarded-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  guarded-auto-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Revalider l'état et tous les fichiers de la PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OWNER="${REPOSITORY%%/*}"
+          REPO_NAME="${REPOSITORY#*/}"
+
+          disable_auto_merge_if_enabled() {
+            local state pr_node_id enabled mutation
+            state="$(gh api graphql \
+              -f query='query($owner:String!, $name:String!, $number:Int!) { repository(owner:$owner, name:$name) { pullRequest(number:$number) { id autoMergeRequest { enabledAt } } } }' \
+              -F owner="$OWNER" -F name="$REPO_NAME" -F number="$PR_NUMBER")"
+            pr_node_id="$(jq -r '.data.repository.pullRequest.id // empty' <<< "$state")"
+            enabled="$(jq -r '.data.repository.pullRequest.autoMergeRequest != null' <<< "$state")"
+
+            if [[ "$enabled" == "true" && -n "$pr_node_id" ]]; then
+              mutation='mutation($pullRequestId:ID!) { disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}) { pullRequest { id } } }'
+              gh api graphql -f query="$mutation" -f pullRequestId="$pr_node_id" >/dev/null
+              echo "Auto-merge désactivé : la PR ne satisfait plus les conditions."
+            fi
+          }
+
+          pr_json="$(gh pr view "$PR_NUMBER" --repo "$REPOSITORY" --json baseRefName,isDraft,labels)"
+          base="$(jq -r '.baseRefName // ""' <<< "$pr_json")"
+          is_draft="$(jq -r '.isDraft // true' <<< "$pr_json")"
+          has_label="$(jq -r '[.labels[].name] | index("ai-automerge-safe") != null' <<< "$pr_json")"
+
+          # Le label et le statut sont relus à chaque événement, pas seulement
+          # au moment où le label est ajouté.
+          if [[ "$base" != "main" || "$is_draft" == "true" || "$has_label" != "true" ]]; then
+            disable_auto_merge_if_enabled
+            echo "Aucune autorisation active : base main, PR non-Draft et label humain requis."
+            exit 0
+          fi
+
+          # Pagination REST : aucun fichier au-delà de la première page ne doit
+          # échapper à la liste d'autorisation.
+          files="$(gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[].filename')"
+          if [[ -z "$files" ]]; then
+            disable_auto_merge_if_enabled
+            echo "::error::PR vide ou liste de fichiers indisponible."
+            exit 1
+          fi
+
+          rejected=0
+          while IFS= read -r path; do
+            [[ -n "$path" ]] || continue
+            case "$path" in
+              docs/*|server/tests/*|public/css/*)
+                ;;
+              *)
+                # Les fichiers Markdown ne sont autorisés qu'à la racine.
+                if [[ "$path" == *.md && "$path" != */* ]]; then
+                  :
+                else
+                  echo "::error::Chemin non autorisé pour l'auto-merge : $path"
+                  rejected=1
+                fi
+                ;;
+            esac
+          done <<< "$files"
+
+          if [[ "$rejected" -ne 0 ]]; then
+            disable_auto_merge_if_enabled
+            exit 1
+          fi
+
+          # GitHub conserve ses règles de protection et ses checks requis.
+          # Cette commande demande l'Auto-merge natif; elle ne fusionne pas
+          # si les contrôles obligatoires ne sont pas tous satisfaits.
+          gh pr merge "$PR_NUMBER" --repo "$REPOSITORY" --auto --squash

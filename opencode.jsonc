@@ -1,0 +1,134 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "plan",
+  "agents": {
+    "plan": {
+      "permissions": [
+        {
+          "action": "edit",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "*",
+          "effect": "ask"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "sunupilot-architect",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "sunupilot-implementer",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "sunupilot-code-reviewer",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "sunupilot-ohada-reviewer",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "sunupilot-pdf-reviewer",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "sunupilot-test-engineer",
+          "effect": "allow"
+        }
+      ]
+    },
+    "build": {
+      "permissions": [
+        {
+          "action": "edit",
+          "resource": "*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git merge*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git branch -D*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git branch -d*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git checkout main*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git switch main*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "gh pr merge*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "docker volume rm*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "docker volume prune*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "docker compose down -v*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "docker compose down --volumes*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "rm -rf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "rm -r*",
+          "effect": "deny"
+        }
+      ]
+    }
+  }
+}
