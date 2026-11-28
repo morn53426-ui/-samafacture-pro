@@ -71,6 +71,7 @@ on:
   push:
     branches:
       - feat/enterprise-workspace-ux-20261117
+      - fix/security-concurrent-case-creation-20261128
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'
@@ -83,6 +84,7 @@ on:
       - 'server/tests/accounting-expense-mappings.test.js'
       - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
+      - 'server/tests/security-alerts.test.js'
 
 permissions:
   contents: read

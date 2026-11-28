@@ -62,7 +62,7 @@ Les endpoints sont tenant-scoped et utilisent les permissions `security.read` et
 
 ## Stockage et exploitation
 
-La migration v26 ajoute `pro_security_alerts`, `pro_security_cases` et `pro_security_case_events`. Les clés uniques empêchent les alertes dupliquées par empreinte et l'ouverture de plusieurs dossiers pour la même alerte dans un tenant. Les tables d'historique ne possèdent pas de FK vers les utilisateurs ou entre elles, afin de ne pas effacer les preuves par cascade lors d'une suppression de compte.
+La migration v26 ajoute `pro_security_alerts`, `pro_security_cases` et `pro_security_case_events`. Les clés uniques empêchent les alertes dupliquées par empreinte et l'ouverture de plusieurs dossiers pour la même alerte dans un tenant. La création d'un dossier verrouille également la ligne de l'alerte dans la transaction ; deux requêtes concurrentes pour la même alerte sont sérialisées, l'une créant le dossier et l'autre recevant un conflit sans ajouter un second historique. Les tables d'historique ne possèdent pas de FK vers les utilisateurs ou entre elles, afin de ne pas effacer les preuves par cascade lors d'une suppression de compte.
 
 Le rollback v26 retire seulement les triggers de la table d'événements de dossier. Il conserve les tables, alertes, dossiers et historiques ; il n'est pas conçu comme une suppression de données.
 
