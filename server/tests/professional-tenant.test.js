@@ -141,8 +141,9 @@ before(async () => {
 
 test('un avoir est refusé pour un devis ou une facture annulée', async () => {
   const fixtures = [
-    { type: 'devis', statut: 'en_attente', label: 'DEVIS' },
-    { type: 'facture', statut: 'annulee', label: 'FACTURE-ANNULEE' }
+    { type: 'devis', statut: 'en_attente', label: 'DEVIS', eligible: false },
+    { type: 'facture', statut: 'annulee', label: 'FACTURE-ANNULEE', eligible: false },
+    { type: 'facture', statut: 'en_attente', label: 'FACTURE-ACTIVE', eligible: true }
   ];
 
   for (const fixture of fixtures) {
@@ -170,14 +171,25 @@ test('un avoir est refusé pour un devis ou une facture annulée', async () => {
         motif: 'Test de refus pour document non éligible'
       });
 
-    assert.equal(response.status, 409, response.text);
-    assert.equal(response.body.code, 'AVOIR_FACTURE_INELIGIBLE');
+    if (!fixture.eligible) {
+      assert.equal(response.status, 409, response.text);
+      assert.equal(response.body.code, 'AVOIR_FACTURE_INELIGIBLE');
+    } else {
+      assert.equal(response.status, 201, response.text);
+      assert.equal(response.body.statut, 'brouillon');
+    }
 
     const [[stored]] = await pool.query(
       'SELECT COUNT(*) AS total FROM pro_avoirs WHERE user_id = ? AND facture_id = ?',
       [ownerId, invoiceId]
     );
-    assert.equal(Number(stored.total), 0, 'aucun avoir ne doit être créé pour un document non éligible');
+    assert.equal(
+      Number(stored.total),
+      fixture.eligible ? 1 : 0,
+      fixture.eligible
+        ? 'un avoir doit rester autorisé sur une facture active'
+        : 'aucun avoir ne doit être créé pour un document non éligible'
+    );
   }
 });
 
