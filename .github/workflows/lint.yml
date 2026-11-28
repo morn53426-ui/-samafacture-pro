@@ -2,7 +2,7 @@ name: ESLint — JavaScript modifié
 
 on:
   pull_request:
-    branches: [main, 'feat/compliance-audit-ledger-lot1-20261126', 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape']
+    branches: [main, 'feat/compliance-audit-ledger-lot1-20261126', 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'feat/compliance-alerts-investigations-lot2-20261126', 'ci/enable-stacked-pr-checks-20261128']
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'
@@ -65,6 +65,8 @@ on:
       - 'server/tests/log-sanitizer.test.js'
       - 'server/tests/mobile-config.test.js'
       - 'mobile/scripts/check-capacitor-config.js'
+      - 'server/routes/security-alerts.js'
+      - 'server/tests/security-alerts.test.js'
       - '.github/workflows/lint.yml'
   push:
     branches:
