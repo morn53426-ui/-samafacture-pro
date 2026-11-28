@@ -363,6 +363,17 @@ test('dossier d’investigation : création idempotente, transitions et historiq
   assert.equal(alertAfterCreate.body.alerts[0].status, 'investigating');
   assert.equal(Number(alertAfterCreate.body.alerts[0].case_id), caseId);
 
+  const resetAlertWhileCaseActive = await request(app)
+    .put('/api/pro/security-alerts/' + alertId + '/status')
+    .set(auth(ownerAToken))
+    .send({ status: 'open' });
+  assert.equal(resetAlertWhileCaseActive.status, 409, resetAlertWhileCaseActive.text);
+  assert.match(resetAlertWhileCaseActive.body.error, /dossier d’investigation actif/i);
+  const alertStillInvestigating = await request(app)
+    .get('/api/pro/security-alerts')
+    .set(auth(ownerAToken));
+  assert.equal(alertStillInvestigating.body.alerts[0].status, 'investigating');
+
   const transition = await request(app)
     .put('/api/pro/security-cases/' + caseId + '/status')
     .set(auth(ownerAToken))
