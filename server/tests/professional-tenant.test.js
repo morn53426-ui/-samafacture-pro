@@ -140,56 +140,83 @@ before(async () => {
 });
 
 test('un avoir est refusé pour un devis ou une facture annulée', async () => {
-  const fixtures = [
-    { type: 'devis', statut: 'en_attente', label: 'DEVIS', eligible: false },
-    { type: 'facture', statut: 'annulee', label: 'FACTURE-ANNULEE', eligible: false },
-    { type: 'facture', statut: 'en_attente', label: 'FACTURE-ACTIVE', eligible: true }
-  ];
+  // Utiliser un client dédié évite de polluer les agrégats vérifiés par les autres
+  // tests du même fichier (notamment le total de factures du client principal).
+  const [createdClient] = await pool.query(
+    'INSERT INTO clients (user_id, nom) VALUES (?, ?)',
+    [ownerId, 'Client isolé test avoir']
+  );
+  const creditNoteClientId = createdClient.insertId;
+  const invoiceIds = [];
 
-  for (const fixture of fixtures) {
-    const [created] = await pool.query(
-      `INSERT INTO factures
-        (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison,
-         sous_total, total_tva, total, montant_paye)
-       VALUES (?, ?, ?, ?, CURDATE(), ?, 0, 0, 1000, 0, 1000, 0)`,
-      [
-        ownerId,
-        clientId,
-        'CREDIT-NOTE-' + fixture.label + '-' + Date.now(),
-        fixture.type,
-        fixture.statut
-      ]
-    );
-    const invoiceId = created.insertId;
+  try {
+    const fixtures = [
+      { type: 'devis', statut: 'en_attente', label: 'DEVIS', eligible: false },
+      { type: 'facture', statut: 'annulee', label: 'FACTURE-ANNULEE', eligible: false },
+      { type: 'facture', statut: 'en_attente', label: 'FACTURE-ACTIVE', eligible: true }
+    ];
 
-    const response = await request(app)
-      .post('/api/pro/credit-notes')
-      .set('Authorization', 'Bearer ' + ownerToken)
-      .send({
-        facture_id: invoiceId,
-        montant: 250,
-        motif: 'Test de refus pour document non éligible'
-      });
+    for (const fixture of fixtures) {
+      const [created] = await pool.query(
+        `INSERT INTO factures
+          (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison,
+           sous_total, total_tva, total, montant_paye)
+         VALUES (?, ?, ?, ?, CURDATE(), ?, 0, 0, 1000, 0, 1000, 0)`,
+        [
+          ownerId,
+          creditNoteClientId,
+          'CREDIT-NOTE-' + fixture.label + '-' + Date.now(),
+          fixture.type,
+          fixture.statut
+        ]
+      );
+      const invoiceId = created.insertId;
+      invoiceIds.push(invoiceId);
 
-    if (!fixture.eligible) {
-      assert.equal(response.status, 409, response.text);
-      assert.equal(response.body.code, 'AVOIR_FACTURE_INELIGIBLE');
-    } else {
-      assert.equal(response.status, 201, response.text);
-      assert.equal(response.body.statut, 'brouillon');
+      const response = await request(app)
+        .post('/api/pro/credit-notes')
+        .set('Authorization', 'Bearer ' + ownerToken)
+        .send({
+          facture_id: invoiceId,
+          montant: 250,
+          motif: 'Test de refus pour document non éligible'
+        });
+
+      if (!fixture.eligible) {
+        assert.equal(response.status, 409, response.text);
+        assert.equal(response.body.code, 'AVOIR_FACTURE_INELIGIBLE');
+      } else {
+        assert.equal(response.status, 201, response.text);
+        assert.equal(response.body.statut, 'brouillon');
+      }
+
+      const [[stored]] = await pool.query(
+        'SELECT COUNT(*) AS total FROM pro_avoirs WHERE user_id = ? AND facture_id = ?',
+        [ownerId, invoiceId]
+      );
+      assert.equal(
+        Number(stored.total),
+        fixture.eligible ? 1 : 0,
+        fixture.eligible
+          ? 'un avoir doit rester autorisé sur une facture active'
+          : 'aucun avoir ne doit être créé pour un document non éligible'
+      );
     }
-
-    const [[stored]] = await pool.query(
-      'SELECT COUNT(*) AS total FROM pro_avoirs WHERE user_id = ? AND facture_id = ?',
-      [ownerId, invoiceId]
-    );
-    assert.equal(
-      Number(stored.total),
-      fixture.eligible ? 1 : 0,
-      fixture.eligible
-        ? 'un avoir doit rester autorisé sur une facture active'
-        : 'aucun avoir ne doit être créé pour un document non éligible'
-    );
+  } finally {
+    // Supprimer d'abord les avoirs, puis leurs factures parentes : la FK
+    // fk_pro_avoirs_facture utilise ON DELETE RESTRICT.
+    if (invoiceIds.length) {
+      const placeholders = invoiceIds.map(() => '?').join(', ');
+      await pool.query(
+        `DELETE FROM pro_avoirs WHERE user_id = ? AND facture_id IN (${placeholders})`,
+        [ownerId, ...invoiceIds]
+      );
+      await pool.query(
+        `DELETE FROM factures WHERE user_id = ? AND id IN (${placeholders})`,
+        [ownerId, ...invoiceIds]
+      );
+    }
+    await pool.query('DELETE FROM clients WHERE id = ? AND user_id = ?', [creditNoteClientId, ownerId]);
   }
 });
 
