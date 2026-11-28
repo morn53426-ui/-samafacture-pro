@@ -80,11 +80,16 @@ async function reserveInvoiceCheckout(connection, {
     );
   }
 
+  // Les durées reflètent les expirations natives des prestataires :
+  // Wave : 30 minutes ; PayDunya : jusqu'à 24 heures pour une facture en attente.
+  // Garder le verrou local aligné sur le délai réellement payable évite de considérer
+  // trop tôt un ancien lien PayDunya comme expiré et d'en autoriser un second.
+  const checkoutTtlMinutes = provider === 'paydunya' ? 24 * 60 : 30;
   const [inserted] = await connection.query(
     `INSERT INTO pro_invoice_checkouts
       (user_id, facture_id, fournisseur, reference_interne, montant, devise, statut, expire_at)
-     VALUES (?, ?, ?, ?, ?, 'XOF', 'creation', DATE_ADD(NOW(), INTERVAL 30 MINUTE))`,
-    [userId, invoice.id, provider, reference, remaining]
+     VALUES (?, ?, ?, ?, ?, 'XOF', 'creation', DATE_ADD(NOW(), INTERVAL ? MINUTE))`,
+    [userId, invoice.id, provider, reference, remaining, checkoutTtlMinutes]
   );
 
   return {

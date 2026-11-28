@@ -30,14 +30,14 @@ async function createInvoice(label) {
   return Number(response.body.facture.id);
 }
 
-async function reserve(invoiceId, suffix) {
+async function reserve(invoiceId, suffix, provider = 'wave') {
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     const result = await reserveInvoiceCheckout(connection, {
       userId,
       invoiceId,
-      provider: 'wave',
+      provider,
       reference: (suffix + Date.now().toString(16)).padEnd(64, '0').slice(0, 64)
     });
     await connection.commit();
@@ -102,6 +102,27 @@ test('deux réservations concurrentes ne créent qu’un seul checkout actif', a
     [userId, invoiceId]
   );
   assert.equal(Number(count.total), 1);
+});
+
+test('la réservation respecte la durée de vie propre à Wave et PayDunya', async () => {
+  const waveInvoiceId = await createInvoice('Durée checkout Wave');
+  const paydunyaInvoiceId = await createInvoice('Durée checkout PayDunya');
+  const waveCheckout = await reserve(waveInvoiceId, 'wave-duration-', 'wave');
+  const paydunyaCheckout = await reserve(paydunyaInvoiceId, 'paydunya-duration-', 'paydunya');
+
+  const [[waveExpiry]] = await pool.query(
+    'SELECT TIMESTAMPDIFF(MINUTE, NOW(), expire_at) AS minutes_left FROM pro_invoice_checkouts WHERE id = ? AND user_id = ?',
+    [waveCheckout.checkoutId, userId]
+  );
+  const [[paydunyaExpiry]] = await pool.query(
+    'SELECT TIMESTAMPDIFF(MINUTE, NOW(), expire_at) AS minutes_left FROM pro_invoice_checkouts WHERE id = ? AND user_id = ?',
+    [paydunyaCheckout.checkoutId, userId]
+  );
+
+  assert.ok(Number(waveExpiry.minutes_left) >= 29 && Number(waveExpiry.minutes_left) <= 30,
+    'Wave expire sa session ouverte après 30 minutes');
+  assert.ok(Number(paydunyaExpiry.minutes_left) >= 1439 && Number(paydunyaExpiry.minutes_left) <= 1440,
+    'PayDunya peut laisser une facture en attente pendant 24 heures');
 });
 
 test('un checkout actif bloque le paiement manuel et l’annulation de la facture', async () => {
