@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+<title id="title">Sunupilot — présentation vidéo</title>
+<desc id="desc">Votre entreprise, mieux pilotée. Factures, devis, clients et rapports.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#11152f"/><stop offset=".56" stop-color="#202052"/><stop offset="1" stop-color="#0b3028"/></linearGradient>
+  <radialGradient id="glow"><stop stop-color="#0a7a45" stop-opacity=".48"/><stop offset="1" stop-color="#0a7a45" stop-opacity="0"/></radialGradient>
+  <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse"><path d="M42 0H0V42" fill="none" stroke="#fff" stroke-opacity=".07"/></pattern>
+</defs>
+<rect width="1280" height="720" fill="url(#bg)"/><rect width="1280" height="720" fill="url(#grid)"/><ellipse cx="1020" cy="285" rx="400" ry="360" fill="url(#glow)"/>
+<g transform="translate(80 54)"><image href="icon-192.png" width="82" height="82"/><text x="104" y="58" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="48" font-weight="750" letter-spacing="-1.6">Sunupilot</text></g>
+<g font-family="Inter,Arial,sans-serif">
+  <rect x="86" y="190" width="300" height="44" rx="22" fill="#0a7a45" fill-opacity=".22" stroke="#69ca97" stroke-opacity=".75"/>
+  <text x="110" y="219" fill="#a8e8c1" font-size="17" font-weight="750" letter-spacing="2">UNE GESTION PLUS SIMPLE</text>
+  <text x="86" y="340" fill="#fff" font-size="64" font-weight="750">Votre entreprise,</text>
+  <text x="86" y="416" fill="#fff" font-size="64" font-weight="750">mieux pilotée.</text>
+  <text x="89" y="484" fill="#d9e4e8" font-size="24">Factures, devis, clients et rapports dans un espace</text>
+  <text x="89" y="520" fill="#d9e4e8" font-size="24">clair pour mieux organiser votre activité.</text>
+  <rect x="88" y="578" width="420" height="60" rx="14" fill="#0a7a45"/>
+  <text x="298" y="617" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">Découvrez Sunupilot</text>
+</g>
+<rect x="1120" y="676" width="80" height="5" rx="2.5" fill="#35c889"/>
+</svg>
