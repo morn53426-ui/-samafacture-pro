@@ -3,7 +3,7 @@ name: Tests automatisés
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main, 'feat/compliance-audit-ledger-lot1-20261126', feat/enterprise-multi-company-foundation-20261116, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'feat/compliance-alerts-investigations-lot2-20261126', 'ci/enable-stacked-pr-checks-20261128', 'fix/security-alert-live-login-evidence-20261128', 'fix/security-case-closed-alert-guard-20261128']
+    branches: [main, 'feat/compliance-audit-ledger-lot1-20261126', feat/enterprise-multi-company-foundation-20261116, 'fix/invoice-pdf-continuation-identity-20261121', 'fix/accounting-invoice-cancellation-reversal-20261121', 'feat/accounting-expense-payment-mode-20261121', 'fix/audit-devise-relances-escape', 'feat/compliance-alerts-investigations-lot2-20261126', 'ci/enable-stacked-pr-checks-20261128', 'fix/security-alert-live-login-evidence-20261128', 'fix/security-case-closed-alert-guard-20261128', 'fix/security-concurrent-case-creation-20261128']
   push:
     branches: [main]
 
