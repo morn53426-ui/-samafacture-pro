@@ -1,0 +1,2 @@
+# Empreintes à ignorer (faux positifs confirmés), une par ligne.
+# Les mots de passe de fixtures dans server/tests/ sont des valeurs de test, pas des secrets.
