@@ -99,6 +99,43 @@ describe('Intégrité des règlements de facture', () => {
     assert.equal(reused.body.code, 'IDEMPOTENCY_KEY_REUTILISEE');
   });
 
+  test('deux paiements partiels concurrents avec des clés différentes ne dépassent jamais le solde', async () => {
+    const facture = await createDocument('facture', 1000);
+    const requestPayment = (suffix) => request(app)
+      .post(`/api/factures/${facture.id}/paiements`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Idempotency-Key', `concurrent-balance-${Date.now()}-${suffix}`)
+      .send({ montant: 600, methode: 'virement', reference: `RACE-${suffix}` });
+
+    const [first, second] = await Promise.all([
+      requestPayment('A'),
+      requestPayment('B')
+    ]);
+
+    assert.deepEqual(
+      [first.status, second.status].sort((a, b) => a - b),
+      [201, 400],
+      'une requête doit être validée et l’autre refusée après relecture du solde sous verrou'
+    );
+
+    const [[stored]] = await pool.query(
+      `SELECT
+         f.montant_paye,
+         f.statut,
+         (SELECT COUNT(*) FROM paiements p WHERE p.user_id = f.user_id AND p.facture_id = f.id) AS payment_count,
+         (SELECT COALESCE(SUM(p.montant), 0) FROM paiements p WHERE p.user_id = f.user_id AND p.facture_id = f.id) AS payments_total
+       FROM factures f
+       WHERE f.id = ? AND f.user_id = ?`,
+      [facture.id, userId]
+    );
+
+    assert.equal(Number(stored.payment_count), 1, 'un seul règlement concurrent doit être enregistré');
+    assert.equal(Number(stored.payments_total), 600);
+    assert.equal(Number(stored.montant_paye), 600);
+    assert.equal(stored.statut, 'en_attente');
+    assert.ok(Number(stored.montant_paye) <= Number(facture.total), 'le total encaissé ne doit jamais dépasser le TTC');
+  });
+
   test('les montants de paiement sont normalisés au centime avant le calcul du solde', async () => {
     const facture = await createDocument('facture', 10.01);
     const first = await request(app)
