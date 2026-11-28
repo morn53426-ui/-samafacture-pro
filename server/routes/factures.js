@@ -17,6 +17,7 @@ const { enqueuePdfJob, getPdfJob, getPdfPath } = require('../pdf-queue');
 const { queueWebhookEvent } = require('../utils/pro-webhooks');
 const { recordInvoiceAccountingTransition } = require('../services/accounting-invoice-lifecycle');
 const { optionalText, optionalIsoDate } = require('../utils/optional-fields');
+const { findActiveInvoiceCheckout } = require('../services/invoice-checkout-lifecycle');
 
 const router = express.Router();
 router.use(requireAuth, resolveTenant, requirePermission);
@@ -729,6 +730,17 @@ router.put('/:id/statut', async (req, res, next) => {
       return res.status(404).json({ error: 'Facture introuvable.' });
     }
 
+    if (statut === 'annulee' && existing.statut !== 'annulee') {
+      const activeCheckout = await findActiveInvoiceCheckout(conn, req.tenantId, existing.id);
+      if (activeCheckout) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: 'Une session de paiement en ligne est active pour cette facture. Attendez son expiration ou son traitement avant de l’annuler.',
+          code: 'CHECKOUT_DEJA_ACTIF'
+        });
+      }
+    }
+
     const { statut } = req.body;
     const valides = ['en_attente', 'payee', 'en_retard', 'annulee'];
     if (!valides.includes(statut)) {
@@ -1435,6 +1447,15 @@ router.post('/:id/paiements', async (req, res, next) => {
         await conn.rollback();
         return respondWithExistingPayment(paymentRows[0]);
       }
+    }
+
+    const activeCheckout = await findActiveInvoiceCheckout(conn, req.tenantId, facture.id);
+    if (activeCheckout) {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Une session de paiement en ligne est active pour cette facture. Attendez son expiration ou son traitement avant d’enregistrer un paiement manuel.',
+        code: 'CHECKOUT_DEJA_ACTIF'
+      });
     }
 
     if (facture.type !== 'facture' || facture.statut === 'annulee') {

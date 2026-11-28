@@ -31,6 +31,8 @@ on:
       - 'server/config/db.js'
       - 'server/email-outbox.js'
       - 'server/routes/professionnel.js'
+      - 'server/services/invoice-checkout-lifecycle.js'
+      - 'server/tests/invoice-checkout-concurrency.test.js'
       - 'server/tests/factures.test.js'
       - 'server/routes/clients.js'
       - 'server/tests/client-history-protection.test.js'
