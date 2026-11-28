@@ -326,6 +326,9 @@ router.post('/security-cases', async (req, res, next) => {
       if (existing.length) return { duplicate: true, caseId: Number(existing[0].id) };
 
       const alert = alerts[0];
+      if (['resolved', 'dismissed'].includes(alert.status)) {
+        return { closedAlert: true };
+      }
       const [insert] = await connection.query(
         `INSERT INTO pro_security_cases
           (tenant_scope_id, tenant_id, source_alert_id, title, severity, status, created_by_user_id)
@@ -357,6 +360,7 @@ router.post('/security-cases', async (req, res, next) => {
     });
     if (created.missing) return res.status(404).json({ error: 'Alerte introuvable pour ce tenant.' });
     if (created.duplicate) return res.status(409).json({ error: 'Un dossier existe déjà pour cette alerte.', case_id: created.caseId });
+    if (created.closedAlert) return res.status(409).json({ error: 'Impossible d’ouvrir un dossier sur une alerte résolue ou écartée. Un nouveau signal doit d’abord la rouvrir.' });
     return res.status(201).json({ id: created.caseId, status: 'open', alert_id: alertId });
   } catch (error) {
     return next(error);
