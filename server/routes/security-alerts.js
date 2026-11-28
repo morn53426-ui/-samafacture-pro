@@ -220,7 +220,7 @@ router.put('/security-alerts/:id/status', async (req, res, next) => {
       if (!ALERT_TRANSITIONS[previous]?.has(nextStatus)) {
         return { conflict: true, reason: 'invalid_transition' };
       }
-      if (nextStatus === 'dismissed' || nextStatus === 'resolved') {
+      if (nextStatus === 'open' || nextStatus === 'dismissed' || nextStatus === 'resolved') {
         const [activeCases] = await connection.query(
           `SELECT id FROM pro_security_cases
             WHERE tenant_scope_id = ? AND source_alert_id = ? AND status IN ('open', 'investigating')
@@ -248,7 +248,7 @@ router.put('/security-alerts/:id/status', async (req, res, next) => {
       return { status: nextStatus };
     });
     if (updated.missing) return res.status(404).json({ error: 'Alerte introuvable pour ce tenant.' });
-    if (updated.conflict && updated.reason === 'active_case') return res.status(409).json({ error: 'Clôturez d’abord le dossier d’investigation lié à cette alerte.' });
+    if (updated.conflict && updated.reason === 'active_case') return res.status(409).json({ error: 'Un dossier d’investigation actif est lié à cette alerte. Terminez ou réorientez le dossier avant de modifier ce statut.' });
     if (updated.conflict) return res.status(409).json({ error: 'Transition de statut impossible pour cette alerte.' });
     return res.json({ id, ...updated });
   } catch (error) {
