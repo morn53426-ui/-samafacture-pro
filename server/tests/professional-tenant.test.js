@@ -139,6 +139,48 @@ before(async () => {
   assert.ok(foreignPayment.insertId);
 });
 
+test('un avoir est refusé pour un devis ou une facture annulée', async () => {
+  const fixtures = [
+    { type: 'devis', statut: 'en_attente', label: 'DEVIS' },
+    { type: 'facture', statut: 'annulee', label: 'FACTURE-ANNULEE' }
+  ];
+
+  for (const fixture of fixtures) {
+    const [created] = await pool.query(
+      `INSERT INTO factures
+        (user_id, client_id, numero, type, date_emission, statut, remise, frais_livraison,
+         sous_total, total_tva, total, montant_paye)
+       VALUES (?, ?, ?, ?, CURDATE(), ?, 0, 0, 1000, 0, 1000, 0)`,
+      [
+        ownerId,
+        clientId,
+        'CREDIT-NOTE-' + fixture.label + '-' + Date.now(),
+        fixture.type,
+        fixture.statut
+      ]
+    );
+    const invoiceId = created.insertId;
+
+    const response = await request(app)
+      .post('/api/pro/credit-notes')
+      .set('Authorization', 'Bearer ' + ownerToken)
+      .send({
+        facture_id: invoiceId,
+        montant: 250,
+        motif: 'Test de refus pour document non éligible'
+      });
+
+    assert.equal(response.status, 409, response.text);
+    assert.equal(response.body.code, 'AVOIR_FACTURE_INELIGIBLE');
+
+    const [[stored]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM pro_avoirs WHERE user_id = ? AND facture_id = ?',
+      [ownerId, invoiceId]
+    );
+    assert.equal(Number(stored.total), 0, 'aucun avoir ne doit être créé pour un document non éligible');
+  }
+});
+
 test('les espaces entreprise isolent les clients, les factures et les permissions', async () => {
   // Un membre voit les données de son compte personnel uniquement sans sélection d'espace.
   const personalList = await request(app)

@@ -257,6 +257,13 @@ router.post('/credit-notes', async (req, res, next) => {
     const [invoiceRows] = await conn.query('SELECT * FROM factures WHERE id = ? AND user_id = ? FOR UPDATE', [invoiceId, uid]);
     const invoice = invoiceRows[0];
     if (!invoice) { await conn.rollback(); return res.status(404).json({ error: 'Facture introuvable.' }); }
+    if (invoice.type !== 'facture' || invoice.statut === 'annulee') {
+      await conn.rollback();
+      return res.status(409).json({
+        error: 'Un avoir ne peut être émis que sur une facture active. Un devis ou une facture annulée ne peut pas recevoir un avoir.',
+        code: 'AVOIR_FACTURE_INELIGIBLE'
+      });
+    }
     const [[sum]] = await conn.query("SELECT COALESCE(SUM(montant),0) AS total FROM pro_avoirs WHERE user_id = ? AND facture_id = ? AND statut != 'rejete'", [uid, invoiceId]);
     const available = Number(invoice.total) - Number(sum.total || 0);
     if (amount > available + 0.001) {
