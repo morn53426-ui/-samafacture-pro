@@ -341,6 +341,10 @@ test('un dossier ne peut pas être ouvert sur une alerte résolue ou écartée',
 });
 
 test('création concurrente de dossier : une seule investigation est ouverte par alerte', async () => {
+  // Tenant jetable dédié : ce test ne doit pas polluer les assertions d'isolation des autres tests.
+  const concurrentOwner = await createAccount('security-alert-concurrency');
+  const concurrentTenantId = concurrentOwner.id;
+  const concurrentToken = concurrentOwner.token;
   const fingerprint = '3'.repeat(64);
   const [insert] = await pool.query(
     `INSERT INTO pro_security_alerts
@@ -348,18 +352,18 @@ test('création concurrente de dossier : une seule investigation est ouverte par
        source_event_type, first_seen_at, last_seen_at, occurrence_count)
      VALUES (?, ?, 'auth.login.failed.threshold', ?, 'high', 'open', ?, ?, 'auth.login.failed',
              UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), 5)`,
-    [ownerB, ownerB, fingerprint, 'Alerte de concurrence', 'Test de concurrence sur la création de dossier']
+    [concurrentTenantId, concurrentTenantId, fingerprint, 'Alerte de concurrence', 'Test de concurrence sur la création de dossier']
   );
   const concurrentAlertId = Number(insert.insertId);
 
   const responses = await Promise.all([
     request(app)
       .post('/api/pro/security-cases')
-      .set(auth(ownerBToken))
+      .set(auth(concurrentToken))
       .send({ alert_id: concurrentAlertId }),
     request(app)
       .post('/api/pro/security-cases')
-      .set(auth(ownerBToken))
+      .set(auth(concurrentToken))
       .send({ alert_id: concurrentAlertId })
   ]);
   assert.deepEqual(responses.map(response => response.status).sort(), [201, 409]);
@@ -378,7 +382,7 @@ test('création concurrente de dossier : une seule investigation est ouverte par
        (SELECT COUNT(*) FROM pro_audit_events
          WHERE tenant_scope_id = ? AND event_type = 'security.case.created'
            AND entity_id = ?) AS signed_events_total`,
-    [ownerB, concurrentAlertId, ownerB, created.body.id, ownerB, String(created.body.id)]
+    [concurrentTenantId, concurrentAlertId, concurrentTenantId, created.body.id, concurrentTenantId, String(created.body.id)]
   );
   assert.equal(Number(counts.cases_total), 1, 'une seule ligne de dossier doit exister');
   assert.equal(Number(counts.events_total), 1, 'un seul événement de création doit exister');
@@ -386,7 +390,7 @@ test('création concurrente de dossier : une seule investigation est ouverte par
 
   const [[alert]] = await pool.query(
     'SELECT status FROM pro_security_alerts WHERE id = ? AND tenant_scope_id = ?',
-    [concurrentAlertId, ownerB]
+    [concurrentAlertId, concurrentTenantId]
   );
   assert.equal(alert.status, 'investigating');
 });
