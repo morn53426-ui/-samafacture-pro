@@ -296,6 +296,50 @@ test('API des alertes : permissions, cache et isolation stricte des tenants', as
   assert.equal(denied.status, 403, denied.text);
 });
 
+test('un dossier ne peut pas être ouvert sur une alerte résolue ou écartée', async () => {
+  for (const [index, status, resolutionCode] of [
+    [1, 'resolved', 'mitigated'],
+    [2, 'dismissed', 'false_positive']
+  ]) {
+    const fingerprint = String(index).repeat(64);
+    const [insert] = await pool.query(
+      `INSERT INTO pro_security_alerts
+        (tenant_scope_id, tenant_id, rule_code, fingerprint, severity, status, title, summary,
+         source_event_type, first_seen_at, last_seen_at, occurrence_count)
+       VALUES (?, ?, 'auth.login.failed.threshold', ?, 'high', 'open', ?, ?, 'auth.login.failed',
+               UTC_TIMESTAMP(6), UTC_TIMESTAMP(6), 5)`,
+      [ownerB, ownerB, fingerprint, 'Alerte de test ' + status, 'Alerte synthétique de test']
+    );
+    const closedAlertId = Number(insert.insertId);
+
+    const closed = await request(app)
+      .put('/api/pro/security-alerts/' + closedAlertId + '/status')
+      .set(auth(ownerBToken))
+      .send({ status, resolution_code: resolutionCode });
+    assert.equal(closed.status, 200, closed.text);
+    assert.equal(closed.body.status, status);
+
+    const attemptedCase = await request(app)
+      .post('/api/pro/security-cases')
+      .set(auth(ownerBToken))
+      .send({ alert_id: closedAlertId });
+    assert.equal(attemptedCase.status, 409, attemptedCase.text);
+    assert.match(attemptedCase.body.error, /alerte résolue ou écartée/i);
+
+    const [[storedAlert]] = await pool.query(
+      'SELECT status FROM pro_security_alerts WHERE id = ? AND tenant_scope_id = ?',
+      [closedAlertId, ownerB]
+    );
+    assert.equal(storedAlert.status, status, 'la création du dossier ne doit pas rouvrir implicitement l’alerte');
+
+    const [[caseCount]] = await pool.query(
+      'SELECT COUNT(*) AS total FROM pro_security_cases WHERE tenant_scope_id = ? AND source_alert_id = ?',
+      [ownerB, closedAlertId]
+    );
+    assert.equal(Number(caseCount.total), 0);
+  }
+});
+
 test('dossier d’investigation : création idempotente, transitions et historique immuable', async () => {
   const created = await request(app)
     .post('/api/pro/security-cases')
