@@ -3,6 +3,55 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { app, pool, setupTestDatabase, emailDeTest, nettoyerUtilisateur, teardownTestEnvironment } = require('./setup');
 
+function observeProductLockAttempts() {
+  const originalGetConnection = pool.getConnection;
+  const waiters = [];
+  let active = true;
+
+  pool.getConnection = async (...args) => {
+    const conn = await originalGetConnection.apply(pool, args);
+    const originalQuery = conn.query.bind(conn);
+    conn.query = (sql, ...queryArgs) => {
+      const isProductLock = typeof sql === 'string' &&
+        /\bFROM\s+produits\b[\s\S]*\bFOR\s+UPDATE\b/i.test(sql);
+      const result = originalQuery(sql, ...queryArgs);
+      if (active && isProductLock) {
+        const waiter = waiters.shift();
+        if (waiter) {
+          clearTimeout(waiter.timer);
+          waiter.resolve();
+        }
+      }
+      return result;
+    };
+    return conn;
+  };
+
+  return {
+    waitForNextProductLock(timeoutMs = 5000) {
+      return new Promise((resolve, reject) => {
+        const waiter = {
+          resolve,
+          timer: setTimeout(() => {
+            const index = waiters.indexOf(waiter);
+            if (index !== -1) waiters.splice(index, 1);
+            reject(new Error('La requête n’a pas tenté de verrouiller le produit dans le délai imparti.'));
+          }, timeoutMs)
+        };
+        waiters.push(waiter);
+      });
+    },
+    restore() {
+      active = false;
+      pool.getConnection = originalGetConnection;
+      for (const waiter of waiters.splice(0)) {
+        clearTimeout(waiter.timer);
+        waiter.reject(new Error('Observation des verrous interrompue avant le signal attendu.'));
+      }
+    }
+  };
+}
+
 // Le stock d'un produit doit se décompter automatiquement à la facturation (jamais pour un
 // devis), et se restituer symétriquement en cas d'annulation ou de suppression — fonctionnalité
 // absente à l'origine, ajoutée avec ces tests.
@@ -374,6 +423,194 @@ describe('Décompte et restitution automatique du stock', () => {
       assert.equal(await storedTotal(), 10);
     } finally {
       await nettoyerUtilisateur(foreignUserId);
+    }
+  });
+
+  test('la création de facture verrouille le produit avant sa ligne pour éviter la course avec sa suppression', async () => {
+    const product = await request(app).post('/api/produits')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Produit sans stock pour course de suppression', prix_ht: 1500, tva: 0, stock: 0 });
+    assert.equal(product.status, 201, product.text);
+    const productId = Number(product.body.produit.id);
+
+    const lock = await pool.getConnection();
+    let lockHeld = false;
+    let observer;
+    let deletePromise;
+    let invoicePromise;
+    try {
+      await lock.beginTransaction();
+      await lock.query('SELECT id FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, userId]);
+      lockHeld = true;
+      observer = observeProductLockAttempts();
+
+      const deleteAttempt = observer.waitForNextProductLock();
+      deletePromise = request(app).delete('/api/produits/' + productId)
+        .set('Authorization', `Bearer ${token}`)
+        .then(response => response);
+      await deleteAttempt;
+
+      const invoiceAttempt = observer.waitForNextProductLock();
+      invoicePromise = request(app).post('/api/factures')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          client_id: clientId,
+          type: 'facture',
+          lignes: [{ designation: 'Produit concurrent', produit_id: productId, quantite: 1, prix_unitaire: 1500, tva: 0 }]
+        })
+        .then(response => response);
+      await invoiceAttempt;
+
+      await lock.commit();
+      lockHeld = false;
+      const [deleted, invoice] = await Promise.all([deletePromise, invoicePromise]);
+      assert.equal(invoice.status, 201, invoice.text);
+      assert.ok([200, 409].includes(deleted.status), deleted.text);
+
+      const [[line]] = await pool.query(
+        'SELECT produit_id FROM facture_lignes WHERE facture_id = ? ORDER BY id LIMIT 1',
+        [invoice.body.facture.id]
+      );
+      if (deleted.status === 200) {
+        assert.equal(line.produit_id, null, 'si la suppression gagne le verrou, la facture reste une saisie libre');
+      } else {
+        assert.equal(Number(line.produit_id), productId, 'si la facture gagne le verrou, le produit reste lié et protégé');
+      }
+    } finally {
+      if (lockHeld) await lock.rollback().catch(() => {});
+      if (observer) observer.restore();
+      lock.release();
+      await Promise.allSettled([deletePromise, invoicePromise].filter(Boolean));
+    }
+  });
+
+  test('la réception fournisseur et la suppression d’un produit suivent le même ordre de verrous', async () => {
+    const supplier = await request(app).post('/api/pro/suppliers')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Fournisseur course de verrous' });
+    assert.equal(supplier.status, 201, supplier.text);
+    const order = await request(app).post('/api/pro/purchase-orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        fournisseur_id: supplier.body.id,
+        lignes: [{ designation: 'Article de réception', produit_id: produitId, quantite: 2, prix_unitaire: 400, tva: 0 }]
+      });
+    assert.equal(order.status, 201, order.text);
+    const [[orderLine]] = await pool.query(
+      'SELECT id FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? ORDER BY id LIMIT 1',
+      [order.body.id, userId]
+    );
+    assert.ok(orderLine);
+
+    const before = await stockActuel();
+    const lock = await pool.getConnection();
+    let lockHeld = false;
+    let observer;
+    let deletePromise;
+    let receivePromise;
+    try {
+      await lock.beginTransaction();
+      await lock.query('SELECT id FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [produitId, userId]);
+      lockHeld = true;
+      observer = observeProductLockAttempts();
+
+      const deleteAttempt = observer.waitForNextProductLock();
+      deletePromise = request(app).delete('/api/produits/' + produitId)
+        .set('Authorization', `Bearer ${token}`)
+        .then(response => response);
+      await deleteAttempt;
+
+      const receiveAttempt = observer.waitForNextProductLock();
+      receivePromise = request(app).post('/api/pro/purchase-orders/' + order.body.id + '/receive')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ operation_id: 'STOCKLOCKORDER20261128', entrepot_id: null, lignes: [{ ligne_id: orderLine.id, quantite: 2 }] })
+        .then(response => response);
+      await receiveAttempt;
+
+      await lock.commit();
+      lockHeld = false;
+      const [deleted, received] = await Promise.all([deletePromise, receivePromise]);
+      assert.equal(deleted.status, 409, deleted.text);
+      assert.equal(received.status, 201, received.text);
+      assert.equal(await stockActuel(), Number(before) + 2, 'la réception doit n’ajouter le stock qu’une seule fois');
+    } finally {
+      if (lockHeld) await lock.rollback().catch(() => {});
+      if (observer) observer.restore();
+      lock.release();
+      await Promise.allSettled([deletePromise, receivePromise].filter(Boolean));
+    }
+  });
+
+  test('l’association d’un produit à une ligne d’achat et sa suppression partagent le même ordre de verrous', async () => {
+    const supplier = await request(app).post('/api/pro/suppliers')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Fournisseur association et suppression' });
+    assert.equal(supplier.status, 201, supplier.text);
+    const order = await request(app).post('/api/pro/purchase-orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        fournisseur_id: supplier.body.id,
+        lignes: [{ designation: 'Ligne à associer', quantite: 1, prix_unitaire: 250, tva: 0 }]
+      });
+    assert.equal(order.status, 201, order.text);
+    const [[orderLine]] = await pool.query(
+      'SELECT id, produit_id FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? ORDER BY id LIMIT 1',
+      [order.body.id, userId]
+    );
+    assert.equal(orderLine.produit_id, null);
+
+    const product = await request(app).post('/api/produits')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Produit pour association concurrente', prix_ht: 250, tva: 0, stock: 0 });
+    assert.equal(product.status, 201, product.text);
+    const productId = Number(product.body.produit.id);
+
+    const lock = await pool.getConnection();
+    let lockHeld = false;
+    let observer;
+    let deletePromise;
+    let linkPromise;
+    try {
+      await lock.beginTransaction();
+      await lock.query('SELECT id FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, userId]);
+      lockHeld = true;
+      observer = observeProductLockAttempts();
+
+      const deleteAttempt = observer.waitForNextProductLock();
+      deletePromise = request(app).delete('/api/produits/' + productId)
+        .set('Authorization', `Bearer ${token}`)
+        .then(response => response);
+      await deleteAttempt;
+
+      const linkAttempt = observer.waitForNextProductLock();
+      linkPromise = request(app).put('/api/pro/purchase-orders/' + order.body.id + '/lines/' + orderLine.id + '/product')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ produit_id: productId })
+        .then(response => response);
+      await linkAttempt;
+
+      await lock.commit();
+      lockHeld = false;
+      const [deleted, linked] = await Promise.all([deletePromise, linkPromise]);
+      assert.ok([200, 409].includes(deleted.status), deleted.text);
+      assert.ok([200, 400].includes(linked.status), linked.text);
+
+      const [[storedLine]] = await pool.query(
+        'SELECT produit_id FROM pro_commandes_fournisseurs_lignes WHERE id = ? AND user_id = ?',
+        [orderLine.id, userId]
+      );
+      if (deleted.status === 200) {
+        assert.equal(linked.status, 400, 'si la suppression gagne, l’association doit refuser le produit disparu');
+        assert.equal(storedLine.produit_id, null);
+      } else {
+        assert.equal(linked.status, 200, 'si l’association gagne, la suppression doit protéger le produit lié');
+        assert.equal(Number(storedLine.produit_id), productId);
+      }
+    } finally {
+      if (lockHeld) await lock.rollback().catch(() => {});
+      if (observer) observer.restore();
+      lock.release();
+      await Promise.allSettled([deletePromise, linkPromise].filter(Boolean));
     }
   });
 });

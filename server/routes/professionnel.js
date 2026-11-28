@@ -2891,6 +2891,21 @@ router.put('/purchase-orders/:id/lines/:lineId/product', async (req, res, next) 
     }
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    // Ordre partagé avec DELETE /produits : produit, commande, puis ligne.
+    // Le verrou produit précède la lecture verrouillée de la ligne liée pour éviter
+    // qu'une suppression ne détienne le produit en attendant cette même ligne.
+    const [products] = await conn.query(
+      'SELECT id, type_catalogue FROM produits WHERE id = ? AND user_id = ? FOR UPDATE',
+      [productId, uid]
+    );
+    if (!products.length) {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Le produit sélectionné n’appartient pas à cette entreprise.' });
+    }
+    if (products[0].type_catalogue === 'service') {
+      await conn.rollback();
+      return res.status(400).json({ error: 'Un service ne peut pas être associé à une réception de stock physique.' });
+    }
     const [orders] = await conn.query(
       'SELECT id, statut FROM pro_commandes_fournisseurs WHERE id = ? AND user_id = ? FOR UPDATE',
       [orderId, uid]
@@ -2916,18 +2931,6 @@ router.put('/purchase-orders/:id/lines/:lineId/product', async (req, res, next) 
     if (Number(line.quantite_recue) > 0) {
       await conn.rollback();
       return res.status(409).json({ error: 'Le produit d’une ligne déjà réceptionnée ne peut plus être modifié.' });
-    }
-    const [products] = await conn.query(
-      'SELECT id, type_catalogue FROM produits WHERE id = ? AND user_id = ? FOR UPDATE',
-      [productId, uid]
-    );
-    if (!products.length) {
-      await conn.rollback();
-      return res.status(400).json({ error: 'Le produit sélectionné n’appartient pas à cette entreprise.' });
-    }
-    if (products[0].type_catalogue === 'service') {
-      await conn.rollback();
-      return res.status(400).json({ error: 'Un service ne peut pas être associé à une réception de stock physique.' });
     }
     await conn.query(
       'UPDATE pro_commandes_fournisseurs_lignes SET produit_id = ? WHERE id = ? AND commande_id = ? AND user_id = ?',
@@ -2962,8 +2965,36 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
       return res.status(400).json({ error: 'Identifiant d’opération de réception invalide.' });
     }
     const reference = operationId ? 'REC-' + operationId : randomRef('REC');
+
+    // Prélecture non verrouillante pour connaître les produits des lignes demandées.
+    // Les verrous exclusifs sont pris ensuite dans l'ordre croissant des produits,
+    // avant la commande et les lignes, comme pour la suppression du catalogue.
+    const requestedLineIds = normalizedLines.map(line => line.ligne_id).sort((a, b) => a - b);
+    const [preflightLines] = await pool.query(
+      `SELECT id, produit_id FROM pro_commandes_fournisseurs_lignes
+        WHERE commande_id = ? AND user_id = ?
+          AND id IN (${requestedLineIds.map(() => '?').join(',')})
+        ORDER BY id`,
+      [req.params.id, uid, ...requestedLineIds]
+    );
+    const preflightProductIds = [...new Set(preflightLines
+      .map(line => Number(line.produit_id))
+      .filter(id => Number.isSafeInteger(id) && id > 0)
+    )].sort((a, b) => a - b);
+
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    const lockedProductsById = new Map();
+    if (preflightProductIds.length) {
+      const [lockedProducts] = await conn.query(
+        `SELECT id, type_catalogue FROM produits
+          WHERE user_id = ? AND id IN (${preflightProductIds.map(() => '?').join(',')})
+          ORDER BY id FOR UPDATE`,
+        [uid, ...preflightProductIds]
+      );
+      for (const product of lockedProducts) lockedProductsById.set(Number(product.id), product);
+    }
+
     const [orderRows] = await conn.query('SELECT * FROM pro_commandes_fournisseurs WHERE id = ? AND user_id = ? FOR UPDATE', [req.params.id, uid]);
     const order = orderRows[0];
     if (!order) { await conn.rollback(); return res.status(404).json({ error: 'Commande fournisseur introuvable.' }); }
@@ -3000,21 +3031,30 @@ router.post('/purchase-orders/:id/receive', async (req, res, next) => {
     }
     const [warehouseRows] = await conn.query('SELECT id, nom FROM pro_entrepots WHERE id = ? AND user_id = ? AND actif = 1', [warehouseId, uid]);
     if (!warehouseRows.length) { await conn.rollback(); return res.status(400).json({ error: 'Entrepôt invalide.' }); }
-    const [receipt] = await conn.query(
-      'INSERT INTO pro_receptions_achats (user_id, commande_id, entrepot_id, reference, date_reception, acteur_user_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [uid, order.id, warehouseId, reference, await safeDateForUser(req.body.date_reception, uid), actor(req)]
-    );
-    const [orderLines] = await conn.query('SELECT * FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? FOR UPDATE', [order.id, uid]);
+    const [orderLines] = await conn.query('SELECT * FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? ORDER BY id FOR UPDATE', [order.id, uid]);
+    const linesById = new Map(orderLines.map(line => [Number(line.id), line]));
+    const itemsToReceive = [];
     for (const received of normalizedLines) {
-      const line = orderLines.find(item => Number(item.id) === received.ligne_id);
+      const line = linesById.get(received.ligne_id);
       const qty = received.quantite;
       if (!line || !Number.isFinite(qty) || qty <= 0 || qty > Number(line.quantite) - Number(line.quantite_recue) + 0.0001) {
         throw new Error('Quantité reçue invalide ou supérieure au reliquat de commande.');
       }
       if (!line.produit_id) throw new Error('La ligne "' + line.designation + '" doit être associée à un produit du catalogue avant de mettre à jour le stock.');
-      const [productRows] = await conn.query('SELECT id, type_catalogue FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [line.produit_id, uid]);
-      if (!productRows.length) throw new Error('Produit supprimé ou non autorisé.');
-      if (productRows[0].type_catalogue === 'service') throw new Error('Un service ne peut pas être réceptionné dans le stock physique.');
+      const product = lockedProductsById.get(Number(line.produit_id));
+      if (!product) {
+        await conn.rollback();
+        return res.status(409).json({ error: 'L’association produit de cette commande a changé pendant la réception. Rechargez la commande et réessayez.' });
+      }
+      if (product.type_catalogue === 'service') throw new Error('Un service ne peut pas être réceptionné dans le stock physique.');
+      itemsToReceive.push({ line, qty });
+    }
+
+    const [receipt] = await conn.query(
+      'INSERT INTO pro_receptions_achats (user_id, commande_id, entrepot_id, reference, date_reception, acteur_user_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [uid, order.id, warehouseId, reference, await safeDateForUser(req.body.date_reception, uid), actor(req)]
+    );
+    for (const { line, qty } of itemsToReceive) {
       await conn.query(
         'INSERT INTO pro_stocks_entrepots (user_id, entrepot_id, produit_id, quantite) VALUES (?, ?, ?, 0) ON DUPLICATE KEY UPDATE id = id',
         [uid, warehouseId, line.produit_id]

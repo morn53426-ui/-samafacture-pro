@@ -67,12 +67,14 @@ on:
       - 'mobile/scripts/check-capacitor-config.js'
       - 'server/routes/security-alerts.js'
       - 'server/tests/security-alerts.test.js'
+      - 'server/tests/stock.test.js'
       - '.github/workflows/lint.yml'
   push:
     branches:
       - feat/enterprise-workspace-ux-20261117
       - fix/security-concurrent-case-creation-20261128
       - fix/security-test-tenant-isolation-20261128
+      - fix/invoice-stock-lock-order-20261128
     paths:
       - 'eslint.config.mjs'
       - 'public/js/sidebar.js'
@@ -86,6 +88,10 @@ on:
       - 'server/tests/workspace-modal-accessibility.test.js'
       - '.github/workflows/lint.yml'
       - 'server/tests/security-alerts.test.js'
+      - 'server/routes/factures.js'
+      - 'server/routes/professionnel.js'
+      - 'server/routes/produits.js'
+      - 'server/tests/stock.test.js'
 
 permissions:
   contents: read

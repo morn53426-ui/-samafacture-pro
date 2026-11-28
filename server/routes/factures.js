@@ -642,6 +642,33 @@ router.post('/', async (req, res, next) => {
       }
       invoiceWarehouseId = Number(warehouse.id);
     }
+
+    // Ordre global des verrous : produits avant l'insertion des lignes de document.
+    // La suppression d'un produit verrouille d'abord la fiche produit puis vérifie
+    // facture_lignes. Sans ce verrou anticipé, l'INSERT de facture_lignes (FK produit)
+    // pouvait détenir un verrou partagé pendant que la suppression détenait le produit,
+    // créant un cycle d'attente au moment du décompte de stock.
+    const linkedProductIds = [...new Set(computedLignes
+      .map(line => Number(line.produit_id))
+      .filter(id => Number.isSafeInteger(id) && id > 0)
+    )].sort((a, b) => a - b);
+    if (linkedProductIds.length) {
+      const [lockedProducts] = await conn.query(
+        `SELECT id FROM produits
+          WHERE user_id = ? AND id IN (${linkedProductIds.map(() => '?').join(',')})
+          ORDER BY id FOR UPDATE`,
+        [req.tenantId, ...linkedProductIds]
+      );
+      const lockedProductIds = new Set(lockedProducts.map(row => Number(row.id)));
+      // Si le produit a été supprimé entre la validation optimiste et la transaction,
+      // la ligne reste une saisie libre plutôt que de provoquer une FK ou une vente orpheline.
+      for (const line of computedLignes) {
+        if (line.produit_id && !lockedProductIds.has(Number(line.produit_id))) {
+          line.produit_id = null;
+        }
+      }
+    }
+
     const numero = await nextNumero(conn, req.tenantId, docType, Number(companyLocalDate.slice(0, 4)));
     const [result] = await conn.query(
       `INSERT INTO factures (user_id, client_id, entrepot_id, numero, type, date_emission, date_echeance, date_validite, objet, reference_externe, conditions_reglement, devise, statut, remise, frais_livraison, mode_paiement, commentaires, sous_total, total_tva, total, verification_code, idempotency_key)
