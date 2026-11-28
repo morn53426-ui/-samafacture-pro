@@ -540,7 +540,80 @@ describe('Décompte et restitution automatique du stock', () => {
       await Promise.allSettled([deletePromise, receivePromise].filter(Boolean));
     }
   });
+
+  test('l’association d’un produit à une ligne d’achat et sa suppression partagent le même ordre de verrous', async () => {
+    const supplier = await request(app).post('/api/pro/suppliers')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Fournisseur association et suppression' });
+    assert.equal(supplier.status, 201, supplier.text);
+    const order = await request(app).post('/api/pro/purchase-orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        fournisseur_id: supplier.body.id,
+        lignes: [{ designation: 'Ligne à associer', quantite: 1, prix_unitaire: 250, tva: 0 }]
+      });
+    assert.equal(order.status, 201, order.text);
+    const [[orderLine]] = await pool.query(
+      'SELECT id, produit_id FROM pro_commandes_fournisseurs_lignes WHERE commande_id = ? AND user_id = ? ORDER BY id LIMIT 1',
+      [order.body.id, userId]
+    );
+    assert.equal(orderLine.produit_id, null);
+
+    const product = await request(app).post('/api/produits')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Produit pour association concurrente', prix_ht: 250, tva: 0, stock: 0 });
+    assert.equal(product.status, 201, product.text);
+    const productId = Number(product.body.produit.id);
+
+    const lock = await pool.getConnection();
+    let lockHeld = false;
+    let observer;
+    let deletePromise;
+    let linkPromise;
+    try {
+      await lock.beginTransaction();
+      await lock.query('SELECT id FROM produits WHERE id = ? AND user_id = ? FOR UPDATE', [productId, userId]);
+      lockHeld = true;
+      observer = observeProductLockAttempts();
+
+      const deleteAttempt = observer.waitForNextProductLock();
+      deletePromise = request(app).delete('/api/produits/' + productId)
+        .set('Authorization', `Bearer ${token}`)
+        .then(response => response);
+      await deleteAttempt;
+
+      const linkAttempt = observer.waitForNextProductLock();
+      linkPromise = request(app).put('/api/pro/purchase-orders/' + order.body.id + '/lines/' + orderLine.id + '/product')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ produit_id: productId })
+        .then(response => response);
+      await linkAttempt;
+
+      await lock.commit();
+      lockHeld = false;
+      const [deleted, linked] = await Promise.all([deletePromise, linkPromise]);
+      assert.ok([200, 409].includes(deleted.status), deleted.text);
+      assert.ok([200, 400].includes(linked.status), linked.text);
+
+      const [[storedLine]] = await pool.query(
+        'SELECT produit_id FROM pro_commandes_fournisseurs_lignes WHERE id = ? AND user_id = ?',
+        [orderLine.id, userId]
+      );
+      if (deleted.status === 200) {
+        assert.equal(linked.status, 400, 'si la suppression gagne, l’association doit refuser le produit disparu');
+        assert.equal(storedLine.produit_id, null);
+      } else {
+        assert.equal(linked.status, 200, 'si l’association gagne, la suppression doit protéger le produit lié');
+        assert.equal(Number(storedLine.produit_id), productId);
+      }
+    } finally {
+      if (lockHeld) await lock.rollback().catch(() => {});
+      if (observer) observer.restore();
+      lock.release();
+      await Promise.allSettled([deletePromise, linkPromise].filter(Boolean));
+    }
+  });
 });
- 
+
 // Fermeture des ressources après les hooks de nettoyage métier de ce fichier.
 after(teardownTestEnvironment);
